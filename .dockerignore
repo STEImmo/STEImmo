@@ -1,9 +1,9 @@
+.git
+.github
 .env
-.DS_Store
-.venv/
+docker/.env
+.venv
 __pycache__/
 *.py[cod]
-.pytest_cache/
-.ruff_cache/
 media/
 staticfiles/

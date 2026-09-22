@@ -30,7 +30,7 @@ Wir verwenden folgenden Stack:
 | Sprache | Python 3.13 |
 | Backend | Django 5.2 LTS |
 | Architektur | Ein Django-Monolith |
-| UI | UIkit 3 mit projektweiter Komponentenpalette |
+| UI | UIkit 3.25.24 mit projektweiter Komponentenpalette |
 | Rendering | Serverseitige Django Templates |
 | JavaScript | UIkit JavaScript, ergänzend minimales Vanilla JavaScript |
 | Datenbank | PostgreSQL 18.6 |
@@ -41,7 +41,7 @@ Wir verwenden folgenden Stack:
 | Tests | Django Test Framework mit pragmatischem TDD |
 | Codequalität | Ruff |
 | Versionsverwaltung | GitHub |
-| CI | Geplant: ein schlanker GitHub-Actions-Workflow |
+| CI | Schlanker GitHub-Actions-Workflow |
 
 ## Entwicklungsregeln
 

@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SECRET_KEY: ci-only-secret
+      DJANGO_DEBUG: "0"
+      DJANGO_ALLOWED_HOSTS: localhost
+      POSTGRES_DB: steimmo
+      POSTGRES_USER: steimmo
+      POSTGRES_PASSWORD: steimmo-ci-password
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      TZ: Europe/Berlin
+
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_DB: steimmo
+          POSTGRES_USER: steimmo
+          POSTGRES_PASSWORD: steimmo-ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U steimmo -d steimmo"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Abhängigkeiten installieren
+        run: python -m pip install --upgrade pip && python -m pip install ".[dev]"
+
+      - name: Django-Systemcheck
+        run: python manage.py check
+
+      - name: Migrationen prüfen
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Django-Tests
+        run: python manage.py test
+
+      - name: Ruff prüfen
+        run: ruff check .
+
+      - name: Ruff-Format prüfen
+        run: ruff format --check .

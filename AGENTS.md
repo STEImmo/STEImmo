@@ -32,7 +32,7 @@ Ein mögliches Property-Modell repräsentiert die eine Immobilie. Es darf nicht 
 - Python 3.13
 - Django 5.2 LTS
 - Django Templates und serverseitiges HTML
-- UIkit 3 als einziges UI-Framework
+- UIkit 3.25.24 als einziges UI-Framework
 - UIkit JavaScript
 - minimales Vanilla JavaScript nur bei echtem Bedarf
 - PostgreSQL 18.6
@@ -42,7 +42,7 @@ Ein mögliches Property-Modell repräsentiert die eine Immobilie. Es darf nicht 
 - Ruff
 - Django Test Framework
 - GitHub
-- ein schlanker GitHub-Actions-CI-Workflow, sobald CI eingerichtet ist
+- ein schlanker GitHub-Actions-CI-Workflow
 
 Nicht ohne neue Entscheidung einführen:
 
@@ -87,6 +87,7 @@ Regeln:
 - keine individuelle Komponentenpalette pro Seite
 - keine neue JavaScript-Abhängigkeit, wenn UIkit oder Vanilla JavaScript ausreicht
 - UIkit-Assets lokal versionieren; kein CDN als Laufzeitabhängigkeit
+- UIkit bleibt auf Version 3.25.24; Updates benötigen eine dokumentierte Entscheidung.
 
 ## Entwicklungsprinzipien
 
