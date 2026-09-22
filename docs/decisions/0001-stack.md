@@ -6,7 +6,9 @@
 
 ## Kontext
 
-Das Projekt ist eine kleine Webanwendung für eine Immobiliengesellschaft. Immobilien sollen veröffentlicht und verwaltet werden. Studierende sollen suchen, filtern, Immobilien ansehen und Anfragen stellen können. Bewertungen, Termine und Dokumentenupload gehören zum vorgesehenen MVP-Umfeld.
+Das Projekt ist eine kleine Webanwendung für eine Immobiliengesellschaft. Verwaltet wird eine einzelne Immobilie mit 25 Einheiten.
+
+Studierende sollen Einheiten suchen, filtern, ansehen, Anfragen stellen und sich bewerben können. Dokumentenupload und Datepicker für Datumsangaben gehören zum MVP. Bewertungen und die Verwaltung weiterer Immobilien sind nicht Bestandteil des MVP.
 
 Das Team besteht aus vier Entwicklern und einer Person mit Schwerpunkt Projektmanagement. Die Entwicklungszeit beträgt ungefähr acht Wochen. Die Anwendung soll auf dem Uni-Server laufen und später ohne grundlegenden Plattformumbau auf VORNIS-Kundenhardware portierbar sein.
 
@@ -17,6 +19,7 @@ Die wichtigsten Kriterien sind:
 - fertige, begrenzende UI-Komponenten
 - lokales Entwickeln und einfaches Hosting
 - gute Wartbarkeit und Portierbarkeit
+- nachvollziehbare Tests und Issue-Dokumentation
 
 ## Entscheidung
 
@@ -27,15 +30,31 @@ Wir verwenden folgenden Stack:
 | Sprache | Python 3.13 |
 | Backend | Django 5.2 LTS |
 | Architektur | Ein Django-Monolith |
-| UI | UIkit mit projektweiter Komponenten-Whitelist |
+| UI | UIkit 3 mit projektweiter Komponentenpalette |
 | Rendering | Serverseitige Django Templates |
-| JavaScript | UIkit JavaScript, ergänzend Vanilla JavaScript |
+| JavaScript | UIkit JavaScript, ergänzend minimales Vanilla JavaScript |
 | Datenbank | PostgreSQL 17 |
+| Datenbanktreiber | psycopg 3 |
+| Dateien | Django Media-Storage mit persistentem Volume |
 | Betrieb | Docker Compose |
-| Produktionsserver | Gunicorn |
-| Tests | Django Test Framework |
+| Produktionsserver | Gunicorn hinter dem Uni-Reverse-Proxy |
+| Tests | Django Test Framework mit pragmatischem TDD |
 | Codequalität | Ruff |
 | Versionsverwaltung | GitHub |
+| CI | Geplant: ein schlanker GitHub-Actions-Workflow |
+
+## Entwicklungsregeln
+
+Die Entwicklung folgt diesen MAO-Prinzipien:
+
+- KISS: einfache Lösungen bevorzugen
+- YAGNI: keine Funktionen für hypothetische Anforderungen
+- pragmatisches DRY: keine vorzeitigen Abstraktionen
+- Vertical Slices: Funktionen vollständig durch alle betroffenen Schichten umsetzen
+- TDD: Test, minimale Implementierung, Refactoring
+- GitHub Issues als verbindliche Aufgaben- und Fortschrittsquelle
+
+TDD gilt insbesondere für Such- und Filterlogik, Formulare, Berechtigungen, Statuswechsel, Uploads, Anfragen und Bewerbungen. Für reine CSS- und Template-Gestaltung werden keine künstlichen Tests erstellt.
 
 ## Begründung
 
@@ -51,7 +70,9 @@ Eine separate React- oder Vue-Anwendung würde eine zusätzliche Toolchain, API-
 
 ### UIkit statt freier UI-Entwicklung
 
-UIkit bietet fertige Layout-, Formular-, Navigations-, Modal-, Upload- und Feedback-Komponenten. Die Whitelist begrenzt gestalterische Freiheiten und beschleunigt die gemeinsame UI-Entscheidung.
+UIkit bietet fertige Layout-, Formular-, Navigations-, Modal-, Upload- und Feedback-Komponenten. Die verbindliche Komponentenpalette begrenzt gestalterische Freiheiten und beschleunigt die gemeinsame UI-Entscheidung.
+
+Der Datepicker wird als natives Datumsfeld umgesetzt. Ein Kalender-Framework wird nicht eingeführt.
 
 ### PostgreSQL statt SQLite
 
@@ -74,6 +95,7 @@ Positiv:
 - konsistentes UI
 - reproduzierbare lokale und serverseitige Umgebung
 - portierbare Anwendung ohne Cloud-Zwang
+- nachvollziehbarer Entwicklungs- und Testprozess
 
 Negativ:
 
@@ -84,16 +106,16 @@ Negativ:
 
 ## Nicht Bestandteil dieser Entscheidung
 
-Die folgenden Punkte werden erst mit den konkreten MVP-Anforderungen festgelegt:
+Folgende Punkte werden innerhalb des festgelegten Rahmens konkretisiert:
 
 - genaue Django-App-Struktur innerhalb des Monolithen
 - fachliches Datenmodell
 - Rollen- und Berechtigungsmatrix
-- konkrete Upload- und Kalenderprozesse
-- Reverse Proxy, TLS und Domain des Uni-Servers
-- CI/CD-Workflow
+- konkrete Upload-Limits und Backup-Details
+- genaue Reverse-Proxy-, TLS- und Domain-Konfiguration
+- konkrete GitHub-Actions-Konfiguration
 
-Diese Punkte dürfen den festgelegten Stack nicht ohne neues ADR erweitern oder aufspalten.
+Diese Konkretisierungen dürfen den festgelegten Stack nicht ohne neues ADR erweitern oder aufspalten.
 
 ## Neubewertung
 
@@ -103,3 +125,4 @@ Der Stack wird nur neu bewertet, wenn sich mindestens eine zentrale Randbedingun
 - deutlich größerer Funktionsumfang
 - verbindliche Integration in bestehende Java-Infrastruktur
 - Anforderungen an Echtzeit, Offlinebetrieb oder extreme Skalierung
+- grundlegende Änderung des MVP-Umfangs
