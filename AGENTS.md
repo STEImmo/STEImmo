@@ -35,7 +35,7 @@ Ein mögliches Property-Modell repräsentiert die eine Immobilie. Es darf nicht 
 - UIkit 3 als einziges UI-Framework
 - UIkit JavaScript
 - minimales Vanilla JavaScript nur bei echtem Bedarf
-- PostgreSQL 17
+- PostgreSQL 18.6
 - psycopg 3
 - Docker Compose
 - Gunicorn für Produktion
