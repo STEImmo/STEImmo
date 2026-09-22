@@ -57,7 +57,7 @@ Bewertungen und die Verwaltung weiterer Immobilien gehören in eine spätere Roa
 | Rendering | Serverseitige Django Templates und HTML |
 | UI | UIkit 3 mit verbindlicher Komponentenpalette |
 | JavaScript | UIkit JavaScript und minimales Vanilla JavaScript |
-| Datenbank | PostgreSQL 17 |
+| Datenbank | PostgreSQL 18.6 |
 | Datenbanktreiber | psycopg 3 |
 | Dateien | Django Media-Storage mit persistentem Volume |
 | Lokale Entwicklung | Docker Compose |
