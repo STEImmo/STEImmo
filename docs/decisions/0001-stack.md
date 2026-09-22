@@ -33,7 +33,7 @@ Wir verwenden folgenden Stack:
 | UI | UIkit 3 mit projektweiter Komponentenpalette |
 | Rendering | Serverseitige Django Templates |
 | JavaScript | UIkit JavaScript, ergänzend minimales Vanilla JavaScript |
-| Datenbank | PostgreSQL 17 |
+| Datenbank | PostgreSQL 18.6 |
 | Datenbanktreiber | psycopg 3 |
 | Dateien | Django Media-Storage mit persistentem Volume |
 | Betrieb | Docker Compose |
