@@ -107,4 +107,4 @@ Die verbindlichen Start- und Testbefehle werden ergänzt, sobald die Docker- und
 
 ## Portierbarkeit
 
-Die Anwendung bleibt durch Docker Compose, PostgreSQL, Umgebungsvariablen und persistente Volumes auf andere Server portierbar. VORNIS-spezifische Abhängigkeiten werden nicht in den Uni-MVP eingebaut.
+Die Anwendung bleibt durch Docker Compose, PostgreSQL, Umgebungsvariablen und persistente Volumes auf andere Server portierbar. 
