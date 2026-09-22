@@ -2,65 +2,109 @@
 
 STE Immobilien eGbR
 
-## Projekt
+## Projektziel
 
-STEImmo ist eine kleine Webanwendung für die Immobilienverwaltung und -suche.
+STEImmo ist eine serverseitig gerenderte Webanwendung für die Verwaltung und Vermarktung einer Immobilie mit 25 Wohneinheiten.
 
-- Immobiliengesellschaft: Immobilien anlegen, verwalten und veröffentlichen
-- Studierende: Immobilien suchen, filtern, ansehen und Anfragen stellen
-- Erweiterungen im MVP-Umfeld: Bewertungen, Termine/Kalender und Dokumentenupload
+Studierende können verfügbare Einheiten suchen, filtern, ansehen und sich darauf bewerben. Die Immobiliengesellschaft verwaltet die Einheiten sowie eingehende Anfragen und Bewerbungen.
 
-Das System bleibt ein einzelner Monolith. Es gibt keine separate Frontend-Anwendung und keine Microservices.
+## Projektstatus
 
-## Finaler Stack
+Der technische Stack und die Entwicklungsregeln sind festgelegt. Die Implementierung des MVP befindet sich noch in der Vorbereitung.
+
+Statussymbole:
+
+- ✅ entschieden oder abgeschlossen
+- 🔄 in Arbeit
+- ⬜ geplant
+- 🚫 außerhalb des MVP
+
+## MVP-Umfang
+
+### Im MVP enthalten
+
+- eine Immobilie mit 25 Einheiten
+- Verwaltung der Immobilie und ihrer Einheiten
+- Suche und Filter
+- Detailansichten
+- Anfragen von Studierenden
+- Bewerbungen
+- Dokumentenupload
+- Datepicker für Datumsangaben
+- Rollen und Berechtigungen
+- lokales Entwickeln mit Docker
+- Deployment auf dem Uni-Server
+
+### Nicht im MVP enthalten
+
+- Verwaltung weiterer Immobilien
+- Bewertungssystem
+- separate Frontend-Anwendung
+- REST- oder GraphQL-API
+- Echtzeitfunktionen
+- Microservices
+- individuelle UI-Komponentenbibliotheken
+
+Bewertungen und die Verwaltung weiterer Immobilien gehören in eine spätere Roadmap.
+
+## Technischer Stack
 
 | Bereich | Entscheidung |
 |---|---|
 | Sprache | Python 3.13 |
 | Backend | Django 5.2 LTS |
-| Architektur | Django-Monolith |
-| Frontend | Serverseitige Django Templates |
-| UI | UIkit mit verbindlicher Komponenten-Whitelist |
-| Browser-Interaktionen | UIkit JavaScript, ergänzend kleines Vanilla JavaScript |
+| Architektur | Ein Django-Monolith |
+| Rendering | Serverseitige Django Templates und HTML |
+| UI | UIkit 3 mit verbindlicher Komponentenpalette |
+| JavaScript | UIkit JavaScript und minimales Vanilla JavaScript |
 | Datenbank | PostgreSQL 17 |
-| Deployment | Docker Compose lokal und auf dem Uni-Server |
-| Produktionsserver | Gunicorn im Django-Container |
-| Tests | Django Test Framework |
-| Codequalität | Ruff als Entwicklungswerkzeug |
+| Datenbanktreiber | psycopg 3 |
+| Dateien | Django Media-Storage mit persistentem Volume |
+| Lokale Entwicklung | Docker Compose |
+| Produktion | Gunicorn hinter dem Uni-Reverse-Proxy |
+| Qualität | Ruff und Django Test Framework |
 | Versionsverwaltung | GitHub |
+| CI | Geplant: ein schlanker GitHub-Actions-Workflow |
 
-### UI-Regel
+## Architektur
 
-UIkit ist das einzige UI-Framework. React, Vue, Bootstrap, Tailwind und weitere UI-Komponentenbibliotheken werden nicht eingeführt.
+Alle Bestandteile laufen in einem einzigen Django-Monolithen. Django-Modelle, Views, Formulare und Templates sind interne Schichten derselben Anwendung und keine separaten Services.
 
-Eigene Styles sind auf ein gemeinsames Theme, Layout-Anpassungen und projektbezogene Ausnahmen zu beschränken. Neue Komponenten werden als wiederverwendbare Django-Template-Partials umgesetzt.
+~~~mermaid
+flowchart TD
+    U["Studierende / Immobiliengesellschaft"] --> B["Browser"]
+    B --> D["Django-Monolith<br/>Templates + UIkit"]
+    D --> P["PostgreSQL"]
+    D --> M["Media-Volume"]
+~~~
 
-### MAO-Regel
+## Technische Roadmap
 
-Jede zusätzliche Abhängigkeit muss einen konkreten Nutzen für den MVP nachweisen. Keine Technologie wird nur für mögliche spätere Anforderungen eingeführt.
+| Phase | Technische Lieferobjekte | Fertigkriterium | Status |
+|---|---|---|---|
+| 1. Foundation | Django-Projekt, Docker Compose, PostgreSQL, Umgebungsvariablen, Ruff, CI-Grundlage | Container startet, Datenbankverbindung und Basischecks funktionieren | ⬜ |
+| 2. Webapp-Basis | Settings, URL-Struktur, Static/Media, Base-Templates, lokale UIkit-Assets | Eine Basis-Seite läuft mit einheitlichem UI | ⬜ |
+| 3. Domänenmodell | Eine Immobilie, 25 Einheiten, Anfragen, Bewerbungen und Dokumente als Django-Modelle inklusive Migrationen | Modelle, Migrationen und Testdaten funktionieren | ⬜ |
+| 4. Authentifizierung | Django-User, Gruppen, Rollen und Berechtigungen für Studierende und Immobiliengesellschaft | Zugriffsschutz ist umgesetzt und getestet | ⬜ |
+| 5. Verwaltungsbereich | Verwaltungsansichten und Formulare für Einheiten, Anfragen, Bewerbungen und Dokumente | Gesellschaft kann den Bestand und Vorgänge verwalten | ⬜ |
+| 6. Studentenbereich | ORM-Suche, Filter, Pagination und Detailansichten | Studierende können Einheiten zuverlässig finden und ansehen | ⬜ |
+| 7. Anfrage und Bewerbung | Formulare, Statusverwaltung, Datepicker, Upload-Validierung und Dateispeicherung | Kernabläufe inklusive Fehlerfällen sind getestet | ⬜ |
+| 8. Qualität und Betrieb | Tests, Django-Checks, Ruff, Produktionssettings, Gunicorn, Static/Media und Deployment | CI ist erfolgreich und Deployment auf dem Uni-Server funktioniert | ⬜ |
 
-## Betrieb
+Eine Roadmap-Phase gilt erst als abgeschlossen, wenn ihre Akzeptanzkriterien erfüllt, getestet und im zugehörigen GitHub-Issue dokumentiert sind.
 
-Docker Compose stellt lokal und auf dem Uni-Server dieselbe technische Grundlage bereit:
+## Lokale Entwicklung
 
-- Django-Anwendung
-- PostgreSQL
-- persistente Volumes für Daten und hochgeladene Dateien
+Die verbindlichen Start- und Testbefehle werden ergänzt, sobald die Docker- und Django-Grundlage im Repository vorhanden ist. Es werden nur geprüfte Befehle dokumentiert.
 
-Konfiguration und Geheimnisse werden über Umgebungsvariablen eingebunden und nicht in Git versioniert.
+## GitHub und Dokumentation
 
-Ein Reverse Proxy bzw. TLS wird nur ergänzt, wenn der konkrete Server dies benötigt. Kubernetes, eine separate Container-Orchestrierung oder eine Cloud-Abhängigkeit sind nicht vorgesehen.
+- GitHub Issues enthalten technische Aufgaben, Akzeptanzkriterien und Fortschritt.
+- Die README zeigt den Projekt- und Roadmap-Status.
+- AGENTS.md enthält verbindliche Regeln für Coding-Agents.
+- Architekturentscheidungen werden unter docs/decisions/ dokumentiert.
+- Einzelne Issue-Inhalte werden nicht vollständig in der README dupliziert.
 
-## Portierbarkeit zu VORNIS
+## Portierbarkeit
 
-Die Anwendung bleibt durch Docker, PostgreSQL, Umgebungsvariablen und persistente Volumes portierbar. VORNIS-spezifische Abhängigkeiten werden nicht in den Uni-MVP eingebaut.
-
-## Dokumentation
-
-- [AGENTS.md](AGENTS.md): verbindliche Arbeitsregeln für Codex und andere Coding-Agents
-- [ADR-0001](docs/decisions/0001-stack.md): Begründung des finalen Stacks
-- Diese README: Projekt, Startpunkt und technische Übersicht
-
-## Status
-
-Der Stack ist entschieden. Als Nächstes werden Projektstruktur, Docker-Konfiguration und die fachlichen MVP-Anforderungen umgesetzt.
+Die Anwendung bleibt durch Docker Compose, PostgreSQL, Umgebungsvariablen und persistente Volumes auf andere Server portierbar. VORNIS-spezifische Abhängigkeiten werden nicht in den Uni-MVP eingebaut.
