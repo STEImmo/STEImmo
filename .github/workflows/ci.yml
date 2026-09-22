@@ -51,6 +51,14 @@ jobs:
       - name: Django-Systemcheck
         run: python manage.py check
 
+      - name: Docker-Compose-Konfiguration prüfen
+        run: |
+          cp docker/.env.example docker/.env
+          docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.dev.yaml config
+
+      - name: Docker-Image bauen
+        run: docker build --tag steimmo-ci .
+
       - name: Migrationen prüfen
         run: python manage.py makemigrations --check --dry-run
 

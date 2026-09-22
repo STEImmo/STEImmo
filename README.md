@@ -82,7 +82,7 @@ flowchart TD
 
 | Phase | Technische Lieferobjekte | Fertigkriterium | Status |
 |---|---|---|---|
-| 1. Foundation | Django-Projekt, Docker Compose, PostgreSQL, Umgebungsvariablen, Ruff, CI-Grundlage | Container startet, Datenbankverbindung und Basischecks funktionieren | ⬜ |
+| 1. Foundation | Django-Projekt, Docker Compose, PostgreSQL, Umgebungsvariablen, Ruff, CI-Grundlage | Container startet, Datenbankverbindung und Basischecks funktionieren | ✅ |
 | 2. Webapp-Basis | Settings, URL-Struktur, Static/Media, Base-Templates, lokale UIkit-Assets | Eine Basis-Seite läuft mit einheitlichem UI | ✅ |
 | 3. Domänenmodell | Eine Immobilie, 25 Einheiten, Anfragen, Bewerbungen und Dokumente als Django-Modelle inklusive Migrationen | Modelle, Migrationen und Testdaten funktionieren | ⬜ |
 | 4. Authentifizierung | Django-User, Gruppen, Rollen und Berechtigungen für Studierende und Immobiliengesellschaft | Zugriffsschutz ist umgesetzt und getestet | ⬜ |
