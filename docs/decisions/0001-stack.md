@@ -10,7 +10,7 @@ Das Projekt ist eine kleine Webanwendung für eine Immobiliengesellschaft. Verwa
 
 Studierende sollen Einheiten suchen, filtern, ansehen, Anfragen stellen und sich bewerben können. Dokumentenupload und Datepicker für Datumsangaben gehören zum MVP. Bewertungen und die Verwaltung weiterer Immobilien sind nicht Bestandteil des MVP.
 
-Das Team besteht aus vier Entwicklern und einer Person mit Schwerpunkt Projektmanagement. Die Entwicklungszeit beträgt ungefähr acht Wochen. Die Anwendung soll auf dem Uni-Server laufen und später ohne grundlegenden Plattformumbau auf VORNIS-Kundenhardware portierbar sein.
+Das Team besteht aus vier Entwicklern und einer Person mit Schwerpunkt Projektmanagement. Die Entwicklungszeit beträgt ungefähr acht Wochen. Die Anwendung soll auf dem Uni-Server laufen und später ohne grundlegenden Plattformumbau auf kundeneigene Hardware portierbar sein.
 
 Die wichtigsten Kriterien sind:
 
@@ -80,7 +80,7 @@ PostgreSQL ist für parallele Zugriffe, Suchabfragen, produktiven Betrieb und sp
 
 ### Docker Compose
 
-Docker Compose sorgt dafür, dass alle vier Entwickler und der Uni-Server dieselbe grundlegende Laufzeitumgebung verwenden. Das reduziert lokale Abweichungen und erleichtert späteres Self-Hosting bei VORNIS.
+Docker Compose sorgt dafür, dass alle vier Entwickler und der Uni-Server dieselbe grundlegende Laufzeitumgebung verwenden. Das reduziert lokale Abweichungen und erleichtert späteres Self-Hosting auf kundeneigener Infrastruktur.
 
 ### Kein Kubernetes
 
