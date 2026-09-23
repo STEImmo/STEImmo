@@ -95,16 +95,61 @@ Eine Roadmap-Phase gilt erst als abgeschlossen, wenn ihre Akzeptanzkriterien erf
 
 ## Lokale Entwicklung
 
-Voraussetzung sind Docker Engine und Docker Compose.
+Die lokale Entwicklungsumgebung läuft vollständig über Docker. Python und PostgreSQL müssen daher nicht separat auf dem Entwicklungsrechner installiert werden.
+
+### Voraussetzungen
+
+- Git
+- Docker mit Docker Compose
+  - Windows: Docker Desktop
+  - macOS (Intel oder Apple Silicon): Docker Desktop
+  - Linux: Docker Engine mit Compose-Plugin
+- optional: IntelliJ IDEA / PyCharm oder eine andere IDE
+
+Nach der Installation prüfen:
+
+~~~bash
+docker --version
+docker compose version
+~~~
+
+Alle folgenden Befehle werden im Root-Verzeichnis des geklonten Repositories ausgeführt. In IntelliJ oder PyCharm kann dafür direkt das integrierte Terminal verwendet werden.
+
+### 1. Lokale Umgebungsdatei anlegen
+
+macOS / Linux sowie Git Bash unter Windows:
 
 ~~~bash
 cp docker/.env.example docker/.env
+~~~
+
+Windows PowerShell:
+
+~~~powershell
+Copy-Item docker/.env.example docker/.env
+~~~
+
+Die Datei `docker/.env` ist nur für die lokale Entwicklung vorgesehen und wird nicht versioniert.
+
+### 2. Entwicklungsumgebung starten
+
+Der folgende Befehl ist unter macOS, Linux und Windows PowerShell identisch:
+
+~~~bash
 docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.dev.yaml up --build
 ~~~
 
-Die Anwendung ist anschließend unter [http://localhost:8000](http://localhost:8000) erreichbar.
+Beim ersten Start werden die benötigten Docker-Images geladen und das Anwendungs-Image gebaut. Sobald die Container laufen, ist die Anwendung unter [http://localhost:8000](http://localhost:8000) erreichbar.
 
-Prüfungen innerhalb des laufenden Web-Containers:
+Der Befehl läuft standardmäßig im Vordergrund. Für einen Start im Hintergrund kann `-d` ergänzt werden:
+
+~~~bash
+docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.dev.yaml up --build -d
+~~~
+
+### 3. Projekt prüfen
+
+Bei laufenden Containern können die Prüfungen aus einem zweiten Terminal ausgeführt werden:
 
 ~~~bash
 docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.dev.yaml exec web python manage.py check
@@ -113,13 +158,17 @@ docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.d
 docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.dev.yaml exec web ruff format --check .
 ~~~
 
-Beenden:
+Für eine erfolgreiche Foundation-Prüfung müssen alle vier Befehle ohne Fehler durchlaufen.
+
+### 4. Entwicklungsumgebung beenden
 
 ~~~bash
 docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.dev.yaml down
 ~~~
 
-`compose.dev.yaml` aktiviert den Entwicklungsserver mit Quellcode-Mount. Ohne den Override startet `compose.yaml` mit Gunicorn und ist für den späteren Serverbetrieb vorgesehen.
+Die persistenten Docker-Volumes für PostgreSQL und hochgeladene Dateien bleiben dabei erhalten.
+
+`compose.dev.yaml` aktiviert den Django-Entwicklungsserver und bindet den lokalen Quellcode in den Container ein. Änderungen am Python-, Template- oder Static-Code sind dadurch direkt aus IntelliJ/PyCharm möglich. Ohne den Development-Override startet `compose.yaml` die Anwendung mit Gunicorn und ist für den späteren Serverbetrieb vorgesehen.
 
 ## Foundation-Struktur
 
