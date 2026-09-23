@@ -157,6 +157,251 @@ Vor jeder Änderung:
 5. bei wesentlichen Unklarheiten nachfragen
 6. bei größeren Änderungen einen kurzen Plan erstellen
 
+## Repository- und Git-Konventionen
+
+### Branches
+
+Branches werden grundsätzlich vom aktuellen `main` erstellt.
+
+Standardformat:
+
+~~~text
+<type>/<issue>-<kurzbeschreibung>
+~~~
+
+Beispiele:
+
+~~~text
+feat/42-unit-search
+fix/51-upload-validation
+refactor/63-application-status
+test/70-filter-tests
+docs/71-readme-setup
+chore/72-ci-cleanup
+~~~
+
+Erlaubte Branch-Typen:
+
+- `feat`: neue fachliche Funktion
+- `fix`: Fehlerbehebung
+- `refactor`: interne Umstrukturierung ohne fachliche Änderung
+- `test`: reine Teständerung
+- `docs`: reine Dokumentationsänderung
+- `chore`: Build-, CI-, Tooling- oder Repository-Pflege
+
+Regeln:
+
+- Branch-Namen verwenden ausschließlich Kleinbuchstaben, Ziffern, Bindestriche und den Trenner `/`.
+- Kurzbeschreibungen stehen in `kebab-case`.
+- keine Personennamen, Initialen oder Entwicklerkürzel im Branch-Namen
+- ein Branch gehört grundsätzlich zu genau einem Issue
+- mehrere unabhängige Issues nicht in einem Branch bündeln
+- Branch vor Beginn auf aktuellen `main`-Stand bringen
+- nach Merge den Branch löschen
+- keine langfristigen Sammelbranches wie `develop`, `dev` oder `feature-all`
+
+Für kleine, ausdrücklich beauftragte Repository- oder Dokumentationsänderungen ohne eigenes Issue ist ausnahmsweise `<type>/<kurzbeschreibung>` zulässig.
+
+### main
+
+`main` ist der Integrationsbranch und soll jederzeit in einem lauffähigen Zustand bleiben.
+
+Regeln:
+
+- normale Entwicklung nie direkt auf `main`
+- Änderungen über Branch und Pull Request
+- kein Force-Push auf `main`
+- keine unfertigen oder experimentellen Änderungen auf `main`
+- direkte Änderungen auf `main` nur nach ausdrücklicher Anweisung für einen klar begrenzten administrativen Sonderfall
+- vor jeder Änderung aktuellen `main`-Stand prüfen
+
+### Commits
+
+Commit-Nachrichten verwenden:
+
+~~~text
+<type>: <imperative description>
+~~~
+
+Beispiele:
+
+~~~text
+feat: add unit availability filter
+fix: validate uploaded file size
+refactor: simplify application status handling
+test: cover invalid inquiry submission
+docs: document local setup
+chore: minimize CI triggers
+~~~
+
+Regeln:
+
+- Commit-Typ entspricht möglichst dem Branch-Typ.
+- Beschreibung kurz, konkret und auf Englisch.
+- Imperative Form bevorzugen.
+- ein Commit enthält eine logisch zusammengehörige Änderung
+- keine finalen Commit-Nachrichten wie `wip`, `update`, `changes`, `stuff`, `fix` oder `test123`
+- keine generierten Artefakte oder unbeabsichtigten Formatierungsänderungen mit fachlichen Änderungen vermischen
+- Secrets, echte Nutzerdaten und lokale Konfigurationen dürfen nie Bestandteil eines Commits sein
+
+### Pull Requests
+
+Pull Requests sind klein und auf ein Issue beziehungsweise eine klar abgegrenzte Aufgabe beschränkt.
+
+PR-Titel verwenden ebenfalls das Schema:
+
+~~~text
+<type>: <kurze Beschreibung>
+~~~
+
+Eine PR-Beschreibung enthält mindestens:
+
+~~~markdown
+## Ziel
+
+## Issue
+
+Closes #123
+
+## Änderungen
+
+## Tests und Checks
+
+## Offene Punkte
+~~~
+
+Regeln:
+
+- `Closes #<issue>` nur verwenden, wenn der PR das Issue vollständig erfüllt
+- bei Teilumsetzungen stattdessen `Refs #<issue>`
+- keine fachlich unabhängigen Änderungen in denselben PR aufnehmen
+- keine reine Aufräum- oder Refactoring-Arbeit in einem fachlichen PR verstecken
+- vor Review den eigenen Diff vollständig prüfen
+- offene bekannte Risiken im PR dokumentieren
+
+### Ready for Review
+
+Ein PR darf erst als Ready for Review markiert werden, wenn:
+
+- das zugehörige Issue eindeutig referenziert ist
+- der Scope des Issues eingehalten wurde
+- die Implementierung fachlich vollständig ist
+- notwendige Tests vorhanden und erfolgreich sind
+- `python manage.py check` erfolgreich ist
+- Migrationen geprüft wurden
+- Ruff-Prüfungen erfolgreich sind
+- relevante Dokumentation aktualisiert wurde
+- keine Secrets, echten Nutzerdaten oder temporären Dateien enthalten sind
+- der Autor den vollständigen Diff selbst geprüft hat
+
+### Review und Merge
+
+Standardprozess:
+
+~~~text
+Todo -> In Progress -> Review -> Done
+~~~
+
+Regeln:
+
+- sobald mit der Umsetzung begonnen wird: Issue auf `In Progress`
+- existiert ein zugehöriger offener PR: Issue auf `Review`, PR Ready for Review
+- der Autor genehmigt den eigenen PR nicht als Ersatz für ein unabhängiges Review
+- Review-Kommentare vor Merge klären oder nachvollziehbar auflösen
+- CI muss vor Merge erfolgreich sein, sofern der PR CI auslöst
+- wenn organisatorisch ein Review vorgesehen ist, mindestens eine andere Person reviewen lassen
+- Standard-Merge-Strategie ist Squash Merge
+- nach Merge Branch löschen
+- nach Merge Abschluss im Issue dokumentieren und Status auf `Done` setzen
+- gibt es für eine vollständig erledigte Aufgabe keinen notwendigen PR, darf das Issue nach erfüllter Definition of Done direkt auf `Done` gesetzt und geschlossen werden
+
+Da technische Branch-Protection im verwendeten GitHub-Tarif nicht zwingend verfügbar ist, gelten diese Regeln unabhängig davon als verbindlicher Teamprozess.
+
+## Code- und Dateikonventionen
+
+### Sprache und Benennung
+
+- Code-Identifier, Branch-Namen und Commit-Nachrichten sind Englisch.
+- Benutzeroberfläche und fachliche Projektdokumentation sind grundsätzlich Deutsch.
+- keine Mischformen wie `get_wohnung_data`
+- Python-Variablen, Funktionen und Module: `snake_case`
+- Klassen, Django-Modelle und Formulare: `PascalCase`
+- Konstanten: `UPPER_SNAKE_CASE`
+- URL-Namen sind beschreibend und innerhalb einer Django-App namespaced.
+- fachliche Modelle werden im Singular benannt.
+- Abkürzungen nur verwenden, wenn sie projektweit eindeutig und dokumentiert sind.
+
+### Django-Struktur
+
+- fachlicher Code liegt in der zuständigen Django-App
+- keine globale `utils.py` als unspezifisches Sammelbecken
+- wiederverwendbaren Code erst extrahieren, wenn tatsächliche Wiederverwendung vorliegt
+- Templates app-bezogen strukturieren, zum Beispiel `templates/app_name/...`
+- wiederverwendbare Template-Bausteine als klar benannte Partials ablegen
+- Views, Forms, Models und Services nicht künstlich aufsplitten, wenn Django-Bordmittel ausreichen
+- neue Django-App nur bei klar abgegrenzter fachlicher Verantwortung anlegen
+
+### Datenbank und Migrationen
+
+- bestehende bereits geteilte Migrationen nicht nachträglich umschreiben
+- Schemaänderungen erhalten neue Migrationen
+- destruktive oder irreversible Migrationen nur nach ausdrücklicher Freigabe
+- Geldbeträge mit `DecimalField`, nicht mit Float-Typen
+- Datums- und Zeitwerte timezone-aware behandeln
+- fachlich zwingende Regeln möglichst zusätzlich mit Datenbank-Constraints absichern
+- keine Geschäftslogik allein auf implizite Datenbankannahmen stützen
+- Migrationen müssen reproduzierbar und im Repository enthalten sein
+
+### Tests
+
+- Testnamen beschreiben beobachtbares Verhalten
+- Beispiel: `test_application_rejects_missing_email`
+- Bugfixes erhalten nach Möglichkeit zuerst einen Test, der den Fehler reproduziert
+- keine Tests ausschließlich für interne Implementierungsdetails
+- keine Snapshot- oder End-to-End-Testframeworks ohne neue Entscheidung
+- Tests dürfen keine Reihenfolge oder persistente lokale Daten voraussetzen
+
+### Abhängigkeiten
+
+Neue Runtime- oder Dev-Abhängigkeiten nur einführen, wenn Django, Python-Standardbibliothek, PostgreSQL oder UIkit den Bedarf nicht sinnvoll abdecken.
+
+Vor Aufnahme einer Dependency prüfen:
+
+- konkreter Nutzen
+- Wartungsstatus
+- Lizenz
+- Sicherheits- und Updateaufwand
+- Auswirkungen auf Docker-Image und CI
+- ob eine kleine Eigenimplementierung mit Bordmitteln verständlicher wäre
+
+Keine Bibliothek für triviale Hilfsfunktionen hinzufügen.
+
+### Logging und Datenschutz
+
+- kein `print()` für produktive Diagnose
+- Python-/Django-Logging verwenden
+- keine Passwörter, Tokens oder Secrets loggen
+- keine hochgeladenen Dokumentinhalte loggen
+- personenbezogene Daten nur loggen, wenn technisch zwingend erforderlich und auf das Minimum reduziert
+- Fehlerausgaben dürfen keine vertraulichen Konfigurationswerte offenlegen
+
+### Repository-Hygiene
+
+Vor Abschluss jeder Änderung prüfen:
+
+- `git status`
+- `git diff`
+- `git diff --check`
+- keine IDE-Dateien
+- keine temporären Dateien
+- keine lokalen Datenbank-Dumps
+- keine generierten Uploads
+- keine `.env`-Datei
+- keine echten Bewerber-, Mieter- oder Kundendokumente
+- keine externen Kunden-, Arbeitgeber- oder Firmennamen ohne ausdrückliche Freigabe
+
+Externe Referenzen, die nicht zum Projekt gehören, dürfen nicht versehentlich in Code, Dokumentation, Beispieldaten, Kommentaren oder Metadaten übernommen werden.
+
 ## Tests und Qualitätsgates
 
 Vor Abschluss einer Änderung, sofern die Projektstruktur dies ermöglicht:
@@ -208,6 +453,13 @@ Minimaler Issue-Aufbau:
 
 ### Während der Umsetzung
 
+Bei Projekt-Board-Nutzung gilt grundsätzlich:
+
+- `Todo`: noch nicht begonnen
+- `In Progress`: aktive Umsetzung
+- `Review`: Implementierung abgeschlossen, PR offen oder Review ausstehend
+- `Done`: Definition of Done erfüllt und gegebenenfalls PR gemerged
+
 Das zuständige Issue wird aktualisiert, wenn:
 
 - eine technische Entscheidung getroffen wurde
@@ -227,7 +479,9 @@ Ein Issue darf erst geschlossen werden, wenn:
 - Tests und Qualitätschecks erfolgreich waren
 - notwendige Dokumentation aktualisiert wurde
 - keine offenen Blocker bestehen
+- ein zugehöriger PR gemerged wurde, sofern einer erforderlich war
 - der Abschluss im Issue dokumentiert wurde
+- der Projektstatus auf `Done` gesetzt wurde, sofern das Issue in einem Projektboard geführt wird
 
 Der Abschlusskommentar enthält mindestens:
 
@@ -267,6 +521,7 @@ Ohne ausdrückliche Freigabe nicht ausführen:
 
 - git push
 - Pull Request mergen
+- Force-Push
 - Deployment
 - Löschen größerer Datenmengen
 - Änderungen an externen Systemen
@@ -283,8 +538,10 @@ Eine Aufgabe ist abgeschlossen, wenn:
 - Tests und Qualitätschecks erfolgreich sind
 - Migrationen korrekt enthalten sind
 - relevante Dokumentation aktuell ist
-- keine Secrets oder Testdaten versehentlich versioniert wurden
-- das Issue aktualisiert und geschlossen wurde
+- keine Secrets, echten Nutzerdaten oder temporären Testdateien versehentlich versioniert wurden
+- ein erforderlicher PR reviewed und gemerged wurde
+- der Arbeitsbranch nach Merge gelöscht wurde
+- das Issue aktualisiert, auf `Done` gesetzt und geschlossen wurde
 
 ## Abschlussbericht
 
