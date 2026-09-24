@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Übergabeprotokoll – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Zur Übersicht</a>
+        <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-small-top">
+            <div>
+                <span class="uk-label">{{ protocol_status_label }}</span>
+                <h1 class="uk-heading-medium uk-margin-small-top">Übergabeprotokoll: {{ protocol_type_label }}</h1>
+            </div>
+            <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_edit' protocol.pk %}">Bearbeiten</a>
+        </div>
+
+        <div class="uk-card uk-card-default uk-card-body uk-margin-top">
+            <h2 class="uk-heading-divider">Zuordnung</h2>
+            <dl class="uk-description-list uk-description-list-divider">
+                <dt>Wohnung</dt>
+                <dd>Gebäude {{ protocol.wohnung.gebaeudenummer }}, Wohnung {{ protocol.wohnung.wohnungsnummer }}</dd>
+                <dt>Beteiligte Person</dt>
+                <dd>{{ protocol.person.vorname }} {{ protocol.person.nachname }}</dd>
+                <dt>Übergabeart</dt>
+                <dd>{{ protocol_type_label }}</dd>
+                <dt>Zustand bei Übergabe</dt>
+                <dd>{{ handover_status_label }}</dd>
+                <dt>Abnahmestatus</dt>
+                <dd>{{ acceptance_status_label }}</dd>
+            </dl>
+
+            <h2 class="uk-heading-divider uk-margin-large-top">Protokollpunkte: Zählerstände</h2>
+            <div class="uk-child-width-1-2@s uk-child-width-1-4@m" uk-grid>
+                <div><div class="uk-text-meta">Kaltwasser</div><div class="uk-text-large">{{ protocol.zaehlerstand_wasser_kalt }}</div></div>
+                <div><div class="uk-text-meta">Warmwasser</div><div class="uk-text-large">{{ protocol.zaehlerstand_wasser_warm }}</div></div>
+                <div><div class="uk-text-meta">Heizung</div><div class="uk-text-large">{{ protocol.zaehlerstand_heizung }}</div></div>
+                <div><div class="uk-text-meta">Strom</div><div class="uk-text-large">{{ protocol.zaehlerstand_strom }}</div></div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

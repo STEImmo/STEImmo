@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Übergabeprotokolle – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section uk-section-muted">
+    <div class="uk-container">
+        <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
+            <div>
+                <span class="uk-label">Wohnungsübergabe</span>
+                <h1 class="uk-heading-medium uk-margin-small-top">Übergabeprotokolle</h1>
+            </div>
+            <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_create' %}">Protokoll anlegen</a>
+        </div>
+
+        {% if protocols %}
+            <div class="uk-overflow-auto uk-card uk-card-default">
+                <table class="uk-table uk-table-divider uk-table-middle uk-margin-remove">
+                    <thead>
+                        <tr>
+                            <th>Wohnung</th>
+                            <th>Übergabeart</th>
+                            <th>Beteiligte Person</th>
+                            <th>Bearbeitungsstand</th>
+                            <th><span class="uk-hidden">Aktion</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for protocol in protocols %}
+                            <tr>
+                                <td>Gebäude {{ protocol.wohnung.gebaeudenummer }}, Wohnung {{ protocol.wohnung.wohnungsnummer }}</td>
+                                <td>{% if protocol.protokoll_typ == "move_in" %}Einzug{% else %}Auszug{% endif %}</td>
+                                <td>{{ protocol.person.vorname }} {{ protocol.person.nachname }}</td>
+                                <td>{% if protocol.status == "open" %}<span class="uk-label">In Bearbeitung</span>{% elif protocol.status == "signed" %}<span class="uk-label uk-label-success">Bestätigt</span>{% else %}<span class="uk-label uk-label-danger">Gesperrt</span>{% endif %}</td>
+                                <td><a class="uk-button uk-button-default uk-button-small" href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}">Öffnen</a></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="uk-card uk-card-default uk-card-body uk-text-center">
+                <p>Noch kein Übergabeprotokoll angelegt.</p>
+                <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_create' %}">Erstes Protokoll anlegen</a>
+            </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
