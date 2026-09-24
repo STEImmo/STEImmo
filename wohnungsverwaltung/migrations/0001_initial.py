@@ -3,7 +3,7 @@ import uuid
 import django.db.models.deletion
 from django.db import migrations, models
 
-import immobilien.fields
+import wohnungsverwaltung.fields
 
 CREATE_ENUM_TYPES = """
 CREATE TYPE geschlecht_enum AS ENUM ('male', 'female', 'divers');
@@ -97,7 +97,7 @@ class Migration(migrations.Migration):
                 ("titel", models.CharField(blank=True, default="", max_length=255)),
                 (
                     "geschlecht",
-                    immobilien.fields.PostgreSQLEnumField(
+                    wohnungsverwaltung.fields.PostgreSQLEnumField(
                         blank=True,
                         choices=[
                             ("male", "male"),
@@ -140,7 +140,7 @@ class Migration(migrations.Migration):
                 ("barrierefrei", models.BooleanField(default=False)),
                 (
                     "status",
-                    immobilien.fields.PostgreSQLEnumField(
+                    wohnungsverwaltung.fields.PostgreSQLEnumField(
                         choices=[
                             ("taken", "taken"),
                             ("free", "free"),
@@ -216,7 +216,7 @@ class Migration(migrations.Migration):
                 ("alternative_wohnung_akzeptiert", models.BooleanField(default=False)),
                 (
                     "status",
-                    immobilien.fields.PostgreSQLEnumField(
+                    wohnungsverwaltung.fields.PostgreSQLEnumField(
                         choices=[
                             ("open", "open"),
                             ("declined", "declined"),
@@ -276,7 +276,7 @@ class Migration(migrations.Migration):
                 ("name", models.CharField(max_length=255)),
                 (
                     "stellplatz_typ",
-                    immobilien.fields.PostgreSQLEnumField(
+                    wohnungsverwaltung.fields.PostgreSQLEnumField(
                         choices=[
                             ("car", "car"),
                             ("ev", "ev"),
@@ -326,7 +326,7 @@ class Migration(migrations.Migration):
                 ("aufschrift", models.CharField(blank=True, default="", max_length=255)),
                 (
                     "status",
-                    immobilien.fields.PostgreSQLEnumField(
+                    wohnungsverwaltung.fields.PostgreSQLEnumField(
                         choices=[
                             ("lost", "lost"),
                             ("in_use", "in_use"),
@@ -363,7 +363,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "protokoll_typ",
-                    immobilien.fields.PostgreSQLEnumField(
+                    wohnungsverwaltung.fields.PostgreSQLEnumField(
                         choices=[("move_in", "move_in"), ("move_out", "move_out")],
                         enum_type="protokoll_typ_enum",
                         max_length=255,
@@ -371,7 +371,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "status",
-                    immobilien.fields.PostgreSQLEnumField(
+                    wohnungsverwaltung.fields.PostgreSQLEnumField(
                         choices=[
                             ("open", "open"),
                             ("signed", "signed"),
@@ -384,7 +384,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "uebergabe_status",
-                    immobilien.fields.PostgreSQLEnumField(
+                    wohnungsverwaltung.fields.PostgreSQLEnumField(
                         choices=[("renovated", "renovated"), ("unrenovated", "unrenovated")],
                         enum_type="uebergabe_status_enum",
                         max_length=255,
@@ -392,7 +392,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "abnahme_status",
-                    immobilien.fields.PostgreSQLEnumField(
+                    wohnungsverwaltung.fields.PostgreSQLEnumField(
                         choices=[
                             ("accepted", "accepted"),
                             ("accepted_with_reservation", "accepted_with_reservation"),
@@ -503,7 +503,7 @@ class Migration(migrations.Migration):
                 ("bezeichnung", models.CharField(max_length=255)),
                 (
                     "datentyp",
-                    immobilien.fields.PostgreSQLEnumField(
+                    wohnungsverwaltung.fields.PostgreSQLEnumField(
                         choices=[
                             ("Reibeputz", "Reibeputz"),
                             ("gekalkt", "gekalkt"),

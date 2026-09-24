@@ -184,7 +184,7 @@ Die persistenten Docker-Volumes für PostgreSQL und hochgeladene Dateien bleiben
 ~~~text
 config/                 Django-Projektkonfiguration
 core/                   technische Basisansichten und Healthcheck
-immobilien/             fachliches Datenmodell und PostgreSQL-Migrationen
+wohnungsverwaltung/     fachliches Datenmodell und PostgreSQL-Migrationen
 templates/              serverseitige Django-Templates
 static/                 lokale UIkit-Assets und Projekt-Styles
 docker/                 Compose, Umgebungsvariablen und EntryPoint
