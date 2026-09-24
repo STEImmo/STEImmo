@@ -141,6 +141,15 @@ docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.d
 
 Beim ersten Start werden die benötigten Docker-Images geladen und das Anwendungs-Image gebaut. Sobald die Container laufen, ist die Anwendung unter [http://localhost:8000](http://localhost:8000) erreichbar.
 
+Beim Start wartet der Web-Container auf den gesunden PostgreSQL-Dienst und führt anschließend mit `python manage.py migrate --noinput` alle ausstehenden Django-Migrationen aus. Die Datenbankstruktur wird dadurch beim ersten Start angelegt und bei späteren Versionen schrittweise erweitert. Das PostgreSQL-Volume muss für normale Strukturänderungen nicht gelöscht werden.
+
+Neue Strukturänderungen werden ausschließlich über Django-Modelle und versionierte Migrationen eingebracht:
+
+~~~bash
+docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.dev.yaml exec web python manage.py makemigrations
+docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.dev.yaml exec web python manage.py migrate
+~~~
+
 Der Befehl läuft standardmäßig im Vordergrund. Für einen Start im Hintergrund kann `-d` ergänzt werden:
 
 ~~~bash
@@ -175,6 +184,7 @@ Die persistenten Docker-Volumes für PostgreSQL und hochgeladene Dateien bleiben
 ~~~text
 config/                 Django-Projektkonfiguration
 core/                   technische Basisansichten und Healthcheck
+immobilien/             fachliches Datenmodell und PostgreSQL-Migrationen
 templates/              serverseitige Django-Templates
 static/                 lokale UIkit-Assets und Projekt-Styles
 docker/                 Compose, Umgebungsvariablen und EntryPoint
@@ -187,6 +197,7 @@ docker/                 Compose, Umgebungsvariablen und EntryPoint
 - Die README zeigt den Projekt- und Roadmap-Status.
 - AGENTS.md enthält verbindliche Regeln für Coding-Agents.
 - Architekturentscheidungen werden unter docs/decisions/ dokumentiert.
+- [ADR-0002](docs/decisions/0002-django-migrationen.md) beschreibt Django-Migrationen als Quelle der Datenbankstruktur.
 - Einzelne Issue-Inhalte werden nicht vollständig in der README dupliziert.
 
 ## Portierbarkeit
