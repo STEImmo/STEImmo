@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Schlüssel erfassen – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}">Zum Übergabeprotokoll</a>
+        <h1 class="uk-heading-medium">Schlüsselübergabe erfassen</h1>
+        <p class="uk-text-lead">Dokumentieren Sie übergebene und fehlende Schlüssel einschließlich Nachliefervereinbarungen.</p>
+        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top">
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>{% endif %}
+            {% for field in form.visible_fields %}
+                <div class="uk-margin">
+                    <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    <div class="uk-form-controls">{{ field }}{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>
+                </div>
+            {% endfor %}
+            <div class="uk-flex uk-flex-right">
+                <button class="uk-button uk-button-primary" type="submit">Schlüssel speichern</button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}

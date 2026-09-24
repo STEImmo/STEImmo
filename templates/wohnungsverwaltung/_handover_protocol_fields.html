@@ -1,35 +1,42 @@
 {% if form.non_field_errors %}
-    <div class="uk-alert-danger" uk-alert>
-        {{ form.non_field_errors }}
-    </div>
+    <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>
 {% endif %}
 
-<h2 class="uk-heading-divider">Übergabe</h2>
+<h2 class="uk-heading-divider">Übergabe und Beteiligte</h2>
 <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
-    {% for field in form.visible_fields|slice:":5" %}
+    {% for field in form.visible_fields|slice:":8" %}
         <div>
             <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
             <div class="uk-form-controls">
                 {{ field }}
-                {% for error in field.errors %}
-                    <p class="uk-text-danger">{{ error }}</p>
-                {% endfor %}
+                {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
             </div>
         </div>
     {% endfor %}
 </div>
 
 <h2 class="uk-heading-divider uk-margin-large-top">Zählerstände</h2>
-<p class="uk-text-meta">Alle Zählerstände sind Pflichtangaben und müssen bei der Übergabe erfasst werden.</p>
+<p class="uk-text-meta">Zählernummern und Zählerstände sind Pflichtangaben. Die Heizungsablesungen IE, IA und Ib werden im vorgesehenen Feld dokumentiert.</p>
 <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
-    {% for field in form.visible_fields|slice:"5:" %}
+    {% for field in form.visible_fields|slice:"8:17" %}
         <div>
             <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
             <div class="uk-form-controls">
                 {{ field }}
-                {% for error in field.errors %}
-                    <p class="uk-text-danger">{{ error }}</p>
-                {% endfor %}
+                {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<h2 class="uk-heading-divider uk-margin-large-top">Anlagen und Vereinbarungen</h2>
+<div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
+    {% for field in form.visible_fields|slice:"17:" %}
+        <div>
+            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <div class="uk-form-controls">
+                {{ field }}
+                {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
             </div>
         </div>
     {% endfor %}

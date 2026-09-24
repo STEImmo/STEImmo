@@ -24,7 +24,7 @@
         {% if messages %}
             <div class="uk-container uk-margin-top">
                 {% for message in messages %}
-                    <div class="uk-alert-success" uk-alert>
+                    <div class="uk-alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% else %}success{% endif %}" uk-alert>
                         {{ message }}
                     </div>
                 {% endfor %}
