@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
@@ -11,6 +12,7 @@ from .models import (
     Protokoll,
     ProtokollStatus,
     ProtokollTyp,
+    Schluessel,
     UebergabeStatus,
     Wohnung,
 )
@@ -62,6 +64,8 @@ class HandoverProtocolViewsTests(TestCase):
         self.assertContains(response, "Datum und Uhrzeit")
         self.assertContains(response, "Zählernummer Strom")
         self.assertContains(response, "Zählerstände")
+        self.assertContains(response, "Gebäude 1, Wohnung 2.04")
+        self.assertContains(response, "Mara Muster")
 
     def test_create_requires_all_mandatory_meter_readings(self) -> None:
         data = self.valid_form_data()
@@ -327,3 +331,20 @@ class HandoverProtocolViewsTests(TestCase):
             response.context["form"], "anzahl", "Bitte erfassen Sie mindestens einen Schlüssel."
         )
         self.assertFalse(protocol.protokoll_schluessel.exists())
+
+
+class SeedStandardDataCommandTests(TestCase):
+    def test_command_creates_25_units_and_is_idempotent(self) -> None:
+        call_command("seed_standard_data")
+
+        self.assertEqual(Wohnung.objects.count(), 25)
+        self.assertEqual(Person.objects.count(), 6)
+        self.assertEqual(Protokoll.objects.count(), 2)
+        self.assertEqual(Schluessel.objects.count(), 25)
+
+        call_command("seed_standard_data")
+
+        self.assertEqual(Wohnung.objects.count(), 25)
+        self.assertEqual(Person.objects.count(), 6)
+        self.assertEqual(Protokoll.objects.count(), 2)
+        self.assertEqual(Schluessel.objects.count(), 25)

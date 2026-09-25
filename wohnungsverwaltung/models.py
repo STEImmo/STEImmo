@@ -119,6 +119,9 @@ class Person(models.Model):
     class Meta:
         db_table = "person"
 
+    def __str__(self) -> str:
+        return f"{self.vorname} {self.nachname}"
+
 
 class Wohnung(models.Model):
     wohnung_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -163,6 +166,9 @@ class Wohnung(models.Model):
                 condition=models.Q(kaution__gte=0), name="wohnung_kaution_nicht_negativ"
             ),
         ]
+
+    def __str__(self) -> str:
+        return f"Gebäude {self.gebaeudenummer}, Wohnung {self.wohnungsnummer}"
 
 
 class Bewerbung(models.Model):
