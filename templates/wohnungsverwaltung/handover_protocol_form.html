@@ -7,9 +7,9 @@
     <div class="uk-container uk-container-small">
         <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Zur Übersicht</a>
         <h1 class="uk-heading-medium">{{ page_title }}</h1>
-        <p class="uk-text-lead">Erfassen Sie die Pflichtangaben für die wohnungsspezifische Übergabe.</p>
+        <p class="uk-text-lead">Wählen Sie zuerst die Wohnung. Anschließend stehen nur die dieser Wohnung direkt zugeordneten Personen zur Auswahl.</p>
 
-        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top">
+        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top" id="handover-protocol-form">
             {% csrf_token %}
             {% include "wohnungsverwaltung/_handover_protocol_fields.html" %}
             <div class="uk-margin-large-top uk-flex uk-flex-right uk-flex-middle">
@@ -21,4 +21,21 @@
         </form>
     </div>
 </section>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const apartmentSelect = document.getElementById("id_wohnung");
+        if (!apartmentSelect) {
+            return;
+        }
+        apartmentSelect.addEventListener("change", () => {
+            const url = new URL(window.location.href);
+            if (apartmentSelect.value) {
+                url.searchParams.set("wohnung", apartmentSelect.value);
+            } else {
+                url.searchParams.delete("wohnung");
+            }
+            window.location.assign(url);
+        });
+    });
+</script>
 {% endblock %}

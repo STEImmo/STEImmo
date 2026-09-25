@@ -100,6 +100,13 @@ class AbnahmeStatus(models.TextChoices):
 
 class Person(models.Model):
     person_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    wohnung = models.ForeignKey(
+        "Wohnung",
+        on_delete=models.SET_NULL,
+        related_name="personen",
+        blank=True,
+        null=True,
+    )
     vorname = models.CharField(max_length=255)
     nachname = models.CharField(max_length=255)
     titel = models.CharField(max_length=255, blank=True, default="")

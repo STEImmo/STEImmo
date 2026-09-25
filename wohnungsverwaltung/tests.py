@@ -20,15 +20,16 @@ from .models import (
 
 class HandoverProtocolViewsTests(TestCase):
     def setUp(self) -> None:
-        self.person = Person.objects.create(
-            vorname="Mara",
-            nachname="Muster",
-            email="mara.muster@example.test",
-        )
         self.wohnung = Wohnung.objects.create(
             etage=2,
             wohnungsnummer="2.04",
             gebaeudenummer="1",
+        )
+        self.person = Person.objects.create(
+            vorname="Mara",
+            nachname="Muster",
+            email="mara.muster@example.test",
+            wohnung=self.wohnung,
         )
 
     def valid_form_data(self) -> dict[str, str]:
@@ -65,7 +66,48 @@ class HandoverProtocolViewsTests(TestCase):
         self.assertContains(response, "Zählernummer Strom")
         self.assertContains(response, "Zählerstände")
         self.assertContains(response, "Gebäude 1, Wohnung 2.04")
+
+    def test_create_page_only_lists_people_assigned_to_the_selected_unit(self) -> None:
+        other_unit = Wohnung.objects.create(
+            etage=1,
+            wohnungsnummer="1.03",
+            gebaeudenummer="1",
+        )
+        Person.objects.create(
+            vorname="Andere",
+            nachname="Person",
+            email="andere.person@example.test",
+            wohnung=other_unit,
+        )
+
+        response = self.client.get(
+            reverse("wohnungsverwaltung:handover_protocol_create"),
+            {"wohnung": self.wohnung.pk},
+        )
+
         self.assertContains(response, "Mara Muster")
+        self.assertNotContains(response, "Andere Person")
+
+    def test_create_rejects_a_person_from_another_unit(self) -> None:
+        other_unit = Wohnung.objects.create(
+            etage=1,
+            wohnungsnummer="1.03",
+            gebaeudenummer="1",
+        )
+        other_person = Person.objects.create(
+            vorname="Andere",
+            nachname="Person",
+            email="andere.person@example.test",
+            wohnung=other_unit,
+        )
+        data = self.valid_form_data()
+        data["person"] = str(other_person.pk)
+
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("person", response.context["form"].errors)
+        self.assertFalse(Protokoll.objects.exists())
 
     def test_create_requires_all_mandatory_meter_readings(self) -> None:
         data = self.valid_form_data()
@@ -341,6 +383,7 @@ class SeedStandardDataCommandTests(TestCase):
         self.assertEqual(Person.objects.count(), 6)
         self.assertEqual(Protokoll.objects.count(), 2)
         self.assertEqual(Schluessel.objects.count(), 25)
+        self.assertEqual(Person.objects.filter(wohnung__isnull=False).count(), 6)
 
         call_command("seed_standard_data")
 
@@ -348,3 +391,4 @@ class SeedStandardDataCommandTests(TestCase):
         self.assertEqual(Person.objects.count(), 6)
         self.assertEqual(Protokoll.objects.count(), 2)
         self.assertEqual(Schluessel.objects.count(), 25)
+        self.assertEqual(Person.objects.filter(wohnung__isnull=False).count(), 6)

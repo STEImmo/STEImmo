@@ -75,8 +75,8 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options) -> None:
-        people = self._create_people()
         units = self._create_units()
+        people = self._create_people(units)
         self._create_unit_keys(units)
         self._create_handover_protocols(units, people)
         self.stdout.write(
@@ -88,12 +88,15 @@ class Command(BaseCommand):
             )
         )
 
-    def _create_people(self) -> dict[str, Person]:
+    def _create_people(self, units: dict[str, Wohnung]) -> dict[str, Person]:
         people = {}
-        for person_data in STANDARD_PEOPLE:
+        for person_data, unit in zip(STANDARD_PEOPLE, units.values()):
             person, _ = Person.objects.update_or_create(
                 email=person_data["email"],
-                defaults=person_data,
+                defaults={
+                    **person_data,
+                    "wohnung": unit,
+                },
             )
             people[person.email] = person
         return people

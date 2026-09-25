@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from django import forms
 
 from .models import (
@@ -121,12 +123,21 @@ class HandoverProtocolForm(forms.ModelForm):
             "nachbesserung_beschreibung": forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
         }
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, wohnung_id: str | None = None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.fields["wohnung"].queryset = Wohnung.objects.order_by(
             "gebaeudenummer", "wohnungsnummer"
         )
-        self.fields["person"].queryset = Person.objects.order_by("nachname", "vorname")
+        selected_wohnung_id = _valid_wohnung_id(wohnung_id)
+        if selected_wohnung_id is None and self.instance.pk:
+            selected_wohnung_id = self.instance.wohnung_id
+        self.fields["person"].queryset = Person.objects.none()
+        if selected_wohnung_id is not None:
+            self.fields["person"].queryset = Person.objects.filter(
+                wohnung_id=selected_wohnung_id
+            ).order_by("nachname", "vorname")
+            if not self.is_bound:
+                self.initial["wohnung"] = selected_wohnung_id
         self.fields["protokoll_typ"].choices = HANDOVER_TYPE_LABELS.items()
         self.fields["uebergabe_status"].choices = HANDOVER_STATUS_LABELS.items()
         self.fields["abnahme_status"].choices = ACCEPTANCE_STATUS_LABELS.items()
@@ -145,6 +156,13 @@ class HandoverProtocolForm(forms.ModelForm):
                 "Bitte beschreiben Sie die vereinbarte Nachbesserung.",
             )
         return cleaned_data
+
+
+def _valid_wohnung_id(wohnung_id: str | None) -> UUID | None:
+    try:
+        return UUID(str(wohnung_id))
+    except (TypeError, ValueError):
+        return None
 
 
 class RoomProtocolForm(forms.ModelForm):

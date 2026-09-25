@@ -30,7 +30,8 @@ def handover_protocol_list(request: HttpRequest) -> HttpResponse:
 
 
 def handover_protocol_create(request: HttpRequest) -> HttpResponse:
-    form = HandoverProtocolForm(request.POST or None)
+    selected_wohnung_id = request.POST.get("wohnung") or request.GET.get("wohnung")
+    form = HandoverProtocolForm(request.POST or None, wohnung_id=selected_wohnung_id)
     if request.method == "POST" and form.is_valid():
         protocol = form.save()
         messages.success(request, "Das Übergabeprotokoll wurde angelegt.")
@@ -74,7 +75,12 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         messages.warning(request, "Bestätigte Protokolle können nicht mehr bearbeitet werden.")
         return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
-    form = HandoverProtocolForm(request.POST or None, instance=protocol)
+    selected_wohnung_id = request.POST.get("wohnung") or request.GET.get("wohnung")
+    form = HandoverProtocolForm(
+        request.POST or None,
+        instance=protocol,
+        wohnung_id=selected_wohnung_id or protocol.wohnung_id,
+    )
     if request.method == "POST" and form.is_valid():
         protocol = form.save()
         messages.success(request, "Das Übergabeprotokoll wurde aktualisiert.")
