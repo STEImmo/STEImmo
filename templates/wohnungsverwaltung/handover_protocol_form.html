@@ -24,17 +24,45 @@
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         const apartmentSelect = document.getElementById("id_wohnung");
-        if (!apartmentSelect) {
-            return;
+        if (apartmentSelect) {
+            apartmentSelect.addEventListener("change", () => {
+                const url = new URL(window.location.href);
+                if (apartmentSelect.value) {
+                    url.searchParams.set("wohnung", apartmentSelect.value);
+                } else {
+                    url.searchParams.delete("wohnung");
+                }
+                window.location.assign(url);
+            });
         }
-        apartmentSelect.addEventListener("change", () => {
-            const url = new URL(window.location.href);
-            if (apartmentSelect.value) {
-                url.searchParams.set("wohnung", apartmentSelect.value);
-            } else {
-                url.searchParams.delete("wohnung");
+
+        const protocolType = document.getElementById("id_protokoll_typ");
+        const updateTypeSpecificSections = () => {
+            if (!protocolType) {
+                return;
             }
-            window.location.assign(url);
+            document.querySelectorAll("[data-protocol-types]").forEach((section) => {
+                section.hidden = !section.dataset.protocolTypes.split(" ").includes(protocolType.value);
+            });
+        };
+        if (protocolType) {
+            protocolType.addEventListener("change", updateTypeSpecificSections);
+            updateTypeSpecificSections();
+        }
+
+        document.querySelectorAll("[data-add-form]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const totalForms = document.getElementById(`id_${button.dataset.prefix}-TOTAL_FORMS`);
+                const target = document.getElementById(button.dataset.target);
+                const template = document.getElementById(button.dataset.template);
+                if (!totalForms || !target || !template) {
+                    return;
+                }
+                const index = totalForms.value;
+                const content = template.innerHTML.replace(/__prefix__/g, index);
+                target.insertAdjacentHTML("beforeend", content);
+                totalForms.value = String(Number(index) + 1);
+            });
         });
     });
 </script>

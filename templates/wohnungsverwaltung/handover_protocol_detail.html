@@ -29,8 +29,10 @@
                 <dd>{{ protocol.person.vorname }} {{ protocol.person.nachname }}</dd>
                 <dt>Kontakt der beteiligten Person</dt>
                 <dd>{{ protocol.person.email }}{% if protocol.person.telefonnummer %}, {{ protocol.person.telefonnummer }}{% endif %}</dd>
-                <dt>Zukünftige Anschrift</dt>
-                <dd>{{ protocol.mieter_zukuenftige_anschrift|linebreaksbr }}</dd>
+                {% if protocol.protokoll_typ == "move_out" %}
+                    <dt>Zukünftige Anschrift</dt>
+                    <dd>{{ protocol.mieter_zukuenftige_anschrift|linebreaksbr }}</dd>
+                {% endif %}
                 <dt>Übergabeart</dt>
                 <dd>{{ protocol_type_label }}</dd>
                 <dt>Zustand bei Übergabe</dt>
@@ -54,17 +56,21 @@
                 <dd>{{ protocol.heizungsablesungen|linebreaksbr }}</dd>
             </dl>
 
-            <h2 class="uk-heading-divider uk-margin-large-top">Anlagen und Vereinbarungen</h2>
-            <dl class="uk-description-list uk-description-list-divider">
-                <dt>Anlagenblätter</dt>
-                <dd>{{ protocol.anlagenblaetter_anzahl }}</dd>
-                <dt>Kautionsbeleg</dt>
-                <dd>{% if protocol.kaution_nachweis_vorhanden %}Liegt vor{% else %}Liegt nicht vor{% endif %}</dd>
-                <dt>Beleg für erste Miete</dt>
-                <dd>{% if protocol.erste_miete_nachweis_vorhanden %}Liegt vor{% else %}Liegt nicht vor{% endif %}</dd>
-                <dt>Nachbesserung</dt>
-                <dd>{% if protocol.nachbesserung_beschreibung %}{{ protocol.nachbesserung_beschreibung|linebreaksbr }}{% if protocol.nachbesserung_bis %}<br>Frist: {{ protocol.nachbesserung_bis|date:"d.m.Y" }}{% endif %}{% else %}Keine vereinbart{% endif %}</dd>
-            </dl>
+            {% if protocol.protokoll_typ == "move_in" %}
+                <h2 class="uk-heading-divider uk-margin-large-top">Nachweise zum Einzug</h2>
+                <dl class="uk-description-list uk-description-list-divider">
+                    <dt>Kautionsbeleg</dt>
+                    <dd>{% if protocol.kaution_nachweis_vorhanden %}Liegt vor{% else %}Liegt nicht vor{% endif %}</dd>
+                    <dt>Beleg für erste Miete</dt>
+                    <dd>{% if protocol.erste_miete_nachweis_vorhanden %}Liegt vor{% else %}Liegt nicht vor{% endif %}</dd>
+                </dl>
+            {% else %}
+                <h2 class="uk-heading-divider uk-margin-large-top">Nachbesserungen zum Auszug</h2>
+                <dl class="uk-description-list uk-description-list-divider">
+                    <dt>Nachbesserung</dt>
+                    <dd>{% if protocol.nachbesserung_beschreibung %}{{ protocol.nachbesserung_beschreibung|linebreaksbr }}{% if protocol.nachbesserung_bis %}<br>Frist: {{ protocol.nachbesserung_bis|date:"d.m.Y" }}{% endif %}{% else %}Keine vereinbart{% endif %}</dd>
+                </dl>
+            {% endif %}
         </div>
 
         <div class="uk-card uk-card-default uk-card-body uk-margin-top">

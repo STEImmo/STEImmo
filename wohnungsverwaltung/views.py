@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -8,12 +9,14 @@ from .forms import (
     HANDOVER_STATUS_LABELS,
     HANDOVER_TYPE_LABELS,
     HandoverKeyForm,
+    HandoverKeyFormSet,
     HandoverProtocolForm,
+    InlineRoomChecklistFormSet,
     ProtocolConfirmationForm,
     RoomChecklistItemForm,
     RoomProtocolForm,
 )
-from .models import Protokoll, ProtokollStatus, Raumprotokoll
+from .models import Protokoll, ProtokollStatus, ProtokollTyp, Raumprotokoll
 
 PROTOCOL_STATUS_LABELS = {
     ProtokollStatus.OPEN: "In Bearbeitung",
@@ -32,8 +35,21 @@ def handover_protocol_list(request: HttpRequest) -> HttpResponse:
 def handover_protocol_create(request: HttpRequest) -> HttpResponse:
     selected_wohnung_id = request.POST.get("wohnung") or request.GET.get("wohnung")
     form = HandoverProtocolForm(request.POST or None, wohnung_id=selected_wohnung_id)
-    if request.method == "POST" and form.is_valid():
-        protocol = form.save()
+    room_formset = InlineRoomChecklistFormSet(request.POST or None, prefix="rooms")
+    key_formset = HandoverKeyFormSet(
+        request.POST or None,
+        prefix="keys",
+        initial=_key_form_initial(form.selected_wohnung) if request.method != "POST" else None,
+    )
+    if (
+        request.method == "POST"
+        and form.is_valid()
+        and room_formset.is_valid()
+        and key_formset.is_valid()
+    ):
+        with transaction.atomic():
+            protocol = form.save()
+            _save_inline_protocol_entries(protocol, room_formset, key_formset)
         messages.success(request, "Das Übergabeprotokoll wurde angelegt.")
         return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
@@ -44,6 +60,8 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
             "form": form,
             "page_title": "Übergabeprotokoll anlegen",
             "submit_label": "Protokoll anlegen",
+            "room_formset": room_formset,
+            "key_formset": key_formset,
         },
     )
 
@@ -81,8 +99,17 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         instance=protocol,
         wohnung_id=selected_wohnung_id or protocol.wohnung_id,
     )
-    if request.method == "POST" and form.is_valid():
-        protocol = form.save()
+    room_formset = InlineRoomChecklistFormSet(request.POST or None, prefix="rooms")
+    key_formset = HandoverKeyFormSet(request.POST or None, prefix="keys")
+    if (
+        request.method == "POST"
+        and form.is_valid()
+        and room_formset.is_valid()
+        and key_formset.is_valid()
+    ):
+        with transaction.atomic():
+            protocol = form.save()
+            _save_inline_protocol_entries(protocol, room_formset, key_formset)
         messages.success(request, "Das Übergabeprotokoll wurde aktualisiert.")
         return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
@@ -94,6 +121,8 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
             "page_title": "Übergabeprotokoll bearbeiten",
             "submit_label": "Änderungen speichern",
             "protocol": protocol,
+            "room_formset": room_formset,
+            "key_formset": key_formset,
         },
     )
 
@@ -177,7 +206,7 @@ def handover_protocol_confirm(request: HttpRequest, protocol_id) -> HttpResponse
         return HttpResponseNotAllowed(["POST"])
 
     protocol = get_object_or_404(
-        Protokoll.objects.prefetch_related("raeume__raum_merkmale"),
+        Protokoll.objects.prefetch_related("raeume__raum_merkmale", "protokoll_schluessel"),
         pk=protocol_id,
     )
     if protocol.status != ProtokollStatus.OPEN:
@@ -216,7 +245,6 @@ def _protocol_completion_errors(protocol: Protokoll) -> list[str]:
     errors = []
     required_text_fields = {
         "vermieter_name": "die Vertretung des Vermieters",
-        "mieter_zukuenftige_anschrift": "die zukünftige Anschrift",
         "zaehlernummer_wasser_kalt": "die Zählernummer für Kaltwasser",
         "zaehlernummer_wasser_warm": "die Zählernummer für Warmwasser",
         "zaehlernummer_heizung": "die Zählernummer für Heizung",
@@ -226,6 +254,15 @@ def _protocol_completion_errors(protocol: Protokoll) -> list[str]:
     for field_name, label in required_text_fields.items():
         if not getattr(protocol, field_name).strip():
             errors.append(f"Für die Bestätigung fehlt {label}.")
+
+    if (
+        protocol.protokoll_typ == ProtokollTyp.MOVE_OUT
+        and not protocol.mieter_zukuenftige_anschrift.strip()
+    ):
+        errors.append("Für den Auszug fehlt die zukünftige Anschrift.")
+
+    if not list(protocol.protokoll_schluessel.all()):
+        errors.append("Für die Bestätigung muss mindestens eine Schlüsselposition erfasst sein.")
 
     rooms = list(protocol.raeume.all())
     if not rooms:
@@ -241,3 +278,33 @@ def _protocol_completion_errors(protocol: Protokoll) -> list[str]:
             if not str(value.get("text", "")).strip():
                 errors.append(f"Für den Prüfpunkt in „{room.name}“ fehlt eine Feststellung.")
     return errors
+
+
+def _key_form_initial(wohnung) -> list[dict[str, object]]:
+    if wohnung is None:
+        return []
+    return [
+        {
+            "anzahl": key.anzahl,
+            "raum_bezeichnung": key.bezeichnung,
+            "aufschrift": key.aufschrift,
+        }
+        for key in wohnung.schluessel.order_by("bezeichnung")
+    ]
+
+
+def _save_inline_protocol_entries(protocol, room_formset, key_formset) -> None:
+    for room_form in room_formset:
+        if (
+            room_form.cleaned_data
+            and not room_form.cleaned_data.get("DELETE")
+            and room_form.has_entry()
+        ):
+            room_form.save(protocol)
+
+    for key_form in key_formset:
+        if not key_form.cleaned_data or key_form.cleaned_data.get("DELETE"):
+            continue
+        key = key_form.save(commit=False)
+        key.protokoll = protocol
+        key.save()

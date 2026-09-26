@@ -271,7 +271,7 @@ class Protokoll(models.Model):
     person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="protokolle")
     uebergabe_zeitpunkt = models.DateTimeField(default=timezone.now)
     vermieter_name = models.CharField(max_length=255, default="")
-    mieter_zukuenftige_anschrift = models.TextField(default="")
+    mieter_zukuenftige_anschrift = models.TextField(blank=True, default="")
     protokoll_typ = PostgreSQLEnumField(
         enum_type="protokoll_typ_enum",
         choices=ProtokollTyp.choices,

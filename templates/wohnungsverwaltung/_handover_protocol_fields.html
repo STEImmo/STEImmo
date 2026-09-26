@@ -4,7 +4,7 @@
 
 <h2 class="uk-heading-divider">Übergabe und Beteiligte</h2>
 <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
-    {% for field in form.visible_fields|slice:":8" %}
+    {% for field in form.main_fields %}
         <div>
             <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
             <div class="uk-form-controls">
@@ -13,12 +13,30 @@
             </div>
         </div>
     {% endfor %}
+</div>
+
+<div class="uk-margin-top" data-protocol-types="move_out">
+    <label class="uk-form-label" for="{{ form.mieter_zukuenftige_anschrift.id_for_label }}">{{ form.mieter_zukuenftige_anschrift.label }}</label>
+    <div class="uk-form-controls">
+        {{ form.mieter_zukuenftige_anschrift }}
+        {% for error in form.mieter_zukuenftige_anschrift.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+    </div>
 </div>
 
 <h2 class="uk-heading-divider uk-margin-large-top">Zählerstände</h2>
-<p class="uk-text-meta">Zählernummern und Zählerstände sind Pflichtangaben. Die Heizungsablesungen IE, IA und Ib werden im vorgesehenen Feld dokumentiert.</p>
+<p class="uk-text-meta">Die Zählernummern werden aus den Wohnungsstammdaten übernommen und können hier nicht geändert werden.</p>
+{% if form.meter_numbers %}
+    <table class="uk-table uk-table-divider uk-table-small">
+        <thead><tr><th>Zähler</th><th>Zählernummer aus den Stammdaten</th></tr></thead>
+        <tbody>
+            {% for label, number in form.meter_numbers %}<tr><td>{{ label }}</td><td>{{ number }}</td></tr>{% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="uk-text-meta">Bitte wählen Sie zuerst eine Wohnung.</p>
+{% endif %}
 <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
-    {% for field in form.visible_fields|slice:"8:17" %}
+    {% for field in form.meter_reading_fields %}
         <div>
             <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
             <div class="uk-form-controls">
@@ -29,15 +47,116 @@
     {% endfor %}
 </div>
 
-<h2 class="uk-heading-divider uk-margin-large-top">Anlagen und Vereinbarungen</h2>
-<div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
-    {% for field in form.visible_fields|slice:"17:" %}
-        <div>
-            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-            <div class="uk-form-controls">
-                {{ field }}
+<section class="uk-margin-large-top" data-protocol-types="move_in">
+    <h2 class="uk-heading-divider">Nachweise zum Einzug</h2>
+    <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
+        {% for field in form.move_in_fields %}
+            <div>
+                <label>{{ field }} {{ field.label }}</label>
                 {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
             </div>
-        </div>
-    {% endfor %}
-</div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="uk-margin-large-top" data-protocol-types="move_out">
+    <h2 class="uk-heading-divider">Nachbesserungen zum Auszug</h2>
+    <p class="uk-text-meta">Nur bei einem Auszug können Nachbesserungen mit Frist vereinbart werden.</p>
+    <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
+        {% for field in form.move_out_fields %}
+            <div>
+                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                <div class="uk-form-controls">
+                    {{ field }}
+                    {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="uk-margin-large-top">
+    <div class="uk-flex uk-flex-between uk-flex-middle">
+        <h2 class="uk-heading-divider uk-margin-remove">Räume und Prüfpunkte</h2>
+        <button class="uk-button uk-button-default uk-button-small" type="button" data-add-form data-prefix="rooms" data-target="room-formset" data-template="room-empty-form">Raumprüfung hinzufügen</button>
+    </div>
+    <p class="uk-text-meta">Jede Zeile legt das untergeordnete Raumprotokoll und einen vollständigen Prüfpunkt an.</p>
+    {{ room_formset.management_form }}
+    <div id="room-formset">
+        {% for inline_form in room_formset %}
+            <article class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-formset-row>
+                {% for hidden in inline_form.hidden_fields %}{{ hidden }}{% endfor %}
+                <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
+                    {% for field in inline_form.visible_fields %}
+                        {% if field.name != "DELETE" %}
+                            <div>
+                                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                <div class="uk-form-controls">{{ field }}{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                <label class="uk-text-meta">{{ inline_form.DELETE }} Diese Zeile nicht übernehmen</label>
+            </article>
+        {% endfor %}
+    </div>
+    <template id="room-empty-form">
+        <article class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-formset-row>
+            {% for hidden in room_formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+            <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
+                {% for field in room_formset.empty_form.visible_fields %}
+                    {% if field.name != "DELETE" %}
+                        <div>
+                            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <div class="uk-form-controls">{{ field }}</div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <label class="uk-text-meta">{{ room_formset.empty_form.DELETE }} Diese Zeile nicht übernehmen</label>
+        </article>
+    </template>
+</section>
+
+<section class="uk-margin-large-top">
+    <div class="uk-flex uk-flex-between uk-flex-middle">
+        <h2 class="uk-heading-divider uk-margin-remove">Schlüsselübergabe</h2>
+        <button class="uk-button uk-button-default uk-button-small" type="button" data-add-form data-prefix="keys" data-target="key-formset" data-template="key-empty-form">Schlüsselposition hinzufügen</button>
+    </div>
+    <p class="uk-text-meta">Die Schlüssel der gewählten Wohnung werden als Vorschlag aus den Stammdaten übernommen. Fehlende Schlüssel erhalten einen Grund und gegebenenfalls eine Nachlieferfrist.</p>
+    {{ key_formset.management_form }}
+    <div id="key-formset">
+        {% for inline_form in key_formset %}
+            <article class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-formset-row>
+                {% for hidden in inline_form.hidden_fields %}{{ hidden }}{% endfor %}
+                <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
+                    {% for field in inline_form.visible_fields %}
+                        {% if field.name != "DELETE" %}
+                            <div>
+                                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                <div class="uk-form-controls">{{ field }}{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                <label class="uk-text-meta">{{ inline_form.DELETE }} Diese Zeile nicht übernehmen</label>
+            </article>
+        {% endfor %}
+    </div>
+    <template id="key-empty-form">
+        <article class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-formset-row>
+            {% for hidden in key_formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+            <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
+                {% for field in key_formset.empty_form.visible_fields %}
+                    {% if field.name != "DELETE" %}
+                        <div>
+                            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <div class="uk-form-controls">{{ field }}</div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <label class="uk-text-meta">{{ key_formset.empty_form.DELETE }} Diese Zeile nicht übernehmen</label>
+        </article>
+    </template>
+</section>
