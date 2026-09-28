@@ -1,6 +1,7 @@
 import uuid
 
 from django.db import models
+from django.utils import timezone
 
 from .fields import PostgreSQLEnumField
 
@@ -99,6 +100,14 @@ class AbnahmeStatus(models.TextChoices):
 
 class Person(models.Model):
     person_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    is_employee = models.BooleanField(default=False)
+    wohnung = models.ForeignKey(
+        "Wohnung",
+        on_delete=models.SET_NULL,
+        related_name="personen",
+        blank=True,
+        null=True,
+    )
     vorname = models.CharField(max_length=255)
     nachname = models.CharField(max_length=255)
     titel = models.CharField(max_length=255, blank=True, default="")
@@ -117,6 +126,9 @@ class Person(models.Model):
 
     class Meta:
         db_table = "person"
+
+    def __str__(self) -> str:
+        return f"{self.vorname} {self.nachname}"
 
 
 class Wohnung(models.Model):
@@ -162,6 +174,9 @@ class Wohnung(models.Model):
                 condition=models.Q(kaution__gte=0), name="wohnung_kaution_nicht_negativ"
             ),
         ]
+
+    def __str__(self) -> str:
+        return f"Gebäude {self.gebaeudenummer}, Wohnung {self.wohnungsnummer}"
 
 
 class Bewerbung(models.Model):
@@ -255,6 +270,9 @@ class Protokoll(models.Model):
     protokoll_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     wohnung = models.ForeignKey(Wohnung, on_delete=models.CASCADE, related_name="protokolle")
     person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="protokolle")
+    uebergabe_zeitpunkt = models.DateTimeField(default=timezone.now)
+    vermieter_name = models.CharField(max_length=255, default="")
+    mieter_zukuenftige_anschrift = models.TextField(blank=True, default="")
     protokoll_typ = PostgreSQLEnumField(
         enum_type="protokoll_typ_enum",
         choices=ProtokollTyp.choices,
@@ -280,6 +298,19 @@ class Protokoll(models.Model):
     zaehlerstand_wasser_warm = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     zaehlerstand_heizung = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     zaehlerstand_strom = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    zaehlernummer_wasser_kalt = models.CharField(max_length=255, default="")
+    zaehlernummer_wasser_warm = models.CharField(max_length=255, default="")
+    zaehlernummer_heizung = models.CharField(max_length=255, default="")
+    zaehlernummer_strom = models.CharField(max_length=255, default="")
+    heizungsablesungen = models.TextField(default="")
+    anlagenblaetter_anzahl = models.PositiveSmallIntegerField(default=0)
+    kaution_nachweis_vorhanden = models.BooleanField(default=False)
+    erste_miete_nachweis_vorhanden = models.BooleanField(default=False)
+    nachbesserung_bis = models.DateField(blank=True, null=True)
+    nachbesserung_beschreibung = models.TextField(blank=True, default="")
+    schluessel_ueberprueft = models.BooleanField(default=False)
+    bestaetigung_erklaert = models.BooleanField(default=False)
+    bestaetigt_am = models.DateTimeField(blank=True, null=True)
     dokument_pfad = models.TextField(blank=True, default="")
     dokument_hash_sha256 = models.CharField(max_length=64, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -304,6 +335,24 @@ class Protokoll(models.Model):
                 condition=models.Q(zaehlerstand_strom__gte=0),
                 name="protokoll_strom_nicht_negativ",
             ),
+        ]
+
+
+class ProtokollEntwurf(models.Model):
+    protokoll_entwurf_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sitzungsschluessel = models.CharField(max_length=64)
+    entwurfsbereich = models.CharField(max_length=255)
+    daten = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "protokoll_entwurf"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("sitzungsschluessel", "entwurfsbereich"),
+                name="protokoll_entwurf_eindeutig_pro_sitzung_und_bereich",
+            )
         ]
 
 
@@ -334,6 +383,9 @@ class Merkmal(models.Model):
     class Meta:
         db_table = "merkmal"
 
+    def __str__(self) -> str:
+        return f"{self.bereich}: {self.bezeichnung}"
+
 
 class RaumMerkmal(models.Model):
     raum_merkmal_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -346,3 +398,25 @@ class RaumMerkmal(models.Model):
 
     class Meta:
         db_table = "raum_merkmal"
+
+
+class ProtokollSchluessel(models.Model):
+    protokoll_schluessel_id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+    protokoll = models.ForeignKey(
+        Protokoll, on_delete=models.CASCADE, related_name="protokoll_schluessel"
+    )
+    anzahl = models.PositiveSmallIntegerField()
+    raum_bezeichnung = models.CharField(max_length=255)
+    aufschrift = models.CharField(max_length=255, blank=True, default="")
+    schluesselnummer = models.CharField(max_length=255, blank=True, default="")
+    fehlt = models.BooleanField(default=False)
+    fehlgrund = models.TextField(blank=True, default="")
+    nachlieferung_am = models.DateField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "protokoll_schluessel"
