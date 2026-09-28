@@ -1,11 +1,11 @@
 from uuid import UUID
 
 from django import forms
+from django.forms.formsets import BaseFormSet
 
 from .models import (
     AbnahmeStatus,
     Merkmal,
-    MerkmalDatentyp,
     Person,
     Protokoll,
     ProtokollSchluessel,
@@ -41,6 +41,12 @@ METER_NUMBER_FIELDS = (
 
 
 class HandoverProtocolForm(forms.ModelForm):
+    vermieter_name = forms.ChoiceField(
+        label="Anwesend für den Vermieter",
+        choices=(),
+        widget=forms.Select(attrs={"class": "uk-select"}),
+    )
+
     class Meta:
         model = Protokoll
         fields = [
@@ -67,7 +73,6 @@ class HandoverProtocolForm(forms.ModelForm):
             "person": "Beteiligte Person",
             "protokoll_typ": "Übergabeart",
             "uebergabe_zeitpunkt": "Datum und Uhrzeit",
-            "vermieter_name": "Anwesend für den Vermieter",
             "mieter_zukuenftige_anschrift": "Zukünftige Anschrift der beteiligten Person",
             "uebergabe_status": "Zustand bei Übergabe",
             "abnahme_status": "Abnahmestatus",
@@ -88,7 +93,6 @@ class HandoverProtocolForm(forms.ModelForm):
             "uebergabe_zeitpunkt": forms.DateTimeInput(
                 attrs={"class": "uk-input", "type": "datetime-local"}, format="%Y-%m-%dT%H:%M"
             ),
-            "vermieter_name": forms.TextInput(attrs={"class": "uk-input"}),
             "mieter_zukuenftige_anschrift": forms.Textarea(
                 attrs={"class": "uk-textarea", "rows": 3}
             ),
@@ -130,6 +134,15 @@ class HandoverProtocolForm(forms.ModelForm):
             ).order_by("nachname", "vorname")
             if not self.is_bound:
                 self.initial["wohnung"] = selected_wohnung_id
+        self.fields["vermieter_name"].choices = [
+            ("", "Bitte auswählen"),
+            *[
+                (str(employee), str(employee))
+                for employee in Person.objects.filter(is_employee=True).order_by(
+                    "nachname", "vorname"
+                )
+            ],
+        ]
         self.fields["mieter_zukuenftige_anschrift"].required = False
         self.fields["protokoll_typ"].choices = HANDOVER_TYPE_LABELS.items()
         self.fields["uebergabe_status"].choices = HANDOVER_STATUS_LABELS.items()
@@ -268,29 +281,57 @@ class RoomProtocolForm(forms.ModelForm):
         widgets = {"name": forms.TextInput(attrs={"class": "uk-input"})}
 
 
+def _feature_area_choices() -> list[tuple[str, str]]:
+    areas = Merkmal.objects.order_by("bereich").values_list("bereich", flat=True).distinct()
+    return [("", "Bereich wählen"), *((area, area) for area in areas)]
+
+
+class FeatureSelect(forms.Select):
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        feature = getattr(value, "instance", None)
+        if feature is not None:
+            option["attrs"]["data-feature-area"] = feature.bereich
+        return option
+
+
+class FeatureChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj: Merkmal) -> str:
+        return obj.bezeichnung
+
+
 class RoomChecklistItemForm(forms.Form):
-    bereich = forms.CharField(
+    bereich = forms.ChoiceField(
+        choices=(),
         label="Bereich",
-        widget=forms.TextInput(attrs={"class": "uk-input"}),
+        widget=forms.Select(attrs={"class": "uk-select", "data-feature-area-select": ""}),
     )
-    bezeichnung = forms.CharField(
-        label="Prüfpunkt",
-        widget=forms.TextInput(attrs={"class": "uk-input"}),
+    merkmal = FeatureChoiceField(
+        queryset=Merkmal.objects.none(),
+        label="Bezeichnung",
+        widget=FeatureSelect(attrs={"class": "uk-select", "data-feature-name-select": ""}),
     )
     wert = forms.CharField(
         label="Feststellung",
         widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
     )
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["bereich"].choices = _feature_area_choices()
+        self.fields["merkmal"].queryset = Merkmal.objects.order_by("bereich", "bezeichnung")
+
+    def clean(self) -> dict:
+        cleaned_data = super().clean()
+        feature = cleaned_data.get("merkmal")
+        if feature is not None and feature.bereich != cleaned_data.get("bereich"):
+            self.add_error("merkmal", "Die Bezeichnung gehört nicht zum gewählten Bereich.")
+        return cleaned_data
+
     def save(self, room: Raumprotokoll) -> RaumMerkmal:
-        merkmal = Merkmal.objects.create(
-            bereich=self.cleaned_data["bereich"],
-            bezeichnung=self.cleaned_data["bezeichnung"],
-            datentyp=MerkmalDatentyp.OK,
-        )
         return RaumMerkmal.objects.create(
             raumprotokoll=room,
-            merkmal=merkmal,
+            merkmal=self.cleaned_data["merkmal"],
             wert={"text": self.cleaned_data["wert"]},
         )
 
@@ -350,57 +391,92 @@ class ProtocolConfirmationForm(forms.Form):
 
 class InlineRoomChecklistForm(forms.Form):
     raum = forms.CharField(
-        label="Raum / Bereich",
+        label="Raum",
         required=False,
-        widget=forms.TextInput(attrs={"class": "uk-input"}),
+        widget=forms.TextInput(attrs={"class": "uk-input", "data-room-name-source": ""}),
     )
-    bezeichnung = forms.CharField(
-        label="Prüfpunkt",
+    bereich = forms.ChoiceField(
+        choices=(),
+        label="Bereich",
         required=False,
-        widget=forms.TextInput(attrs={"class": "uk-input"}),
+        widget=forms.Select(attrs={"class": "uk-select", "data-feature-area-select": ""}),
+    )
+    merkmal = FeatureChoiceField(
+        queryset=Merkmal.objects.none(),
+        label="Bezeichnung",
+        required=False,
+        widget=FeatureSelect(attrs={"class": "uk-select", "data-feature-name-select": ""}),
     )
     wert = forms.CharField(
         label="Feststellung",
         required=False,
-        widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 2}),
+        widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 5}),
     )
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["bereich"].choices = _feature_area_choices()
+        self.fields["merkmal"].queryset = Merkmal.objects.order_by("bereich", "bezeichnung")
 
     def clean(self) -> dict:
         cleaned_data = super().clean()
-        field_names = ("raum", "bezeichnung", "wert")
         values = {
-            field_name: cleaned_data.get(field_name, "").strip() for field_name in field_names
+            "raum": cleaned_data.get("raum", "").strip(),
+            "bereich": cleaned_data.get("bereich", "").strip(),
+            "merkmal": cleaned_data.get("merkmal"),
+            "wert": cleaned_data.get("wert", "").strip(),
         }
-        if not any(values.values()):
+        if not any((values["bereich"], values["merkmal"], values["wert"])):
             return cleaned_data
-        for field_name, value in values.items():
+        for field_name in ("bereich", "merkmal", "wert"):
+            value = values[field_name]
             if not value:
                 self.add_error(field_name, "Bitte vervollständigen Sie diese Raumprüfung.")
+        feature = cleaned_data.get("merkmal")
+        if feature is not None and feature.bereich != cleaned_data.get("bereich"):
+            self.add_error("merkmal", "Die Bezeichnung gehört nicht zum gewählten Bereich.")
         return cleaned_data
 
     def has_entry(self) -> bool:
-        return bool(self.cleaned_data.get("raum", "").strip())
+        return self.cleaned_data.get("merkmal") is not None
 
     def save(self, protocol: Protokoll) -> RaumMerkmal:
         room, _created = Raumprotokoll.objects.get_or_create(
             protokoll=protocol,
             name=self.cleaned_data["raum"],
         )
-        merkmal = Merkmal.objects.create(
-            bereich=room.name,
-            bezeichnung=self.cleaned_data["bezeichnung"],
-            datentyp=MerkmalDatentyp.OK,
-        )
         return RaumMerkmal.objects.create(
             raumprotokoll=room,
-            merkmal=merkmal,
+            merkmal=self.cleaned_data["merkmal"],
             wert={"text": self.cleaned_data["wert"]},
         )
+
+
+class RoomChecklistFormSet(BaseFormSet):
+    def clean(self) -> None:
+        super().clean()
+        current_room = ""
+        for room_form in self.forms:
+            if (
+                not getattr(room_form, "cleaned_data", None)
+                or room_form.cleaned_data.get("DELETE")
+                or not room_form.has_entry()
+            ):
+                continue
+            room_name = room_form.cleaned_data.get("raum", "").strip()
+            if room_name:
+                current_room = room_name
+                continue
+            if current_room:
+                room_form.cleaned_data["raum"] = current_room
+                continue
+            room_form.add_error("raum", "Bitte geben Sie für den ersten Prüfpunkt einen Raum an.")
 
 
 InlineRoomChecklistFormSet = forms.formset_factory(
     InlineRoomChecklistForm,
     extra=1,
     can_delete=True,
+    formset=RoomChecklistFormSet,
 )
 HandoverKeyFormSet = forms.formset_factory(HandoverKeyForm, extra=1, can_delete=True)

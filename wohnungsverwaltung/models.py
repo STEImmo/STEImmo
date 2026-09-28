@@ -100,6 +100,7 @@ class AbnahmeStatus(models.TextChoices):
 
 class Person(models.Model):
     person_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    is_employee = models.BooleanField(default=False)
     wohnung = models.ForeignKey(
         "Wohnung",
         on_delete=models.SET_NULL,
@@ -337,6 +338,24 @@ class Protokoll(models.Model):
         ]
 
 
+class ProtokollEntwurf(models.Model):
+    protokoll_entwurf_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sitzungsschluessel = models.CharField(max_length=64)
+    entwurfsbereich = models.CharField(max_length=255)
+    daten = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "protokoll_entwurf"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("sitzungsschluessel", "entwurfsbereich"),
+                name="protokoll_entwurf_eindeutig_pro_sitzung_und_bereich",
+            )
+        ]
+
+
 class Raumprotokoll(models.Model):
     raumprotokoll_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     protokoll = models.ForeignKey(Protokoll, on_delete=models.CASCADE, related_name="raeume")
@@ -363,6 +382,9 @@ class Merkmal(models.Model):
 
     class Meta:
         db_table = "merkmal"
+
+    def __str__(self) -> str:
+        return f"{self.bereich}: {self.bezeichnung}"
 
 
 class RaumMerkmal(models.Model):

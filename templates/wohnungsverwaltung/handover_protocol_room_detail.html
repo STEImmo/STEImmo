@@ -15,13 +15,19 @@
                 <dl class="uk-description-list uk-description-list-divider">
                     {% for item in room.raum_merkmale.all %}
                         <dt>{{ item.merkmal.bereich }}: {{ item.merkmal.bezeichnung }}</dt>
-                        <dd>{{ item.wert.text }}</dd>
+                        <dd class="uk-flex uk-flex-between uk-flex-middle">
+                            <span>{{ item.wert.text }}</span>
+                            <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_delete' protocol.pk room.pk item.pk %}">
+                                {% csrf_token %}
+                                <button class="uk-button uk-button-danger uk-button-small" type="submit">Prüfpunkt löschen</button>
+                            </form>
+                        </dd>
                     {% endfor %}
                 </dl>
             </div>
         {% endif %}
 
-        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top">
+        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top" data-room-checklist-form>
             {% csrf_token %}
             <h2 class="uk-heading-divider">Prüfpunkt hinzufügen</h2>
             {% for field in form.visible_fields %}
@@ -36,4 +42,32 @@
         </form>
     </div>
 </section>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const container = document.querySelector("[data-room-checklist-form]");
+        if (!container) {
+            return;
+        }
+        const areaSelect = container.querySelector("[data-feature-area-select]");
+        const nameSelect = container.querySelector("[data-feature-name-select]");
+        const filterFeatureNames = () => {
+            const selectedArea = areaSelect.value;
+            Array.from(nameSelect.options).forEach((option) => {
+                if (!option.dataset.featureArea) {
+                    return;
+                }
+                const belongsToSelectedArea = option.dataset.featureArea === selectedArea;
+                option.hidden = !belongsToSelectedArea;
+                option.disabled = !belongsToSelectedArea;
+            });
+            const selectedOption = nameSelect.selectedOptions[0];
+            if (selectedOption?.dataset.featureArea !== selectedArea) {
+                nameSelect.value = "";
+            }
+            nameSelect.disabled = !selectedArea;
+        };
+        areaSelect.addEventListener("change", filterFeatureNames);
+        filterFeatureNames();
+    });
+</script>
 {% endblock %}

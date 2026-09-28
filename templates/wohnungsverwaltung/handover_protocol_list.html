@@ -13,6 +13,41 @@
             <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_create' %}">Protokoll anlegen</a>
         </div>
 
+        {% if draft_entries %}
+            <div class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+                <h2 class="uk-heading-divider">Gespeicherte Entwürfe</h2>
+                <p class="uk-text-meta">Entwürfe dieses Browsers werden automatisch zwischengespeichert und können fortgesetzt werden.</p>
+                <div class="uk-overflow-auto">
+                    <table class="uk-table uk-table-divider uk-table-middle uk-margin-remove">
+                        <thead>
+                            <tr>
+                                <th>Wohnung</th>
+                                <th>Übergabeart</th>
+                                <th>Zuletzt gespeichert</th>
+                                <th><span class="uk-hidden">Aktion</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in draft_entries %}
+                                <tr>
+                                    <td>{% if entry.wohnung %}Gebäude {{ entry.wohnung.gebaeudenummer }}, Wohnung {{ entry.wohnung.wohnungsnummer }}{% else %}Noch nicht ausgewählt{% endif %}</td>
+                                    <td>{{ entry.protokoll_typ }}</td>
+                                    <td>{{ entry.draft.updated_at|date:"d.m.Y H:i" }}</td>
+                                    <td>
+                                        <a class="uk-button uk-button-primary uk-button-small" href="{{ entry.continue_url }}">Entwurf fortsetzen</a>
+                                        <form class="uk-display-inline" method="post" action="{% url 'wohnungsverwaltung:handover_protocol_draft_delete' entry.draft.pk %}">
+                                            {% csrf_token %}
+                                            <button class="uk-button uk-button-danger uk-button-small" type="submit">Entwurf löschen</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
         {% if protocols %}
             <div class="uk-overflow-auto uk-card uk-card-default">
                 <table class="uk-table uk-table-divider uk-table-middle uk-margin-remove">

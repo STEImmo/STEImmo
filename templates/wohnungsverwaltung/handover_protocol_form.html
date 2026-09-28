@@ -9,8 +9,16 @@
         <h1 class="uk-heading-medium">{{ page_title }}</h1>
         <p class="uk-text-lead">Wählen Sie zuerst die Wohnung. Anschließend stehen nur die dieser Wohnung direkt zugeordneten Personen zur Auswahl.</p>
 
-        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top" id="handover-protocol-form">
+        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top" id="handover-protocol-form" data-draft-scope="{{ draft_scope }}" data-draft-save-url="{% url 'wohnungsverwaltung:handover_protocol_draft_save' %}" data-draft-delete-url="{{ server_draft_delete_url }}">
             {% csrf_token %}
+            <div class="uk-alert-warning" hidden data-protocol-draft-notice>
+                <p>Ein Entwurf vom <span data-protocol-draft-time></span> ist verfügbar.</p>
+                <div class="uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
+                    <div><button class="uk-button uk-button-primary uk-button-small" type="button" data-restore-protocol-draft>Entwurf wiederherstellen</button></div>
+                    <div><button class="uk-button uk-button-default uk-button-small" type="button" data-discard-protocol-draft>Entwurf verwerfen</button></div>
+                </div>
+            </div>
+            <p class="uk-text-meta" aria-live="polite" data-protocol-draft-status></p>
             {% include "wohnungsverwaltung/_handover_protocol_fields.html" %}
             <div class="uk-margin-large-top uk-flex uk-flex-right uk-flex-middle">
                 <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Abbrechen</a>
@@ -19,20 +27,72 @@
                 </div>
             </div>
         </form>
+        {% if server_draft %}{{ server_draft|json_script:"server-protocol-draft" }}{% endif %}
     </div>
 </section>
 <script>
     document.addEventListener("DOMContentLoaded", () => {
+        const protocolForm = document.getElementById("handover-protocol-form");
+        const draftScope = protocolForm?.dataset.draftScope;
+        const draftStorageKey = draftScope ? `handover-protocol-draft:${draftScope}` : null;
+        const draftSaveUrl = protocolForm?.dataset.draftSaveUrl;
+        let serverDraftDeleteUrl = protocolForm?.dataset.draftDeleteUrl || "";
+        const draftMaximumAge = 7 * 24 * 60 * 60 * 1000;
+        const draftNotice = document.querySelector("[data-protocol-draft-notice]");
+        const draftTime = document.querySelector("[data-protocol-draft-time]");
+        const draftStatus = document.querySelector("[data-protocol-draft-status]");
+        let isRestoringDraft = false;
+        let serverDraftTimer;
+
+        const readServerDraft = () => {
+            const serverDraftElement = document.getElementById("server-protocol-draft");
+            if (!serverDraftElement) {
+                return null;
+            }
+            try {
+                return JSON.parse(serverDraftElement.textContent);
+            } catch (error) {
+                return null;
+            }
+        };
+        const csrfToken = () => protocolForm?.querySelector("[name=csrfmiddlewaretoken]")?.value || "";
+
         const apartmentSelect = document.getElementById("id_wohnung");
-        if (apartmentSelect) {
-            apartmentSelect.addEventListener("change", () => {
-                const url = new URL(window.location.href);
-                if (apartmentSelect.value) {
-                    url.searchParams.set("wohnung", apartmentSelect.value);
-                } else {
-                    url.searchParams.delete("wohnung");
+        const updateApartmentDependentFields = async () => {
+            if (!apartmentSelect) {
+                return false;
+            }
+            const url = new URL(window.location.href);
+            if (apartmentSelect.value) {
+                url.searchParams.set("wohnung", apartmentSelect.value);
+            } else {
+                url.searchParams.delete("wohnung");
+            }
+            const response = await fetch(url);
+            if (!response.ok) {
+                return false;
+            }
+            const updatedPage = new DOMParser().parseFromString(await response.text(), "text/html");
+            [
+                "id_person",
+                "meter-number-display",
+                "key-formset-management",
+                "key-formset",
+            ].forEach((id) => {
+                const currentElement = document.getElementById(id);
+                const updatedElement = updatedPage.getElementById(id);
+                if (currentElement && updatedElement) {
+                    currentElement.replaceWith(updatedElement);
                 }
-                window.location.assign(url);
+            });
+            window.history.replaceState(null, "", url);
+            return true;
+        };
+        if (apartmentSelect) {
+            apartmentSelect.addEventListener("change", async () => {
+                saveDraft(true);
+                await updateApartmentDependentFields();
+                saveDraft(true);
             });
         }
 
@@ -50,20 +110,416 @@
             updateTypeSpecificSections();
         }
 
-        document.querySelectorAll("[data-add-form]").forEach((button) => {
-            button.addEventListener("click", () => {
-                const totalForms = document.getElementById(`id_${button.dataset.prefix}-TOTAL_FORMS`);
-                const target = document.getElementById(button.dataset.target);
-                const template = document.getElementById(button.dataset.template);
-                if (!totalForms || !target || !template) {
+        const filterFeatureNames = (container) => {
+            if (!container) {
+                return;
+            }
+            const areaSelect = container.querySelector("[data-feature-area-select]");
+            const nameSelect = container.querySelector("[data-feature-name-select]");
+            if (!areaSelect || !nameSelect) {
+                return;
+            }
+            const selectedArea = areaSelect.value;
+            Array.from(nameSelect.options).forEach((option) => {
+                if (!option.dataset.featureArea) {
                     return;
                 }
-                const index = totalForms.value;
-                const content = template.innerHTML.replace(/__prefix__/g, index);
-                target.insertAdjacentHTML("beforeend", content);
-                totalForms.value = String(Number(index) + 1);
+                const belongsToSelectedArea = option.dataset.featureArea === selectedArea;
+                option.hidden = !belongsToSelectedArea;
+                option.disabled = !belongsToSelectedArea;
+            });
+            const selectedOption = nameSelect.selectedOptions[0];
+            if (selectedOption?.dataset.featureArea !== selectedArea) {
+                nameSelect.value = "";
+            }
+            nameSelect.disabled = !selectedArea;
+        };
+
+        document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
+        const synchronizeRoomCard = (card) => {
+            if (!card) {
+                return;
+            }
+            const roomName = card.querySelector("[data-room-name-source]")?.value || "";
+            card.querySelectorAll("[data-room-name-value]").forEach((input) => {
+                input.value = roomName;
+                input.setAttribute("value", roomName);
+            });
+            const title = card.querySelector("[data-room-title]");
+            if (title) {
+                title.textContent = roomName ? `Raum: ${roomName}` : "Raum";
+            }
+        };
+
+        document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
+        document.addEventListener("change", (event) => {
+            if (event.target.matches("[data-feature-area-select]")) {
+                filterFeatureNames(event.target.closest("[data-room-checklist-form]"));
+                saveDraft(true);
+            }
+        });
+        document.addEventListener("input", (event) => {
+            if (event.target.matches("[data-room-name-source]")) {
+                synchronizeRoomCard(event.target.closest("[data-room-card]"));
+                saveDraft();
+            }
+        });
+
+        const addRoom = () => {
+            const totalForms = document.getElementById("id_rooms-TOTAL_FORMS");
+            const target = document.getElementById("room-formset");
+            const template = document.getElementById("room-empty-form");
+            if (!totalForms || !target || !template) {
+                return;
+            }
+            const content = template.innerHTML.replace(/__prefix__/g, totalForms.value);
+            target.insertAdjacentHTML("beforeend", content);
+            totalForms.value = String(Number(totalForms.value) + 1);
+            const card = target.lastElementChild;
+            synchronizeRoomCard(card);
+            filterFeatureNames(card);
+        };
+
+        const addRoomChecklistItem = (card) => {
+            const totalForms = document.getElementById("id_rooms-TOTAL_FORMS");
+            const target = card?.querySelector("[data-room-checklist-items]");
+            const template = document.getElementById("room-checklist-empty-form");
+            if (!totalForms || !target || !template) {
+                return;
+            }
+            const content = template.innerHTML.replace(/__prefix__/g, totalForms.value);
+            target.insertAdjacentHTML("beforeend", content);
+            totalForms.value = String(Number(totalForms.value) + 1);
+            synchronizeRoomCard(card);
+            filterFeatureNames(target.lastElementChild);
+        };
+
+        document.addEventListener("click", (event) => {
+            if (event.target.closest("[data-add-room]")) {
+                addRoom();
+                saveDraft(true);
+            }
+            const removeRoomButton = event.target.closest("[data-remove-room]");
+            if (removeRoomButton) {
+                const roomCard = removeRoomButton.closest("[data-room-card]");
+                roomCard?.querySelectorAll('input[name$="-DELETE"]').forEach((input) => {
+                    input.checked = true;
+                });
+                if (roomCard) {
+                    roomCard.hidden = true;
+                }
+                saveDraft(true);
+            }
+            const checklistButton = event.target.closest("[data-add-room-checklist]");
+            if (checklistButton) {
+                addRoomChecklistItem(checklistButton.closest("[data-room-card]"));
+                saveDraft(true);
+            }
+            const removeChecklistButton = event.target.closest("[data-remove-room-checklist]");
+            if (removeChecklistButton) {
+                const checklistItem = removeChecklistButton.closest("[data-room-checklist-form]");
+                const deleteField = checklistItem?.querySelector('input[name$="-DELETE"]');
+                if (deleteField) {
+                    deleteField.checked = true;
+                }
+                if (checklistItem) {
+                    checklistItem.hidden = true;
+                }
+                saveDraft(true);
+            }
+            const removeKeyButton = event.target.closest("[data-remove-key]");
+            if (removeKeyButton) {
+                const keyCard = removeKeyButton.closest("[data-key-formset-row]");
+                const deleteField = keyCard?.querySelector('input[name$="-DELETE"]');
+                if (deleteField) {
+                    deleteField.checked = true;
+                }
+                if (keyCard) {
+                    keyCard.hidden = true;
+                }
+                saveDraft(true);
+            }
+        });
+
+        const addKeyForm = () => {
+            const totalForms = document.getElementById("id_keys-TOTAL_FORMS");
+            const target = document.getElementById("key-formset");
+            const template = document.getElementById("key-empty-form");
+            if (!totalForms || !target || !template) {
+                return null;
+            }
+            const content = template.innerHTML.replace(/__prefix__/g, totalForms.value);
+            target.insertAdjacentHTML("beforeend", content);
+            totalForms.value = String(Number(totalForms.value) + 1);
+            return target.lastElementChild;
+        };
+
+        document.querySelectorAll("[data-add-form]").forEach((button) => {
+            button.addEventListener("click", () => {
+                if (button.dataset.prefix === "keys") {
+                    addKeyForm();
+                    saveDraft(true);
+                }
             });
         });
+
+        const protocolFieldNames = [
+            "wohnung",
+            "person",
+            "protokoll_typ",
+            "uebergabe_zeitpunkt",
+            "vermieter_name",
+            "mieter_zukuenftige_anschrift",
+            "uebergabe_status",
+            "abnahme_status",
+            "zaehlerstand_wasser_kalt",
+            "zaehlerstand_wasser_warm",
+            "zaehlerstand_heizung",
+            "heizungsablesungen",
+            "zaehlerstand_strom",
+            "kaution_nachweis_vorhanden",
+            "erste_miete_nachweis_vorhanden",
+            "nachbesserung_bis",
+            "nachbesserung_beschreibung",
+        ];
+        const checklistFieldNames = ["bereich", "merkmal", "wert"];
+        const keyFieldNames = [
+            "anzahl",
+            "raum_bezeichnung",
+            "aufschrift",
+            "schluesselnummer",
+            "fehlt",
+            "fehlgrund",
+            "nachlieferung_am",
+        ];
+
+        const fieldForName = (container, fieldName) => (
+            container?.querySelector(`[name="${fieldName}"]`)
+            || container?.querySelector(`[name$="-${fieldName}"]`)
+        );
+        const serializeFields = (container, fieldNames) => Object.fromEntries(
+            fieldNames.flatMap((fieldName) => {
+                const field = fieldForName(container, fieldName);
+                if (!field) {
+                    return [];
+                }
+                return [[fieldName, {
+                    value: field.value,
+                    checked: field.type === "checkbox" ? field.checked : null,
+                }]];
+            }),
+        );
+        const restoreFields = (container, values) => {
+            Object.entries(values || {}).forEach(([fieldName, state]) => {
+                const field = fieldForName(container, fieldName);
+                if (!field) {
+                    return;
+                }
+                if (field.type === "checkbox") {
+                    field.checked = Boolean(state.checked);
+                } else {
+                    field.value = state.value || "";
+                }
+            });
+        };
+        const currentDraft = () => ({
+            version: 1,
+            savedAt: Date.now(),
+            fields: serializeFields(protocolForm, protocolFieldNames),
+            rooms: Array.from(document.querySelectorAll("[data-room-card]"))
+                .filter((card) => !card.hidden)
+                .map((card) => ({
+                    name: card.querySelector("[data-room-name-source]")?.value || "",
+                    items: Array.from(card.querySelectorAll("[data-room-checklist-form]"))
+                        .filter((item) => !item.hidden)
+                        .map((item) => serializeFields(item, checklistFieldNames)),
+                })),
+            keys: Array.from(document.querySelectorAll("[data-key-formset-row]"))
+                .filter((card) => !card.hidden)
+                .map((card) => serializeFields(card, keyFieldNames)),
+        });
+        const showDraftStatus = (message) => {
+            if (draftStatus) {
+                draftStatus.textContent = message;
+            }
+        };
+        const saveServerDraft = (draft, immediately = false) => {
+            if (!draftSaveUrl || !draftScope) {
+                return;
+            }
+            window.clearTimeout(serverDraftTimer);
+            const persistDraft = async () => {
+                try {
+                    const response = await fetch(draftSaveUrl, {
+                        method: "POST",
+                        keepalive: true,
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": csrfToken(),
+                        },
+                        body: JSON.stringify({scope: draftScope, draft}),
+                    });
+                    if (!response.ok) {
+                        throw new Error("Der Entwurf konnte nicht gespeichert werden.");
+                    }
+                    const result = await response.json();
+                    serverDraftDeleteUrl = result.delete_url || serverDraftDeleteUrl;
+                    showDraftStatus("Zwischengespeichert");
+                } catch (error) {
+                    showDraftStatus("Lokal zwischengespeichert – der Server ist gerade nicht erreichbar.");
+                }
+            };
+            if (immediately) {
+                persistDraft();
+                return;
+            }
+            serverDraftTimer = window.setTimeout(persistDraft, 400);
+        };
+        const saveDraft = (immediately = false) => {
+            if (!draftStorageKey || !protocolForm || isRestoringDraft) {
+                return;
+            }
+            const draft = currentDraft();
+            try {
+                window.localStorage.setItem(draftStorageKey, JSON.stringify(draft));
+                showDraftStatus("Lokal zwischengespeichert");
+            } catch (error) {
+                showDraftStatus("Entwurf wird auf dem Server zwischengespeichert.");
+            }
+            saveServerDraft(draft, immediately);
+        };
+        const readDraft = () => {
+            if (!draftStorageKey) {
+                return null;
+            }
+            try {
+                const serializedDraft = window.localStorage.getItem(draftStorageKey);
+                if (!serializedDraft) {
+                    return null;
+                }
+                const draft = JSON.parse(serializedDraft);
+                if (
+                    draft.version !== 1
+                    || !draft.savedAt
+                    || Date.now() - draft.savedAt > draftMaximumAge
+                ) {
+                    window.localStorage.removeItem(draftStorageKey);
+                    return null;
+                }
+                return draft;
+            } catch (error) {
+                return null;
+            }
+        };
+        const restoreRooms = (rooms) => {
+            const totalForms = document.getElementById("id_rooms-TOTAL_FORMS");
+            const target = document.getElementById("room-formset");
+            if (!totalForms || !target) {
+                return;
+            }
+            target.innerHTML = "";
+            totalForms.value = "0";
+            (rooms || []).forEach((savedRoom) => {
+                addRoom();
+                const card = target.lastElementChild;
+                const roomInput = card?.querySelector("[data-room-name-source]");
+                if (roomInput) {
+                    roomInput.value = savedRoom.name || "";
+                }
+                const savedItems = savedRoom.items?.length ? savedRoom.items : [{}];
+                while (card?.querySelectorAll("[data-room-checklist-form]").length < savedItems.length) {
+                    addRoomChecklistItem(card);
+                }
+                card?.querySelectorAll("[data-room-checklist-form]").forEach((item, index) => {
+                    restoreFields(item, savedItems[index]);
+                    filterFeatureNames(item);
+                });
+                synchronizeRoomCard(card);
+            });
+        };
+        const restoreKeys = (keys) => {
+            const totalForms = document.getElementById("id_keys-TOTAL_FORMS");
+            const target = document.getElementById("key-formset");
+            if (!totalForms || !target) {
+                return;
+            }
+            target.innerHTML = "";
+            totalForms.value = "0";
+            (keys || []).forEach((savedKey) => {
+                restoreFields(addKeyForm(), savedKey);
+            });
+        };
+        const restoreDraft = async (draft) => {
+            if (!draft || !protocolForm) {
+                return;
+            }
+            isRestoringDraft = true;
+            try {
+                const savedApartment = draft.fields?.wohnung?.value;
+                if (apartmentSelect && savedApartment && apartmentSelect.value !== savedApartment) {
+                    apartmentSelect.value = savedApartment;
+                    await updateApartmentDependentFields();
+                }
+                restoreFields(protocolForm, draft.fields);
+                restoreRooms(draft.rooms);
+                restoreKeys(draft.keys);
+                document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
+                document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
+                if (draftNotice) {
+                    draftNotice.hidden = true;
+                }
+                showDraftStatus("Entwurf wiederhergestellt");
+            } finally {
+                isRestoringDraft = false;
+            }
+            saveDraft();
+        };
+        const discardDraft = () => {
+            if (draftStorageKey) {
+                try {
+                    window.localStorage.removeItem(draftStorageKey);
+                } catch (error) {
+                    // Die sichtbare Maske bleibt unabhängig vom lokalen Browser-Speicher nutzbar.
+                }
+            }
+            if (draftNotice) {
+                draftNotice.hidden = true;
+            }
+            if (serverDraftDeleteUrl) {
+                fetch(serverDraftDeleteUrl, {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": csrfToken(),
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                }).catch(() => {
+                    showDraftStatus("Der Entwurf wurde lokal verworfen.");
+                });
+            }
+            showDraftStatus("Entwurf verworfen");
+        };
+
+        protocolForm?.addEventListener("input", saveDraft);
+        protocolForm?.addEventListener("change", () => saveDraft(true));
+        protocolForm?.querySelectorAll("a[href]").forEach((link) => {
+            link.addEventListener("click", () => saveDraft(true));
+        });
+        protocolForm?.addEventListener("submit", () => {
+            window.clearTimeout(serverDraftTimer);
+        });
+        document.querySelector("[data-restore-protocol-draft]")?.addEventListener("click", async () => {
+            await restoreDraft(availableDraft);
+        });
+        document.querySelector("[data-discard-protocol-draft]")?.addEventListener("click", discardDraft);
+
+        const drafts = [readDraft(), readServerDraft()].filter(Boolean);
+        const availableDraft = drafts.sort((first, second) => second.savedAt - first.savedAt)[0];
+        if (availableDraft && draftNotice) {
+            if (draftTime) {
+                draftTime.textContent = new Date(availableDraft.savedAt).toLocaleString("de-DE");
+            }
+            draftNotice.hidden = false;
+        }
     });
 </script>
 {% endblock %}

@@ -80,13 +80,21 @@
             </div>
             {% if protocol.protokoll_schluessel.all %}
                 <table class="uk-table uk-table-divider uk-table-small">
-                    <thead><tr><th>Stück</th><th>Raum / Bezeichnung</th><th>Aufschrift / Nummer</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Stück</th><th>Raum / Bezeichnung</th><th>Aufschrift / Nummer</th><th>Status</th>{% if protocol.status == "open" %}<th></th>{% endif %}</tr></thead>
                     <tbody>
                         {% for key in protocol.protokoll_schluessel.all %}
                             <tr>
                                 <td>{{ key.anzahl }}</td><td>{{ key.raum_bezeichnung }}</td>
                                 <td>{{ key.aufschrift }}{% if key.aufschrift and key.schluesselnummer %} / {% endif %}{{ key.schluesselnummer }}</td>
                                 <td>{% if key.fehlt %}Fehlt: {{ key.fehlgrund }}{% if key.nachlieferung_am %} (Nachlieferung {{ key.nachlieferung_am|date:"d.m.Y" }}){% endif %}{% else %}Übergeben{% endif %}</td>
+                                {% if protocol.status == "open" %}
+                                    <td>
+                                        <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_key_delete' protocol.pk key.pk %}">
+                                            {% csrf_token %}
+                                            <button class="uk-button uk-button-danger uk-button-small" type="submit">Schlüsselposition löschen</button>
+                                        </form>
+                                    </td>
+                                {% endif %}
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -110,13 +118,29 @@
                                 {% if room.raum_merkmale.all %}
                                     <ul class="uk-list uk-list-divider">
                                         {% for item in room.raum_merkmale.all %}
-                                            <li><strong>{{ item.merkmal.bereich }}: {{ item.merkmal.bezeichnung }}</strong><br>{{ item.wert.text }}</li>
+                                            <li class="uk-flex uk-flex-between uk-flex-middle">
+                                                <div><strong>{{ item.merkmal.bereich }}: {{ item.merkmal.bezeichnung }}</strong><br>{{ item.wert.text }}</div>
+                                                {% if protocol.status == "open" %}
+                                                    <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_delete' protocol.pk room.pk item.pk %}">
+                                                        {% csrf_token %}
+                                                        <button class="uk-button uk-button-danger uk-button-small" type="submit">Prüfpunkt löschen</button>
+                                                    </form>
+                                                {% endif %}
+                                            </li>
                                         {% endfor %}
                                     </ul>
                                 {% else %}
                                     <p class="uk-text-danger">Noch keine Prüfpunkte erfasst.</p>
                                 {% endif %}
-                                {% if protocol.status == "open" %}<a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_room_detail' protocol.pk room.pk %}">Prüfpunkte bearbeiten</a>{% endif %}
+                                {% if protocol.status == "open" %}
+                                    <div class="uk-flex uk-flex-between uk-flex-middle">
+                                        <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_room_detail' protocol.pk room.pk %}">Prüfpunkte bearbeiten</a>
+                                        <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_room_delete' protocol.pk room.pk %}">
+                                            {% csrf_token %}
+                                            <button class="uk-button uk-button-danger uk-button-small" type="submit">Raum löschen</button>
+                                        </form>
+                                    </div>
+                                {% endif %}
                             </article>
                         </div>
                     {% endfor %}
@@ -140,4 +164,17 @@
         {% endif %}
     </div>
 </section>
+{% if draft_key_to_clear %}
+    <span hidden data-draft-key-to-clear="{{ draft_key_to_clear }}"></span>
+    <script>
+        const draftKeyToClear = document.querySelector("[data-draft-key-to-clear]")?.dataset.draftKeyToClear;
+        if (draftKeyToClear) {
+            try {
+                window.localStorage.removeItem(draftKeyToClear);
+            } catch (error) {
+                // Das bestätigte Protokoll bleibt gespeichert, auch wenn der Browser keinen lokalen Speicher zulässt.
+            }
+        }
+    </script>
+{% endif %}
 {% endblock %}

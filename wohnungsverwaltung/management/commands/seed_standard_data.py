@@ -31,6 +31,7 @@ STANDARD_PEOPLE = [
         "email": "nora.neumann@example.test",
         "telefonnummer": "+49 30 555 0101",
         "geschlecht": Geschlecht.FEMALE,
+        "is_employee": False,
     },
     {
         "vorname": "Ben",
@@ -38,6 +39,7 @@ STANDARD_PEOPLE = [
         "email": "ben.berger@example.test",
         "telefonnummer": "+49 30 555 0102",
         "geschlecht": Geschlecht.MALE,
+        "is_employee": False,
     },
     {
         "vorname": "Lara",
@@ -45,6 +47,7 @@ STANDARD_PEOPLE = [
         "email": "lara.lorenz@example.test",
         "telefonnummer": "+49 30 555 0103",
         "geschlecht": Geschlecht.FEMALE,
+        "is_employee": False,
     },
     {
         "vorname": "David",
@@ -52,6 +55,7 @@ STANDARD_PEOPLE = [
         "email": "david.dahl@example.test",
         "telefonnummer": "+49 30 555 0104",
         "geschlecht": Geschlecht.MALE,
+        "is_employee": False,
     },
     {
         "vorname": "Emilia",
@@ -59,6 +63,7 @@ STANDARD_PEOPLE = [
         "email": "emilia.engel@example.test",
         "telefonnummer": "+49 30 555 0105",
         "geschlecht": Geschlecht.FEMALE,
+        "is_employee": False,
     },
     {
         "vorname": "Jonas",
@@ -66,7 +71,51 @@ STANDARD_PEOPLE = [
         "email": "jonas.jansen@example.test",
         "telefonnummer": "+49 30 555 0106",
         "geschlecht": Geschlecht.MALE,
+        "is_employee": False,
     },
+]
+
+STANDARD_EMPLOYEES = [
+    {
+        "vorname": "Mira",
+        "nachname": "Verwaltung",
+        "email": "mira.verwaltung@example.test",
+        "telefonnummer": "+49 30 555 0199",
+        "geschlecht": Geschlecht.FEMALE,
+        "is_employee": True,
+    },
+    {
+        "vorname": "Leon",
+        "nachname": "Verwaltung",
+        "email": "leon.verwaltung@example.test",
+        "telefonnummer": "+49 30 555 0200",
+        "geschlecht": Geschlecht.MALE,
+        "is_employee": True,
+    },
+]
+
+WALL_FEATURES = [
+    ("Reibeputz", MerkmalDatentyp.REIBEPUTZ, []),
+    ("Gekalkt", MerkmalDatentyp.GEKALKT, []),
+    ("Ohne Tapete", MerkmalDatentyp.OHNE_TAPETE, []),
+    ("Tapezierfähig", MerkmalDatentyp.TAPEZIERFAEHIG, []),
+    ("Raufaser", MerkmalDatentyp.RAUFASER, []),
+    ("Textiltapete", MerkmalDatentyp.TEXTILTAPETE, []),
+    ("Gemusterte Tapete", MerkmalDatentyp.GEMUSTERTE_TAPETE, []),
+    ("Holzverkleidung", MerkmalDatentyp.HOLZVERKLEIDUNG, []),
+    ("Gestrichen in Farbe", MerkmalDatentyp.GESTRICHEN, ["Farbe"]),
+    ("Ordentlich", MerkmalDatentyp.ORDENTLICH, []),
+    ("Unsauber", MerkmalDatentyp.UNSAUBER, []),
+    ("Fliesen", MerkmalDatentyp.FLIESEN, []),
+    ("Stein", MerkmalDatentyp.STEIN, []),
+    ("Neu", MerkmalDatentyp.NEU, []),
+    ("Neuwertig", MerkmalDatentyp.NEUWERTIG, []),
+    ("Gebrauchsspuren", MerkmalDatentyp.GEBRAUCHSSPUREN, []),
+    ("Sehr abgenutzt", MerkmalDatentyp.SEHR_ABGENUTZT, []),
+    ("Schäden", MerkmalDatentyp.NICHT_OK, ["Beschreibung"]),
+    ("Anzahl der Bohr- und Nagellöcher", MerkmalDatentyp.OK, ["Anzahl"]),
+    ("Bohrlöcher sind glatt zugegipst", MerkmalDatentyp.GLATT_ZUGEGIPST, []),
+    ("Bohrlöcher sind unsauber zugegipst", MerkmalDatentyp.UNSAUBER_ZUGEGIPST, []),
 ]
 
 
@@ -77,6 +126,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options) -> None:
         units = self._create_units()
         people = self._create_people(units)
+        self._create_wall_features()
         self._create_unit_keys(units)
         self._create_handover_protocols(units, people)
         self.stdout.write(
@@ -99,6 +149,15 @@ class Command(BaseCommand):
                 },
             )
             people[person.email] = person
+        for employee_data in STANDARD_EMPLOYEES:
+            employee, _ = Person.objects.update_or_create(
+                email=employee_data["email"],
+                defaults={
+                    **employee_data,
+                    "wohnung": None,
+                },
+            )
+            people[employee.email] = employee
         return people
 
     def _create_units(self) -> dict[str, Wohnung]:
@@ -149,12 +208,22 @@ class Command(BaseCommand):
                 },
             )
 
+    def _create_wall_features(self) -> None:
+        for name, data_type, options in WALL_FEATURES:
+            Merkmal.objects.update_or_create(
+                bereich="Wände",
+                bezeichnung=name,
+                defaults={"datentyp": data_type, "optionen": options},
+            )
+
     def _create_handover_protocols(
         self, units: dict[str, Wohnung], people: dict[str, Person]
     ) -> None:
+        landlord_name = str(people["mira.verwaltung@example.test"])
         signed_protocol = self._get_or_create_protocol(
             unit=units["1.01"],
             person=people["nora.neumann@example.test"],
+            landlord_name=landlord_name,
             protocol_type=ProtokollTyp.MOVE_IN,
             status=ProtokollStatus.SIGNED,
             timestamp=timezone.make_aware(datetime(2026, 9, 1, 10, 0)),
@@ -164,6 +233,7 @@ class Command(BaseCommand):
         open_protocol = self._get_or_create_protocol(
             unit=units["1.02"],
             person=people["ben.berger@example.test"],
+            landlord_name=landlord_name,
             protocol_type=ProtokollTyp.MOVE_OUT,
             status=ProtokollStatus.OPEN,
             timestamp=timezone.make_aware(datetime(2026, 9, 25, 14, 30)),
@@ -175,6 +245,7 @@ class Command(BaseCommand):
         *,
         unit: Wohnung,
         person: Person,
+        landlord_name: str,
         protocol_type: str,
         status: str,
         timestamp: datetime,
@@ -186,7 +257,7 @@ class Command(BaseCommand):
             defaults={
                 "status": status,
                 "uebergabe_zeitpunkt": timestamp,
-                "vermieter_name": "STEImmo Verwaltung",
+                "vermieter_name": landlord_name,
                 "mieter_zukuenftige_anschrift": "Beispielallee 12\n12345 Musterstadt",
                 "uebergabe_status": UebergabeStatus.RENOVATED,
                 "abnahme_status": AbnahmeStatus.ACCEPTED_WITH_RESERVATION,
