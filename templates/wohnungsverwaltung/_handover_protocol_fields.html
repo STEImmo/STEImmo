@@ -1,0 +1,227 @@
+{% if form.non_field_errors %}
+    <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>
+{% endif %}
+
+<h2 class="uk-heading-divider">Übergabe und Beteiligte</h2>
+<div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
+    {% for field in form.main_fields %}
+        <div>
+            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <div class="uk-form-controls">
+                {{ field }}
+                {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<div class="uk-margin-top" data-protocol-types="move_out">
+    <label class="uk-form-label" for="{{ form.mieter_zukuenftige_anschrift.id_for_label }}">{{ form.mieter_zukuenftige_anschrift.label }}</label>
+    <div class="uk-form-controls">
+        {{ form.mieter_zukuenftige_anschrift }}
+        {% for error in form.mieter_zukuenftige_anschrift.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+    </div>
+</div>
+
+<h2 class="uk-heading-divider uk-margin-large-top">Zählerstände</h2>
+<p class="uk-text-meta">Die Zählernummern werden aus den Wohnungsstammdaten übernommen und können hier nicht geändert werden.</p>
+<div id="meter-number-display">
+    {% if form.meter_numbers %}
+        <table class="uk-table uk-table-divider uk-table-small">
+            <thead><tr><th>Zähler</th><th>Zählernummer aus den Stammdaten</th></tr></thead>
+            <tbody>
+                {% for label, number in form.meter_numbers %}<tr><td>{{ label }}</td><td>{{ number }}</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="uk-text-meta">Bitte wählen Sie zuerst eine Wohnung.</p>
+    {% endif %}
+</div>
+<div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
+    {% for field in form.meter_reading_fields %}
+        <div>
+            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <div class="uk-form-controls">
+                {{ field }}
+                {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<section class="uk-margin-large-top" data-protocol-types="move_in">
+    <h2 class="uk-heading-divider">Nachweise zum Einzug</h2>
+    <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
+        {% for field in form.move_in_fields %}
+            <div>
+                <label>{{ field }} {{ field.label }}</label>
+                {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="uk-margin-large-top" data-protocol-types="move_out">
+    <h2 class="uk-heading-divider">Nachbesserungen zum Auszug</h2>
+    <p class="uk-text-meta">Nur bei einem Auszug können Nachbesserungen mit Frist vereinbart werden.</p>
+    <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
+        {% for field in form.move_out_fields %}
+            <div>
+                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                <div class="uk-form-controls">
+                    {{ field }}
+                    {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="uk-margin-large-top">
+    <div class="uk-flex uk-flex-between uk-flex-middle">
+        <h2 class="uk-heading-divider uk-margin-remove">Räume und Prüfpunkte</h2>
+        <button class="uk-button uk-button-default uk-button-small" type="button" data-add-room>Raum hinzufügen</button>
+    </div>
+    <p class="uk-text-meta">Jede Raumkarte fasst alle zugehörigen Prüfpunkte zusammen.</p>
+    {{ room_formset.management_form }}
+    <div id="room-formset">
+        {% for group in room_form_groups %}
+            <article class="uk-card uk-card-default uk-margin" data-room-card>
+                <header class="uk-card-header">
+                    <div class="uk-flex uk-flex-between uk-flex-middle">
+                        <h3 class="uk-card-title uk-margin-remove" data-room-title>Raum</h3>
+                        <button class="uk-button uk-button-danger uk-button-small" type="button" data-remove-room>Raum entfernen</button>
+                    </div>
+                    <div class="uk-margin-small-top">
+                        <label class="uk-form-label" for="{{ group.room_form.raum.id_for_label }}">{{ group.room_form.raum.label }}</label>
+                        <div class="uk-form-controls">
+                            {{ group.room_form.raum }}
+                            {% for error in group.room_form.raum.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                        </div>
+                    </div>
+                </header>
+                <div class="uk-card-body">
+                    <h4 class="uk-heading-bullet">Prüfpunkte</h4>
+                    <div data-room-checklist-items>
+                        {% for checklist_form in group.checklist_forms %}
+                            <div class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-room-checklist-form>
+                                <div hidden>{{ checklist_form.DELETE }}</div>
+                                {% if not forloop.first %}
+                                    <input type="hidden" name="{{ checklist_form.raum.html_name }}" id="{{ checklist_form.raum.id_for_label }}" value="{{ checklist_form.raum.value|default_if_none:'' }}" data-room-name-value>
+                                {% endif %}
+                                <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
+                                    {% for field in checklist_form.visible_fields %}
+                                        {% if field.name != "raum" and field.name != "DELETE" %}
+                                            <div{% if field.name == "wert" %} class="uk-width-1-1"{% endif %}>
+                                                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                                <div class="uk-form-controls">{{ field }}{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                <button class="uk-button uk-button-danger uk-button-small uk-margin-small-top" type="button" data-remove-room-checklist>Prüfpunkt entfernen</button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <button class="uk-button uk-button-default uk-button-small uk-margin-small-top" type="button" data-add-room-checklist>Prüfpunkt hinzufügen</button>
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+    <template id="room-empty-form">
+        <article class="uk-card uk-card-default uk-margin" data-room-card>
+            <header class="uk-card-header">
+                <div class="uk-flex uk-flex-between uk-flex-middle">
+                    <h3 class="uk-card-title uk-margin-remove" data-room-title>Raum</h3>
+                    <button class="uk-button uk-button-danger uk-button-small" type="button" data-remove-room>Raum entfernen</button>
+                </div>
+                <div class="uk-margin-small-top">
+                    <label class="uk-form-label" for="{{ room_formset.empty_form.raum.id_for_label }}">{{ room_formset.empty_form.raum.label }}</label>
+                    <div class="uk-form-controls">{{ room_formset.empty_form.raum }}</div>
+                </div>
+            </header>
+            <div class="uk-card-body">
+                <h4 class="uk-heading-bullet">Prüfpunkte</h4>
+                <div data-room-checklist-items>
+                    <div class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-room-checklist-form>
+                        <div hidden>{{ room_formset.empty_form.DELETE }}</div>
+                        <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
+                            {% for field in room_formset.empty_form.visible_fields %}
+                                {% if field.name != "raum" and field.name != "DELETE" %}
+                                    <div{% if field.name == "wert" %} class="uk-width-1-1"{% endif %}>
+                                        <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                        <div class="uk-form-controls">{{ field }}</div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <button class="uk-button uk-button-danger uk-button-small uk-margin-small-top" type="button" data-remove-room-checklist>Prüfpunkt entfernen</button>
+                    </div>
+                </div>
+                <button class="uk-button uk-button-default uk-button-small uk-margin-small-top" type="button" data-add-room-checklist>Prüfpunkt hinzufügen</button>
+            </div>
+        </article>
+    </template>
+    <template id="room-checklist-empty-form">
+        <div class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-room-checklist-form>
+            <input type="hidden" name="rooms-__prefix__-raum" id="id_rooms-__prefix__-raum" data-room-name-value>
+            <div hidden>{{ room_formset.empty_form.DELETE }}</div>
+            <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
+                {% for field in room_formset.empty_form.visible_fields %}
+                    {% if field.name != "raum" and field.name != "DELETE" %}
+                        <div{% if field.name == "wert" %} class="uk-width-1-1"{% endif %}>
+                            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <div class="uk-form-controls">{{ field }}</div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <button class="uk-button uk-button-danger uk-button-small uk-margin-small-top" type="button" data-remove-room-checklist>Prüfpunkt entfernen</button>
+        </div>
+    </template>
+</section>
+
+<section class="uk-margin-large-top">
+    <div class="uk-flex uk-flex-between uk-flex-middle">
+        <h2 class="uk-heading-divider uk-margin-remove">Schlüsselübergabe</h2>
+        <button class="uk-button uk-button-default uk-button-small" type="button" data-add-form data-prefix="keys" data-target="key-formset" data-template="key-empty-form">Schlüsselposition hinzufügen</button>
+    </div>
+    <p class="uk-text-meta">Die Schlüssel der gewählten Wohnung werden als Vorschlag aus den Stammdaten übernommen. Fehlende Schlüssel erhalten einen Grund und gegebenenfalls eine Nachlieferfrist.</p>
+    <div id="key-formset-management">{{ key_formset.management_form }}</div>
+    <div id="key-formset">
+        {% for inline_form in key_formset %}
+            <article class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-formset-row data-key-formset-row>
+                {% for hidden in inline_form.hidden_fields %}{{ hidden }}{% endfor %}
+                <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
+                    {% for field in inline_form.visible_fields %}
+                        {% if field.name != "DELETE" %}
+                            <div>
+                                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                <div class="uk-form-controls">{{ field }}{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                <div hidden>{{ inline_form.DELETE }}</div>
+                <button class="uk-button uk-button-danger uk-button-small uk-margin-small-top" type="button" data-remove-key>Schlüsselposition entfernen</button>
+            </article>
+        {% endfor %}
+    </div>
+    <template id="key-empty-form">
+        <article class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-formset-row data-key-formset-row>
+            {% for hidden in key_formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+            <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
+                {% for field in key_formset.empty_form.visible_fields %}
+                    {% if field.name != "DELETE" %}
+                        <div>
+                            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <div class="uk-form-controls">{{ field }}</div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <div hidden>{{ key_formset.empty_form.DELETE }}</div>
+            <button class="uk-button uk-button-danger uk-button-small uk-margin-small-top" type="button" data-remove-key>Schlüsselposition entfernen</button>
+        </article>
+    </template>
+</section>

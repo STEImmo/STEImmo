@@ -1,410 +1,908 @@
+import json
 from decimal import Decimal
 
-from django.contrib.auth import get_user_model
-from django.db import IntegrityError, connection, transaction
-from django.db.migrations.executor import MigrationExecutor
-from django.test import TestCase, TransactionTestCase
+from django import forms
+from django.core.management import call_command
+from django.test import Client, TestCase
 from django.urls import reverse
 
-from .forms import StellplatzForm, StellplatzZuordnungForm
+from .forms import InlineRoomChecklistFormSet, RoomChecklistItemForm
 from .models import (
+    AbnahmeStatus,
+    Merkmal,
+    MerkmalDatentyp,
+    Person,
+    Protokoll,
+    ProtokollEntwurf,
+    ProtokollStatus,
+    ProtokollTyp,
     Schluessel,
-    Stellplatz,
-    StellplatzTyp,
-    StellplatzZuordnung,
+    UebergabeStatus,
     Wohnung,
-    WohnungStatus,
 )
 
 
-class ManagementViewTests(TestCase):
+class HandoverProtocolViewsTests(TestCase):
     def setUp(self) -> None:
-        self.staff_user = get_user_model().objects.create_user(
-            username="mitarbeiter",
-            password="sicheres-passwort",
-            is_staff=True,
+        self.wohnung = Wohnung.objects.create(
+            etage=2,
+            wohnungsnummer="2.04",
+            gebaeudenummer="1",
+            zaehlernummer_wasser_kalt="KW-1001",
+            zaehlernummer_wasser_warm="WW-1002",
+            zaehlernummer_heizung="HZ-1003",
+            zaehlernummer_strom="ST-1004",
         )
-        self.regular_user = get_user_model().objects.create_user(
-            username="besucher",
-            password="sicheres-passwort",
+        self.person = Person.objects.create(
+            vorname="Mara",
+            nachname="Muster",
+            email="mara.muster@example.test",
+            wohnung=self.wohnung,
         )
-
-    def wohnung(self, **overrides) -> Wohnung:
-        defaults = {
-            "gebaeudenummer": "A",
-            "wohnungsnummer": "1",
-            "etage": 1,
-            "groesse_qm": Decimal("42.50"),
-            "zimmeranzahl": Decimal("2.00"),
-            "kaltmiete": Decimal("500.00"),
-            "warmmiete": Decimal("650.00"),
-            "kaution": Decimal("1000.00"),
-        }
-        defaults.update(overrides)
-        return Wohnung.objects.create(**defaults)
-
-    def wohnung_payload(self, wohnung: Wohnung | None = None) -> dict[str, str]:
-        data = {
-            "gebaeudenummer": "B",
-            "wohnungsnummer": "17",
-            "etage": "2",
-            "groesse_qm": "51.25",
-            "zimmeranzahl": "2.5",
-            "kaltmiete": "650.00",
-            "warmmiete": "790.00",
-            "kaution": "1300.00",
-            "barrierefrei": "on",
-            "zaehlernummer_wasser_kalt": "KW-1",
-            "zaehlernummer_wasser_warm": "WW-2",
-            "zaehlernummer_heizung": "HZ-3",
-            "zaehlernummer_strom": "ST-4",
-            "schluessel-TOTAL_FORMS": "1",
-            "schluessel-INITIAL_FORMS": "0",
-            "schluessel-MIN_NUM_FORMS": "0",
-            "schluessel-MAX_NUM_FORMS": "1000",
-            "schluessel-0-schluessel_id": "",
-            "schluessel-0-bezeichnung": "",
-            "schluessel-0-anzahl": "0",
-            "schluessel-0-aufschrift": "",
-            "schluessel-0-status": "",
-        }
-        if wohnung is not None:
-            data["gebaeudenummer"] = wohnung.gebaeudenummer
-            data["wohnungsnummer"] = wohnung.wohnungsnummer
-            data["etage"] = str(wohnung.etage)
-            data["groesse_qm"] = str(wohnung.groesse_qm)
-            data["zimmeranzahl"] = str(wohnung.zimmeranzahl)
-            data["kaltmiete"] = str(wohnung.kaltmiete)
-            data["warmmiete"] = str(wohnung.warmmiete)
-            data["kaution"] = str(wohnung.kaution)
-        return data
-
-    @staticmethod
-    def stellplatz_payload(
-        *,
-        name: str = "TG-07",
-        stellplatz_typ: str = StellplatzTyp.CAR,
-        wohnung: Wohnung | None = None,
-        miete: str = "0.00",
-    ) -> dict[str, str]:
-        return {
-            "name": name,
-            "stellplatz_typ": stellplatz_typ,
-            "wohnung": str(wohnung.pk) if wohnung else "",
-            "miete": miete,
-        }
-
-    def force_staff_login(self) -> None:
-        self.client.force_login(self.staff_user)
-
-    def test_management_pages_require_staff_members(self) -> None:
-        url = reverse("wohnungsverwaltung:wohnung_list")
-
-        response = self.client.get(url)
-        self.assertRedirects(response, f"/admin/login/?next={url}")
-
-        self.client.force_login(self.regular_user)
-        response = self.client.get(url)
-        self.assertRedirects(response, f"/admin/login/?next={url}")
-
-        self.force_staff_login()
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_wohnung_list_is_sorted_by_floor_then_number(self) -> None:
-        self.wohnung(etage=2, wohnungsnummer="01")
-        self.wohnung(etage=1, wohnungsnummer="99")
-        self.wohnung(etage=1, wohnungsnummer="02")
-        self.force_staff_login()
-
-        response = self.client.get(reverse("wohnungsverwaltung:wohnung_list"))
-
-        self.assertEqual(
-            [wohnung.wohnungsnummer for wohnung in response.context["wohnungen"]],
-            ["02", "99", "01"],
+        self.employee = Person.objects.create(
+            vorname="Emil",
+            nachname="Example",
+            email="emil.example@example.test",
+            is_employee=True,
         )
-
-    def test_create_wohnung_persists_only_allowed_stammdaten(self) -> None:
-        self.force_staff_login()
-
-        response = self.client.post(
-            reverse("wohnungsverwaltung:wohnung_create"),
-            self.wohnung_payload(),
+        self.room_feature = Merkmal.objects.create(
+            bereich="Küche",
+            bezeichnung="Fenster",
+            datentyp=MerkmalDatentyp.OK,
         )
-
-        wohnung = Wohnung.objects.get(wohnungsnummer="17")
-        self.assertRedirects(
-            response,
-            reverse("wohnungsverwaltung:wohnung_edit", args=[wohnung.pk]),
+        self.second_room_feature = Merkmal.objects.create(
+            bereich="Küche",
+            bezeichnung="Boden",
+            datentyp=MerkmalDatentyp.OK,
         )
-        self.assertEqual(wohnung.status, WohnungStatus.FREE)
-        self.assertTrue(wohnung.barrierefrei)
-        self.assertEqual(wohnung.zaehlernummer_strom, "ST-4")
-
-    def test_wohnung_form_does_not_allow_status_changes(self) -> None:
-        wohnung = self.wohnung(status=WohnungStatus.TAKEN)
-        self.force_staff_login()
-
-        response = self.client.get(reverse("wohnungsverwaltung:wohnung_edit", args=[wohnung.pk]))
-        self.assertNotIn("status", response.context["form"].fields)
-
-        payload = self.wohnung_payload(wohnung)
-        payload["status"] = WohnungStatus.BLOCKED
-        response = self.client.post(
-            reverse("wohnungsverwaltung:wohnung_edit", args=[wohnung.pk]),
-            payload,
+        self.living_room_feature = Merkmal.objects.create(
+            bereich="Wohnzimmer",
+            bezeichnung="Boden",
+            datentyp=MerkmalDatentyp.OK,
         )
-        if response.status_code != 302:
-            self.fail(
-                f"Schlüsselformset ist ungültig: {response.context['schluessel_formset'].errors}"
-            )
-
-        wohnung.refresh_from_db()
-        self.assertEqual(wohnung.status, WohnungStatus.TAKEN)
-
-    def test_wohnung_rejects_negative_values(self) -> None:
-        self.force_staff_login()
-        payload = self.wohnung_payload()
-        payload["groesse_qm"] = "-0.01"
-
-        response = self.client.post(reverse("wohnungsverwaltung:wohnung_create"), payload)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(Wohnung.objects.filter(wohnungsnummer="17").exists())
-        self.assertTrue(response.context["form"].errors)
-
-    def test_key_formset_can_create_update_and_delete_keys(self) -> None:
-        wohnung = self.wohnung()
-        existing_key = Schluessel.objects.create(
-            wohnung=wohnung,
-            bezeichnung="Haustür",
+        Schluessel.objects.create(
+            wohnung=self.wohnung,
+            bezeichnung="Wohnungstür",
             anzahl=2,
-            aufschrift="H1",
+            aufschrift="A",
             status="in_use",
         )
-        self.force_staff_login()
-        payload = self.wohnung_payload(wohnung)
-        payload.update(
-            {
-                "schluessel-TOTAL_FORMS": "2",
-                "schluessel-INITIAL_FORMS": "1",
-                "schluessel-0-schluessel_id": str(existing_key.pk),
-                "schluessel-0-bezeichnung": "Haustür",
-                "schluessel-0-anzahl": "3",
-                "schluessel-0-aufschrift": "H2",
-                "schluessel-0-status": "in_use",
-                "schluessel-1-schluessel_id": "",
-                "schluessel-1-bezeichnung": "Keller",
-                "schluessel-1-anzahl": "1",
-                "schluessel-1-aufschrift": "K1",
-                "schluessel-1-status": "blocked",
-            }
+
+    def valid_form_data(self) -> dict[str, str]:
+        return {
+            "wohnung": str(self.wohnung.pk),
+            "person": str(self.person.pk),
+            "protokoll_typ": ProtokollTyp.MOVE_IN,
+            "uebergabe_zeitpunkt": "2026-09-25T10:30",
+            "vermieter_name": str(self.employee),
+            "uebergabe_status": UebergabeStatus.RENOVATED,
+            "abnahme_status": AbnahmeStatus.ACCEPTED,
+            "heizungsablesungen": "IE: 10, IA: 20, Ib: 30",
+            "zaehlerstand_wasser_kalt": "12.50",
+            "zaehlerstand_wasser_warm": "4.75",
+            "zaehlerstand_heizung": "155.00",
+            "zaehlerstand_strom": "87.25",
+            "kaution_nachweis_vorhanden": "true",
+            "erste_miete_nachweis_vorhanden": "true",
+            "rooms-TOTAL_FORMS": "1",
+            "rooms-INITIAL_FORMS": "0",
+            "rooms-MIN_NUM_FORMS": "0",
+            "rooms-MAX_NUM_FORMS": "1000",
+            "keys-TOTAL_FORMS": "1",
+            "keys-INITIAL_FORMS": "0",
+            "keys-MIN_NUM_FORMS": "0",
+            "keys-MAX_NUM_FORMS": "1000",
+        }
+
+    def draft_data(self) -> dict[str, object]:
+        return {
+            "version": 1,
+            "savedAt": 1_790_000_000_000,
+            "fields": {
+                "wohnung": {"value": str(self.wohnung.pk), "checked": None},
+                "protokoll_typ": {"value": ProtokollTyp.MOVE_IN, "checked": None},
+            },
+            "rooms": [],
+            "keys": [],
+        }
+
+    def test_create_page_shows_required_handover_fields(self) -> None:
+        response = self.client.get(
+            reverse("wohnungsverwaltung:handover_protocol_create"),
+            {"wohnung": self.wohnung.pk},
         )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Wohnung")
+        self.assertContains(response, "Übergabeart")
+        self.assertContains(response, "Datum und Uhrzeit")
+        self.assertContains(response, "Zählernummer aus den Stammdaten")
+        self.assertContains(response, "ST-1004")
+        self.assertContains(response, "Zählerstände")
+        self.assertContains(response, "Wohnungstür")
+        self.assertContains(response, "Gebäude 1, Wohnung 2.04")
+        self.assertNotIn("zaehlernummer_strom", response.context["form"].fields)
+
+    def test_create_page_only_lists_people_assigned_to_the_selected_unit(self) -> None:
+        other_unit = Wohnung.objects.create(
+            etage=1,
+            wohnungsnummer="1.03",
+            gebaeudenummer="1",
+        )
+        Person.objects.create(
+            vorname="Andere",
+            nachname="Person",
+            email="andere.person@example.test",
+            wohnung=other_unit,
+        )
+
+        response = self.client.get(
+            reverse("wohnungsverwaltung:handover_protocol_create"),
+            {"wohnung": self.wohnung.pk},
+        )
+
+        self.assertContains(response, "Mara Muster")
+        self.assertNotContains(response, "Andere Person")
+
+    def test_create_page_lists_only_employees_as_landlord_representatives(self) -> None:
+        response = self.client.get(
+            reverse("wohnungsverwaltung:handover_protocol_create"),
+            {"wohnung": self.wohnung.pk},
+        )
+
+        landlord_field = response.context["form"].fields["vermieter_name"]
+        landlord_choices = landlord_field.choices
+
+        self.assertIsInstance(landlord_field, forms.ChoiceField)
+        self.assertIn((str(self.employee), str(self.employee)), landlord_choices)
+        self.assertNotIn((str(self.person), str(self.person)), landlord_choices)
+
+    def test_create_rejects_a_non_employee_as_landlord_representative(self) -> None:
+        data = self.valid_form_data()
+        data["vermieter_name"] = str(self.person)
+
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("vermieter_name", response.context["form"].errors)
+        self.assertFalse(Protokoll.objects.exists())
+
+    def test_create_page_updates_people_without_a_full_page_reload(self) -> None:
+        response = self.client.get(reverse("wohnungsverwaltung:handover_protocol_create"))
+
+        self.assertContains(response, 'id="handover-protocol-form"')
+        self.assertNotContains(response, "window.location.assign")
+
+    def test_create_page_offers_draft_recovery(self) -> None:
+        response = self.client.get(reverse("wohnungsverwaltung:handover_protocol_create"))
+
+        self.assertContains(response, 'data-draft-scope="create"')
+        self.assertContains(response, "Entwurf wiederherstellen")
+        self.assertContains(response, "Entwurf verwerfen")
+        self.assertContains(response, "Zwischengespeichert")
+
+    def test_server_draft_is_listed_and_can_be_continued(self) -> None:
+        response = self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_draft_save"),
+            data=json.dumps({"scope": "create", "draft": self.draft_data()}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        draft = ProtokollEntwurf.objects.get()
+        response = self.client.get(reverse("wohnungsverwaltung:handover_protocol_list"))
+
+        self.assertContains(response, "Gespeicherte Entwürfe")
+        self.assertContains(response, "Gebäude 1, Wohnung 2.04")
+        self.assertContains(response, "Entwurf fortsetzen")
+        self.assertContains(response, f"?draft={draft.pk}")
+
+        response = self.client.get(
+            reverse("wohnungsverwaltung:handover_protocol_create"), {"draft": draft.pk}
+        )
+
+        self.assertContains(response, 'id="server-protocol-draft"')
+
+    def test_server_draft_is_only_visible_to_its_browser_session(self) -> None:
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_draft_save"),
+            data=json.dumps({"scope": "create", "draft": self.draft_data()}),
+            content_type="application/json",
+        )
+        draft = ProtokollEntwurf.objects.get()
+        other_browser = Client()
+
+        response = other_browser.get(reverse("wohnungsverwaltung:handover_protocol_list"))
+
+        self.assertNotContains(response, "Gespeicherte Entwürfe")
+        response = other_browser.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_draft_delete",
+                kwargs={"draft_id": draft.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(ProtokollEntwurf.objects.filter(pk=draft.pk).exists())
+
+    def test_server_draft_can_be_deleted_from_the_overview(self) -> None:
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_draft_save"),
+            data=json.dumps({"scope": "create", "draft": self.draft_data()}),
+            content_type="application/json",
+        )
+        draft = ProtokollEntwurf.objects.get()
 
         response = self.client.post(
-            reverse("wohnungsverwaltung:wohnung_edit", args=[wohnung.pk]),
-            payload,
-        )
-        if response.status_code != 302:
-            self.fail(
-                f"Schlüsselformset ist ungültig: {response.context['schluessel_formset'].errors}"
+            reverse(
+                "wohnungsverwaltung:handover_protocol_draft_delete",
+                kwargs={"draft_id": draft.pk},
             )
-
-        existing_key.refresh_from_db()
-        self.assertEqual(existing_key.anzahl, 3)
-        self.assertTrue(Schluessel.objects.filter(wohnung=wohnung, bezeichnung="Keller").exists())
-
-        payload = self.wohnung_payload(wohnung)
-        payload.update(
-            {
-                "schluessel-TOTAL_FORMS": "2",
-                "schluessel-INITIAL_FORMS": "2",
-                "schluessel-0-schluessel_id": str(existing_key.pk),
-                "schluessel-0-bezeichnung": "Haustür",
-                "schluessel-0-anzahl": "3",
-                "schluessel-0-aufschrift": "H2",
-                "schluessel-0-status": "in_use",
-                "schluessel-0-DELETE": "on",
-            }
-        )
-        cellar_key = Schluessel.objects.get(wohnung=wohnung, bezeichnung="Keller")
-        payload.update(
-            {
-                "schluessel-1-schluessel_id": str(cellar_key.pk),
-                "schluessel-1-bezeichnung": "Keller",
-                "schluessel-1-anzahl": "1",
-                "schluessel-1-aufschrift": "K1",
-                "schluessel-1-status": "blocked",
-            }
         )
 
-        response = self.client.post(
-            reverse("wohnungsverwaltung:wohnung_edit", args=[wohnung.pk]),
-            payload,
+        self.assertRedirects(response, reverse("wohnungsverwaltung:handover_protocol_list"))
+        self.assertFalse(ProtokollEntwurf.objects.exists())
+
+    def test_successful_creation_clears_local_and_server_drafts(self) -> None:
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_draft_save"),
+            data=json.dumps({"scope": "create", "draft": self.draft_data()}),
+            content_type="application/json",
         )
-        if response.status_code != 302:
-            self.fail(
-                f"Schlüsselformset ist ungültig: {response.context['schluessel_formset'].errors}"
+        self.assertTrue(ProtokollEntwurf.objects.exists())
+
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
+        )
+        protocol = Protokoll.objects.get()
+
+        self.assertFalse(ProtokollEntwurf.objects.exists())
+
+        response = self.client.get(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
             )
+        )
 
-        self.assertFalse(Schluessel.objects.filter(pk=existing_key.pk).exists())
-        self.assertTrue(Schluessel.objects.filter(pk=cellar_key.pk).exists())
+        self.assertContains(
+            response,
+            'data-draft-key-to-clear="handover-protocol-draft:create"',
+        )
 
-    def test_stellplatz_dashboard_is_sorted_and_wohnung_form_has_no_stellplatz_fields(self) -> None:
-        Stellplatz.objects.create(name="Z 10", stellplatz_typ=StellplatzTyp.CAR)
-        Stellplatz.objects.create(name="A 01", stellplatz_typ=StellplatzTyp.EV)
-        self.force_staff_login()
+    def test_room_checklist_uses_a_large_finding_field_and_supports_deletion(self) -> None:
+        finding_field = InlineRoomChecklistFormSet().empty_form.fields["wert"]
 
-        response = self.client.get(reverse("wohnungsverwaltung:stellplatz_list"))
+        self.assertTrue(InlineRoomChecklistFormSet.can_delete)
+        self.assertEqual(finding_field.widget.attrs["rows"], 5)
 
+    def test_create_page_has_controls_to_remove_rooms_keys_and_checklist_items(self) -> None:
+        response = self.client.get(reverse("wohnungsverwaltung:handover_protocol_create"))
+
+        self.assertContains(response, "data-remove-room")
+        self.assertContains(response, "data-remove-room-checklist")
+        self.assertContains(response, "data-remove-key")
+
+    def test_room_checklist_separates_area_from_feature_name(self) -> None:
+        fields = InlineRoomChecklistFormSet().empty_form.fields
+        feature_field = fields["merkmal"]
+
+        self.assertIsInstance(feature_field, forms.ModelChoiceField)
         self.assertEqual(
-            [stellplatz.name for stellplatz in response.context["stellplaetze"]], ["A 01", "Z 10"]
+            list(fields["bereich"].choices),
+            [("", "Bereich wählen"), ("Küche", "Küche"), ("Wohnzimmer", "Wohnzimmer")],
         )
-        self.assertEqual(set(StellplatzForm().fields), {"name", "stellplatz_typ", "miete"})
-        self.assertEqual(set(StellplatzZuordnungForm().fields), {"wohnung"})
+        self.assertCountEqual(
+            feature_field.queryset,
+            [self.room_feature, self.second_room_feature, self.living_room_feature],
+        )
+        self.assertEqual(feature_field.label_from_instance(self.room_feature), "Fenster")
 
-        response = self.client.get(reverse("wohnungsverwaltung:wohnung_create"))
-
-        self.assertNotContains(response, "Stellplatz zuordnen")
-        self.assertNotIn("zuordnung_formset", response.context)
-
-    def test_stellplatz_create_and_edit_includes_wohnung_zuordnung(self) -> None:
-        wohnung = self.wohnung()
-        other_wohnung = self.wohnung(wohnungsnummer="2")
-        self.force_staff_login()
-        create_response = self.client.post(
-            reverse("wohnungsverwaltung:stellplatz_create"),
-            self.stellplatz_payload(wohnung=wohnung, miete="45.00"),
+    def test_room_checklist_rejects_a_feature_from_another_area(self) -> None:
+        form = RoomChecklistItemForm(
+            data={"bereich": "Wohnzimmer", "merkmal": str(self.room_feature.pk), "wert": "Geprüft"}
         )
 
-        stellplatz = Stellplatz.objects.get(name="TG-07")
-        self.assertRedirects(
-            create_response,
-            reverse("wohnungsverwaltung:stellplatz_edit", args=[stellplatz.pk]),
-        )
-        zuordnung = StellplatzZuordnung.objects.get(stellplatz=stellplatz)
-        self.assertEqual(zuordnung.wohnung, wohnung)
-        self.assertEqual(stellplatz.miete, Decimal("45.00"))
+        self.assertFalse(form.is_valid())
+        self.assertIn("merkmal", form.errors)
 
+    def test_person_defaults_to_not_being_an_employee(self) -> None:
+        person = Person.objects.create(
+            vorname="Eva",
+            nachname="Example",
+            email="eva.example@example.test",
+        )
+
+        self.assertFalse(person.is_employee)
+
+    def test_create_rejects_a_person_from_another_unit(self) -> None:
+        other_unit = Wohnung.objects.create(
+            etage=1,
+            wohnungsnummer="1.03",
+            gebaeudenummer="1",
+        )
+        other_person = Person.objects.create(
+            vorname="Andere",
+            nachname="Person",
+            email="andere.person@example.test",
+            wohnung=other_unit,
+        )
+        data = self.valid_form_data()
+        data["person"] = str(other_person.pk)
+
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("person", response.context["form"].errors)
+        self.assertFalse(Protokoll.objects.exists())
+
+    def test_create_requires_all_mandatory_meter_readings(self) -> None:
+        data = self.valid_form_data()
+        data.pop("zaehlerstand_strom")
+
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"], "zaehlerstand_strom", "Dieses Feld ist zwingend erforderlich."
+        )
+        self.assertFalse(Protokoll.objects.exists())
+
+    def test_create_copies_meter_numbers_from_apartment_master_data(self) -> None:
+        data = self.valid_form_data()
+        data["zaehlernummer_strom"] = "Manipuliert-9999"
+
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
+
+        self.assertEqual(response.status_code, 302)
+        protocol = Protokoll.objects.get()
+        self.assertEqual(protocol.zaehlernummer_strom, "ST-1004")
+
+    def test_create_assigns_protocol_to_apartment_and_type(self) -> None:
         response = self.client.post(
-            reverse("wohnungsverwaltung:stellplatz_edit", args=[stellplatz.pk]),
-            self.stellplatz_payload(
-                name="TG-08",
-                stellplatz_typ=StellplatzTyp.EV,
-                wohnung=other_wohnung,
-                miete="55.00",
+            reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
+        )
+
+        protocol = Protokoll.objects.get()
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
             ),
         )
-        self.assertRedirects(
-            response,
-            reverse("wohnungsverwaltung:stellplatz_edit", args=[stellplatz.pk]),
-        )
-        stellplatz.refresh_from_db()
-        self.assertEqual(stellplatz.stellplatz_typ, StellplatzTyp.EV)
-        self.assertEqual(stellplatz.miete, Decimal("55.00"))
-        zuordnung.refresh_from_db()
-        self.assertEqual(zuordnung.wohnung, other_wohnung)
+        self.assertEqual(protocol.wohnung, self.wohnung)
+        self.assertEqual(protocol.person, self.person)
+        self.assertEqual(protocol.protokoll_typ, ProtokollTyp.MOVE_IN)
+        self.assertEqual(protocol.status, ProtokollStatus.OPEN)
+        self.assertEqual(protocol.zaehlernummer_strom, "ST-1004")
+        self.assertEqual(protocol.zaehlerstand_wasser_kalt, Decimal("12.50"))
 
-    def test_stellplatz_master_data_can_remove_wohnung_zuordnung(self) -> None:
-        wohnung = self.wohnung()
-        stellplatz = Stellplatz.objects.create(name="TG-01", stellplatz_typ=StellplatzTyp.CAR)
-        self.force_staff_login()
-
-        response = self.client.post(
-            reverse("wohnungsverwaltung:stellplatz_edit", args=[stellplatz.pk]),
-            self.stellplatz_payload(name="TG-01", wohnung=wohnung, miete="45.00"),
-        )
-        self.assertRedirects(
-            response,
-            reverse("wohnungsverwaltung:stellplatz_edit", args=[stellplatz.pk]),
+    def test_move_in_clears_exit_only_fields(self) -> None:
+        data = self.valid_form_data()
+        data.update(
+            {
+                "mieter_zukuenftige_anschrift": "Neue Adresse 1, 12345 Beispielstadt",
+                "nachbesserung_bis": "2026-10-01",
+                "nachbesserung_beschreibung": "Tür einstellen",
+            }
         )
 
-        zuordnung = StellplatzZuordnung.objects.get(stellplatz=stellplatz)
-        self.assertEqual(zuordnung.wohnung, wohnung)
-        stellplatz.refresh_from_db()
-        self.assertEqual(stellplatz.miete, Decimal("45.00"))
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
 
-        response = self.client.post(
-            reverse("wohnungsverwaltung:stellplatz_edit", args=[stellplatz.pk]),
-            self.stellplatz_payload(name="TG-01"),
-        )
-        self.assertRedirects(
-            response,
-            reverse("wohnungsverwaltung:stellplatz_edit", args=[stellplatz.pk]),
-        )
-        self.assertFalse(StellplatzZuordnung.objects.filter(pk=zuordnung.pk).exists())
-        self.assertTrue(Stellplatz.objects.filter(pk=stellplatz.pk).exists())
+        self.assertEqual(response.status_code, 302)
+        protocol = Protokoll.objects.get()
+        self.assertEqual(protocol.mieter_zukuenftige_anschrift, "")
+        self.assertEqual(protocol.nachbesserung_beschreibung, "")
+        self.assertIsNone(protocol.nachbesserung_bis)
 
-    def test_stellplatz_can_have_miete_without_wohnung_zuordnung(self) -> None:
-        self.force_staff_login()
+    def test_move_out_requires_future_address_and_allows_remediation(self) -> None:
+        data = self.valid_form_data()
+        data["protokoll_typ"] = ProtokollTyp.MOVE_OUT
+        data["kaution_nachweis_vorhanden"] = ""
+        data["erste_miete_nachweis_vorhanden"] = ""
+        data["nachbesserung_bis"] = "2026-10-01"
+        data["nachbesserung_beschreibung"] = "Tür einstellen"
 
-        response = self.client.post(
-            reverse("wohnungsverwaltung:stellplatz_create"),
-            self.stellplatz_payload(name="TG-05", miete="30.00"),
-        )
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
 
-        stellplatz = Stellplatz.objects.get(name="TG-05")
-        self.assertRedirects(
-            response,
-            reverse("wohnungsverwaltung:stellplatz_edit", args=[stellplatz.pk]),
-        )
-        self.assertEqual(stellplatz.miete, Decimal("30.00"))
-        self.assertFalse(StellplatzZuordnung.objects.filter(stellplatz=stellplatz).exists())
-
-    def test_stellplatz_master_data_rejects_negative_miete(self) -> None:
-        wohnung = self.wohnung(wohnungsnummer="1")
-        stellplatz = Stellplatz.objects.create(name="TG-02", stellplatz_typ=StellplatzTyp.CAR)
-        self.force_staff_login()
-
-        response = self.client.post(
-            reverse("wohnungsverwaltung:stellplatz_edit", args=[stellplatz.pk]),
-            self.stellplatz_payload(name="TG-02", wohnung=wohnung, miete="-1.00"),
-        )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(stellplatz.miete, Decimal("0"))
+        self.assertFormError(
+            response.context["form"],
+            "mieter_zukuenftige_anschrift",
+            "Bitte erfassen Sie die zukünftige Anschrift für den Auszug.",
+        )
 
-    def test_database_prevents_two_current_zuordnungen_for_one_stellplatz(self) -> None:
-        stellplatz = Stellplatz.objects.create(name="TG-03", stellplatz_typ=StellplatzTyp.CAR)
-        StellplatzZuordnung.objects.create(stellplatz=stellplatz, wohnung=self.wohnung())
+        data["mieter_zukuenftige_anschrift"] = "Neue Adresse 1, 12345 Beispielstadt"
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
 
-        with self.assertRaises(IntegrityError):
-            with transaction.atomic():
-                StellplatzZuordnung.objects.create(
-                    stellplatz=stellplatz,
-                    wohnung=self.wohnung(wohnungsnummer="3"),
-                )
+        self.assertEqual(response.status_code, 302)
+        protocol = Protokoll.objects.get()
+        self.assertEqual(protocol.nachbesserung_beschreibung, "Tür einstellen")
+        self.assertFalse(protocol.kaution_nachweis_vorhanden)
+        self.assertFalse(protocol.erste_miete_nachweis_vorhanden)
+
+    def test_create_saves_multiple_checklist_items_for_one_room(self) -> None:
+        data = self.valid_form_data()
+        data.update(
+            {
+                "rooms-TOTAL_FORMS": "2",
+                "rooms-INITIAL_FORMS": "0",
+                "rooms-MIN_NUM_FORMS": "0",
+                "rooms-MAX_NUM_FORMS": "1000",
+                "rooms-0-raum": "Küche",
+                "rooms-0-bereich": "Küche",
+                "rooms-0-merkmal": str(self.room_feature.pk),
+                "rooms-0-wert": "Ohne sichtbare Schäden",
+                "rooms-1-raum": "",
+                "rooms-1-bereich": "Küche",
+                "rooms-1-merkmal": str(self.second_room_feature.pk),
+                "rooms-1-wert": "Boden ohne Schäden",
+                "keys-TOTAL_FORMS": "1",
+                "keys-INITIAL_FORMS": "0",
+                "keys-MIN_NUM_FORMS": "0",
+                "keys-MAX_NUM_FORMS": "1000",
+                "keys-0-anzahl": "2",
+                "keys-0-raum_bezeichnung": "Wohnungstür",
+                "keys-0-aufschrift": "A",
+                "keys-0-schluesselnummer": "S-01",
+            }
+        )
+
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
+
+        self.assertEqual(response.status_code, 302)
+        protocol = Protokoll.objects.get()
+        room = protocol.raeume.get()
+        self.assertEqual(room.name, "Küche")
+        self.assertCountEqual(
+            room.raum_merkmale.values_list("merkmal__bezeichnung", flat=True), ["Fenster", "Boden"]
+        )
+        self.assertEqual(protocol.protokoll_schluessel.get().anzahl, 2)
+
+    def test_create_skips_rooms_and_keys_marked_for_removal(self) -> None:
+        data = self.valid_form_data()
+        data.update(
+            {
+                "rooms-TOTAL_FORMS": "1",
+                "rooms-INITIAL_FORMS": "0",
+                "rooms-MIN_NUM_FORMS": "0",
+                "rooms-MAX_NUM_FORMS": "1000",
+                "rooms-0-raum": "Küche",
+                "rooms-0-bereich": "Küche",
+                "rooms-0-merkmal": str(self.room_feature.pk),
+                "rooms-0-wert": "Ohne sichtbare Schäden",
+                "rooms-0-DELETE": "on",
+                "keys-TOTAL_FORMS": "1",
+                "keys-INITIAL_FORMS": "0",
+                "keys-MIN_NUM_FORMS": "0",
+                "keys-MAX_NUM_FORMS": "1000",
+                "keys-0-anzahl": "2",
+                "keys-0-raum_bezeichnung": "Wohnungstür",
+                "keys-0-aufschrift": "A",
+                "keys-0-DELETE": "on",
+            }
+        )
+
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
+
+        self.assertEqual(response.status_code, 302)
+        protocol = Protokoll.objects.get()
+        self.assertFalse(protocol.raeume.exists())
+        self.assertFalse(protocol.protokoll_schluessel.exists())
+
+    def test_detail_shows_the_complete_protocol_for_its_apartment(self) -> None:
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
+        )
+        protocol = Protokoll.objects.get()
+
+        response = self.client.get(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Gebäude 1, Wohnung 2.04")
+        self.assertContains(response, "Einzug")
+        self.assertContains(response, "In Bearbeitung")
+        self.assertContains(response, "12,50")
+
+    def test_edit_keeps_protocol_data_on_the_same_handover(self) -> None:
+        protocol = Protokoll.objects.create(
+            wohnung=self.wohnung,
+            person=self.person,
+            protokoll_typ=ProtokollTyp.MOVE_OUT,
+            uebergabe_status=UebergabeStatus.UNRENOVATED,
+            abnahme_status=AbnahmeStatus.ACCEPTED_WITH_RESERVATION,
+            zaehlerstand_wasser_kalt=Decimal("1.00"),
+            zaehlerstand_wasser_warm=Decimal("2.00"),
+            zaehlerstand_heizung=Decimal("3.00"),
+            zaehlerstand_strom=Decimal("4.00"),
+        )
+        data = self.valid_form_data()
+        data["protokoll_typ"] = ProtokollTyp.MOVE_OUT
+        data["zaehlerstand_strom"] = "99.90"
+        data["mieter_zukuenftige_anschrift"] = "Neue Adresse 1, 12345 Beispielstadt"
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_edit",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+            data,
+        )
+
+        protocol.refresh_from_db()
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+        )
+        self.assertEqual(protocol.pk, protocol.protokoll_id)
+        self.assertEqual(protocol.zaehlerstand_strom, Decimal("99.90"))
+
+    def test_room_checklist_records_a_detailed_previous_protocol_point(self) -> None:
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
+        )
+        protocol = Protokoll.objects.get()
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_room_create",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+            {"name": "Küche"},
+        )
+
+        room = protocol.raeume.get()
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_room_detail",
+                kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+            ),
+        )
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_room_detail",
+                kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+            ),
+            {
+                "bereich": "Küche",
+                "merkmal": str(self.room_feature.pk),
+                "wert": "ohne sichtbare Schäden",
+            },
+        )
+
+        room_merkmal = room.raum_merkmale.get()
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_room_detail",
+                kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+            ),
+        )
+        self.assertEqual(room_merkmal.merkmal.bereich, "Küche")
+        self.assertEqual(room_merkmal.merkmal.bezeichnung, "Fenster")
+        self.assertEqual(room_merkmal.merkmal.datentyp, MerkmalDatentyp.OK)
+        self.assertEqual(room_merkmal.wert, {"text": "ohne sichtbare Schäden"})
+
+    def test_open_protocol_allows_removing_rooms_and_key_positions(self) -> None:
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
+        )
+        protocol = Protokoll.objects.get()
+        room = protocol.raeume.create(name="Küche")
+        checklist_item = room.raum_merkmale.create(
+            merkmal=self.room_feature,
+            wert={"text": "Ohne sichtbare Schäden"},
+        )
+        key = protocol.protokoll_schluessel.create(
+            anzahl=2,
+            raum_bezeichnung="Wohnungstür",
+        )
+
+        response = self.client.get(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
+            )
+        )
+        self.assertContains(response, "Prüfpunkt löschen")
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_checklist_item_delete",
+                kwargs={
+                    "protocol_id": protocol.pk,
+                    "room_id": room.pk,
+                    "item_id": checklist_item.pk,
+                },
+            )
+        )
+
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_room_detail",
+                kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+            ),
+        )
+        self.assertFalse(room.raum_merkmale.filter(pk=checklist_item.pk).exists())
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_room_delete",
+                kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+            )
+        )
+
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+        )
+        self.assertFalse(protocol.raeume.filter(pk=room.pk).exists())
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_key_delete",
+                kwargs={"protocol_id": protocol.pk, "key_id": key.pk},
+            )
+        )
+
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+        )
+        self.assertFalse(protocol.protokoll_schluessel.filter(pk=key.pk).exists())
+
+    def test_confirmation_rejects_incomplete_room_protocols(self) -> None:
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
+        )
+        protocol = Protokoll.objects.get()
+        protocol.raeume.create(name="Küche")
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_confirm",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+            {"bestaetigung_erklaert": "on", "schluessel_ueberprueft": "on"},
+        )
+
+        protocol.refresh_from_db()
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+        )
+        self.assertEqual(protocol.status, ProtokollStatus.OPEN)
+
+    def test_confirmation_signs_complete_protocol_and_locks_edits(self) -> None:
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
+        )
+        protocol = Protokoll.objects.get()
+        room = protocol.raeume.create(name="Küche")
+        merkmal = Merkmal.objects.create(
+            bereich="Küche",
+            bezeichnung="Fenster",
+            datentyp=MerkmalDatentyp.OK,
+        )
+        checklist_item = room.raum_merkmale.create(
+            merkmal=merkmal,
+            wert={"text": "ohne sichtbare Schäden"},
+        )
+        key = protocol.protokoll_schluessel.create(
+            anzahl=2,
+            raum_bezeichnung="Wohnungstür",
+        )
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_confirm",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+            {"bestaetigung_erklaert": "on", "schluessel_ueberprueft": "on"},
+        )
+
+        protocol.refresh_from_db()
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+        )
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_checklist_item_delete",
+                kwargs={
+                    "protocol_id": protocol.pk,
+                    "room_id": room.pk,
+                    "item_id": checklist_item.pk,
+                },
+            )
+        )
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+        )
+        self.assertTrue(room.raum_merkmale.filter(pk=checklist_item.pk).exists())
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_room_delete",
+                kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+            )
+        )
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+        )
+        self.assertTrue(protocol.raeume.filter(pk=room.pk).exists())
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_key_delete",
+                kwargs={"protocol_id": protocol.pk, "key_id": key.pk},
+            )
+        )
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+        )
+        self.assertTrue(protocol.protokoll_schluessel.filter(pk=key.pk).exists())
+        self.assertEqual(protocol.status, ProtokollStatus.SIGNED)
+        self.assertIsNotNone(protocol.bestaetigt_am)
+        self.assertTrue(protocol.schluessel_ueberprueft)
+        self.assertTrue(protocol.bestaetigung_erklaert)
+
+        response = self.client.get(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_edit",
+                kwargs={"protocol_id": protocol.pk},
+            )
+        )
+
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+        )
+
+    def test_confirmation_requires_at_least_one_key_record(self) -> None:
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
+        )
+        protocol = Protokoll.objects.get()
+        room = protocol.raeume.create(name="Küche")
+        merkmal = Merkmal.objects.create(
+            bereich="Küche",
+            bezeichnung="Fenster",
+            datentyp=MerkmalDatentyp.OK,
+        )
+        room.raum_merkmale.create(merkmal=merkmal, wert={"text": "ohne sichtbare Schäden"})
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_confirm",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+            {"bestaetigung_erklaert": "on", "schluessel_ueberprueft": "on"},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_detail",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+        )
+        protocol.refresh_from_db()
+        self.assertEqual(protocol.status, ProtokollStatus.OPEN)
+
+    def test_missing_key_requires_a_reason_for_the_handover_record(self) -> None:
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
+        )
+        protocol = Protokoll.objects.get()
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_key_create",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+            {
+                "anzahl": "1",
+                "raum_bezeichnung": "Wohnungstür",
+                "fehlt": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"], "fehlgrund", "Bitte begründen Sie den fehlenden Schlüssel."
+        )
+        self.assertFalse(protocol.protokoll_schluessel.exists())
+
+    def test_key_record_requires_a_positive_key_count(self) -> None:
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
+        )
+        protocol = Protokoll.objects.get()
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_key_create",
+                kwargs={"protocol_id": protocol.pk},
+            ),
+            {"anzahl": "0", "raum_bezeichnung": "Wohnungstür"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"], "anzahl", "Bitte erfassen Sie mindestens einen Schlüssel."
+        )
+        self.assertFalse(protocol.protokoll_schluessel.exists())
 
 
-class StellplatzZuordnungMigrationTests(TransactionTestCase):
-    migrate_from = ("immobilien", "0001_initial")
-    migrate_to = ("immobilien", "0003_stellplatz_eigenstaendige_miete")
+class SeedStandardDataCommandTests(TestCase):
+    def test_command_creates_25_units_and_is_idempotent(self) -> None:
+        call_command("seed_standard_data")
 
-    def setUp(self) -> None:
-        super().setUp()
-        executor = MigrationExecutor(connection)
-        executor.migrate([self.migrate_from])
-        old_apps = executor.loader.project_state([self.migrate_from]).apps
-        OldWohnung = old_apps.get_model("immobilien", "Wohnung")
-        OldStellplatz = old_apps.get_model("immobilien", "Stellplatz")
-        wohnung = OldWohnung.objects.create(gebaeudenummer="A", wohnungsnummer="10")
-        self.stellplatz_id = OldStellplatz.objects.create(
-            wohnung=wohnung,
-            name="TG-99",
-            stellplatz_typ="car",
-            miete=Decimal("35.00"),
-        ).pk
-        executor = MigrationExecutor(connection)
-        executor.loader.build_graph()
-        executor.migrate([self.migrate_to])
+        self.assertEqual(Wohnung.objects.count(), 25)
+        self.assertEqual(Person.objects.count(), 8)
+        self.assertEqual(Protokoll.objects.count(), 2)
+        self.assertEqual(Schluessel.objects.count(), 25)
+        self.assertEqual(Person.objects.filter(wohnung__isnull=False).count(), 6)
+        self.assertEqual(Person.objects.filter(is_employee=False).count(), 6)
+        self.assertEqual(Person.objects.filter(is_employee=True).count(), 2)
+        self.assertEqual(Merkmal.objects.filter(bereich="Wände").count(), 21)
+        self.assertEqual(
+            Merkmal.objects.get(bereich="Wände", bezeichnung="Gestrichen in Farbe").optionen,
+            ["Farbe"],
+        )
+        self.assertEqual(
+            Merkmal.objects.get(
+                bereich="Wände", bezeichnung="Anzahl der Bohr- und Nagellöcher"
+            ).optionen,
+            ["Anzahl"],
+        )
 
-    def test_existing_stellplatz_becomes_stamm_mit_miete_und_zuordnung(self) -> None:
-        apps = MigrationExecutor(connection).loader.project_state([self.migrate_to]).apps
-        Stellplatz = apps.get_model("immobilien", "Stellplatz")
-        StellplatzZuordnung = apps.get_model("immobilien", "StellplatzZuordnung")
+        call_command("seed_standard_data")
 
-        zuordnung = StellplatzZuordnung.objects.get(stellplatz_id=self.stellplatz_id)
-        stellplatz = Stellplatz.objects.get(stellplatz_id=self.stellplatz_id)
-
-        self.assertEqual(zuordnung.stellplatz_id, self.stellplatz_id)
-        self.assertEqual(stellplatz.miete, Decimal("35.00"))
-        self.assertEqual(stellplatz.name, "TG-99")
+        self.assertEqual(Wohnung.objects.count(), 25)
+        self.assertEqual(Person.objects.count(), 8)
+        self.assertEqual(Protokoll.objects.count(), 2)
+        self.assertEqual(Schluessel.objects.count(), 25)
+        self.assertEqual(Person.objects.filter(wohnung__isnull=False).count(), 6)
+        self.assertEqual(Person.objects.filter(is_employee=False).count(), 6)
+        self.assertEqual(Person.objects.filter(is_employee=True).count(), 2)
+        self.assertEqual(Merkmal.objects.filter(bereich="Wände").count(), 21)

@@ -10,7 +10,7 @@
                 <h1 class="uk-heading-small uk-margin-remove-bottom">Stellplätze</h1>
                 <p class="uk-text-muted uk-margin-small-top">Wohnungsunabhängige Stellplatzstammdaten.</p>
             </div>
-            <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:stellplatz_create' %}">
+            <a class="uk-button uk-button-primary" href="{% url 'verwaltung:stellplatz_create' %}">
                 Stellplatz anlegen
             </a>
         </div>
@@ -32,7 +32,7 @@
                             </td>
                             <td>{{ stellplatz.miete }} €</td>
                             <td class="uk-text-right">
-                                <a class="uk-button uk-button-default uk-button-small" href="{% url 'wohnungsverwaltung:stellplatz_edit' stellplatz.stellplatz_id %}">
+                                <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:stellplatz_edit' stellplatz.stellplatz_id %}">
                                     Bearbeiten
                                 </a>
                             </td>
@@ -43,7 +43,7 @@
                 </tbody>
             </table>
         </div>
-        <p><a href="{% url 'wohnungsverwaltung:wohnung_list' %}">Zur Wohnungsübersicht</a></p>
+        <p><a href="{% url 'verwaltung:wohnung_list' %}">Zur Wohnungsübersicht</a></p>
     </div>
 </section>
 {% endblock %}

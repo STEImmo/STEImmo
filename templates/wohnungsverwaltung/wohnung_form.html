@@ -10,7 +10,7 @@
                 <h1 class="uk-heading-small uk-margin-remove-bottom">{{ title }}</h1>
                 {% if wohnung.pk %}<p class="uk-text-muted uk-margin-small-top">Status: {{ wohnung.status }}</p>{% endif %}
             </div>
-            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:wohnung_list' %}">Zur Übersicht</a>
+            <a class="uk-button uk-button-default" href="{% url 'verwaltung:wohnung_list' %}">Zur Übersicht</a>
         </div>
 
         <form method="post">

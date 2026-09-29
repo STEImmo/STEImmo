@@ -7,7 +7,7 @@
     <div class="uk-container uk-container-small">
         <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
             <h1 class="uk-heading-small uk-margin-remove">{{ title }}</h1>
-            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:stellplatz_list' %}">Zur Übersicht</a>
+            <a class="uk-button uk-button-default" href="{% url 'verwaltung:stellplatz_list' %}">Zur Übersicht</a>
         </div>
         <form method="post">
             {% csrf_token %}

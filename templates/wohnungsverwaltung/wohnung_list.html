@@ -10,7 +10,7 @@
                 <h1 class="uk-heading-small uk-margin-remove-bottom">Wohnungen</h1>
                 <p class="uk-text-muted uk-margin-small-top">Wohnungsstammdaten und Schlüssel.</p>
             </div>
-            <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:wohnung_create' %}">
+            <a class="uk-button uk-button-primary" href="{% url 'verwaltung:wohnung_create' %}">
                 Wohnung anlegen
             </a>
         </div>
@@ -38,7 +38,7 @@
                             <td>{{ wohnung.zimmeranzahl }}</td>
                             <td><span class="uk-label">{{ wohnung.status }}</span></td>
                             <td class="uk-text-right">
-                                <a class="uk-button uk-button-default uk-button-small" href="{% url 'wohnungsverwaltung:wohnung_edit' wohnung.wohnung_id %}">
+                                <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:wohnung_edit' wohnung.wohnung_id %}">
                                     Bearbeiten
                                 </a>
                             </td>
@@ -49,7 +49,7 @@
                 </tbody>
             </table>
         </div>
-        <p><a href="{% url 'wohnungsverwaltung:stellplatz_list' %}">Stellplatzstammdaten verwalten</a></p>
+        <p><a href="{% url 'verwaltung:stellplatz_list' %}">Stellplatzstammdaten verwalten</a></p>
     </div>
 </section>
 {% endblock %}
