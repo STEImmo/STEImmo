@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section uk-section-default">
+    <div class="uk-container">
+        <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
+            <div>
+                <h1 class="uk-heading-small uk-margin-remove-bottom">{{ title }}</h1>
+                {% if wohnung.pk %}<p class="uk-text-muted uk-margin-small-top">Status: {{ wohnung.status }}</p>{% endif %}
+            </div>
+            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:wohnung_list' %}">Zur Übersicht</a>
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            {% for error in form.non_field_errors %}
+                <div class="uk-alert-danger" uk-alert><p>{{ error }}</p></div>
+            {% endfor %}
+
+            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+                <h2 class="uk-h3">Wohnungsstammdaten</h2>
+                <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.gebaeudenummer %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.wohnungsnummer %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.etage %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.groesse_qm %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.zimmeranzahl %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.barrierefrei %}</div>
+                </div>
+            </section>
+
+            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+                <h2 class="uk-h3">Miete</h2>
+                <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.kaltmiete %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.warmmiete %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.kaution %}</div>
+                </div>
+            </section>
+
+            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+                <h2 class="uk-h3">Zählernummern</h2>
+                <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.zaehlernummer_wasser_kalt %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.zaehlernummer_wasser_warm %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.zaehlernummer_heizung %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.zaehlernummer_strom %}</div>
+                </div>
+            </section>
+
+            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+                <div class="uk-flex uk-flex-between uk-flex-middle">
+                    <h2 class="uk-h3">Schlüssel</h2>
+                    <button class="uk-button uk-button-default uk-button-small" type="button" data-add-form="schluessel">
+                        Schlüssel hinzufügen
+                    </button>
+                </div>
+                {{ schluessel_formset.management_form }}
+                {% for error in schluessel_formset.non_form_errors %}
+                    <div class="uk-text-danger uk-text-small">{{ error }}</div>
+                {% endfor %}
+                <div id="schluessel-forms">
+                    {% for form in schluessel_formset %}
+                        {% include "wohnungsverwaltung/_schluessel_form_row.html" with form=form %}
+                    {% endfor %}
+                </div>
+                <template id="schluessel-empty-form">
+                    {% include "wohnungsverwaltung/_schluessel_form_row.html" with form=schluessel_formset.empty_form %}
+                </template>
+            </section>
+
+            <button class="uk-button uk-button-primary" type="submit">Speichern</button>
+        </form>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.querySelectorAll("[data-add-form]").forEach((button) => {
+        button.addEventListener("click", () => {
+            const prefix = button.dataset.addForm;
+            const totalForms = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
+            const template = document.getElementById(`${prefix}-empty-form`);
+            const container = document.getElementById(`${prefix}-forms`);
+            const index = totalForms.value;
+            container.insertAdjacentHTML("beforeend", template.innerHTML.replace(/__prefix__/g, index));
+            totalForms.value = Number(index) + 1;
+        });
+    });
+
+    document.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-remove-form]");
+        if (!button) {
+            return;
+        }
+
+        const row = button.closest("[data-formset-row]");
+        const deleteInput = row.querySelector('input[name$="-DELETE"]');
+        deleteInput.value = "on";
+        row.hidden = true;
+    });
+</script>
+{% endblock %}

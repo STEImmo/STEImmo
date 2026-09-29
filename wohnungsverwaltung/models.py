@@ -163,6 +163,9 @@ class Wohnung(models.Model):
             ),
         ]
 
+    def __str__(self) -> str:
+        return f"Gebäude {self.gebaeudenummer}, Wohnung {self.wohnungsnummer}"
+
 
 class Bewerbung(models.Model):
     bewerbung_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -199,7 +202,6 @@ class Bewerbung(models.Model):
 
 class Stellplatz(models.Model):
     stellplatz_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    wohnung = models.ForeignKey(Wohnung, on_delete=models.CASCADE, related_name="stellplaetze")
     name = models.CharField(max_length=255)
     stellplatz_typ = PostgreSQLEnumField(
         enum_type="stellplatz_typ_enum",
@@ -215,7 +217,26 @@ class Stellplatz(models.Model):
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(miete__gte=0), name="stellplatz_miete_nicht_negativ"
-            )
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class StellplatzZuordnung(models.Model):
+    stellplatz_zuordnung_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    stellplatz = models.ForeignKey(Stellplatz, on_delete=models.CASCADE, related_name="zuordnungen")
+    wohnung = models.ForeignKey(
+        Wohnung, on_delete=models.CASCADE, related_name="stellplatz_zuordnungen"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "stellplatz_zuordnung"
+        constraints = [
+            models.UniqueConstraint(fields=("stellplatz",), name="stellplatz_nur_einer_wohnung"),
         ]
 
 
