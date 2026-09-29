@@ -1,0 +1,16 @@
+<div class="uk-card uk-card-default uk-card-body uk-margin-small-bottom" data-formset-row>
+    {{ form.schluessel_id }}
+    {% for error in form.non_field_errors %}
+        <div class="uk-text-danger uk-text-small">{{ error }}</div>
+    {% endfor %}
+    <div class="uk-grid-small" uk-grid>
+        <div class="uk-width-1-4@m">{% include "wohnungsverwaltung/_form_field.html" with field=form.bezeichnung %}</div>
+        <div class="uk-width-1-4@m">{% include "wohnungsverwaltung/_form_field.html" with field=form.anzahl %}</div>
+        <div class="uk-width-1-4@m">{% include "wohnungsverwaltung/_form_field.html" with field=form.aufschrift %}</div>
+        <div class="uk-width-1-4@m">{% include "wohnungsverwaltung/_form_field.html" with field=form.status %}</div>
+    </div>
+    {{ form.DELETE.as_hidden }}
+    <button class="uk-button uk-button-danger uk-button-small" type="button" data-remove-form>
+        Schlüssel entfernen
+    </button>
+</div>

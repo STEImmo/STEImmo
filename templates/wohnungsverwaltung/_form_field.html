@@ -1,0 +1,12 @@
+<div class="uk-margin">
+    {% if field.field.widget.input_type == "checkbox" %}
+        <div class="uk-form-label uk-invisible" aria-hidden="true">&nbsp;</div>
+        <label>{{ field }} {{ field.label }}</label>
+    {% else %}
+        {{ field.label_tag }}
+        {{ field }}
+    {% endif %}
+    {% for error in field.errors %}
+        <div class="uk-text-danger uk-text-small">{{ error }}</div>
+    {% endfor %}
+</div>

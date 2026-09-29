@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section uk-section-default">
+    <div class="uk-container uk-container-small">
+        <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
+            <h1 class="uk-heading-small uk-margin-remove">{{ title }}</h1>
+            <a class="uk-button uk-button-default" href="{% url 'verwaltung:stellplatz_list' %}">Zur Übersicht</a>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            {% for error in form.non_field_errors %}
+                <div class="uk-alert-danger" uk-alert><p>{{ error }}</p></div>
+            {% endfor %}
+            {% for error in zuordnung_form.non_field_errors %}
+                <div class="uk-alert-danger" uk-alert><p>{{ error }}</p></div>
+            {% endfor %}
+            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+                <h2 class="uk-h3">Stellplatzstammdaten</h2>
+                {% include "wohnungsverwaltung/_form_field.html" with field=form.name %}
+                {% include "wohnungsverwaltung/_form_field.html" with field=form.stellplatz_typ %}
+                {% include "wohnungsverwaltung/_form_field.html" with field=form.miete %}
+            </section>
+            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+                <h2 class="uk-h3">Zuordnung zur Wohnung</h2>
+                <p class="uk-text-muted uk-text-small">Optional. Ohne Auswahl bleibt der Stellplatz unzugeordnet.</p>
+                {% include "wohnungsverwaltung/_form_field.html" with field=zuordnung_form.wohnung %}
+            </section>
+            <button class="uk-button uk-button-primary" type="submit">Speichern</button>
+        </form>
+    </div>
+</section>
+{% endblock %}
