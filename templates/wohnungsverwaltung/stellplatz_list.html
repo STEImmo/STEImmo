@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Stellplätze verwalten – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section uk-section-default">
+    <div class="uk-container">
+        <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
+            <div>
+                <h1 class="uk-heading-small uk-margin-remove-bottom">Stellplätze</h1>
+                <p class="uk-text-muted uk-margin-small-top">Wohnungsunabhängige Stellplatzstammdaten.</p>
+            </div>
+            <a class="uk-button uk-button-primary" href="{% url 'verwaltung:stellplatz_create' %}">
+                Stellplatz anlegen
+            </a>
+        </div>
+
+        <div class="uk-overflow-auto">
+            <table class="uk-table uk-table-divider uk-table-middle">
+                <thead><tr><th>Name</th><th>Typ</th><th>Wohnung</th><th>Miete</th><th><span class="uk-hidden">Aktion</span></th></tr></thead>
+                <tbody>
+                    {% for stellplatz in stellplaetze %}
+                        <tr>
+                            <td>{{ stellplatz.name }}</td>
+                            <td>{{ stellplatz.stellplatz_typ }}</td>
+                            <td>
+                                {% for zuordnung in stellplatz.zuordnungen.all %}
+                                    {{ zuordnung.wohnung.gebaeudenummer }} / {{ zuordnung.wohnung.wohnungsnummer }}
+                                {% empty %}
+                                    <span class="uk-text-muted">Nicht zugeordnet</span>
+                                {% endfor %}
+                            </td>
+                            <td>{{ stellplatz.miete }} €</td>
+                            <td class="uk-text-right">
+                                <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:stellplatz_edit' stellplatz.stellplatz_id %}">
+                                    Bearbeiten
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="5" class="uk-text-muted">Noch keine Stellplätze angelegt.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p><a href="{% url 'verwaltung:wohnung_list' %}">Zur Wohnungsübersicht</a></p>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,11 @@
+<div class="uk-card uk-card-default uk-card-body uk-margin-small-bottom" data-formset-row>
+    {{ form.stellplatz_zuordnung_id }}
+    {% for error in form.non_field_errors %}
+        <div class="uk-text-danger uk-text-small">{{ error }}</div>
+    {% endfor %}
+    <div class="uk-grid-small" uk-grid>
+        <div class="uk-width-expand@m">{% include "wohnungsverwaltung/_form_field.html" with field=form.stellplatz %}</div>
+        <div class="uk-width-1-4@m">{% include "wohnungsverwaltung/_form_field.html" with field=form.miete %}</div>
+    </div>
+    <label class="uk-text-small">{{ form.DELETE }} Zuordnung lösen</label>
+</div>
