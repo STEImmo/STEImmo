@@ -5,6 +5,7 @@ from django.forms.formsets import BaseFormSet
 
 from .models import (
     AbnahmeStatus,
+    Bewerbung,
     Merkmal,
     Person,
     Protokoll,
@@ -14,6 +15,7 @@ from .models import (
     Raumprotokoll,
     UebergabeStatus,
     Wohnung,
+    WohnungStatus,
 )
 
 HANDOVER_TYPE_LABELS = {
@@ -38,6 +40,55 @@ METER_NUMBER_FIELDS = (
     ("zaehlernummer_heizung", "Heizung"),
     ("zaehlernummer_strom", "Strom"),
 )
+
+
+class BewerbungForm(forms.ModelForm):
+    personenanzahl = forms.IntegerField(
+        initial=1,
+        min_value=1,
+        label="Personen im Haushalt",
+        widget=forms.NumberInput(attrs={"class": "uk-input", "min": "1", "step": "1"}),
+    )
+    haustiere = forms.TypedChoiceField(
+        choices=(("true", "Ja"), ("false", "Nein")),
+        coerce=lambda value: value == "true",
+        empty_value=None,
+        label="Ziehen Haustiere mit ein?",
+        error_messages={"required": "Bitte wählen Sie aus, ob Haustiere mit einziehen."},
+        widget=forms.RadioSelect(attrs={"class": "uk-radio"}),
+    )
+
+    class Meta:
+        model = Bewerbung
+        fields = ["wohnung", "personenanzahl", "haustiere", "ueber_mich"]
+        labels = {
+            "wohnung": "Gewünschte Wohnung",
+            "personenanzahl": "Personen im Haushalt",
+            "ueber_mich": "Über mich",
+        }
+        widgets = {
+            "wohnung": forms.Select(attrs={"class": "uk-select"}),
+            "ueber_mich": forms.Textarea(attrs={"class": "uk-textarea", "rows": 5}),
+        }
+
+    def __init__(self, *args, applicant: Person, unit: Wohnung | None = None, **kwargs) -> None:
+        self.applicant = applicant
+        super().__init__(*args, **kwargs)
+        available_units = Wohnung.objects.filter(status=WohnungStatus.FREE).order_by(
+            "gebaeudenummer", "wohnungsnummer"
+        )
+        self.fields["wohnung"].queryset = available_units
+        if unit is not None:
+            self.fields["wohnung"].queryset = available_units.filter(pk=unit.pk)
+            self.fields["wohnung"].initial = unit.pk
+            self.fields["wohnung"].disabled = True
+
+    def save(self, commit: bool = True) -> Bewerbung:
+        application = super().save(commit=False)
+        application.person = self.applicant
+        if commit:
+            application.save()
+        return application
 
 
 class HandoverProtocolForm(forms.ModelForm):

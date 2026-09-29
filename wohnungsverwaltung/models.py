@@ -1,5 +1,6 @@
 import uuid
 
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -184,8 +185,8 @@ class Bewerbung(models.Model):
     person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="bewerbungen")
     wohnung = models.ForeignKey(Wohnung, on_delete=models.CASCADE, related_name="bewerbungen")
     score = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    personenanzahl = models.PositiveSmallIntegerField(default=0)
-    ueber_mich = models.TextField(blank=True, default="")
+    personenanzahl = models.PositiveSmallIntegerField(default=1, validators=[MinValueValidator(1)])
+    ueber_mich = models.TextField()
     haustiere = models.BooleanField(default=False)
     barrierefreiheit_benoetigt = models.BooleanField(default=False)
     alternative_wohnung_akzeptiert = models.BooleanField(default=False)
@@ -205,6 +206,10 @@ class Bewerbung(models.Model):
                 condition=models.Q(status=BewerbungStatus.OPEN),
                 fields=("person",),
                 name="bewerbung_eine_offene_pro_person",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(personenanzahl__gte=1),
+                name="bewerbung_personenanzahl_mindestens_eins",
             ),
             models.CheckConstraint(
                 condition=models.Q(score__gte=0), name="bewerbung_score_nicht_negativ"

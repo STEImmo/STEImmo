@@ -12,6 +12,7 @@ from .forms import (
     ACCEPTANCE_STATUS_LABELS,
     HANDOVER_STATUS_LABELS,
     HANDOVER_TYPE_LABELS,
+    BewerbungForm,
     HandoverKeyForm,
     HandoverKeyFormSet,
     HandoverProtocolForm,
@@ -21,6 +22,7 @@ from .forms import (
     RoomProtocolForm,
 )
 from .models import (
+    Person,
     Protokoll,
     ProtokollEntwurf,
     ProtokollSchluessel,
@@ -38,6 +40,16 @@ PROTOCOL_STATUS_LABELS = {
 }
 
 DRAFT_MAXIMUM_SIZE = 512_000
+
+
+def pre_application_preview(request: HttpRequest) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    return render(
+        request,
+        "wohnungsverwaltung/pre_application_preview.html",
+        {"form": BewerbungForm(applicant=Person())},
+    )
 
 
 def _draft_session_key(request: HttpRequest) -> str:

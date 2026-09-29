@@ -5,6 +5,11 @@ from . import views
 app_name = "wohnungsverwaltung"
 
 urlpatterns = [
+    path(
+        "bewerbung/vorschau/",
+        views.pre_application_preview,
+        name="pre_application_preview",
+    ),
     path("", views.handover_protocol_list, name="handover_protocol_list"),
     path("neu/", views.handover_protocol_create, name="handover_protocol_create"),
     path(
