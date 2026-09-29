@@ -1,14 +1,19 @@
 import json
 from decimal import Decimal
+from io import StringIO
 
 from django import forms
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.test import Client, TestCase
+from django.db import IntegrityError, connection, transaction
+from django.db.migrations.executor import MigrationExecutor
+from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
 
-from .forms import InlineRoomChecklistFormSet, RoomChecklistItemForm
+from .forms import BewerbungForm, InlineRoomChecklistFormSet, RoomChecklistItemForm
 from .models import (
     AbnahmeStatus,
+    Bewerbung,
     Merkmal,
     MerkmalDatentyp,
     Person,
@@ -19,6 +24,7 @@ from .models import (
     Schluessel,
     UebergabeStatus,
     Wohnung,
+    WohnungStatus,
 )
 
 
@@ -906,3 +912,367 @@ class SeedStandardDataCommandTests(TestCase):
         self.assertEqual(Person.objects.filter(is_employee=False).count(), 6)
         self.assertEqual(Person.objects.filter(is_employee=True).count(), 2)
         self.assertEqual(Merkmal.objects.filter(bereich="Wände").count(), 21)
+
+
+class BewerbungFormTests(TestCase):
+    def setUp(self) -> None:
+        self.applicant = Person.objects.create(
+            vorname="Lena",
+            nachname="Interessentin",
+            email="lena.interessentin@example.test",
+        )
+        self.free_unit = Wohnung.objects.create(
+            etage=1,
+            wohnungsnummer="1.01",
+            gebaeudenummer="1",
+            status=WohnungStatus.FREE,
+        )
+        self.second_free_unit = Wohnung.objects.create(
+            etage=1,
+            wohnungsnummer="1.04",
+            gebaeudenummer="1",
+            status=WohnungStatus.FREE,
+        )
+        self.taken_unit = Wohnung.objects.create(
+            etage=1,
+            wohnungsnummer="1.02",
+            gebaeudenummer="1",
+            status=WohnungStatus.TAKEN,
+        )
+        self.blocked_unit = Wohnung.objects.create(
+            etage=1,
+            wohnungsnummer="1.03",
+            gebaeudenummer="1",
+            status=WohnungStatus.BLOCKED,
+        )
+
+    def valid_form_data(self) -> dict[str, str]:
+        return {
+            "wohnung": str(self.free_unit.pk),
+            "personenanzahl": "2",
+            "haustiere": "false",
+            "ueber_mich": "Ich suche gemeinsam mit meiner Partnerin ein neues Zuhause.",
+        }
+
+    def test_form_only_offers_free_units(self) -> None:
+        form = BewerbungForm(applicant=self.applicant)
+
+        self.assertQuerySetEqual(
+            form.fields["wohnung"].queryset, [self.free_unit, self.second_free_unit]
+        )
+
+    def test_form_saves_the_server_side_applicant_and_selected_unit(self) -> None:
+        form = BewerbungForm(self.valid_form_data(), applicant=self.applicant)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        application = form.save()
+
+        self.assertEqual(application.person, self.applicant)
+        self.assertEqual(application.wohnung, self.free_unit)
+        self.assertEqual(application.personenanzahl, 2)
+        self.assertFalse(application.haustiere)
+        self.assertEqual(application.ueber_mich, self.valid_form_data()["ueber_mich"])
+
+    def test_form_locks_a_preselected_free_unit_against_form_data(self) -> None:
+        form = BewerbungForm(
+            self.valid_form_data(),
+            applicant=self.applicant,
+            unit=self.second_free_unit,
+        )
+
+        self.assertTrue(form.fields["wohnung"].disabled)
+        self.assertEqual(form.fields["wohnung"].initial, self.second_free_unit.pk)
+        self.assertTrue(form.is_valid(), form.errors)
+        application = form.save()
+
+        self.assertEqual(application.wohnung, self.second_free_unit)
+
+    def test_form_rejects_a_preselected_unavailable_unit(self) -> None:
+        form = BewerbungForm(
+            self.valid_form_data(),
+            applicant=self.applicant,
+            unit=self.taken_unit,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("wohnung", form.errors)
+
+    def test_form_rejects_zero_household_size(self) -> None:
+        data = self.valid_form_data() | {"personenanzahl": "0"}
+        form = BewerbungForm(data, applicant=self.applicant)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("personenanzahl", form.errors)
+
+    def test_form_requires_an_explicit_pet_answer(self) -> None:
+        data = self.valid_form_data()
+        del data["haustiere"]
+        form = BewerbungForm(data, applicant=self.applicant)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("haustiere", form.errors)
+
+    def test_form_rejects_an_empty_about_me_text(self) -> None:
+        data = self.valid_form_data() | {"ueber_mich": "   "}
+        form = BewerbungForm(data, applicant=self.applicant)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("ueber_mich", form.errors)
+
+    def test_form_rejects_a_taken_unit_submitted_outside_its_queryset(self) -> None:
+        data = self.valid_form_data() | {"wohnung": str(self.taken_unit.pk)}
+        form = BewerbungForm(data, applicant=self.applicant)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("wohnung", form.errors)
+
+    def test_form_rejects_a_blocked_unit_submitted_outside_its_queryset(self) -> None:
+        data = self.valid_form_data() | {"wohnung": str(self.blocked_unit.pk)}
+        form = BewerbungForm(data, applicant=self.applicant)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("wohnung", form.errors)
+
+
+class BewerbungDatabaseConstraintTests(TestCase):
+    def setUp(self) -> None:
+        self.applicant = Person.objects.create(
+            vorname="Jonas",
+            nachname="Bewerber",
+            email="jonas.bewerber@example.test",
+        )
+        self.first_unit = Wohnung.objects.create(
+            etage=2,
+            wohnungsnummer="2.01",
+            gebaeudenummer="1",
+            status=WohnungStatus.FREE,
+        )
+        self.second_unit = Wohnung.objects.create(
+            etage=2,
+            wohnungsnummer="2.02",
+            gebaeudenummer="1",
+            status=WohnungStatus.FREE,
+        )
+
+    def test_database_rejects_a_household_size_below_one(self) -> None:
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Bewerbung.objects.create(
+                    person=self.applicant,
+                    wohnung=self.first_unit,
+                    personenanzahl=0,
+                    ueber_mich="Ich suche eine Wohnung.",
+                )
+
+    def test_database_allows_only_one_open_application_per_person(self) -> None:
+        Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.first_unit,
+            personenanzahl=1,
+            ueber_mich="Ich suche eine Wohnung.",
+        )
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Bewerbung.objects.create(
+                    person=self.applicant,
+                    wohnung=self.second_unit,
+                    personenanzahl=1,
+                    ueber_mich="Ich suche ebenfalls diese Wohnung.",
+                )
+
+
+class PreApplicationAuthenticationTests(TestCase):
+    def setUp(self) -> None:
+        self.user = get_user_model().objects.create_user(
+            username="testbewerber@example.test",
+            email="testbewerber@example.test",
+            password="FjordTanne!4826",
+        )
+        self.applicant = Person.objects.create(
+            user=self.user,
+            vorname="Test",
+            nachname="Bewerber",
+            email="testbewerber@example.test",
+        )
+        self.free_unit = Wohnung.objects.create(
+            etage=4,
+            wohnungsnummer="4.01",
+            gebaeudenummer="1",
+            status=WohnungStatus.FREE,
+        )
+
+    def valid_form_data(self) -> dict[str, str]:
+        return {
+            "wohnung": str(self.free_unit.pk),
+            "personenanzahl": "2",
+            "haustiere": "false",
+            "ueber_mich": "Ich möchte mich für diese Wohnung bewerben.",
+        }
+
+    def test_create_page_requires_login(self) -> None:
+        application_url = reverse("wohnungsverwaltung:pre_application_create")
+
+        response = self.client.get(application_url)
+
+        self.assertRedirects(response, f"{reverse('login')}?next={application_url}")
+
+    def test_user_without_person_profile_cannot_open_application_form(self) -> None:
+        user_without_profile = get_user_model().objects.create_user(
+            username="ohneprofil@example.test",
+            password="KieselWolke!4826",
+        )
+        self.client.force_login(user_without_profile)
+
+        response = self.client.get(reverse("wohnungsverwaltung:pre_application_create"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_linked_user_can_submit_an_application(self) -> None:
+        self.assertTrue(self.client.login(username=self.user.username, password="FjordTanne!4826"))
+
+        response = self.client.post(
+            reverse("wohnungsverwaltung:pre_application_create"), self.valid_form_data()
+        )
+
+        self.assertRedirects(response, reverse("wohnungsverwaltung:pre_application_list"))
+        application = Bewerbung.objects.get()
+        self.assertEqual(application.person, self.applicant)
+        self.assertEqual(application.wohnung, self.free_unit)
+
+    def test_linked_user_sees_their_submitted_application(self) -> None:
+        Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Meine Pre-Bewerbungen")
+        self.assertContains(response, "Gebäude 1, Wohnung 4.01")
+
+    def test_list_disables_new_application_button_for_open_application(self) -> None:
+        Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+
+        self.assertContains(
+            response,
+            'type="button" disabled>Neue Pre-Bewerbung</button>',
+        )
+        self.assertContains(response, "Sie haben bereits eine offene Pre-Bewerbung.")
+
+
+class CreateTestApplicantCommandTests(TestCase):
+    def test_command_creates_a_linked_test_user_and_person(self) -> None:
+        call_command(
+            "create_test_applicant",
+            email="testbewerber@example.test",
+            password="FjordTanne!4826",
+            stdout=StringIO(),
+        )
+
+        user = get_user_model().objects.get(username="testbewerber@example.test")
+        person = Person.objects.get(email="testbewerber@example.test")
+
+        self.assertTrue(user.check_password("FjordTanne!4826"))
+        self.assertEqual(person.user, user)
+        self.assertFalse(person.is_employee)
+        self.assertIsNone(person.wohnung)
+
+
+class BewerbungPreviewViewTests(TestCase):
+    def setUp(self) -> None:
+        self.free_unit = Wohnung.objects.create(
+            etage=3,
+            wohnungsnummer="3.01",
+            gebaeudenummer="1",
+            status=WohnungStatus.FREE,
+        )
+        self.taken_unit = Wohnung.objects.create(
+            etage=3,
+            wohnungsnummer="3.02",
+            gebaeudenummer="1",
+            status=WohnungStatus.TAKEN,
+        )
+
+    def test_preview_shows_the_application_form_for_free_units(self) -> None:
+        response = self.client.get(reverse("wohnungsverwaltung:pre_application_preview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "wohnungsverwaltung/pre_application_preview.html")
+        self.assertContains(response, "Bewerbungsformular – Vorschau")
+        self.assertContains(response, "Gewünschte Wohnung")
+        self.assertContains(response, "Personen im Haushalt")
+        self.assertContains(response, "Ziehen Haustiere mit ein?")
+        self.assertContains(response, "Über mich")
+        self.assertContains(response, "Abgabe wird mit Registrierung aktiviert")
+        self.assertContains(response, "Ja")
+        self.assertContains(response, "Nein")
+        self.assertContains(response, "enforceMinimumHouseholdSize")
+        apartment_queryset = response.context["form"].fields["wohnung"].queryset
+        self.assertQuerySetEqual(apartment_queryset, [self.free_unit])
+        self.assertEqual(response.context["form"].fields["personenanzahl"].initial, 1)
+        self.assertEqual(response.context["form"].fields["personenanzahl"].widget.attrs["min"], 1)
+
+    def test_preview_accepts_only_get_requests(self) -> None:
+        response = self.client.post(reverse("wohnungsverwaltung:pre_application_preview"))
+
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response.headers["Allow"], "GET")
+
+
+class HouseholdSizeMigrationTests(TransactionTestCase):
+    migrate_from = [("immobilien", "0007_protokollentwurf")]
+    migrate_to = [("immobilien", "0008_alter_bewerbung_personenanzahl_and_more")]
+
+    def setUp(self) -> None:
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+        executor = MigrationExecutor(connection)
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+        person = old_apps.get_model("immobilien", "Person").objects.create(
+            vorname="Alte",
+            nachname="Bewerbung",
+            email="alte.bewerbung@example.test",
+        )
+        apartment = old_apps.get_model("immobilien", "Wohnung").objects.create(
+            etage=1,
+            wohnungsnummer="1.99",
+            gebaeudenummer="1",
+        )
+        self.application_id = (
+            old_apps.get_model("immobilien", "Bewerbung")
+            .objects.create(
+                person=person,
+                wohnung=apartment,
+                personenanzahl=0,
+            )
+            .pk
+        )
+
+    def tearDown(self) -> None:
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
+    def test_migration_normalizes_existing_household_size_before_constraint(self) -> None:
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_to)
+        executor = MigrationExecutor(connection)
+        new_apps = executor.loader.project_state(self.migrate_to).apps
+        application = new_apps.get_model("immobilien", "Bewerbung").objects.get(
+            pk=self.application_id
+        )
+
+        self.assertEqual(application.personenanzahl, 1)
