@@ -5,6 +5,13 @@ from . import views
 app_name = "wohnungsverwaltung"
 
 urlpatterns = [
+    path("bewerbung/meine/", views.pre_application_list, name="pre_application_list"),
+    path("bewerbung/neu/", views.pre_application_create, name="pre_application_create"),
+    path(
+        "bewerbung/neu/<uuid:unit_id>/",
+        views.pre_application_create,
+        name="pre_application_create_for_unit",
+    ),
     path(
         "bewerbung/vorschau/",
         views.pre_application_preview,

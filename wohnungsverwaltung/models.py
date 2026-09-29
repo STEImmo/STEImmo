@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
@@ -101,6 +102,13 @@ class AbnahmeStatus(models.TextChoices):
 
 class Person(models.Model):
     person_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="person_profile",
+        blank=True,
+        null=True,
+    )
     is_employee = models.BooleanField(default=False)
     wohnung = models.ForeignKey(
         "Wohnung",

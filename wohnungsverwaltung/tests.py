@@ -1,7 +1,9 @@
 import json
 from decimal import Decimal
+from io import StringIO
 
 from django import forms
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.test import Client, TestCase
@@ -1077,6 +1079,115 @@ class BewerbungDatabaseConstraintTests(TestCase):
                     personenanzahl=1,
                     ueber_mich="Ich suche ebenfalls diese Wohnung.",
                 )
+
+
+class PreApplicationAuthenticationTests(TestCase):
+    def setUp(self) -> None:
+        self.user = get_user_model().objects.create_user(
+            username="testbewerber@example.test",
+            email="testbewerber@example.test",
+            password="FjordTanne!4826",
+        )
+        self.applicant = Person.objects.create(
+            user=self.user,
+            vorname="Test",
+            nachname="Bewerber",
+            email="testbewerber@example.test",
+        )
+        self.free_unit = Wohnung.objects.create(
+            etage=4,
+            wohnungsnummer="4.01",
+            gebaeudenummer="1",
+            status=WohnungStatus.FREE,
+        )
+
+    def valid_form_data(self) -> dict[str, str]:
+        return {
+            "wohnung": str(self.free_unit.pk),
+            "personenanzahl": "2",
+            "haustiere": "false",
+            "ueber_mich": "Ich möchte mich für diese Wohnung bewerben.",
+        }
+
+    def test_create_page_requires_login(self) -> None:
+        application_url = reverse("wohnungsverwaltung:pre_application_create")
+
+        response = self.client.get(application_url)
+
+        self.assertRedirects(response, f"{reverse('login')}?next={application_url}")
+
+    def test_user_without_person_profile_cannot_open_application_form(self) -> None:
+        user_without_profile = get_user_model().objects.create_user(
+            username="ohneprofil@example.test",
+            password="KieselWolke!4826",
+        )
+        self.client.force_login(user_without_profile)
+
+        response = self.client.get(reverse("wohnungsverwaltung:pre_application_create"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_linked_user_can_submit_an_application(self) -> None:
+        self.assertTrue(self.client.login(username=self.user.username, password="FjordTanne!4826"))
+
+        response = self.client.post(
+            reverse("wohnungsverwaltung:pre_application_create"), self.valid_form_data()
+        )
+
+        self.assertRedirects(response, reverse("wohnungsverwaltung:pre_application_list"))
+        application = Bewerbung.objects.get()
+        self.assertEqual(application.person, self.applicant)
+        self.assertEqual(application.wohnung, self.free_unit)
+
+    def test_linked_user_sees_their_submitted_application(self) -> None:
+        Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Meine Pre-Bewerbungen")
+        self.assertContains(response, "Gebäude 1, Wohnung 4.01")
+
+    def test_list_disables_new_application_button_for_open_application(self) -> None:
+        Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+
+        self.assertContains(
+            response,
+            'type="button" disabled>Neue Pre-Bewerbung</button>',
+        )
+        self.assertContains(response, "Sie haben bereits eine offene Pre-Bewerbung.")
+
+
+class CreateTestApplicantCommandTests(TestCase):
+    def test_command_creates_a_linked_test_user_and_person(self) -> None:
+        call_command(
+            "create_test_applicant",
+            email="testbewerber@example.test",
+            password="FjordTanne!4826",
+            stdout=StringIO(),
+        )
+
+        user = get_user_model().objects.get(username="testbewerber@example.test")
+        person = Person.objects.get(email="testbewerber@example.test")
+
+        self.assertTrue(user.check_password("FjordTanne!4826"))
+        self.assertEqual(person.user, user)
+        self.assertFalse(person.is_employee)
+        self.assertIsNone(person.wohnung)
 
 
 class BewerbungPreviewViewTests(TestCase):
