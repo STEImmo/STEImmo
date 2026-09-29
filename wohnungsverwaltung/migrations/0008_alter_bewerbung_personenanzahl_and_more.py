@@ -4,6 +4,11 @@ from django.core.validators import MinValueValidator
 from django.db import migrations, models
 
 
+def normalize_existing_household_sizes(apps, schema_editor) -> None:
+    Bewerbung = apps.get_model("immobilien", "Bewerbung")
+    Bewerbung.objects.filter(personenanzahl__lt=1).update(personenanzahl=1)
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("immobilien", "0007_protokollentwurf"),
@@ -19,6 +24,10 @@ class Migration(migrations.Migration):
             model_name="bewerbung",
             name="ueber_mich",
             field=models.TextField(),
+        ),
+        migrations.RunPython(
+            normalize_existing_household_sizes,
+            reverse_code=migrations.RunPython.noop,
         ),
         migrations.AddConstraint(
             model_name="bewerbung",

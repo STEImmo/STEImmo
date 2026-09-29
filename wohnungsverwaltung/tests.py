@@ -5,8 +5,9 @@ from io import StringIO
 from django import forms
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.db import IntegrityError, transaction
-from django.test import Client, TestCase
+from django.db import IntegrityError, connection, transaction
+from django.db.migrations.executor import MigrationExecutor
+from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
 
 from .forms import BewerbungForm, InlineRoomChecklistFormSet, RoomChecklistItemForm
@@ -1229,3 +1230,49 @@ class BewerbungPreviewViewTests(TestCase):
 
         self.assertEqual(response.status_code, 405)
         self.assertEqual(response.headers["Allow"], "GET")
+
+
+class HouseholdSizeMigrationTests(TransactionTestCase):
+    migrate_from = [("immobilien", "0007_protokollentwurf")]
+    migrate_to = [("immobilien", "0008_alter_bewerbung_personenanzahl_and_more")]
+
+    def setUp(self) -> None:
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+        executor = MigrationExecutor(connection)
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+        person = old_apps.get_model("immobilien", "Person").objects.create(
+            vorname="Alte",
+            nachname="Bewerbung",
+            email="alte.bewerbung@example.test",
+        )
+        apartment = old_apps.get_model("immobilien", "Wohnung").objects.create(
+            etage=1,
+            wohnungsnummer="1.99",
+            gebaeudenummer="1",
+        )
+        self.application_id = (
+            old_apps.get_model("immobilien", "Bewerbung")
+            .objects.create(
+                person=person,
+                wohnung=apartment,
+                personenanzahl=0,
+            )
+            .pk
+        )
+
+    def tearDown(self) -> None:
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
+    def test_migration_normalizes_existing_household_size_before_constraint(self) -> None:
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_to)
+        executor = MigrationExecutor(connection)
+        new_apps = executor.loader.project_state(self.migrate_to).apps
+        application = new_apps.get_model("immobilien", "Bewerbung").objects.get(
+            pk=self.application_id
+        )
+
+        self.assertEqual(application.personenanzahl, 1)
