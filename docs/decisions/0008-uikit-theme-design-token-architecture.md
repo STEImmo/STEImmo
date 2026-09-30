@@ -6,13 +6,23 @@
 
 ## Entscheidung
 
-STEImmo baut das UI-Fundament mit der vorhandenen UIkit-Version und Django-Templates weiter. Semantische Design-Tokens und gezielte UIkit-Anpassungen liegen zunächst in `static/css/app.css`; die mitgelieferten Dateien unter `static/vendor/uikit/` bleiben unverändert. `templates/base.html` bleibt für den gemeinsamen Rahmen und die Navigation zuständig. App-übergreifende Template-Bausteine kommen bei tatsächlichem Wiederholungsbedarf nach `templates/partials/`; app-spezifische Partials bleiben in der jeweiligen App.
+STEImmo baut das UI-Fundament mit der vorhandenen UIkit-Version und Django-Templates weiter. Semantische Design-Tokens und gezielte UIkit-Anpassungen liegen zunächst in `static/css/app.css`; die mitgelieferten Dateien unter `static/vendor/uikit/` bleiben unverändert. Tokens werden in `:root` mit einem `--steimmo-`-Präfix und semantischen Namen geführt, zum Beispiel `--steimmo-color-text`, `--steimmo-color-surface`, `--steimmo-color-action` und `--steimmo-focus-ring`. `templates/base.html` bleibt für den gemeinsamen Rahmen und die Navigation zuständig. App-übergreifende Template-Bausteine kommen bei tatsächlichem Wiederholungsbedarf nach `templates/partials/`; app-spezifische Partials bleiben in der jeweiligen App.
 
-Für UIkit-Komponenten nutzt die Projekt-CSS wenige gezielte Selektoren. Eigene CSS-Variablen allein ändern das bereits kompilierte UIkit-CSS nicht. Falls viele schwer wartbare Overrides nötig werden, wird UIkits Sass-Theming erneut geprüft. UIkit-JavaScript und bei konkretem Bedarf Vanilla JavaScript genügen; ein zweites UI-Framework oder eine separate Frontend-Buildkette wird nicht eingeführt.
+UIkit-Komponenten bleiben die Bausteine; die CSS-Custom-Properties benennen Projektwerte, und wenige gezielte Selektoren in `app.css` wenden sie auf genutzte UIkit-Komponenten an. Eigene CSS-Variablen allein ändern das bereits kompilierte UIkit-CSS nicht. Templates enthalten Struktur und Semantik; Partials kapseln nur tatsächlich wiederkehrendes Markup. UIkit-JavaScript genügt für UIkit-Interaktionen; Vanilla JavaScript kommt nur bei einem konkreten Bedarf dazu. Falls viele schwer wartbare CSS-Overrides nötig werden, wird UIkits Sass-Theming erneut geprüft. Ein zweites UI-Framework oder eine separate Frontend-Buildkette wird nicht eingeführt.
 
 ## Warum
 
 Das Repository verwendet bereits Django-Templates und lokal eingebundenes UIkit. Die Lösung knüpft daran an, hält die Zahl der Werkzeuge klein und lässt die Farb- und Typografieentscheidungen in #45 offen. Es werden durch diese Entscheidung keine Datenmodelle, URLs, Berechtigungen oder fachlichen Abläufe geändert.
+
+## Spike-Kriterien und Ergebnis
+
+| Kriterium | Ergebnis |
+|---|---|
+| UIkit-Einbindung und Anpassbarkeit prüfen | `templates/base.html` lädt die versionierten UIkit-Dateien aus `static/vendor/uikit/` und `static/css/app.css`. Die vorhandene UIkit-CSS-Datei ist vorkompiliert; eigene Variablen greifen deshalb erst über Projektregeln. Gezielte CSS-Overrides sind jetzt schlank; Sass-Theming bleibt die Rückfalloption bei wachsendem Anpassungsbedarf. |
+| Ablage und Benennung festlegen | Projekt-CSS und Tokens: `static/css/app.css`; Tokens in `:root` als `--steimmo-<bereich>-<bedeutung>` (etwa `--steimmo-color-text`). Theme-Regeln bleiben dort, Vendor-Dateien unverändert. |
+| Zuständigkeiten abgrenzen | UIkit stellt Komponenten bereit; Custom Properties halten semantische Werte; gezielte CSS-Regeln verbinden beides; Django-Templates liefern Struktur; wiederkehrende app-übergreifende Partials liegen bei Bedarf in `templates/partials/`. UIkit-JS zuerst, Vanilla JS nur für notwendige projektspezifische Interaktion. |
+| Öffentliche Seite und internes Dashboard skizzieren | Der Prototyp enthält eine öffentliche Formularvorschau und eine interne Dashboard-Skizze mit Navigation zu bestehenden Bereichen sowie eine Beispiel-Wohnungsliste. Die interne Übersichtsroute existiert im Produkt derzeit nicht; die Dashboard-Karten sind daher nur ein Navigationsmuster. |
+| Responsivität, Fokus, Validierung und Zustände bewerten | Öffentliche Ansicht: Formular stapelt auf schmalen Ansichten; Labels bleiben sichtbar; ein statischer ungültiger E-Mail-Zustand ist mit `aria-invalid` und `aria-describedby` dem Feld zugeordnet; Fokus ist über einen deutlichen Ring sichtbar. Dashboard/Liste: Karten stapeln, Navigation bleibt umbrechend erreichbar, Tabellenwerte erhalten Mobilbeschriftungen, Status zeigt Text plus Symbol/Farbe. Das Dashboard hat bewusst kein Formular; Validierung wird am öffentlichen Formularmuster beurteilt. Dies ist eine konzeptionelle Bewertung, keine Browser-/Assistive-Technology-Abnahme der Produktseiten; die konkrete Umsetzung wird in #45/#46 geprüft. |
 
 ## Wozu die Skizze dient
 
