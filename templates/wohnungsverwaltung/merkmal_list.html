@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Merkmalvorlagen verwalten – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section uk-section-default">
+    <div class="uk-container">
+        <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-margin-bottom">
+            <div>
+                <h1 class="uk-heading-small uk-margin-remove-bottom">Merkmalvorlagen</h1>
+                <p class="uk-text-muted uk-margin-small-top">Globale Vorlagen für Raumprüfungen.</p>
+            </div>
+            <a class="uk-button uk-button-primary uk-margin-small-top" href="{% url 'verwaltung:merkmal_create' %}">Merkmalvorlage anlegen</a>
+        </div>
+        <div class="uk-overflow-auto">
+            <table class="uk-table uk-table-divider uk-table-middle">
+                <thead><tr><th>Wo wird geprüft?</th><th>Was wird geprüft?</th><th>Vorgegebene Bewertung</th><th>Zusätzliche Angaben</th><th><span class="uk-hidden">Aktion</span></th></tr></thead>
+                <tbody>
+                    {% for merkmal in merkmale %}
+                        <tr>
+                            <td>{{ merkmal.bereich }}</td>
+                            <td>{{ merkmal.bezeichnung }}</td>
+                            <td><span class="uk-label">{{ merkmal.datentyp }}</span></td>
+                            <td>{{ merkmal.optionen|join:", " }}</td>
+                            <td class="uk-text-right"><a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:merkmal_edit' merkmal.pk %}">Bearbeiten</a></td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="5" class="uk-text-muted">Noch keine Merkmalvorlagen angelegt.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p><a href="{% url 'verwaltung:wohnung_list' %}">Zur Wohnungsverwaltung</a></p>
+    </div>
+</section>
+{% endblock %}

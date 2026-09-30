@@ -15,6 +15,7 @@ from wohnungsverwaltung.models import (
     ProtokollSchluessel,
     ProtokollStatus,
     ProtokollTyp,
+    Raum,
     RaumMerkmal,
     Raumprotokoll,
     Schluessel,
@@ -297,7 +298,15 @@ class Command(BaseCommand):
             key.anzahl = 2
             key.save(update_fields=["anzahl"])
 
-        room, _ = Raumprotokoll.objects.get_or_create(protokoll=protocol, name="Wohnzimmer")
+        master_room, _ = Raum.objects.get_or_create(
+            wohnung=protocol.wohnung,
+            name="Wohnzimmer",
+        )
+        room, _ = Raumprotokoll.objects.get_or_create(
+            protokoll=protocol,
+            raum=master_room,
+            defaults={"name": master_room.name},
+        )
         metric, _ = Merkmal.objects.get_or_create(
             bereich="Wohnzimmer",
             bezeichnung="Fenster",
