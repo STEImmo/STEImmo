@@ -23,6 +23,7 @@ from .models import (
     ProtokollEntwurf,
     ProtokollStatus,
     ProtokollTyp,
+    Raum,
     Schluessel,
     UebergabeStatus,
     Wohnung,
@@ -66,6 +67,7 @@ class HandoverProtocolViewsTests(TestCase):
             bereich="Küche",
             bezeichnung="Fenster",
             datentyp=MerkmalDatentyp.OK,
+            optionen=["Anzahl"],
         )
         self.second_room_feature = Merkmal.objects.create(
             bereich="Küche",
@@ -77,6 +79,7 @@ class HandoverProtocolViewsTests(TestCase):
             bezeichnung="Boden",
             datentyp=MerkmalDatentyp.OK,
         )
+        self.kitchen = Raum.objects.create(wohnung=self.wohnung, name="Küche")
         Schluessel.objects.create(
             wohnung=self.wohnung,
             bezeichnung="Wohnungstür",
@@ -139,6 +142,9 @@ class HandoverProtocolViewsTests(TestCase):
         self.assertContains(response, "Wohnungstür")
         self.assertContains(response, "Gebäude 1, Wohnung 2.04")
         self.assertNotIn("zaehlernummer_strom", response.context["form"].fields)
+        heating_readings_field = response.context["form"].fields["heizungsablesungen"]
+        self.assertIsInstance(heating_readings_field.widget, forms.TextInput)
+        self.assertEqual(heating_readings_field.widget.attrs["class"], "uk-input")
 
     def test_create_page_only_lists_people_assigned_to_the_selected_unit(self) -> None:
         other_unit = Wohnung.objects.create(
@@ -160,6 +166,61 @@ class HandoverProtocolViewsTests(TestCase):
 
         self.assertContains(response, "Mara Muster")
         self.assertNotContains(response, "Andere Person")
+
+    def test_room_names_are_unique_per_apartment_only(self) -> None:
+        other_unit = Wohnung.objects.create(etage=1, wohnungsnummer="1.03", gebaeudenummer="1")
+        Raum.objects.create(wohnung=other_unit, name="Küche")
+
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                Raum.objects.create(wohnung=self.wohnung, name="Küche")
+
+    def test_room_protocol_uses_only_rooms_from_its_apartment_and_keeps_a_name_snapshot(
+        self,
+    ) -> None:
+        other_unit = Wohnung.objects.create(etage=1, wohnungsnummer="1.03", gebaeudenummer="1")
+        other_room = Raum.objects.create(wohnung=other_unit, name="Bad")
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
+        )
+        protocol = Protokoll.objects.get()
+        room_url = reverse(
+            "wohnungsverwaltung:handover_protocol_room_create",
+            kwargs={"protocol_id": protocol.pk},
+        )
+
+        response = self.client.get(room_url)
+
+        self.assertContains(response, "Küche")
+        self.assertNotContains(response, "Bad")
+
+        response = self.client.post(room_url, {"raum": str(other_room.pk)})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("raum", response.context["form"].errors)
+        self.assertFalse(protocol.raeume.exists())
+
+        response = self.client.post(room_url, {"raum": str(self.kitchen.pk)})
+
+        room_protocol = protocol.raeume.get()
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_room_detail",
+                kwargs={"protocol_id": protocol.pk, "room_id": room_protocol.pk},
+            ),
+        )
+        self.assertEqual(room_protocol.raum, self.kitchen)
+        self.assertEqual(room_protocol.name, "Küche")
+
+        self.kitchen.name = "Wohnküche"
+        self.kitchen.save(update_fields=["name"])
+        room_protocol.refresh_from_db()
+        self.assertEqual(room_protocol.name, "Küche")
+
+        response = self.client.post(room_url, {"raum": str(self.kitchen.pk)})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("raum", response.context["form"].errors)
 
     def test_create_page_lists_only_employees_as_landlord_representatives(self) -> None:
         response = self.client.get(
@@ -323,6 +384,19 @@ class HandoverProtocolViewsTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("merkmal", form.errors)
 
+    def test_room_checklist_rejects_an_additional_detail_not_defined_by_the_feature(self) -> None:
+        form = RoomChecklistItemForm(
+            data={
+                "bereich": "Küche",
+                "merkmal": str(self.room_feature.pk),
+                "wert": "Geprüft",
+                "zusatzangaben": '{"Farbe": "weiß"}',
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("zusatzangaben", form.errors)
+
     def test_person_defaults_to_not_being_an_employee(self) -> None:
         person = Person.objects.create(
             vorname="Eva",
@@ -447,11 +521,12 @@ class HandoverProtocolViewsTests(TestCase):
                 "rooms-INITIAL_FORMS": "0",
                 "rooms-MIN_NUM_FORMS": "0",
                 "rooms-MAX_NUM_FORMS": "1000",
-                "rooms-0-raum": "Küche",
+                "rooms-0-raum": str(self.kitchen.pk),
                 "rooms-0-bereich": "Küche",
                 "rooms-0-merkmal": str(self.room_feature.pk),
                 "rooms-0-wert": "Ohne sichtbare Schäden",
-                "rooms-1-raum": "",
+                "rooms-0-zusatzangaben": '{"Anzahl": "2"}',
+                "rooms-1-raum": str(self.kitchen.pk),
                 "rooms-1-bereich": "Küche",
                 "rooms-1-merkmal": str(self.second_room_feature.pk),
                 "rooms-1-wert": "Boden ohne Schäden",
@@ -475,7 +550,30 @@ class HandoverProtocolViewsTests(TestCase):
         self.assertCountEqual(
             room.raum_merkmale.values_list("merkmal__bezeichnung", flat=True), ["Fenster", "Boden"]
         )
+        self.assertEqual(
+            room.raum_merkmale.get(merkmal=self.room_feature).wert,
+            {"text": "Ohne sichtbare Schäden", "angaben": {"Anzahl": "2"}},
+        )
         self.assertEqual(protocol.protokoll_schluessel.get().anzahl, 2)
+
+    def test_inline_room_checklist_rejects_a_room_from_another_apartment(self) -> None:
+        other_unit = Wohnung.objects.create(etage=1, wohnungsnummer="1.03", gebaeudenummer="1")
+        other_room = Raum.objects.create(wohnung=other_unit, name="Bad")
+        data = self.valid_form_data()
+        data.update(
+            {
+                "rooms-0-raum": str(other_room.pk),
+                "rooms-0-bereich": "Küche",
+                "rooms-0-merkmal": str(self.room_feature.pk),
+                "rooms-0-wert": "Ohne sichtbare Schäden",
+            }
+        )
+
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("raum", response.context["room_formset"].forms[0].errors)
+        self.assertFalse(Protokoll.objects.exists())
 
     def test_create_skips_rooms_and_keys_marked_for_removal(self) -> None:
         data = self.valid_form_data()
@@ -485,7 +583,7 @@ class HandoverProtocolViewsTests(TestCase):
                 "rooms-INITIAL_FORMS": "0",
                 "rooms-MIN_NUM_FORMS": "0",
                 "rooms-MAX_NUM_FORMS": "1000",
-                "rooms-0-raum": "Küche",
+                "rooms-0-raum": str(self.kitchen.pk),
                 "rooms-0-bereich": "Küche",
                 "rooms-0-merkmal": str(self.room_feature.pk),
                 "rooms-0-wert": "Ohne sichtbare Schäden",
@@ -574,7 +672,7 @@ class HandoverProtocolViewsTests(TestCase):
                 "wohnungsverwaltung:handover_protocol_room_create",
                 kwargs={"protocol_id": protocol.pk},
             ),
-            {"name": "Küche"},
+            {"raum": str(self.kitchen.pk)},
         )
 
         room = protocol.raeume.get()
@@ -594,6 +692,7 @@ class HandoverProtocolViewsTests(TestCase):
                 "bereich": "Küche",
                 "merkmal": str(self.room_feature.pk),
                 "wert": "ohne sichtbare Schäden",
+                "zusatzangaben": '{"Anzahl": "3"}',
             },
         )
 
@@ -608,14 +707,25 @@ class HandoverProtocolViewsTests(TestCase):
         self.assertEqual(room_merkmal.merkmal.bereich, "Küche")
         self.assertEqual(room_merkmal.merkmal.bezeichnung, "Fenster")
         self.assertEqual(room_merkmal.merkmal.datentyp, MerkmalDatentyp.OK)
-        self.assertEqual(room_merkmal.wert, {"text": "ohne sichtbare Schäden"})
+        self.assertEqual(
+            room_merkmal.wert,
+            {"text": "ohne sichtbare Schäden", "angaben": {"Anzahl": "3"}},
+        )
+        response = self.client.get(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_room_detail",
+                kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+            )
+        )
+        self.assertContains(response, "Anzahl")
+        self.assertContains(response, "3")
 
     def test_open_protocol_allows_removing_rooms_and_key_positions(self) -> None:
         self.client.post(
             reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
         )
         protocol = Protokoll.objects.get()
-        room = protocol.raeume.create(name="Küche")
+        room = protocol.raeume.create(raum=self.kitchen, name=self.kitchen.name)
         checklist_item = room.raum_merkmale.create(
             merkmal=self.room_feature,
             wert={"text": "Ohne sichtbare Schäden"},
@@ -690,7 +800,7 @@ class HandoverProtocolViewsTests(TestCase):
             reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
         )
         protocol = Protokoll.objects.get()
-        protocol.raeume.create(name="Küche")
+        protocol.raeume.create(raum=self.kitchen, name=self.kitchen.name)
 
         response = self.client.post(
             reverse(
@@ -715,7 +825,7 @@ class HandoverProtocolViewsTests(TestCase):
             reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
         )
         protocol = Protokoll.objects.get()
-        room = protocol.raeume.create(name="Küche")
+        room = protocol.raeume.create(raum=self.kitchen, name=self.kitchen.name)
         merkmal = Merkmal.objects.create(
             bereich="Küche",
             bezeichnung="Fenster",
@@ -820,7 +930,7 @@ class HandoverProtocolViewsTests(TestCase):
             reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
         )
         protocol = Protokoll.objects.get()
-        room = protocol.raeume.create(name="Küche")
+        room = protocol.raeume.create(raum=self.kitchen, name=self.kitchen.name)
         merkmal = Merkmal.objects.create(
             bereich="Küche",
             bezeichnung="Fenster",

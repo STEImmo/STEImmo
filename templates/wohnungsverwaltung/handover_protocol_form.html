@@ -78,6 +78,7 @@
                 "meter-number-display",
                 "key-formset-management",
                 "key-formset",
+                "room-formset-section",
             ].forEach((id) => {
                 const currentElement = document.getElementById(id);
                 const updatedElement = updatedPage.getElementById(id);
@@ -110,6 +111,81 @@
             updateTypeSpecificSections();
         }
 
+        const featureOptions = (container) => {
+            const selectedOption = container?.querySelector("[data-feature-name-select]")?.selectedOptions[0];
+            try {
+                const options = JSON.parse(selectedOption?.dataset.featureOptions || "[]");
+                return Array.from(new Set(options.filter((option) => typeof option === "string" && option.trim())))
+                    .map((option) => option.trim());
+            } catch (error) {
+                return [];
+            }
+        };
+
+        const storedAdditionalDetails = (input) => {
+            try {
+                const details = JSON.parse(input?.value || "{}");
+                return details && typeof details === "object" && !Array.isArray(details) ? details : {};
+            } catch (error) {
+                return {};
+            }
+        };
+
+        const renderAdditionalDetails = (container) => {
+            const detailsInput = container?.querySelector("[data-additional-details-value]");
+            const detailsContainer = container?.querySelector("[data-additional-details]");
+            if (!detailsInput || !detailsContainer) {
+                return;
+            }
+            const options = featureOptions(container);
+            const storedDetails = storedAdditionalDetails(detailsInput);
+            const details = Object.fromEntries(options
+                .filter((label) => typeof storedDetails[label] === "string" && storedDetails[label].trim())
+                .map((label) => [label, storedDetails[label].trim()]));
+            detailsInput.value = JSON.stringify(details);
+            detailsContainer.replaceChildren();
+            detailsContainer.hidden = options.length === 0;
+            if (!options.length) {
+                return;
+            }
+
+            const heading = document.createElement("h5");
+            heading.className = "uk-heading-bullet uk-margin-remove-bottom";
+            heading.textContent = "Zusätzliche Angaben";
+            detailsContainer.append(heading);
+            const hint = document.createElement("p");
+            hint.className = "uk-text-meta uk-margin-small-top";
+            hint.textContent = "Diese Angaben werden zusammen mit dem Prüfpunkt gespeichert.";
+            detailsContainer.append(hint);
+            const grid = document.createElement("div");
+            grid.className = "uk-child-width-1-2@m uk-grid-small";
+            grid.setAttribute("uk-grid", "");
+            options.forEach((label, index) => {
+                const field = document.createElement("div");
+                const inputId = `${detailsInput.id}-detail-${index}`;
+                const labelElement = document.createElement("label");
+                labelElement.className = "uk-form-label";
+                labelElement.htmlFor = inputId;
+                labelElement.textContent = label;
+                const input = document.createElement("input");
+                input.className = "uk-input";
+                input.id = inputId;
+                input.type = "text";
+                input.value = details[label] || "";
+                input.setAttribute("data-additional-detail", label);
+                input.addEventListener("input", () => {
+                    const currentDetails = Object.fromEntries(Array.from(
+                        detailsContainer.querySelectorAll("[data-additional-detail]"),
+                    ).map((fieldInput) => [fieldInput.dataset.additionalDetail, fieldInput.value.trim()])
+                        .filter(([, value]) => value));
+                    detailsInput.value = JSON.stringify(currentDetails);
+                });
+                field.append(labelElement, input);
+                grid.append(field);
+            });
+            detailsContainer.append(grid);
+        };
+
         const filterFeatureNames = (container) => {
             if (!container) {
                 return;
@@ -133,6 +209,7 @@
                 nameSelect.value = "";
             }
             nameSelect.disabled = !selectedArea;
+            renderAdditionalDetails(container);
         };
 
         document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
@@ -140,10 +217,12 @@
             if (!card) {
                 return;
             }
-            const roomName = card.querySelector("[data-room-name-source]")?.value || "";
-            card.querySelectorAll("[data-room-name-value]").forEach((input) => {
-                input.value = roomName;
-                input.setAttribute("value", roomName);
+            const roomSelect = card.querySelector("[data-room-source]");
+            const roomId = roomSelect?.value || "";
+            const roomName = roomSelect?.selectedOptions[0]?.textContent?.trim() || "";
+            card.querySelectorAll("[data-room-value]").forEach((input) => {
+                input.value = roomId;
+                input.setAttribute("value", roomId);
             });
             const title = card.querySelector("[data-room-title]");
             if (title) {
@@ -157,11 +236,13 @@
                 filterFeatureNames(event.target.closest("[data-room-checklist-form]"));
                 saveDraft(true);
             }
-        });
-        document.addEventListener("input", (event) => {
-            if (event.target.matches("[data-room-name-source]")) {
+            if (event.target.matches("[data-feature-name-select]")) {
+                renderAdditionalDetails(event.target.closest("[data-room-checklist-form]"));
+                saveDraft(true);
+            }
+            if (event.target.matches("[data-room-source]")) {
                 synchronizeRoomCard(event.target.closest("[data-room-card]"));
-                saveDraft();
+                saveDraft(true);
             }
         });
 
@@ -282,7 +363,7 @@
             "nachbesserung_bis",
             "nachbesserung_beschreibung",
         ];
-        const checklistFieldNames = ["bereich", "merkmal", "wert"];
+        const checklistFieldNames = ["bereich", "merkmal", "wert", "zusatzangaben"];
         const keyFieldNames = [
             "anzahl",
             "raum_bezeichnung",
@@ -329,7 +410,7 @@
             rooms: Array.from(document.querySelectorAll("[data-room-card]"))
                 .filter((card) => !card.hidden)
                 .map((card) => ({
-                    name: card.querySelector("[data-room-name-source]")?.value || "",
+                    raum: card.querySelector("[data-room-source]")?.value || "",
                     items: Array.from(card.querySelectorAll("[data-room-checklist-form]"))
                         .filter((item) => !item.hidden)
                         .map((item) => serializeFields(item, checklistFieldNames)),
@@ -422,9 +503,9 @@
             (rooms || []).forEach((savedRoom) => {
                 addRoom();
                 const card = target.lastElementChild;
-                const roomInput = card?.querySelector("[data-room-name-source]");
+                const roomInput = card?.querySelector("[data-room-source]");
                 if (roomInput) {
-                    roomInput.value = savedRoom.name || "";
+                    roomInput.value = savedRoom.raum || "";
                 }
                 const savedItems = savedRoom.items?.length ? savedRoom.items : [{}];
                 while (card?.querySelectorAll("[data-room-checklist-form]").length < savedItems.length) {

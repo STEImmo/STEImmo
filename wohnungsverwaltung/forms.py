@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 
 from django import forms
@@ -25,6 +26,7 @@ from .models import (
     Protokoll,
     ProtokollSchluessel,
     ProtokollTyp,
+    Raum,
     RaumMerkmal,
     Raumprotokoll,
     Schluessel,
@@ -540,7 +542,7 @@ class HandoverProtocolForm(forms.ModelForm):
             "zaehlerstand_heizung": forms.NumberInput(
                 attrs={"class": "uk-input", "min": "0", "step": "0.01"}
             ),
-            "heizungsablesungen": forms.Textarea(attrs={"class": "uk-textarea", "rows": 2}),
+            "heizungsablesungen": forms.TextInput(attrs={"class": "uk-input"}),
             "zaehlerstand_strom": forms.NumberInput(
                 attrs={"class": "uk-input", "min": "0", "step": "0.01"}
             ),
@@ -585,6 +587,16 @@ class HandoverProtocolForm(forms.ModelForm):
         cleaned_data = super().clean()
         handover_type = cleaned_data.get("protokoll_typ")
         apartment = cleaned_data.get("wohnung")
+        if (
+            self.instance.pk
+            and apartment is not None
+            and apartment.pk != self.instance.wohnung_id
+            and self.instance.raeume.exists()
+        ):
+            self.add_error(
+                "wohnung",
+                "Die Wohnung kann nicht geändert werden, weil das Protokoll bereits Räume enthält.",
+            )
         if apartment is not None:
             for field_name, label in METER_NUMBER_FIELDS:
                 if not getattr(apartment, field_name).strip():
@@ -709,9 +721,22 @@ def _valid_wohnung_id(wohnung_id: str | None) -> UUID | None:
 class RoomProtocolForm(forms.ModelForm):
     class Meta:
         model = Raumprotokoll
-        fields = ["name"]
-        labels = {"name": "Raum / Bereich"}
-        widgets = {"name": forms.TextInput(attrs={"class": "uk-input"})}
+        fields = ["raum"]
+        labels = {"raum": "Raum"}
+        widgets = {"raum": forms.Select(attrs={"class": "uk-select"})}
+
+    def __init__(self, *args, protocol: Protokoll, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.protocol = protocol
+        self.fields["raum"].queryset = Raum.objects.filter(wohnung=protocol.wohnung).order_by(
+            "name"
+        )
+
+    def clean_raum(self) -> Raum:
+        raum = self.cleaned_data["raum"]
+        if Raumprotokoll.objects.filter(protokoll=self.protocol, raum=raum).exists():
+            raise forms.ValidationError("Dieser Raum wurde im Übergabeprotokoll bereits erfasst.")
+        return raum
 
 
 def _feature_area_choices() -> list[tuple[str, str]]:
@@ -725,6 +750,7 @@ class FeatureSelect(forms.Select):
         feature = getattr(value, "instance", None)
         if feature is not None:
             option["attrs"]["data-feature-area"] = feature.bereich
+            option["attrs"]["data-feature-options"] = json.dumps(_feature_options(feature))
         return option
 
 
@@ -733,20 +759,66 @@ class FeatureChoiceField(forms.ModelChoiceField):
         return obj.bezeichnung
 
 
+def _feature_options(feature: Merkmal) -> list[str]:
+    options: list[str] = []
+    for value in feature.optionen:
+        if not isinstance(value, str):
+            continue
+        option = value.strip()
+        if option and option not in options:
+            options.append(option)
+    return options
+
+
+def _clean_additional_details(raw_value: str, feature: Merkmal | None) -> dict[str, str]:
+    if not raw_value:
+        return {}
+    try:
+        details = json.loads(raw_value)
+    except json.JSONDecodeError as error:
+        raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.") from error
+    if not isinstance(details, dict):
+        raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.")
+
+    permitted_labels = set(_feature_options(feature)) if feature is not None else set()
+    cleaned_details: dict[str, str] = {}
+    for label, value in details.items():
+        if not isinstance(label, str) or label not in permitted_labels:
+            raise forms.ValidationError(
+                "Diese zusätzliche Angabe gehört nicht zum gewählten Prüfpunkt."
+            )
+        if not isinstance(value, str):
+            raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.")
+        if cleaned_value := value.strip():
+            cleaned_details[label] = cleaned_value
+    return cleaned_details
+
+
+def _finding_value(text: str, additional_details: dict[str, str]) -> dict[str, object]:
+    value: dict[str, object] = {"text": text}
+    if additional_details:
+        value["angaben"] = additional_details
+    return value
+
+
 class RoomChecklistItemForm(forms.Form):
     bereich = forms.ChoiceField(
         choices=(),
-        label="Bereich",
+        label="Wo wird geprüft?",
         widget=forms.Select(attrs={"class": "uk-select", "data-feature-area-select": ""}),
     )
     merkmal = FeatureChoiceField(
         queryset=Merkmal.objects.none(),
-        label="Bezeichnung",
+        label="Was wird geprüft?",
         widget=FeatureSelect(attrs={"class": "uk-select", "data-feature-name-select": ""}),
     )
     wert = forms.CharField(
-        label="Feststellung",
+        label="Was wurde festgestellt?",
         widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
+    )
+    zusatzangaben = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"data-additional-details-value": ""}),
     )
 
     def __init__(self, *args, **kwargs) -> None:
@@ -759,13 +831,19 @@ class RoomChecklistItemForm(forms.Form):
         feature = cleaned_data.get("merkmal")
         if feature is not None and feature.bereich != cleaned_data.get("bereich"):
             self.add_error("merkmal", "Die Bezeichnung gehört nicht zum gewählten Bereich.")
+        try:
+            cleaned_data["zusatzangaben"] = _clean_additional_details(
+                cleaned_data.get("zusatzangaben", ""), feature
+            )
+        except forms.ValidationError as error:
+            self.add_error("zusatzangaben", error)
         return cleaned_data
 
     def save(self, room: Raumprotokoll) -> RaumMerkmal:
         return RaumMerkmal.objects.create(
             raumprotokoll=room,
             merkmal=self.cleaned_data["merkmal"],
-            wert={"text": self.cleaned_data["wert"]},
+            wert=_finding_value(self.cleaned_data["wert"], self.cleaned_data["zusatzangaben"]),
         )
 
 
@@ -823,38 +901,47 @@ class ProtocolConfirmationForm(forms.Form):
 
 
 class InlineRoomChecklistForm(forms.Form):
-    raum = forms.CharField(
+    raum = forms.ModelChoiceField(
+        queryset=Raum.objects.none(),
         label="Raum",
         required=False,
-        widget=forms.TextInput(attrs={"class": "uk-input", "data-room-name-source": ""}),
+        widget=forms.Select(attrs={"class": "uk-select", "data-room-source": ""}),
     )
     bereich = forms.ChoiceField(
         choices=(),
-        label="Bereich",
+        label="Wo wird geprüft?",
         required=False,
         widget=forms.Select(attrs={"class": "uk-select", "data-feature-area-select": ""}),
     )
     merkmal = FeatureChoiceField(
         queryset=Merkmal.objects.none(),
-        label="Bezeichnung",
+        label="Was wird geprüft?",
         required=False,
         widget=FeatureSelect(attrs={"class": "uk-select", "data-feature-name-select": ""}),
     )
     wert = forms.CharField(
-        label="Feststellung",
+        label="Was wurde festgestellt?",
         required=False,
         widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 5}),
     )
+    zusatzangaben = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"data-additional-details-value": ""}),
+    )
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, wohnung_id: UUID | None = None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        if wohnung_id is not None:
+            self.fields["raum"].queryset = Raum.objects.filter(wohnung_id=wohnung_id).order_by(
+                "name"
+            )
         self.fields["bereich"].choices = _feature_area_choices()
         self.fields["merkmal"].queryset = Merkmal.objects.order_by("bereich", "bezeichnung")
 
     def clean(self) -> dict:
         cleaned_data = super().clean()
         values = {
-            "raum": cleaned_data.get("raum", "").strip(),
+            "raum": cleaned_data.get("raum"),
             "bereich": cleaned_data.get("bereich", "").strip(),
             "merkmal": cleaned_data.get("merkmal"),
             "wert": cleaned_data.get("wert", "").strip(),
@@ -868,27 +955,35 @@ class InlineRoomChecklistForm(forms.Form):
         feature = cleaned_data.get("merkmal")
         if feature is not None and feature.bereich != cleaned_data.get("bereich"):
             self.add_error("merkmal", "Die Bezeichnung gehört nicht zum gewählten Bereich.")
+        try:
+            cleaned_data["zusatzangaben"] = _clean_additional_details(
+                cleaned_data.get("zusatzangaben", ""), feature
+            )
+        except forms.ValidationError as error:
+            self.add_error("zusatzangaben", error)
         return cleaned_data
 
     def has_entry(self) -> bool:
         return self.cleaned_data.get("merkmal") is not None
 
     def save(self, protocol: Protokoll) -> RaumMerkmal:
+        raum = self.cleaned_data["raum"]
         room, _created = Raumprotokoll.objects.get_or_create(
             protokoll=protocol,
-            name=self.cleaned_data["raum"],
+            raum=raum,
+            defaults={"name": raum.name},
         )
         return RaumMerkmal.objects.create(
             raumprotokoll=room,
             merkmal=self.cleaned_data["merkmal"],
-            wert={"text": self.cleaned_data["wert"]},
+            wert=_finding_value(self.cleaned_data["wert"], self.cleaned_data["zusatzangaben"]),
         )
 
 
 class RoomChecklistFormSet(BaseFormSet):
     def clean(self) -> None:
         super().clean()
-        current_room = ""
+        current_room = None
         for room_form in self.forms:
             if (
                 not getattr(room_form, "cleaned_data", None)
@@ -896,14 +991,14 @@ class RoomChecklistFormSet(BaseFormSet):
                 or not room_form.has_entry()
             ):
                 continue
-            room_name = room_form.cleaned_data.get("raum", "").strip()
-            if room_name:
-                current_room = room_name
+            room = room_form.cleaned_data.get("raum")
+            if room is not None:
+                current_room = room
                 continue
-            if current_room:
+            if current_room is not None:
                 room_form.cleaned_data["raum"] = current_room
                 continue
-            room_form.add_error("raum", "Bitte geben Sie für den ersten Prüfpunkt einen Raum an.")
+            room_form.add_error("raum", "Bitte wählen Sie für den ersten Prüfpunkt einen Raum.")
 
 
 InlineRoomChecklistFormSet = forms.formset_factory(
@@ -963,6 +1058,38 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "zaehlernummer_heizung": "Zählernummer Heizung",
             "zaehlernummer_strom": "Zählernummer Strom",
         }
+
+
+class RaumForm(UIkitFormMixin, forms.ModelForm):
+    class Meta:
+        model = Raum
+        fields = ["name"]
+        labels = {"name": "Raumname"}
+
+
+class MerkmalForm(UIkitFormMixin, forms.ModelForm):
+    class Meta:
+        model = Merkmal
+        fields = ["bereich", "bezeichnung", "datentyp"]
+        labels = {
+            "bereich": "Wo wird geprüft?",
+            "bezeichnung": "Was wird geprüft?",
+            "datentyp": "Vorgegebene Bewertung",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["datentyp"].help_text = (
+            "Wählen Sie den typischen Wert, der diesen Prüfpunkt beschreibt, "
+            "zum Beispiel „OK“ oder „Fliesen“."
+        )
+
+
+class MerkmalOptionForm(UIkitFormMixin, forms.Form):
+    wert = forms.CharField(label="Zusätzliche Angabe", required=False)
+
+
+MerkmalOptionFormSet = forms.formset_factory(MerkmalOptionForm, extra=1, can_delete=True)
 
 
 class SchluesselForm(UIkitFormMixin, forms.ModelForm):

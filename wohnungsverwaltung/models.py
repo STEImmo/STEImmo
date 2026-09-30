@@ -471,15 +471,40 @@ class ProtokollEntwurf(models.Model):
         ]
 
 
+class Raum(models.Model):
+    raum_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    wohnung = models.ForeignKey(Wohnung, on_delete=models.CASCADE, related_name="raeume")
+    name = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "raum"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("wohnung", "name"), name="raum_name_pro_wohnung_eindeutig"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Raumprotokoll(models.Model):
     raumprotokoll_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     protokoll = models.ForeignKey(Protokoll, on_delete=models.CASCADE, related_name="raeume")
+    raum = models.ForeignKey(Raum, on_delete=models.PROTECT, related_name="raumprotokolle")
     name = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "raumprotokoll"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("protokoll", "raum"), name="raumprotokoll_eindeutig_pro_protokoll"
+            )
+        ]
 
 
 class Merkmal(models.Model):

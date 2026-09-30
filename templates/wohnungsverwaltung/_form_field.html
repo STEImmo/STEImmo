@@ -6,6 +6,9 @@
         {{ field.label_tag }}
         {{ field }}
     {% endif %}
+    {% if field.help_text %}
+        <div class="uk-text-meta uk-text-small">{{ field.help_text }}</div>
+    {% endif %}
     {% for error in field.errors %}
         <div class="uk-text-danger uk-text-small">{{ error }}</div>
     {% endfor %}

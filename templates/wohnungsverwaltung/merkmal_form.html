@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section uk-section-default">
+    <div class="uk-container uk-container-small">
+        <a class="uk-button uk-button-text" href="{% url 'verwaltung:merkmal_list' %}">Zur Übersicht</a>
+        <h1 class="uk-heading-small">{{ title }}</h1>
+        <p class="uk-text-lead">Legen Sie fest, wo und was bei einer Raumprüfung dokumentiert wird.</p>
+        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top">
+            {% csrf_token %}
+            {% for field in form.visible_fields %}
+                {% include "wohnungsverwaltung/_form_field.html" with field=field %}
+            {% endfor %}
+
+            <section class="uk-margin-large-top">
+                <div class="uk-flex uk-flex-between uk-flex-middle">
+                <h2 class="uk-h3 uk-margin-remove">Zusätzliche Angaben</h2>
+                <button class="uk-button uk-button-default uk-button-small" type="button" data-add-option>Angabe hinzufügen</button>
+            </div>
+                <p class="uk-text-meta">Erfassen Sie Angaben, die bei diesem Prüfpunkt zusätzlich dokumentiert werden sollen.</p>
+                {{ option_formset.management_form }}
+                <div id="option-formset">
+                    {% for option_form in option_formset %}
+                        <div class="uk-flex uk-flex-middle uk-margin-small-bottom" data-option-row>
+                            <div class="uk-width-expand">{% include "wohnungsverwaltung/_form_field.html" with field=option_form.wert %}</div>
+                            <div class="uk-margin-left"><button class="uk-button uk-button-danger uk-button-small" type="button" data-remove-option>Entfernen</button></div>
+                            <div hidden>{{ option_form.DELETE }}</div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <template id="option-empty-form">
+                    <div class="uk-flex uk-flex-middle uk-margin-small-bottom" data-option-row>
+                        <div class="uk-width-expand">{% include "wohnungsverwaltung/_form_field.html" with field=option_formset.empty_form.wert %}</div>
+                        <div class="uk-margin-left"><button class="uk-button uk-button-danger uk-button-small" type="button" data-remove-option>Entfernen</button></div>
+                        <div hidden>{{ option_formset.empty_form.DELETE }}</div>
+                    </div>
+                </template>
+            </section>
+            <button class="uk-button uk-button-primary uk-margin-top" type="submit">Speichern</button>
+        </form>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const optionFormset = document.getElementById("option-formset");
+    const optionTotalForms = document.getElementById("id_optionen-TOTAL_FORMS");
+    const optionTemplate = document.getElementById("option-empty-form");
+    document.querySelector("[data-add-option]")?.addEventListener("click", () => {
+        if (!optionFormset || !optionTotalForms || !optionTemplate) {
+            return;
+        }
+        optionFormset.insertAdjacentHTML("beforeend", optionTemplate.innerHTML.replace(/__prefix__/g, optionTotalForms.value));
+        optionTotalForms.value = String(Number(optionTotalForms.value) + 1);
+    });
+    document.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-remove-option]");
+        if (!button) {
+            return;
+        }
+        const row = button.closest("[data-option-row]");
+        const deleted = row?.querySelector('input[name$="-DELETE"]');
+        if (deleted) {
+            deleted.checked = true;
+        }
+        if (row) {
+            row.hidden = true;
+        }
+    });
+</script>
+{% endblock %}
