@@ -118,6 +118,14 @@ Danach werden Konten im UIkit-Bereich **Verwaltung → Benutzer** erstellt, mit 
 
 Selbstregistrierte Bewerberkonten bleiben bis zur Eingabe eines per E-Mail gesendeten, sechsstelligen Bestätigungscodes deaktiviert. Der Code ist 15 Minuten gültig; nach fünf falschen Versuchen ist ein neuer Code anzufordern. Die lokale Entwicklungsumgebung startet dafür automatisch Mailpit. Das lokale Testpostfach ist unter [http://localhost:8025](http://localhost:8025) erreichbar und bewahrt höchstens 100 E-Mails bis zum Stoppen des Containers auf. Es werden keine E-Mails an externe Empfänger gesendet.
 
+Mit dem Development-Override wird beim Containerstart außerdem ein ausschließlich lokales Mitarbeiterkonto bereitgestellt. Es existiert nicht in der Produktions-Compose-Konfiguration und der zugrunde liegende Command verweigert die Ausführung bei `DEBUG=False`.
+
+| E-Mail-Adresse | Passwort | Zugriff |
+|---|---|---|
+| `mitarbeiter@example.test` | `KometFjord!4826` | Mitarbeiterbereich und Übergaben |
+
+Der lokale Bootstrap reaktiviert dieses fiktive Konto und setzt sein Passwort bei jedem Entwicklungsstart auf den dokumentierten Wert zurück. Die Zugangsdaten sind absichtlich öffentlich und dürfen niemals außerhalb der lokalen Entwicklungsumgebung verwendet werden.
+
 Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD` und `DJANGO_EMAIL_USE_TLS`. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
 
 ## Lokale Entwicklung

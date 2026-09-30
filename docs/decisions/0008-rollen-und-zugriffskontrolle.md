@@ -24,6 +24,8 @@ Die UIkit-Benutzerverwaltung ist der einzige Pflegeweg für User und Gruppen in 
 
 Bei der Selbstregistrierung werden `User` und `Person` atomar, aber zunächst mit `is_active=False` angelegt. Ein zufälliger sechsstelliger Bestätigungscode wird ausschließlich als Passwort-Hash gespeichert, gilt 15 Minuten und hat höchstens fünf Eingabeversuche. Nach erfolgreicher Bestätigung wird das Konto aktiviert und angemeldet. Ein erneuter Versand ersetzt den vorherigen Code; zwischen zwei Sendungen gilt eine Sperrzeit von einer Minute. In der Entwicklung stellt der ausschließlich im Compose-Override enthaltene Mailpit-Container ein lokales Testpostfach auf `localhost:8025` bereit. Er ist auf 100 temporäre E-Mails begrenzt und wird nicht in Produktion gestartet. Produktion verwendet einen konfigurierten SMTP-Backend. Ein Browser-Hinweis in der Anwendung enthält den Code bewusst nicht, weil er keinen vom Registrierungsbrowser getrennten Nachweis liefern würde.
 
+Der Development-Override startet zusätzlich einen explizit fiktiven Mitarbeiter über `create_development_employee`. Die Compose-Variablen sind auf `mitarbeiter@example.test` und ein dokumentiertes lokales Passwort festgelegt. Der Command darf ausschließlich mit `DEBUG=True` laufen, erstellt die verknüpfte Person, aktiviert das Konto und vergibt die Gruppe `Mitarbeiter`. Bei jedem Entwicklungsstart stellt er diesen Zustand wieder her. Eine Datenmigration oder die Produktions-Compose-Konfiguration erzeugt kein solches Konto.
+
 ## Erweiterungsroutine
 
 Für eine neue geschützte Seite wird in dieser Reihenfolge vorgegangen:

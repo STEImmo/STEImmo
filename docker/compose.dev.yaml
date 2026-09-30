@@ -7,6 +7,9 @@ services:
       DJANGO_EMAIL_PORT: "1025"
       DJANGO_EMAIL_USE_TLS: "0"
       DJANGO_DEFAULT_FROM_EMAIL: noreply@steimmo.test
+      DJANGO_CREATE_DEVELOPMENT_EMPLOYEE: "1"
+      DJANGO_DEVELOPMENT_EMPLOYEE_EMAIL: mitarbeiter@example.test
+      DJANGO_DEVELOPMENT_EMPLOYEE_PASSWORD: KometFjord!4826
     command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
     volumes:
       - ..:/app

@@ -6,7 +6,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core import mail
 from django.core.management import call_command
-from django.test import TestCase
+from django.core.management.base import CommandError
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -352,3 +353,46 @@ class InitialUserManagerCommandTests(TestCase):
         self.assertEqual(account.person_profile.email, "erste.verwaltung@example.test")
         self.assertTrue(account.person_profile.is_employee)
         self.assertTrue(account.groups.filter(name=ROLE_USER_MANAGEMENT).exists())
+
+
+class CreateDevelopmentEmployeeCommandTests(TestCase):
+    @override_settings(DEBUG=True)
+    def test_command_creates_an_active_linked_employee_account(self) -> None:
+        call_command(
+            "create_development_employee",
+            email="mitarbeiter@example.test",
+            password="KometFjord!4826",
+            stdout=StringIO(),
+        )
+
+        account = get_user_model().objects.get(username="mitarbeiter@example.test")
+
+        self.assertTrue(account.is_active)
+        self.assertTrue(account.check_password("KometFjord!4826"))
+        self.assertTrue(account.person_profile.is_employee)
+        self.assertTrue(account.groups.filter(name=ROLE_EMPLOYEE).exists())
+
+        account.is_active = False
+        account.set_password("AnderesPasswort!4826")
+        account.save()
+        call_command(
+            "create_development_employee",
+            email="mitarbeiter@example.test",
+            password="KometFjord!4826",
+            stdout=StringIO(),
+        )
+
+        account.refresh_from_db()
+        self.assertTrue(account.is_active)
+        self.assertTrue(account.check_password("KometFjord!4826"))
+        self.assertEqual(get_user_model().objects.filter(username=account.username).count(), 1)
+
+    @override_settings(DEBUG=False)
+    def test_command_refuses_to_run_outside_development(self) -> None:
+        with self.assertRaises(CommandError):
+            call_command(
+                "create_development_employee",
+                email="mitarbeiter@example.test",
+                password="KometFjord!4826",
+                stdout=StringIO(),
+            )
