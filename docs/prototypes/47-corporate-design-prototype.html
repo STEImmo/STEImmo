@@ -19,6 +19,8 @@
       --muted: #595959;
       --line: #d4cec8;
       --focus: #155eef;
+      --cta-forest: #2D5A43;
+      --cta-teal: #1F4E5B;
     }
     html { scroll-behavior: smooth; }
     body { min-height: 100vh; background: #f5f2ef; color: var(--ink); }
@@ -41,6 +43,10 @@
     .demo-nav a, .button-primary { border-radius: 5px; background: var(--anthracite); color: white !important; }
     .demo-nav a { padding: .65rem 1rem; text-decoration: none; font-weight: 600; }
     .button-primary { border: 0; }
+    .accent-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem; }
+    .accent-option { overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: white; }
+    .accent-color { min-height: 110px; }
+    .accent-copy { padding: 1rem; }
     .section { padding-block: clamp(2rem, 5vw, 4rem); scroll-margin-top: 1rem; }
     .section-heading { margin-bottom: 1.5rem; }
     .section-heading h2 { margin: .25rem 0; color: var(--anthracite); font-size: clamp(1.6rem, 3vw, 2.25rem); }
@@ -231,8 +237,26 @@
           <div class="swatch"><div class="swatch-color" style="background:#3F4345"></div><div class="swatch-copy"><strong>Dach · Anthrazit</strong>#3F4345</div></div>
           <div class="swatch"><div class="swatch-color" style="background:#89847A"></div><div class="swatch-copy"><strong>Sockel · Grau</strong>#89847A</div></div>
           <div class="swatch"><div class="swatch-color" style="background:#454545"></div><div class="swatch-copy"><strong>Rahmen · Dunkelgrau</strong>#454545</div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#2D5A43"></div><div class="swatch-copy"><strong>CTA · Waldgrün</strong>#2D5A43</div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#1F4E5B"></div><div class="swatch-copy"><strong>CTA · Petrol</strong>#1F4E5B</div></div>
         </div>
         <p class="note uk-margin-top">Kontrast-Hinweis: Sand mit Anthrazit liegt bei etwa 7:1. Taupe und Sockelgrau sind auf Sand zu kontrastarm für normalen Text; hier nur als Flächen, Linien oder Akzente gedacht. Endgültige Zustände und Fokusfarben folgen in #45/#46.</p>
+        <div class="uk-margin-large-top">
+          <div class="eyebrow">Akzentfarben · zur Abstimmung</div>
+          <h3 class="card-title">Waldgrün oder Petrol?</h3>
+          <p class="note">Beide Richtungen harmonieren mit den Fassadentönen. Die Farbflächen dienen nur dem visuellen Vergleich – welche Farbe primär eingesetzt wird, bleibt offen.</p>
+          <div class="accent-options">
+            <article class="accent-option">
+              <div class="accent-color" style="background:#2D5A43"></div>
+              <div class="accent-copy"><strong>Waldgrün · #2D5A43</strong><p class="note uk-margin-small-top">Natürlicher und erdiger. Weißer Text: 7,9:1; auf Sand: 5,6:1.</p></div>
+            </article>
+            <article class="accent-option">
+              <div class="accent-color" style="background:#1F4E5B"></div>
+              <div class="accent-copy"><strong>Petrol · #1F4E5B</strong><p class="note uk-margin-small-top">Kühler und etwas urbaner. Weißer Text: 9,1:1; auf Sand: 6,4:1.</p></div>
+            </article>
+          </div>
+          <p class="note uk-margin-small-top">Die beiden Töne sind benachbarte Blaugrüntöne und damit analog/harmonisch, keine Komplementärfarben. Für normalen Text auf Sand gilt mindestens 4,5:1 Kontrast. Statusfarben bleiben semantisch getrennt und werden immer zusätzlich mit einem Statusbegriff dargestellt.</p>
+        </div>
       </div>
     </section>
   </main>
