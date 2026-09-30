@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Statischer UI-Prototyp für STEImmo Spike #47">
+  <title>STEImmo · UI-Fundament – Spike #47</title>
+  <link rel="stylesheet" href="../../static/vendor/uikit/uikit.min.css">
+  <style>
+    :root {
+      color-scheme: light;
+      --sand: #DFD7CE;
+      --taupe: #AB9F94;
+      --anthracite: #3F4345;
+      --base: #89847A;
+      --frame: #454545;
+      --paper: #fff;
+      --ink: #292b2c;
+      --muted: #595959;
+      --line: #d4cec8;
+      --focus: #155eef;
+    }
+    html { scroll-behavior: smooth; }
+    body { min-height: 100vh; background: #f5f2ef; color: var(--ink); }
+    a { color: #303638; text-underline-offset: .18em; }
+    a:hover { color: #151718; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    .site-header { background: var(--anthracite); color: white; }
+    .site-header a { color: white; }
+    .header-inner { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .brand { display: inline-flex; align-items: center; gap: .75rem; font-size: 1.15rem; font-weight: 700; text-decoration: none; letter-spacing: .02em; }
+    .house-mark { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(255,255,255,.68); border-radius: 9px; color: white; font-size: .68rem; line-height: 1.1; text-align: center; }
+    .header-links { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
+    .header-links a { font-size: .92rem; }
+    .hero { background: var(--sand); border-bottom: 5px solid var(--taupe); }
+    .hero-inner { padding-block: clamp(2rem, 5vw, 4rem); }
+    .eyebrow { color: #4a4642; font-size: .78rem; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
+    .hero h1 { max-width: 760px; margin: .45rem 0 .7rem; color: var(--anthracite); font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.08; }
+    .hero p { max-width: 680px; color: #363535; font-size: 1.08rem; }
+    .demo-nav { display: flex; flex-wrap: wrap; gap: .65rem; margin-top: 1.5rem; }
+    .demo-nav a, .button-primary { border-radius: 5px; background: var(--anthracite); color: white !important; }
+    .demo-nav a { padding: .65rem 1rem; text-decoration: none; font-weight: 600; }
+    .button-primary { border: 0; }
+    .section { padding-block: clamp(2rem, 5vw, 4rem); scroll-margin-top: 1rem; }
+    .section-heading { margin-bottom: 1.5rem; }
+    .section-heading h2 { margin: .25rem 0; color: var(--anthracite); font-size: clamp(1.6rem, 3vw, 2.25rem); }
+    .section-heading p { max-width: 700px; color: var(--muted); }
+    .paper-card { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 26px rgba(45,40,35,.06); }
+    .paper-card.uk-card-body { padding: clamp(1.2rem, 3vw, 2rem); }
+    .notice { padding: 1rem 1.1rem; background: #f2ede7; border-left: 4px solid var(--base); color: #292b2c; }
+    .field-label { display: block; margin-bottom: .35rem; color: var(--frame); font-weight: 600; }
+    .required { color: #8c302a; }
+    .help { display: block; margin-top: .35rem; color: #595959; font-size: .875rem; }
+    .error { color: #8c302a; font-weight: 600; font-size: .9rem; }
+    .uk-input, .uk-select { border-color: #77716c; border-radius: 4px; }
+    .uk-input:focus, .uk-select:focus { border-color: var(--focus); }
+    .card-accent { border-top: 4px solid var(--taupe); }
+    .stat-label { color: var(--muted); font-size: .9rem; }
+    .card-title { color: var(--anthracite); font-size: 1.25rem; font-weight: 700; }
+    .arrow-link { font-weight: 700; }
+    .status { display: inline-flex; align-items: center; gap: .45rem; border-radius: 999px; padding: .25rem .65rem; background: #eeece8; color: #333; font-size: .86rem; font-weight: 600; }
+    .status-dot { width: .55rem; height: .55rem; border-radius: 50%; background: #66755b; }
+    .table-wrap { overflow-x: auto; }
+    .uk-table thead { background: #f2efec; }
+    .uk-table th { color: var(--frame); font-weight: 700; }
+    .row-label { display: none; color: var(--muted); font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .palette { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: .75rem; }
+    .swatch { overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: white; }
+    .swatch-color { height: 55px; }
+    .swatch-copy { padding: .65rem .75rem; font-size: .85rem; }
+    .swatch-copy strong { display: block; }
+    .note { color: var(--muted); font-size: .9rem; }
+    footer { padding: 1.5rem 0; background: var(--anthracite); color: #fff; }
+    @media (max-width: 959px) {
+      .header-inner { align-items: flex-start; flex-direction: column; padding-block: 1rem; }
+      .header-links { gap: .5rem 1rem; }
+      .header-links a { font-size: .88rem; }
+      .table-wrap { overflow: visible; }
+      .uk-table-responsive, .uk-table-responsive tbody, .uk-table-responsive tr, .uk-table-responsive td { display: block; width: 100%; }
+      .uk-table-responsive thead { display: none; }
+      .uk-table-responsive tr { margin-block: .85rem; padding: .55rem .8rem; border: 1px solid var(--line); border-radius: 7px; background: white; }
+      .uk-table-responsive td { display: grid; grid-template-columns: minmax(6.5rem, 38%) 1fr; gap: .65rem; padding: .45rem 0; border: 0; }
+      .row-label { display: block; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="uk-container header-inner">
+      <a class="brand" href="#start" aria-label="STEImmo UI-Prototyp, Start">
+        <span class="house-mark" aria-hidden="true">Haus<br>Platzhalter</span>
+        <span>STEImmo</span>
+      </a>
+      <nav class="header-links" aria-label="Hauptnavigation">
+        <a href="#bewerbung">Bewerbung</a>
+        <a href="#verwaltung">Verwaltung</a>
+        <a href="#wohnungen">Wohnungen</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="start">
+    <section class="hero">
+      <div class="uk-container hero-inner">
+        <div class="eyebrow">Spike #47 · Corporate Design &amp; UI-Fundament</div>
+        <h1>Ein ruhiger, klarer Auftritt für STEImmo.</h1>
+        <p>Ein klickbarer, statischer Entwurf mit dem vorhandenen UIkit: öffentliches Formular, interne Verwaltungsnavigation und eine auf Mobilgeräten lesbare Liste.</p>
+        <div class="demo-nav" aria-label="Prototyp-Ansichten">
+          <a href="#bewerbung">Formularvorschau ansehen</a>
+          <a href="#verwaltung">Verwaltungsansicht ansehen</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="bewerbung">
+      <div class="uk-container">
+        <div class="section-heading">
+          <div class="eyebrow">Ansicht 01 · Öffentlich</div>
+          <h2>Bewerbungsvorschau</h2>
+          <p>Das Muster zeigt Hierarchie, Formularfelder, einen erklärenden Hinweis und einen feldnahen Fehler. Es sendet und speichert keine Daten.</p>
+        </div>
+        <div class="uk-card uk-card-body paper-card">
+          <div class="uk-grid-large" uk-grid>
+            <div class="uk-width-1-3@m">
+              <h3 class="uk-card-title">Ihre Bewerbung</h3>
+              <p class="note">Wohnanlage Würzburg · Vorschau</p>
+              <div class="notice" role="note">Dies ist eine Vorschau. Ihre Angaben werden hier nicht gespeichert oder übermittelt.</div>
+            </div>
+            <div class="uk-width-2-3@m">
+              <form aria-label="Statisches Formularbeispiel">
+                <div class="uk-margin">
+                  <label class="field-label" for="name">Vor- und Nachname <span class="required">*</span></label>
+                  <input class="uk-input" id="name" name="name" autocomplete="name" placeholder="Max Mustermann" aria-describedby="name-help">
+                  <span class="help" id="name-help">Bitte tragen Sie Ihren vollständigen Namen ein.</span>
+                </div>
+                <div class="uk-margin">
+                  <label class="field-label" for="email">E-Mail-Adresse <span class="required">*</span></label>
+                  <input class="uk-input" id="email" name="email" type="email" autocomplete="email" value="max@" aria-invalid="true" aria-describedby="email-error">
+                  <span class="error" id="email-error">Bitte geben Sie eine gültige E-Mail-Adresse ein.</span>
+                </div>
+                <div class="uk-margin">
+                  <label class="field-label" for="wohnung">Wohnungswunsch</label>
+                  <select class="uk-select" id="wohnung" name="wohnung"><option>Bitte auswählen</option><option>Wohnung 01 · Beispiel</option></select>
+                </div>
+                <div class="uk-flex uk-flex-middle uk-flex-between uk-flex-wrap uk-margin-top">
+                  <span class="note">* Pflichtfeld · Beispielzustand</span>
+                  <button class="uk-button uk-button-primary button-primary" type="button" disabled>Vorschau · nicht absenden</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="verwaltung" style="background:#eeebe7">
+      <div class="uk-container">
+        <div class="section-heading">
+          <div class="eyebrow">Ansicht 02 · Intern</div>
+          <h2>Verwaltung auf einen Blick</h2>
+          <p>Navigationskarten führen zu bestehenden Bereichen. Die Beispielansicht behauptet keine noch nicht vorhandenen Kennzahlen oder Dashboard-Funktionen.</p>
+        </div>
+        <div class="uk-grid-medium uk-child-width-1-2@m" uk-grid>
+          <article class="uk-card uk-card-body paper-card card-accent">
+            <div class="stat-label">Bereich</div>
+            <h3 class="card-title">Wohnungen verwalten</h3>
+            <p>Wohnungsstammdaten ansehen und pflegen.</p>
+            <a class="arrow-link" href="#wohnungen">Zur Wohnungsliste <span aria-hidden="true">→</span></a>
+          </article>
+          <article class="uk-card uk-card-body paper-card card-accent">
+            <div class="stat-label">Bereich</div>
+            <h3 class="card-title">Übergabeprotokolle</h3>
+            <p>Vorhandene Protokolle aufrufen und bearbeiten.</p>
+            <a class="arrow-link" href="#hinweis">Zum Bereich <span aria-hidden="true">→</span></a>
+          </article>
+        </div>
+        <p class="note uk-margin-top" id="hinweis">Nur Navigationsmuster – Links sind im Prototyp nicht mit Produktseiten verbunden.</p>
+      </div>
+    </section>
+
+    <section class="section" id="wohnungen">
+      <div class="uk-container">
+        <div class="section-heading">
+          <div class="eyebrow">Ansicht 03 · Liste</div>
+          <h2>Wohnungen</h2>
+          <p>Am Desktop als Tabelle, auf kleinen Ansichten als beschriftete Datensätze. Beispielwerte dienen nur der Darstellung.</p>
+        </div>
+        <div class="uk-card uk-card-body paper-card">
+          <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-margin-bottom">
+            <div><strong>Wohnungsstammdaten</strong><div class="note">Beispielhafte Darstellung</div></div>
+            <button class="uk-button uk-button-default" type="button">+ Wohnung anlegen</button>
+          </div>
+          <div class="table-wrap">
+            <table class="uk-table uk-table-divider uk-table-middle uk-table-responsive">
+              <thead><tr><th>Gebäude</th><th>Wohnung</th><th>Etage</th><th>Größe</th><th>Status</th><th>Aktion</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><span class="row-label">Gebäude</span>Haus 1</td>
+                  <td><span class="row-label">Wohnung</span>01</td>
+                  <td><span class="row-label">Etage</span>Erdgeschoss</td>
+                  <td><span class="row-label">Größe</span>62 m²</td>
+                  <td><span class="row-label">Status</span><span class="status"><span class="status-dot" aria-hidden="true"></span>Frei</span></td>
+                  <td><span class="row-label">Aktion</span><a href="#wohnungen">Ansehen</a></td>
+                </tr>
+                <tr>
+                  <td><span class="row-label">Gebäude</span>Haus 1</td>
+                  <td><span class="row-label">Wohnung</span>02</td>
+                  <td><span class="row-label">Etage</span>1. Obergeschoss</td>
+                  <td><span class="row-label">Größe</span>48 m²</td>
+                  <td><span class="row-label">Status</span><span class="status"><span class="status-dot" style="background:#89847A" aria-hidden="true"></span>Belegt</span></td>
+                  <td><span class="row-label">Aktion</span><a href="#wohnungen">Ansehen</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="background:#eeebe7">
+      <div class="uk-container">
+        <div class="section-heading">
+          <div class="eyebrow">Farbansatz · noch nicht final</div>
+          <h2>Fassadenfarben als Ausgangspunkt</h2>
+          <p>Die Töne stammen aus den Auftraggeberangaben. Das Haussymbol ist ein Platzhalter; Originaldatei und Fassadenplan müssen vor Freigabe einbezogen werden.</p>
+        </div>
+        <div class="palette" aria-label="Vorgeschlagene Farben">
+          <div class="swatch"><div class="swatch-color" style="background:#DFD7CE"></div><div class="swatch-copy"><strong>Fassade · Sand</strong>#DFD7CE</div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#AB9F94"></div><div class="swatch-copy"><strong>Akzent · Taupe</strong>#AB9F94</div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#3F4345"></div><div class="swatch-copy"><strong>Dach · Anthrazit</strong>#3F4345</div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#89847A"></div><div class="swatch-copy"><strong>Sockel · Grau</strong>#89847A</div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#454545"></div><div class="swatch-copy"><strong>Rahmen · Dunkelgrau</strong>#454545</div></div>
+        </div>
+        <p class="note uk-margin-top">Kontrast-Hinweis: Sand mit Anthrazit liegt bei etwa 7:1. Taupe und Sockelgrau sind auf Sand zu kontrastarm für normalen Text; hier nur als Flächen, Linien oder Akzente gedacht. Endgültige Zustände und Fokusfarben folgen in #45/#46.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="uk-container">STEImmo · Konzeptskizze für Spike #47 · keine Produktseite</div></footer>
+  <script src="../../static/vendor/uikit/uikit.min.js"></script>
+  <script src="../../static/vendor/uikit/uikit-icons.min.js"></script>
+</body>
+</html>
