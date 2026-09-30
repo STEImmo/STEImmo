@@ -29,6 +29,82 @@ from .models import (
 )
 
 
+class ApartmentSearchViewTests(TestCase):
+    def create_unit(self, number: str, **overrides) -> Wohnung:
+        defaults = {
+            "gebaeudenummer": "1",
+            "wohnungsnummer": number,
+            "etage": 1,
+            "groesse_qm": Decimal("55.00"),
+            "zimmeranzahl": Decimal("2.00"),
+            "kaltmiete": Decimal("650.00"),
+            "barrierefrei": True,
+            "status": WohnungStatus.FREE,
+        }
+        return Wohnung.objects.create(**(defaults | overrides))
+
+    def test_search_shows_only_available_units(self) -> None:
+        free_unit = self.create_unit("1.01")
+        taken_unit = self.create_unit("1.02", status=WohnungStatus.TAKEN)
+        blocked_unit = self.create_unit("1.03", status=WohnungStatus.BLOCKED)
+
+        response = self.client.get(reverse("wohnungsverwaltung_public:apartment_search"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertQuerySetEqual(response.context["wohnungen"], [free_unit])
+        self.assertNotContains(response, taken_unit.wohnungsnummer)
+        self.assertNotContains(response, blocked_unit.wohnungsnummer)
+
+    def test_search_filters_available_units_by_apartment_attributes(self) -> None:
+        matching_unit = self.create_unit("1.01")
+        self.create_unit("1.02", groesse_qm=Decimal("70.00"))
+        self.create_unit("1.03", kaltmiete=Decimal("900.00"))
+        self.create_unit("1.04", zimmeranzahl=Decimal("3.00"))
+        self.create_unit("2.01", etage=2)
+        self.create_unit("1.06", barrierefrei=False)
+
+        response = self.client.get(
+            reverse("wohnungsverwaltung_public:apartment_search"),
+            {
+                "groesse_min": "50",
+                "groesse_max": "60",
+                "kaltmiete_max": "700",
+                "zimmer_min": "1",
+                "zimmer_max": "2",
+                "etage": "1",
+                "barrierefrei": "true",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertQuerySetEqual(response.context["wohnungen"], [matching_unit])
+
+    def test_empty_search_shows_all_available_units(self) -> None:
+        first_unit = self.create_unit("1.01")
+        second_unit = self.create_unit("1.02")
+
+        response = self.client.get(reverse("wohnungsverwaltung_public:apartment_search"))
+
+        self.assertQuerySetEqual(response.context["wohnungen"], [first_unit, second_unit])
+        self.assertContains(response, "Filter zurücksetzen")
+
+    def test_search_rejects_a_minimum_above_the_maximum(self) -> None:
+        self.create_unit("1.01")
+
+        response = self.client.get(
+            reverse("wohnungsverwaltung_public:apartment_search"),
+            {"groesse_min": "60", "groesse_max": "50"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"],
+            "groesse_max",
+            "Der Höchstwert muss mindestens dem Mindestwert entsprechen.",
+        )
+        self.assertFalse(response.context["wohnungen"].exists())
+
+
 class HandoverProtocolViewsTests(TestCase):
     def setUp(self) -> None:
         self.wohnung = Wohnung.objects.create(

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Wohnungen finden – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section uk-section-default">
+    <div class="uk-container">
+        <h1 class="uk-heading-medium">Wohnungen finden</h1>
+        <p class="uk-text-lead">Filtern Sie die verfügbaren Wohnungen nach Ihren Wünschen.</p>
+
+        <form method="get" action="{% url 'wohnungsverwaltung_public:apartment_search' %}" class="uk-card uk-card-default uk-card-body uk-margin-large-bottom" novalidate>
+            <div class="uk-grid-small uk-child-width-1-2@s uk-child-width-1-4@m" uk-grid>
+                {% for field in form %}
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=field %}</div>
+                {% endfor %}
+            </div>
+            <div class="uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
+                <div><button class="uk-button uk-button-primary" type="submit">Filter anwenden</button></div>
+                <div><a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Filter zurücksetzen</a></div>
+            </div>
+        </form>
+
+        <h2 class="uk-h3">Verfügbare Wohnungen</h2>
+        {% if wohnungen %}
+            <div class="uk-grid-medium uk-child-width-1-2@m" uk-grid>
+                {% for wohnung in wohnungen %}
+                    <article>
+                        <div class="uk-card uk-card-default uk-card-body">
+                            <div class="uk-flex uk-flex-between uk-flex-middle">
+                                <h3 class="uk-card-title">Wohnung {{ wohnung.wohnungsnummer }}</h3>
+                                <span class="uk-label uk-label-success">Verfügbar</span>
+                            </div>
+                            <dl class="uk-description-list uk-description-list-divider">
+                                <dt>Gebäude und Etage</dt>
+                                <dd>{{ wohnung.gebaeudenummer }}, {% if wohnung.etage == 0 %}Erdgeschoss{% else %}Etage {{ wohnung.etage }}{% endif %}</dd>
+                                <dt>Wohnfläche</dt>
+                                <dd>{{ wohnung.groesse_qm }} m²</dd>
+                                <dt>Zimmer</dt>
+                                <dd>{{ wohnung.zimmeranzahl }}</dd>
+                                <dt>Kaltmiete</dt>
+                                <dd>{{ wohnung.kaltmiete }} €</dd>
+                                <dt>Barrierefrei</dt>
+                                <dd>{% if wohnung.barrierefrei %}Ja{% else %}Nein{% endif %}</dd>
+                            </dl>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="uk-alert-primary" uk-alert>
+                {% if request.GET %}
+                    <p>Keine verfügbaren Wohnungen passen zu diesen Filtern.</p>
+                {% else %}
+                    <p>Zurzeit sind keine Wohnungen verfügbar.</p>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

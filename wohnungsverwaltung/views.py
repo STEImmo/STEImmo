@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from .forms import (
     ACCEPTANCE_STATUS_LABELS,
+    ApartmentSearchForm,
     HANDOVER_STATUS_LABELS,
     HANDOVER_TYPE_LABELS,
     BewerbungForm,
@@ -65,6 +66,39 @@ def _valid_wohnung_id(wohnung_id: str | UUID | None) -> UUID | None:
         return UUID(str(wohnung_id))
     except (TypeError, ValueError):
         return None
+
+
+def apartment_search(request: HttpRequest) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    form = ApartmentSearchForm(request.GET)
+    wohnungen = Wohnung.objects.filter(status=WohnungStatus.FREE)
+    if form.is_valid():
+        filter_fields = {
+            "groesse_min": "groesse_qm__gte",
+            "groesse_max": "groesse_qm__lte",
+            "kaltmiete_min": "kaltmiete__gte",
+            "kaltmiete_max": "kaltmiete__lte",
+            "zimmer_min": "zimmeranzahl__gte",
+            "zimmer_max": "zimmeranzahl__lte",
+            "etage": "etage",
+            "barrierefrei": "barrierefrei",
+        }
+        filters = {
+            lookup: form.cleaned_data[field_name]
+            for field_name, lookup in filter_fields.items()
+            if form.cleaned_data[field_name] not in (None, "")
+        }
+        wohnungen = wohnungen.filter(**filters)
+    else:
+        wohnungen = wohnungen.none()
+
+    return render(
+        request,
+        "wohnungsverwaltung/apartment_search.html",
+        {"form": form, "wohnungen": wohnungen.order_by("etage", "wohnungsnummer")},
+    )
 
 
 def pre_application_preview(request: HttpRequest) -> HttpResponse:
