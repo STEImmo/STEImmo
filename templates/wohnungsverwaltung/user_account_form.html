@@ -7,7 +7,7 @@
     <div class="uk-container uk-container-small">
         <a class="uk-button uk-button-text" href="{% url 'verwaltung:user_account_list' %}">Zur Kontoübersicht</a>
         <h1 class="uk-heading-small uk-margin-top">{{ title }}</h1>
-        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top">
+        <form method="post" autocomplete="on" class="uk-card uk-card-default uk-card-body uk-margin-top">
             {% csrf_token %}
             {% if form.non_field_errors %}
                 <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>

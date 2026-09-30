@@ -35,6 +35,18 @@ class RegistrationViewTests(TestCase):
         self.assertEqual(user.person_profile.vorname, "Lina")
         self.assertTrue(user.groups.filter(name=ROLE_APPLICANT).exists())
 
+    def test_registration_marks_account_email_as_username_for_password_managers(self) -> None:
+        response = self.client.get(reverse("register"))
+
+        self.assertContains(
+            response,
+            '<input type="email" name="email" class="uk-input" autocomplete="username"',
+        )
+        self.assertContains(
+            response,
+            '<input type="password" name="password1" class="uk-input" autocomplete="new-password"',
+        )
+
     def test_registration_does_not_link_an_existing_person(self) -> None:
         Person.objects.create(
             vorname="Lina",

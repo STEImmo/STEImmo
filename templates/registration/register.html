@@ -7,7 +7,7 @@
     <div class="uk-container uk-container-small">
         <h1 class="uk-heading-medium">Bewerberkonto registrieren</h1>
         <p class="uk-text-lead">Erstellen Sie ein Konto, um Ihre Pre-Bewerbungen geschützt zu speichern und später wieder aufzurufen.</p>
-        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top">
+        <form method="post" autocomplete="on" class="uk-card uk-card-default uk-card-body uk-margin-top">
             {% csrf_token %}
             {% if form.non_field_errors %}
                 <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>

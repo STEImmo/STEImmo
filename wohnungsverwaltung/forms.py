@@ -75,7 +75,7 @@ class RegistrationForm(forms.Form):
     email = forms.EmailField(
         label="E-Mail-Adresse",
         max_length=255,
-        widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "email"}),
+        widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "username"}),
     )
     password1 = forms.CharField(
         label="Passwort",
@@ -165,7 +165,7 @@ class UserAccountForm(forms.Form):
         label="Neue Person: E-Mail-Adresse",
         max_length=255,
         required=False,
-        widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "email"}),
+        widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "username"}),
     )
     roles = forms.ModelMultipleChoiceField(
         label="Rollen",
