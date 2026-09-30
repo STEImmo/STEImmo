@@ -16,7 +16,17 @@
                     {% for item in room.raum_merkmale.all %}
                         <dt>{{ item.merkmal.bereich }}: {{ item.merkmal.bezeichnung }}</dt>
                         <dd class="uk-flex uk-flex-between uk-flex-middle">
-                            <span>{{ item.wert.text }}</span>
+                            <div>
+                                <div>{{ item.wert.text }}</div>
+                                {% if item.wert.angaben %}
+                                    <dl class="uk-description-list uk-description-list-divider uk-margin-small-top">
+                                        {% for label, value in item.wert.angaben.items %}
+                                            <dt>{{ label }}</dt>
+                                            <dd>{{ value }}</dd>
+                                        {% endfor %}
+                                    </dl>
+                                {% endif %}
+                            </div>
                             <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_delete' protocol.pk room.pk item.pk %}">
                                 {% csrf_token %}
                                 <button class="uk-button uk-button-danger uk-button-small" type="submit">Prüfpunkt löschen</button>
@@ -36,6 +46,9 @@
                     <div class="uk-form-controls">{{ field }}{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>
                 </div>
             {% endfor %}
+            {{ form.zusatzangaben }}
+            {% for error in form.zusatzangaben.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+            <div class="uk-margin-top" data-additional-details hidden></div>
             <div class="uk-flex uk-flex-right">
                 <button class="uk-button uk-button-primary" type="submit">Prüfpunkt speichern</button>
             </div>
@@ -50,6 +63,77 @@
         }
         const areaSelect = container.querySelector("[data-feature-area-select]");
         const nameSelect = container.querySelector("[data-feature-name-select]");
+        const detailsInput = container.querySelector("[data-additional-details-value]");
+        const detailsContainer = container.querySelector("[data-additional-details]");
+        const featureOptions = () => {
+            const selectedOption = nameSelect.selectedOptions[0];
+            try {
+                const options = JSON.parse(selectedOption?.dataset.featureOptions || "[]");
+                return Array.from(new Set(options.filter((option) => typeof option === "string" && option.trim())))
+                    .map((option) => option.trim());
+            } catch (error) {
+                return [];
+            }
+        };
+        const storedAdditionalDetails = () => {
+            try {
+                const details = JSON.parse(detailsInput?.value || "{}");
+                return details && typeof details === "object" && !Array.isArray(details) ? details : {};
+            } catch (error) {
+                return {};
+            }
+        };
+        const renderAdditionalDetails = () => {
+            if (!detailsInput || !detailsContainer) {
+                return;
+            }
+            const options = featureOptions();
+            const storedDetails = storedAdditionalDetails();
+            const details = Object.fromEntries(options
+                .filter((label) => typeof storedDetails[label] === "string" && storedDetails[label].trim())
+                .map((label) => [label, storedDetails[label].trim()]));
+            detailsInput.value = JSON.stringify(details);
+            detailsContainer.replaceChildren();
+            detailsContainer.hidden = options.length === 0;
+            if (!options.length) {
+                return;
+            }
+            const heading = document.createElement("h5");
+            heading.className = "uk-heading-bullet uk-margin-remove-bottom";
+            heading.textContent = "Zusätzliche Angaben";
+            detailsContainer.append(heading);
+            const hint = document.createElement("p");
+            hint.className = "uk-text-meta uk-margin-small-top";
+            hint.textContent = "Diese Angaben werden zusammen mit dem Prüfpunkt gespeichert.";
+            detailsContainer.append(hint);
+            const grid = document.createElement("div");
+            grid.className = "uk-child-width-1-2@m uk-grid-small";
+            grid.setAttribute("uk-grid", "");
+            options.forEach((label, index) => {
+                const field = document.createElement("div");
+                const inputId = `${detailsInput.id}-detail-${index}`;
+                const labelElement = document.createElement("label");
+                labelElement.className = "uk-form-label";
+                labelElement.htmlFor = inputId;
+                labelElement.textContent = label;
+                const input = document.createElement("input");
+                input.className = "uk-input";
+                input.id = inputId;
+                input.type = "text";
+                input.value = details[label] || "";
+                input.setAttribute("data-additional-detail", label);
+                input.addEventListener("input", () => {
+                    const currentDetails = Object.fromEntries(Array.from(
+                        detailsContainer.querySelectorAll("[data-additional-detail]"),
+                    ).map((fieldInput) => [fieldInput.dataset.additionalDetail, fieldInput.value.trim()])
+                        .filter(([, value]) => value));
+                    detailsInput.value = JSON.stringify(currentDetails);
+                });
+                field.append(labelElement, input);
+                grid.append(field);
+            });
+            detailsContainer.append(grid);
+        };
         const filterFeatureNames = () => {
             const selectedArea = areaSelect.value;
             Array.from(nameSelect.options).forEach((option) => {
@@ -65,8 +149,10 @@
                 nameSelect.value = "";
             }
             nameSelect.disabled = !selectedArea;
+            renderAdditionalDetails();
         };
         areaSelect.addEventListener("change", filterFeatureNames);
+        nameSelect.addEventListener("change", renderAdditionalDetails);
         filterFeatureNames();
     });
 </script>

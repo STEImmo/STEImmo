@@ -119,7 +119,17 @@
                                     <ul class="uk-list uk-list-divider">
                                         {% for item in room.raum_merkmale.all %}
                                             <li class="uk-flex uk-flex-between uk-flex-middle">
-                                                <div><strong>{{ item.merkmal.bereich }}: {{ item.merkmal.bezeichnung }}</strong><br>{{ item.wert.text }}</div>
+                                                <div>
+                                                    <strong>{{ item.merkmal.bereich }}: {{ item.merkmal.bezeichnung }}</strong><br>
+                                                    {{ item.wert.text }}
+                                                    {% if item.wert.angaben %}
+                                                        <div class="uk-text-meta uk-text-small uk-margin-small-top">
+                                                            {% for label, value in item.wert.angaben.items %}
+                                                                <span>{{ label }}: {{ value }}</span>{% if not forloop.last %} · {% endif %}
+                                                            {% endfor %}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
                                                 {% if protocol.status == "open" %}
                                                     <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_delete' protocol.pk room.pk item.pk %}">
                                                         {% csrf_token %}

@@ -6,6 +6,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
+from django.db.models.deletion import ProtectedError
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -20,7 +21,10 @@ from .forms import (
     HandoverKeyFormSet,
     HandoverProtocolForm,
     InlineRoomChecklistFormSet,
+    MerkmalForm,
+    MerkmalOptionFormSet,
     ProtocolConfirmationForm,
+    RaumForm,
     RoomChecklistItemForm,
     RoomProtocolForm,
     SchluesselFormSet,
@@ -31,12 +35,14 @@ from .forms import (
 from .models import (
     Bewerbung,
     BewerbungStatus,
+    Merkmal,
     Person,
     Protokoll,
     ProtokollEntwurf,
     ProtokollSchluessel,
     ProtokollStatus,
     ProtokollTyp,
+    Raum,
     RaumMerkmal,
     Raumprotokoll,
     Stellplatz,
@@ -52,6 +58,13 @@ PROTOCOL_STATUS_LABELS = {
 }
 
 DRAFT_MAXIMUM_SIZE = 512_000
+
+
+def _valid_wohnung_id(wohnung_id: str | UUID | None) -> UUID | None:
+    try:
+        return UUID(str(wohnung_id))
+    except (TypeError, ValueError):
+        return None
 
 
 def pre_application_preview(request: HttpRequest) -> HttpResponse:
@@ -308,7 +321,11 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
         or (_draft_field_value(server_draft, "wohnung") if server_draft else None)
     )
     form = HandoverProtocolForm(request.POST or None, wohnung_id=selected_wohnung_id)
-    room_formset = InlineRoomChecklistFormSet(request.POST or None, prefix="rooms")
+    room_formset = InlineRoomChecklistFormSet(
+        request.POST or None,
+        prefix="rooms",
+        form_kwargs={"wohnung_id": _valid_wohnung_id(selected_wohnung_id)},
+    )
     key_formset = HandoverKeyFormSet(
         request.POST or None,
         prefix="keys",
@@ -380,7 +397,11 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         instance=protocol,
         wohnung_id=selected_wohnung_id or protocol.wohnung_id,
     )
-    room_formset = InlineRoomChecklistFormSet(request.POST or None, prefix="rooms")
+    room_formset = InlineRoomChecklistFormSet(
+        request.POST or None,
+        prefix="rooms",
+        form_kwargs={"wohnung_id": _valid_wohnung_id(selected_wohnung_id or protocol.wohnung_id)},
+    )
     key_formset = HandoverKeyFormSet(request.POST or None, prefix="keys")
     if (
         request.method == "POST"
@@ -421,11 +442,14 @@ def handover_protocol_room_create(request: HttpRequest, protocol_id) -> HttpResp
         messages.warning(request, "Bestätigte Protokolle können nicht mehr bearbeitet werden.")
         return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
-    form = RoomProtocolForm(request.POST or None)
+    form = RoomProtocolForm(request.POST or None, protocol=protocol)
     if request.method == "POST" and form.is_valid():
-        room = form.save(commit=False)
-        room.protokoll = protocol
-        room.save()
+        master_room = form.cleaned_data["raum"]
+        room = Raumprotokoll.objects.create(
+            protokoll=protocol,
+            raum=master_room,
+            name=master_room.name,
+        )
         messages.success(request, "Der Raum wurde für das Übergabeprotokoll angelegt.")
         return redirect(
             "wohnungsverwaltung:handover_protocol_room_detail",
@@ -705,10 +729,106 @@ def _wohnung_form(request: HttpRequest, wohnung: Wohnung, title: str) -> HttpRes
         "wohnungsverwaltung/wohnung_form.html",
         {
             "form": form,
+            "raeume": wohnung.raeume.order_by("name") if wohnung.pk else (),
             "schluessel_formset": schluessel_formset,
             "title": title,
             "wohnung": wohnung,
         },
+    )
+
+
+@staff_member_required
+def raum_create(request: HttpRequest, wohnung_id) -> HttpResponse:
+    wohnung = get_object_or_404(Wohnung, pk=wohnung_id)
+    return _raum_form(request, wohnung, Raum(wohnung=wohnung), "Raum anlegen")
+
+
+@staff_member_required
+def raum_edit(request: HttpRequest, wohnung_id, raum_id) -> HttpResponse:
+    wohnung = get_object_or_404(Wohnung, pk=wohnung_id)
+    raum = get_object_or_404(Raum, pk=raum_id, wohnung=wohnung)
+    return _raum_form(request, wohnung, raum, "Raum bearbeiten")
+
+
+def _raum_form(request: HttpRequest, wohnung: Wohnung, raum: Raum, title: str) -> HttpResponse:
+    form = RaumForm(request.POST or None, instance=raum)
+    if request.method == "POST" and form.is_valid():
+        saved_room = form.save(commit=False)
+        saved_room.wohnung = wohnung
+        try:
+            with transaction.atomic():
+                saved_room.save()
+        except IntegrityError:
+            form.add_error("name", "Diese Raumbezeichnung gibt es in der Wohnung bereits.")
+        else:
+            messages.success(request, "Der Raum wurde gespeichert.")
+            return redirect("verwaltung:wohnung_edit", wohnung_id=wohnung.pk)
+    return render(
+        request,
+        "wohnungsverwaltung/raum_form.html",
+        {"form": form, "wohnung": wohnung, "title": title},
+    )
+
+
+@staff_member_required
+def raum_delete(request: HttpRequest, wohnung_id, raum_id) -> HttpResponse:
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    wohnung = get_object_or_404(Wohnung, pk=wohnung_id)
+    raum = get_object_or_404(Raum, pk=raum_id, wohnung=wohnung)
+    try:
+        raum.delete()
+    except ProtectedError:
+        messages.error(request, "Der Raum wird bereits in einem Übergabeprotokoll verwendet.")
+    else:
+        messages.success(request, "Der Raum wurde gelöscht.")
+    return redirect("verwaltung:wohnung_edit", wohnung_id=wohnung.pk)
+
+
+@staff_member_required
+def merkmal_list(request: HttpRequest) -> HttpResponse:
+    merkmale = Merkmal.objects.order_by("bereich", "bezeichnung")
+    return render(request, "wohnungsverwaltung/merkmal_list.html", {"merkmale": merkmale})
+
+
+@staff_member_required
+def merkmal_create(request: HttpRequest) -> HttpResponse:
+    return _merkmal_form(request, Merkmal(), "Merkmalvorlage anlegen")
+
+
+@staff_member_required
+def merkmal_edit(request: HttpRequest, merkmal_id) -> HttpResponse:
+    merkmal = get_object_or_404(Merkmal, pk=merkmal_id)
+    return _merkmal_form(request, merkmal, "Merkmalvorlage bearbeiten")
+
+
+def _merkmal_form(request: HttpRequest, merkmal: Merkmal, title: str) -> HttpResponse:
+    if request.method == "POST":
+        form = MerkmalForm(request.POST, instance=merkmal)
+        option_formset = MerkmalOptionFormSet(request.POST, prefix="optionen")
+        if form.is_valid() and option_formset.is_valid():
+            saved_feature = form.save(commit=False)
+            saved_feature.optionen = [
+                option_form.cleaned_data["wert"].strip()
+                for option_form in option_formset
+                if option_form.cleaned_data
+                and not option_form.cleaned_data.get("DELETE")
+                and option_form.cleaned_data["wert"].strip()
+            ]
+            saved_feature.save()
+            messages.success(request, "Die Merkmalvorlage wurde gespeichert.")
+            return redirect("verwaltung:merkmal_edit", merkmal_id=saved_feature.pk)
+    else:
+        form = MerkmalForm(instance=merkmal)
+        existing_options = merkmal.optionen if isinstance(merkmal.optionen, list) else []
+        option_formset = MerkmalOptionFormSet(
+            initial=[{"wert": option} for option in existing_options],
+            prefix="optionen",
+        )
+    return render(
+        request,
+        "wohnungsverwaltung/merkmal_form.html",
+        {"form": form, "option_formset": option_formset, "title": title},
     )
 
 
