@@ -1,10 +1,14 @@
+import re
+from datetime import timedelta
 from io import StringIO
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from django.core import mail
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from .access import (
     APPLICANT_ACCESS_PERMISSION,
@@ -13,7 +17,7 @@ from .access import (
     ROLE_TENANT,
     ROLE_USER_MANAGEMENT,
 )
-from .models import Person
+from .models import Person, RegistrationVerification
 
 
 class RegistrationViewTests(TestCase):
@@ -29,11 +33,68 @@ class RegistrationViewTests(TestCase):
     def test_registration_creates_linked_applicant_account(self) -> None:
         response = self.client.post(reverse("register"), self.registration_data())
 
-        self.assertRedirects(response, reverse("login"))
+        self.assertRedirects(response, reverse("register_verify"))
         user = get_user_model().objects.get(username="lina.lang@example.test")
         self.assertEqual(user.email, "lina.lang@example.test")
         self.assertEqual(user.person_profile.vorname, "Lina")
+        self.assertFalse(user.is_active)
         self.assertTrue(user.groups.filter(name=ROLE_APPLICANT).exists())
+        verification = RegistrationVerification.objects.get(user=user)
+        self.assertEqual(len(mail.outbox), 1)
+        code_match = re.search(r"\b\d{6}\b", mail.outbox[0].body)
+        self.assertIsNotNone(code_match)
+        self.assertTrue(verification.matches(code_match.group()))
+        self.assertNotIn(code_match.group(), verification.code_hash)
+
+    def test_valid_verification_code_activates_and_logs_in_the_new_account(self) -> None:
+        self.client.post(reverse("register"), self.registration_data())
+        code = re.search(r"\b\d{6}\b", mail.outbox[0].body).group()
+
+        response = self.client.post(
+            reverse("register_verify"),
+            {"email": "lina.lang@example.test", "code": code},
+        )
+
+        self.assertRedirects(response, reverse("wohnungsverwaltung:pre_application_list"))
+        user = get_user_model().objects.get(username="lina.lang@example.test")
+        self.assertTrue(user.is_active)
+        self.assertFalse(RegistrationVerification.objects.filter(user=user).exists())
+
+    def test_expired_verification_code_does_not_activate_the_account(self) -> None:
+        self.client.post(reverse("register"), self.registration_data())
+        verification = RegistrationVerification.objects.get()
+        verification.expires_at = timezone.now() - timedelta(seconds=1)
+        verification.save(update_fields=["expires_at"])
+        code = re.search(r"\b\d{6}\b", mail.outbox[0].body).group()
+
+        response = self.client.post(
+            reverse("register_verify"),
+            {"email": "lina.lang@example.test", "code": code},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Der Code konnte nicht bestätigt werden.")
+        self.assertFalse(get_user_model().objects.get().is_active)
+
+    def test_resending_a_code_invalidates_the_previous_code(self) -> None:
+        self.client.post(reverse("register"), self.registration_data())
+        first_code = re.search(r"\b\d{6}\b", mail.outbox[0].body).group()
+        verification = RegistrationVerification.objects.get()
+        verification.last_sent_at = timezone.now() - RegistrationVerification.RESEND_DELAY
+        verification.save(update_fields=["last_sent_at"])
+
+        response = self.client.post(
+            reverse("resend_registration_code"),
+            {"email": "lina.lang@example.test"},
+        )
+
+        self.assertRedirects(response, reverse("register_verify"))
+        self.assertEqual(len(mail.outbox), 2)
+        second_code = re.search(r"\b\d{6}\b", mail.outbox[1].body).group()
+        verification.refresh_from_db()
+        self.assertNotEqual(first_code, second_code)
+        self.assertFalse(verification.matches(first_code))
+        self.assertTrue(verification.matches(second_code))
 
     def test_registration_marks_account_email_as_username_for_password_managers(self) -> None:
         response = self.client.get(reverse("register"))
@@ -46,6 +107,11 @@ class RegistrationViewTests(TestCase):
             response,
             '<input type="password" name="password1" class="uk-input" autocomplete="new-password"',
         )
+
+    def test_verification_code_field_uses_one_time_code_autofill(self) -> None:
+        response = self.client.get(reverse("register_verify"))
+
+        self.assertContains(response, 'name="code" class="uk-input" autocomplete="one-time-code"')
 
     def test_registration_does_not_link_an_existing_person(self) -> None:
         Person.objects.create(

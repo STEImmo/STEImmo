@@ -128,6 +128,7 @@ class RegistrationForm(forms.Form):
                 email=self.cleaned_data["email"],
                 first_name=self.cleaned_data["vorname"],
                 last_name=self.cleaned_data["nachname"],
+                is_active=False,
             )
             user.set_password(self.cleaned_data["password1"])
             user.save()
@@ -139,6 +140,41 @@ class RegistrationForm(forms.Form):
             )
             user.groups.add(Group.objects.get(name="Bewerber"))
         return user
+
+
+class RegistrationVerificationForm(forms.Form):
+    email = forms.EmailField(
+        label="E-Mail-Adresse",
+        max_length=255,
+        widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "username"}),
+    )
+    code = forms.CharField(
+        label="Bestätigungscode",
+        min_length=6,
+        max_length=6,
+        widget=forms.TextInput(
+            attrs={
+                "class": "uk-input",
+                "autocomplete": "one-time-code",
+                "inputmode": "numeric",
+                "pattern": "[0-9]{6}",
+            }
+        ),
+    )
+
+    def clean_code(self) -> str:
+        code = self.cleaned_data["code"].strip()
+        if not code.isascii() or not code.isdigit():
+            raise forms.ValidationError("Bitte geben Sie den sechsstelligen Code ein.")
+        return code
+
+
+class ResendRegistrationCodeForm(forms.Form):
+    email = forms.EmailField(
+        label="E-Mail-Adresse",
+        max_length=255,
+        widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "username"}),
+    )
 
 
 class UserAccountForm(forms.Form):

@@ -12,5 +12,11 @@ urlpatterns = [
         name="login",
     ),
     path("accounts/registrieren/", views.register, name="register"),
+    path("accounts/registrieren/bestaetigen/", views.register_verify, name="register_verify"),
+    path(
+        "accounts/registrieren/code-erneut-senden/",
+        views.resend_registration_code,
+        name="resend_registration_code",
+    ),
     path("accounts/logout/", LogoutView.as_view(), name="logout"),
 ]

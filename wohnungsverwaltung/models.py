@@ -1,6 +1,9 @@
+import secrets
 import uuid
+from datetime import timedelta
 
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
@@ -144,6 +147,47 @@ class Person(models.Model):
 
     def __str__(self) -> str:
         return f"{self.vorname} {self.nachname}"
+
+
+class RegistrationVerification(models.Model):
+    CODE_LENGTH = 6
+    CODE_VALIDITY = timedelta(minutes=15)
+    MAX_ATTEMPTS = 5
+    RESEND_DELAY = timedelta(minutes=1)
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="registration_verification",
+    )
+    code_hash = models.CharField(max_length=128)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_sent_at = models.DateTimeField()
+
+    class Meta:
+        db_table = "registration_verification"
+
+    def issue_code(self) -> str:
+        code = f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
+        while self.code_hash and check_password(code, self.code_hash):
+            code = f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
+        now = timezone.now()
+        self.code_hash = make_password(code)
+        self.expires_at = now + self.CODE_VALIDITY
+        self.attempts = 0
+        self.last_sent_at = now
+        return code
+
+    def matches(self, code: str) -> bool:
+        return (
+            self.attempts < self.MAX_ATTEMPTS
+            and self.expires_at >= timezone.now()
+            and check_password(code, self.code_hash)
+        )
+
+    def can_resend(self) -> bool:
+        return self.last_sent_at + self.RESEND_DELAY <= timezone.now()
 
 
 class Wohnung(models.Model):

@@ -1,13 +1,21 @@
 from django.contrib import messages
+from django.contrib.auth import login
 from django.contrib.auth.views import LoginView
-from django.db import IntegrityError, connection
+from django.core.mail import send_mail
+from django.db import IntegrityError, connection, transaction
 from django.db.utils import OperationalError
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from wohnungsverwaltung.access import APPLICANT_ACCESS_PERMISSION, EMPLOYEE_ACCESS_PERMISSION
-from wohnungsverwaltung.forms import ACCOUNT_CREATION_ERROR, RegistrationForm
+from wohnungsverwaltung.forms import (
+    ACCOUNT_CREATION_ERROR,
+    RegistrationForm,
+    RegistrationVerificationForm,
+    ResendRegistrationCodeForm,
+)
+from wohnungsverwaltung.models import RegistrationVerification
 
 
 def home(request: HttpRequest):
@@ -37,10 +45,106 @@ def register(request: HttpRequest) -> HttpResponse:
     form = RegistrationForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         try:
-            form.save()
+            with transaction.atomic():
+                user = form.save()
+                verification = RegistrationVerification(user=user)
+                code = verification.issue_code()
+                verification.save()
         except IntegrityError:
             form.add_error("email", ACCOUNT_CREATION_ERROR)
         else:
-            messages.success(request, "Ihr Bewerberkonto wurde angelegt. Bitte melden Sie sich an.")
-            return redirect("login")
+            send_registration_code(user.email, code)
+            request.session["registration_verification_email"] = user.email
+            messages.success(request, "Wir haben Ihnen einen Bestätigungscode gesendet.")
+            return redirect("register_verify")
     return render(request, "registration/register.html", {"form": form})
+
+
+def send_registration_code(email: str, code: str) -> None:
+    send_mail(
+        subject="STEImmo: Bestätigungscode für Ihre Registrierung",
+        message=(
+            "Ihr Bestätigungscode lautet: "
+            f"{code}\n\n"
+            "Der Code ist 15 Minuten gültig. Falls Sie kein Konto angelegt haben, "
+            "können Sie diese E-Mail ignorieren."
+        ),
+        from_email=None,
+        recipient_list=[email],
+    )
+
+
+def register_verify(request: HttpRequest) -> HttpResponse:
+    initial = {"email": request.session.get("registration_verification_email", "")}
+    form = RegistrationVerificationForm(request.POST or None, initial=initial)
+    resend_form = ResendRegistrationCodeForm(initial=initial)
+    if request.method == "POST" and form.is_valid():
+        try:
+            with transaction.atomic():
+                verification = (
+                    RegistrationVerification.objects.select_for_update()
+                    .select_related("user")
+                    .get(
+                        user__email__iexact=form.cleaned_data["email"],
+                        user__is_active=False,
+                    )
+                )
+                if verification.matches(form.cleaned_data["code"]):
+                    user = verification.user
+                    user.is_active = True
+                    user.save(update_fields=["is_active"])
+                    verification.delete()
+                else:
+                    verification.attempts += 1
+                    verification.save(update_fields=["attempts"])
+                    user = None
+        except RegistrationVerification.DoesNotExist:
+            form.add_error(None, "Der Code konnte nicht bestätigt werden.")
+        else:
+            if user is not None:
+                login(request, user)
+                request.session.pop("registration_verification_email", None)
+                messages.success(request, "Ihr Konto wurde bestätigt.")
+                return redirect("wohnungsverwaltung:pre_application_list")
+            form.add_error(None, "Der Code konnte nicht bestätigt werden.")
+    return render(
+        request,
+        "registration/verify_registration.html",
+        {"form": form, "resend_form": resend_form},
+    )
+
+
+def resend_registration_code(request: HttpRequest) -> HttpResponse:
+    if request.method != "POST":
+        return redirect("register_verify")
+
+    form = ResendRegistrationCodeForm(request.POST)
+    if form.is_valid():
+        try:
+            with transaction.atomic():
+                verification = (
+                    RegistrationVerification.objects.select_for_update()
+                    .select_related("user")
+                    .get(
+                        user__email__iexact=form.cleaned_data["email"],
+                        user__is_active=False,
+                    )
+                )
+                if verification.can_resend():
+                    code = verification.issue_code()
+                    verification.save(
+                        update_fields=["code_hash", "expires_at", "attempts", "last_sent_at"]
+                    )
+                else:
+                    code = None
+        except RegistrationVerification.DoesNotExist:
+            code = None
+        else:
+            if code is not None:
+                send_registration_code(verification.user.email, code)
+        request.session["registration_verification_email"] = form.cleaned_data["email"]
+    messages.success(
+        request,
+        "Falls eine offene Registrierung vorliegt, wurde ein neuer Bestätigungscode gesendet.",
+    )
+    return redirect("register_verify")
