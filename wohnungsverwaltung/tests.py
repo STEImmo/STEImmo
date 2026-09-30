@@ -1250,6 +1250,21 @@ class PreApplicationAuthenticationTests(TestCase):
         self.assertEqual(application.person, self.applicant)
         self.assertEqual(application.wohnung, self.free_unit)
 
+    def test_linked_user_cannot_submit_for_a_unit_that_became_unavailable(self) -> None:
+        self.assertTrue(
+            self.client.login(username=self.user.username, password="FjordTanne!4826")
+        )
+        self.free_unit.status = WohnungStatus.BLOCKED
+        self.free_unit.save(update_fields=["status"])
+
+        response = self.client.post(
+            reverse("wohnungsverwaltung:pre_application_create"), self.valid_form_data()
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("wohnung", response.context["form"].errors)
+        self.assertFalse(Bewerbung.objects.exists())
+
     def test_linked_user_sees_their_submitted_application(self) -> None:
         Bewerbung.objects.create(
             person=self.applicant,
