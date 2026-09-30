@@ -3,6 +3,8 @@ from uuid import UUID
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
@@ -14,6 +16,7 @@ from .forms import (
     ACCEPTANCE_STATUS_LABELS,
     HANDOVER_STATUS_LABELS,
     HANDOVER_TYPE_LABELS,
+    BewerbungForm,
     HandoverKeyForm,
     HandoverKeyFormSet,
     HandoverProtocolForm,
@@ -30,7 +33,10 @@ from .forms import (
     WohnungForm,
 )
 from .models import (
+    Bewerbung,
+    BewerbungStatus,
     Merkmal,
+    Person,
     Protokoll,
     ProtokollEntwurf,
     ProtokollSchluessel,
@@ -42,6 +48,7 @@ from .models import (
     Stellplatz,
     StellplatzZuordnung,
     Wohnung,
+    WohnungStatus,
 )
 
 PROTOCOL_STATUS_LABELS = {
@@ -58,6 +65,81 @@ def _valid_wohnung_id(wohnung_id: str | UUID | None) -> UUID | None:
         return UUID(str(wohnung_id))
     except (TypeError, ValueError):
         return None
+
+
+def pre_application_preview(request: HttpRequest) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    return render(
+        request,
+        "wohnungsverwaltung/pre_application_preview.html",
+        {"form": BewerbungForm(applicant=Person())},
+    )
+
+
+def _applicant_for_user(request: HttpRequest) -> Person:
+    applicant = getattr(request.user, "person_profile", None)
+    if applicant is None:
+        raise PermissionDenied("Dem Benutzerkonto ist keine Person zugeordnet.")
+    return applicant
+
+
+@login_required
+def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) -> HttpResponse:
+    applicant = _applicant_for_user(request)
+    unit = None
+    if unit_id is not None:
+        unit = get_object_or_404(Wohnung.objects.filter(status=WohnungStatus.FREE), pk=unit_id)
+
+    form = BewerbungForm(request.POST or None, applicant=applicant, unit=unit)
+    application_created = False
+    if request.method == "POST" and form.is_valid():
+        try:
+            with transaction.atomic():
+                selected_unit = (
+                    Wohnung.objects.select_for_update()
+                    .filter(
+                        pk=form.cleaned_data["wohnung"].pk,
+                        status=WohnungStatus.FREE,
+                    )
+                    .first()
+                )
+                if selected_unit is None:
+                    form.add_error("wohnung", "Die Wohnung ist nicht mehr verfügbar.")
+                else:
+                    form.instance.wohnung = selected_unit
+                    form.save()
+                    application_created = True
+        except IntegrityError:
+            form.add_error(
+                None,
+                "Sie haben bereits eine offene Pre-Bewerbung. Bitte warten Sie deren Abschluss ab.",
+            )
+        if application_created:
+            messages.success(request, "Ihre Pre-Bewerbung wurde erfolgreich gespeichert.")
+            return redirect("wohnungsverwaltung:pre_application_list")
+
+    return render(
+        request,
+        "wohnungsverwaltung/pre_application_form.html",
+        {"form": form, "unit_is_preselected": unit is not None},
+    )
+
+
+@login_required
+def pre_application_list(request: HttpRequest) -> HttpResponse:
+    applicant = _applicant_for_user(request)
+    applications = (
+        Bewerbung.objects.filter(person=applicant).select_related("wohnung").order_by("-created_at")
+    )
+    return render(
+        request,
+        "wohnungsverwaltung/pre_application_list.html",
+        {
+            "applications": applications,
+            "has_open_application": applications.filter(status=BewerbungStatus.OPEN).exists(),
+        },
+    )
 
 
 def _draft_session_key(request: HttpRequest) -> str:

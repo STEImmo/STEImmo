@@ -100,4 +100,7 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "wohnungsverwaltung:pre_application_list"
+LOGOUT_REDIRECT_URL = "home"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Pre-Bewerbung – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:pre_application_list' %}">Meine Pre-Bewerbungen</a>
+        <h1 class="uk-heading-medium">Pre-Bewerbung abgeben</h1>
+        {% if unit_is_preselected %}
+            <div class="uk-alert-primary" uk-alert>
+                <p>Die gewünschte Wohnung wurde aus der Wohnungsübersicht übernommen.</p>
+            </div>
+        {% endif %}
+        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>
+            {% endif %}
+            {% include "wohnungsverwaltung/_pre_application_fields.html" %}
+            <div class="uk-margin-large-top uk-flex uk-flex-right">
+                <button class="uk-button uk-button-primary" type="submit">Pre-Bewerbung abgeben</button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}

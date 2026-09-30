@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Anmelden – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <h1 class="uk-heading-medium">Anmelden</h1>
+        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>
+            {% endif %}
+            <div class="uk-margin">
+                <label class="uk-form-label" for="id_username">E-Mail-Adresse</label>
+                <div class="uk-form-controls">
+                    <input class="uk-input" id="id_username" name="username" type="text" autocomplete="username" required autofocus>
+                </div>
+            </div>
+            <div class="uk-margin">
+                <label class="uk-form-label" for="id_password">Passwort</label>
+                <div class="uk-form-controls">
+                    <input class="uk-input" id="id_password" name="password" type="password" autocomplete="current-password" required>
+                </div>
+            </div>
+            {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+            <div class="uk-margin-large-top uk-flex uk-flex-right">
+                <button class="uk-button uk-button-primary" type="submit">Anmelden</button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}

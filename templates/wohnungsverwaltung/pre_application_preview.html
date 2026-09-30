@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Bewerbungsformular – Vorschau – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <span class="uk-label">Vorschau</span>
+        <h1 class="uk-heading-medium">Bewerbungsformular – Vorschau</h1>
+        <p class="uk-text-lead">So wird die Pre-Bewerbung nach der Registrierung aussehen.</p>
+
+        <div class="uk-alert-warning" uk-alert>
+            <p>Diese Vorschau speichert keine Daten. Abgabe wird mit Registrierung aktiviert.</p>
+        </div>
+
+        <form class="uk-card uk-card-default uk-card-body uk-margin-top" aria-describedby="application-preview-notice">
+            <p id="application-preview-notice" class="uk-text-meta">Die Angaben werden erst im späteren Bewerbungsprozess geprüft und gespeichert.</p>
+
+            {% include "wohnungsverwaltung/_pre_application_fields.html" %}
+
+            <div class="uk-margin-large-top uk-flex uk-flex-right">
+                <button class="uk-button uk-button-primary" type="button" disabled>Abgabe wird mit Registrierung aktiviert</button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}
