@@ -101,6 +101,26 @@ class ManagementViewTests(TestCase):
         wohnung.refresh_from_db()
         self.assertEqual(wohnung.status, WohnungStatus.FREE)
 
+    def test_blocked_apartment_is_removed_from_pre_application_choices(self) -> None:
+        wohnung = Wohnung.objects.create(
+            gebaeudenummer="B",
+            wohnungsnummer="17",
+            status=WohnungStatus.FREE,
+        )
+        self.client.force_login(self.staff_user)
+
+        response = self.client.post(
+            reverse("verwaltung:wohnung_edit", args=[wohnung.pk]),
+            self.wohnung_payload() | {"status": WohnungStatus.BLOCKED},
+        )
+        self.assertRedirects(response, reverse("verwaltung:wohnung_edit", args=[wohnung.pk]))
+
+        response = self.client.get(reverse("wohnungsverwaltung:pre_application_preview"))
+
+        self.assertEqual(response.status_code, 200)
+        selectable_units = response.context["form"].fields["wohnung"].queryset
+        self.assertFalse(selectable_units.filter(pk=wohnung.pk).exists())
+
     def test_apartment_edit_shows_availability_choices(self) -> None:
         wohnung = Wohnung.objects.create(
             gebaeudenummer="B",
