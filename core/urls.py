@@ -18,5 +18,10 @@ urlpatterns = [
         views.resend_registration_code,
         name="resend_registration_code",
     ),
+    path(
+        "accounts/mitarbeiter-mfa/",
+        views.employee_mfa_verify,
+        name="employee_mfa_verify",
+    ),
     path("accounts/logout/", LogoutView.as_view(), name="logout"),
 ]

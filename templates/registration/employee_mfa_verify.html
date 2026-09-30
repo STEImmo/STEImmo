@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Mitarbeiteranmeldung bestätigen – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <h1 class="uk-heading-medium">Mitarbeiteranmeldung bestätigen</h1>
+        <p class="uk-text-lead">Geben Sie den sechsstelligen Einmalcode aus Ihrer E-Mail ein. Der Code ist 15 Minuten gültig.</p>
+        <form method="post" autocomplete="on" class="uk-card uk-card-default uk-card-body uk-margin-top">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>
+            {% endif %}
+            <div class="uk-margin">
+                <label class="uk-form-label" for="{{ form.code.id_for_label }}">{{ form.code.label }}</label>
+                <div class="uk-form-controls">{{ form.code }}</div>
+                {% for error in form.code.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+            </div>
+            <div class="uk-margin-large-top uk-flex uk-flex-between">
+                <a class="uk-button uk-button-default" href="{% url 'login' %}">Zurück zur Anmeldung</a>
+                <button class="uk-button uk-button-primary" type="submit">Anmeldung bestätigen</button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}

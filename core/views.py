@@ -7,15 +7,21 @@ from django.db.utils import OperationalError
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from wohnungsverwaltung.access import APPLICANT_ACCESS_PERMISSION, EMPLOYEE_ACCESS_PERMISSION
 from wohnungsverwaltung.forms import (
     ACCOUNT_CREATION_ERROR,
+    EmployeeMfaCodeForm,
     RegistrationForm,
     RegistrationVerificationForm,
     ResendRegistrationCodeForm,
 )
-from wohnungsverwaltung.models import RegistrationVerification
+from wohnungsverwaltung.models import EmployeeLoginVerification, RegistrationVerification
+
+EMPLOYEE_MFA_USER_SESSION_KEY = "employee_mfa_user_id"
+EMPLOYEE_MFA_REDIRECT_SESSION_KEY = "employee_mfa_redirect_url"
 
 
 def home(request: HttpRequest):
@@ -33,12 +39,36 @@ def health(request: HttpRequest) -> JsonResponse:
 class RoleAwareLoginView(LoginView):
     template_name = "registration/login.html"
 
-    def get_default_redirect_url(self) -> str:
-        if self.request.user.has_perm(EMPLOYEE_ACCESS_PERMISSION):
+    def form_valid(self, form):
+        user = form.get_user()
+        if user.has_perm(EMPLOYEE_ACCESS_PERMISSION):
+            with transaction.atomic():
+                verification, _created = (
+                    EmployeeLoginVerification.objects.select_for_update().get_or_create(
+                        user=user,
+                        defaults={"code_hash": "", "expires_at": timezone.now()},
+                    )
+                )
+                code = verification.issue_code()
+                verification.save()
+            send_employee_mfa_code(user.email, code)
+            self.request.session[EMPLOYEE_MFA_USER_SESSION_KEY] = user.pk
+            self.request.session[EMPLOYEE_MFA_REDIRECT_SESSION_KEY] = (
+                self.get_redirect_url() or self.get_default_redirect_url_for_user(user)
+            )
+            messages.success(self.request, "Wir haben Ihnen einen Einmalcode gesendet.")
+            return redirect("employee_mfa_verify")
+        return super().form_valid(form)
+
+    def get_default_redirect_url_for_user(self, user) -> str:
+        if user.has_perm(EMPLOYEE_ACCESS_PERMISSION):
             return reverse("verwaltung:wohnung_list")
-        if self.request.user.has_perm(APPLICANT_ACCESS_PERMISSION):
+        if user.has_perm(APPLICANT_ACCESS_PERMISSION):
             return reverse("wohnungsverwaltung:pre_application_list")
         return reverse("home")
+
+    def get_default_redirect_url(self) -> str:
+        return self.get_default_redirect_url_for_user(self.request.user)
 
 
 def register(request: HttpRequest) -> HttpResponse:
@@ -68,6 +98,20 @@ def send_registration_code(email: str, code: str) -> None:
             f"{code}\n\n"
             "Der Code ist 15 Minuten gültig. Falls Sie kein Konto angelegt haben, "
             "können Sie diese E-Mail ignorieren."
+        ),
+        from_email=None,
+        recipient_list=[email],
+    )
+
+
+def send_employee_mfa_code(email: str, code: str) -> None:
+    send_mail(
+        subject="STEImmo: Einmalcode für die Mitarbeiteranmeldung",
+        message=(
+            "Ihr Einmalcode lautet: "
+            f"{code}\n\n"
+            "Der Code ist 15 Minuten gültig. Falls Sie diese Anmeldung nicht gestartet haben, "
+            "ignorieren Sie diese E-Mail."
         ),
         from_email=None,
         recipient_list=[email],
@@ -148,3 +192,44 @@ def resend_registration_code(request: HttpRequest) -> HttpResponse:
         "Falls eine offene Registrierung vorliegt, wurde ein neuer Bestätigungscode gesendet.",
     )
     return redirect("register_verify")
+
+
+def employee_mfa_verify(request: HttpRequest) -> HttpResponse:
+    pending_user_id = request.session.get(EMPLOYEE_MFA_USER_SESSION_KEY)
+    if pending_user_id is None:
+        return redirect("login")
+
+    form = EmployeeMfaCodeForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            with transaction.atomic():
+                verification = (
+                    EmployeeLoginVerification.objects.select_for_update()
+                    .select_related("user")
+                    .get(user_id=pending_user_id, user__is_active=True)
+                )
+                if verification.matches(form.cleaned_data["code"]):
+                    user = verification.user
+                    verification.delete()
+                else:
+                    verification.attempts += 1
+                    verification.save(update_fields=["attempts"])
+                    user = None
+        except EmployeeLoginVerification.DoesNotExist:
+            request.session.pop(EMPLOYEE_MFA_USER_SESSION_KEY, None)
+            request.session.pop(EMPLOYEE_MFA_REDIRECT_SESSION_KEY, None)
+            return redirect("login")
+        else:
+            if user is not None:
+                login(request, user)
+                redirect_url = request.session.pop(EMPLOYEE_MFA_REDIRECT_SESSION_KEY, "")
+                request.session.pop(EMPLOYEE_MFA_USER_SESSION_KEY, None)
+                if url_has_allowed_host_and_scheme(
+                    url=redirect_url,
+                    allowed_hosts={request.get_host()},
+                    require_https=request.is_secure(),
+                ):
+                    return redirect(redirect_url)
+                return redirect("verwaltung:wohnung_list")
+            form.add_error(None, "Der Code konnte nicht bestätigt werden.")
+    return render(request, "registration/employee_mfa_verify.html", {"form": form})

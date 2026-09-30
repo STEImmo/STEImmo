@@ -18,7 +18,7 @@ from .access import (
     ROLE_TENANT,
     ROLE_USER_MANAGEMENT,
 )
-from .models import Person, RegistrationVerification
+from .models import EmployeeLoginVerification, Person, RegistrationVerification
 
 
 class RegistrationViewTests(TestCase):
@@ -212,6 +212,102 @@ class AccessControlTests(TestCase):
         self.assertContains(manager_response, ">Verwaltung<")
         self.assertContains(manager_response, ">Übergaben<")
         self.assertContains(manager_response, ">Benutzer<")
+
+
+class EmployeeMfaLoginTests(TestCase):
+    def setUp(self) -> None:
+        self.user_model = get_user_model()
+        self.employee = self.user_model.objects.create_user(
+            username="mitarbeiter.mfa@example.test",
+            email="mitarbeiter.mfa@example.test",
+            password="FjordTanne!4826",
+        )
+        Person.objects.create(
+            user=self.employee,
+            vorname="MFA",
+            nachname="Mitarbeiter",
+            email="mitarbeiter.mfa@example.test",
+            is_employee=True,
+        )
+        self.employee.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
+
+    def login_employee(self, **extra_data: str):
+        data = {
+            "username": "mitarbeiter.mfa@example.test",
+            "password": "FjordTanne!4826",
+        }
+        data.update(extra_data)
+        return self.client.post(reverse("login"), data)
+
+    def test_employee_password_login_requires_a_mailed_code_before_session_creation(self) -> None:
+        response = self.login_employee()
+
+        self.assertRedirects(response, reverse("employee_mfa_verify"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+        verification = EmployeeLoginVerification.objects.get(user=self.employee)
+        self.assertEqual(len(mail.outbox), 1)
+        code = re.search(r"\b\d{6}\b", mail.outbox[0].body).group()
+        self.assertTrue(verification.matches(code))
+        self.assertNotIn(code, verification.code_hash)
+
+    def test_valid_mfa_code_logs_an_employee_in_and_preserves_next_url(self) -> None:
+        target_url = reverse("verwaltung:wohnung_list")
+        self.login_employee(next=target_url)
+        code = re.search(r"\b\d{6}\b", mail.outbox[0].body).group()
+
+        response = self.client.post(reverse("employee_mfa_verify"), {"code": code})
+
+        self.assertRedirects(response, target_url)
+        self.assertIn("_auth_user_id", self.client.session)
+        self.assertFalse(EmployeeLoginVerification.objects.filter(user=self.employee).exists())
+
+    def test_valid_mfa_code_redirects_to_employee_management_by_default(self) -> None:
+        self.login_employee()
+        code = re.search(r"\b\d{6}\b", mail.outbox[0].body).group()
+
+        response = self.client.post(reverse("employee_mfa_verify"), {"code": code})
+
+        self.assertRedirects(response, reverse("verwaltung:wohnung_list"))
+
+    def test_employee_login_after_logout_issues_a_new_code(self) -> None:
+        self.login_employee()
+        first_code = re.search(r"\b\d{6}\b", mail.outbox[0].body).group()
+        self.client.post(reverse("employee_mfa_verify"), {"code": first_code})
+        self.client.post(reverse("logout"))
+
+        response = self.login_employee()
+
+        self.assertRedirects(response, reverse("employee_mfa_verify"))
+        self.assertEqual(len(mail.outbox), 2)
+        second_code = re.search(r"\b\d{6}\b", mail.outbox[1].body).group()
+        self.assertNotEqual(first_code, second_code)
+
+    def test_invalid_mfa_code_does_not_create_a_session(self) -> None:
+        self.login_employee()
+
+        response = self.client.post(reverse("employee_mfa_verify"), {"code": "000000"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Der Code konnte nicht bestätigt werden.")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_expired_mfa_code_does_not_create_a_session(self) -> None:
+        self.login_employee()
+        verification = EmployeeLoginVerification.objects.get(user=self.employee)
+        verification.expires_at = timezone.now() - timedelta(seconds=1)
+        verification.save(update_fields=["expires_at"])
+        code = re.search(r"\b\d{6}\b", mail.outbox[0].body).group()
+
+        response = self.client.post(reverse("employee_mfa_verify"), {"code": code})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Der Code konnte nicht bestätigt werden.")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_mfa_page_without_a_pending_employee_login_redirects_to_login(self) -> None:
+        response = self.client.get(reverse("employee_mfa_verify"))
+
+        self.assertRedirects(response, reverse("login"))
 
 
 class UserAccountManagementTests(TestCase):

@@ -26,6 +26,8 @@ Bei der Selbstregistrierung werden `User` und `Person` atomar, aber zunächst mi
 
 Der Development-Override startet zusätzlich einen explizit fiktiven Mitarbeiter über `create_development_employee`. Die Compose-Variablen sind auf `mitarbeiter@example.test` und ein dokumentiertes lokales Passwort festgelegt. Der Command darf ausschließlich mit `DEBUG=True` laufen, erstellt die verknüpfte Person, aktiviert das Konto und vergibt die Gruppe `Mitarbeiter`. Bei jedem Entwicklungsstart stellt er diesen Zustand wieder her. Eine Datenmigration oder die Produktions-Compose-Konfiguration erzeugt kein solches Konto.
 
+Jede Anmeldung eines Kontos mit `access_employee_area` erfordert Passwort und einen zusätzlichen E-Mail-Einmalcode. Das gilt auch für Benutzerverwaltung und direkte Einzelrechte, weil beide dieselbe Permission verwenden. Der Code wird ausschließlich als Passwort-Hash gespeichert, ist 15 Minuten gültig und hat höchstens fünf Versuche. Erst nach korrekter Eingabe legt die Anwendung die authentifizierte Session an; es gibt keine dauerhafte Gerätefreigabe. Eine neue Passwortanmeldung erstellt stets einen neuen Code.
+
 ## Erweiterungsroutine
 
 Für eine neue geschützte Seite wird in dieser Reihenfolge vorgegangen:

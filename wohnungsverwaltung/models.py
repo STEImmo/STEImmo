@@ -190,6 +190,40 @@ class RegistrationVerification(models.Model):
         return self.last_sent_at + self.RESEND_DELAY <= timezone.now()
 
 
+class EmployeeLoginVerification(models.Model):
+    CODE_LENGTH = 6
+    CODE_VALIDITY = timedelta(minutes=15)
+    MAX_ATTEMPTS = 5
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="employee_login_verification",
+    )
+    code_hash = models.CharField(max_length=128)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        db_table = "employee_login_verification"
+
+    def issue_code(self) -> str:
+        code = f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
+        while self.code_hash and check_password(code, self.code_hash):
+            code = f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
+        self.code_hash = make_password(code)
+        self.expires_at = timezone.now() + self.CODE_VALIDITY
+        self.attempts = 0
+        return code
+
+    def matches(self, code: str) -> bool:
+        return (
+            self.attempts < self.MAX_ATTEMPTS
+            and self.expires_at >= timezone.now()
+            and check_password(code, self.code_hash)
+        )
+
+
 class Wohnung(models.Model):
     wohnung_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     etage = models.SmallIntegerField(default=0)

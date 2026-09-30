@@ -177,6 +177,28 @@ class ResendRegistrationCodeForm(forms.Form):
     )
 
 
+class EmployeeMfaCodeForm(forms.Form):
+    code = forms.CharField(
+        label="Einmalcode",
+        min_length=6,
+        max_length=6,
+        widget=forms.TextInput(
+            attrs={
+                "class": "uk-input",
+                "autocomplete": "one-time-code",
+                "inputmode": "numeric",
+                "pattern": "[0-9]{6}",
+            }
+        ),
+    )
+
+    def clean_code(self) -> str:
+        code = self.cleaned_data["code"].strip()
+        if not code.isascii() or not code.isdigit():
+            raise forms.ValidationError("Bitte geben Sie den sechsstelligen Code ein.")
+        return code
+
+
 class UserAccountForm(forms.Form):
     person = forms.ModelChoiceField(
         label="Bestehende Person",
