@@ -19,6 +19,7 @@ from .models import (
     StellplatzZuordnung,
     UebergabeStatus,
     Wohnung,
+    WohnungStatus,
 )
 
 
@@ -41,6 +42,7 @@ class ManagementViewTests(TestCase):
             "warmmiete": "790.00",
             "kaution": "1300.00",
             "barrierefrei": "on",
+            "status": WohnungStatus.FREE,
             "zaehlernummer_wasser_kalt": "KW-1",
             "zaehlernummer_wasser_warm": "WW-2",
             "zaehlernummer_heizung": "HZ-3",
@@ -58,6 +60,20 @@ class ManagementViewTests(TestCase):
 
         self.assertRedirects(response, f"/admin/login/?next={url}")
 
+    def test_apartment_availability_cannot_be_changed_without_staff_access(self) -> None:
+        wohnung = Wohnung.objects.create(
+            gebaeudenummer="B",
+            wohnungsnummer="17",
+            status=WohnungStatus.BLOCKED,
+        )
+        url = reverse("verwaltung:wohnung_edit", args=[wohnung.pk])
+
+        response = self.client.post(url, {"status": WohnungStatus.FREE})
+
+        self.assertRedirects(response, f"/admin/login/?next={url}")
+        wohnung.refresh_from_db()
+        self.assertEqual(wohnung.status, WohnungStatus.BLOCKED)
+
     def test_apartment_can_be_created_with_all_master_data(self) -> None:
         self.client.force_login(self.staff_user)
 
@@ -67,6 +83,38 @@ class ManagementViewTests(TestCase):
         self.assertRedirects(response, reverse("verwaltung:wohnung_edit", args=[wohnung.pk]))
         self.assertTrue(wohnung.barrierefrei)
         self.assertEqual(wohnung.zaehlernummer_strom, "ST-4")
+
+    def test_staff_can_change_apartment_availability(self) -> None:
+        wohnung = Wohnung.objects.create(
+            gebaeudenummer="B",
+            wohnungsnummer="17",
+            status=WohnungStatus.BLOCKED,
+        )
+        self.client.force_login(self.staff_user)
+
+        response = self.client.post(
+            reverse("verwaltung:wohnung_edit", args=[wohnung.pk]),
+            self.wohnung_payload(),
+        )
+
+        self.assertRedirects(response, reverse("verwaltung:wohnung_edit", args=[wohnung.pk]))
+        wohnung.refresh_from_db()
+        self.assertEqual(wohnung.status, WohnungStatus.FREE)
+
+    def test_apartment_edit_shows_availability_choices(self) -> None:
+        wohnung = Wohnung.objects.create(
+            gebaeudenummer="B",
+            wohnungsnummer="17",
+            status=WohnungStatus.BLOCKED,
+        )
+        self.client.force_login(self.staff_user)
+
+        response = self.client.get(reverse("verwaltung:wohnung_edit", args=[wohnung.pk]))
+
+        self.assertContains(response, "Verfügbarkeitsstatus")
+        self.assertContains(response, "Verfügbar")
+        self.assertContains(response, "Vermietet")
+        self.assertContains(response, "Gesperrt")
 
     def test_key_is_managed_with_apartment(self) -> None:
         self.client.force_login(self.staff_user)

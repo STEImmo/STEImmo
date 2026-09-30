@@ -648,6 +648,16 @@ class UIkitFormMixin:
 
 
 class WohnungForm(UIkitFormMixin, forms.ModelForm):
+    status = forms.ChoiceField(
+        choices=(
+            (WohnungStatus.FREE, "Verfügbar"),
+            (WohnungStatus.TAKEN, "Vermietet"),
+            (WohnungStatus.BLOCKED, "Gesperrt"),
+        ),
+        label="Verfügbarkeitsstatus",
+        widget=forms.Select(attrs={"class": "uk-select"}),
+    )
+
     class Meta:
         model = Wohnung
         fields = [
@@ -660,6 +670,7 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "warmmiete",
             "kaution",
             "barrierefrei",
+            "status",
             "zaehlernummer_wasser_kalt",
             "zaehlernummer_wasser_warm",
             "zaehlernummer_heizung",
