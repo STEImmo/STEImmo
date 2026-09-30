@@ -85,13 +85,36 @@ flowchart TD
 | 1. Foundation | Django-Projekt, Docker Compose, PostgreSQL, Umgebungsvariablen, Ruff, CI-Grundlage | Container startet, Datenbankverbindung und Basischecks funktionieren | ✅ |
 | 2. Webapp-Basis | Settings, URL-Struktur, Static/Media, Base-Templates, lokale UIkit-Assets | Eine Basis-Seite läuft mit einheitlichem UI | ✅ |
 | 3. Domänenmodell | Eine Immobilie, 25 Einheiten, Anfragen, Bewerbungen und Dokumente als Django-Modelle inklusive Migrationen | Modelle, Migrationen und Testdaten funktionieren | ⬜ |
-| 4. Authentifizierung | Django-User, Gruppen, Rollen und Berechtigungen für Studierende und Immobiliengesellschaft | Zugriffsschutz ist umgesetzt und getestet | ⬜ |
+| 4. Authentifizierung | Django-User, Gruppen, Rollen und Berechtigungen für Studierende und Immobiliengesellschaft | Zugriffsschutz ist umgesetzt und getestet | 🔄 |
 | 5. Verwaltungsbereich | Verwaltungsansichten und Formulare für Einheiten, Anfragen, Bewerbungen und Dokumente | Gesellschaft kann den Bestand und Vorgänge verwalten | ⬜ |
 | 6. Studentenbereich | ORM-Suche, Filter, Pagination und Detailansichten | Studierende können Einheiten zuverlässig finden und ansehen | ⬜ |
 | 7. Anfrage und Bewerbung | Formulare, Statusverwaltung, Datepicker, Upload-Validierung und Dateispeicherung | Kernabläufe inklusive Fehlerfällen sind getestet | ⬜ |
 | 8. Qualität und Betrieb | Tests, Django-Checks, Ruff, Produktionssettings, Gunicorn, Static/Media und Deployment | CI ist erfolgreich und Deployment auf dem Uni-Server funktioniert | ⬜ |
 
 Eine Roadmap-Phase gilt erst als abgeschlossen, wenn ihre Akzeptanzkriterien erfüllt, getestet und im zugehörigen GitHub-Issue dokumentiert sind.
+
+## Benutzerkonten und Zugriff
+
+Öffentliche Seiten sind ohne Konto erreichbar. Angemeldete Konten erhalten Zugriffe über feste Gruppen; zusätzliche Seitenrechte können in der Benutzerverwaltung gezielt pro Konto vergeben werden.
+
+| Gruppe | Zugriff |
+|---|---|
+| `Bewerber` | Eigene Pre-Bewerbungen erstellen und einsehen |
+| `Mieter` | Für einen späteren Mieterbereich vorbereitet; derzeit keine eigene Seite |
+| `Mitarbeiter` | Verwaltungsbereich und Übergabeprotokolle |
+| `Benutzerverwaltung` | Mitarbeiterzugriff sowie Konten, Rollen und Seitenrechte verwalten |
+
+Nach dem Ausführen der Migrationen wird der erste Benutzerverwalter einmalig angelegt:
+
+~~~bash
+docker compose exec web python manage.py create_initial_user_manager \
+  --email verwaltung@example.test \
+  --password 'ein-sicheres-passwort' \
+  --first-name Verwaltung \
+  --last-name Beispiel
+~~~
+
+Danach werden Konten im UIkit-Bereich **Verwaltung → Benutzer** erstellt, mit einer bestehenden konto-losen Person verknüpft oder zusammen mit einer neuen Person erfasst. Konten werden deaktiviert statt gelöscht. Die technische Rechte-Matrix und die Regel zum Ergänzen weiterer geschützter Seiten stehen in [ADR-0008](docs/decisions/0008-rollen-und-zugriffskontrolle.md).
 
 ## Lokale Entwicklung
 

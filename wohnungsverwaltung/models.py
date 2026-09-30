@@ -135,6 +135,12 @@ class Person(models.Model):
 
     class Meta:
         db_table = "person"
+        permissions = [
+            ("access_applicant_area", "Kann auf den Bewerberbereich zugreifen"),
+            ("access_tenant_area", "Kann auf den vorbereiteten Mieterbereich zugreifen"),
+            ("access_employee_area", "Kann auf den Mitarbeiterbereich zugreifen"),
+            ("manage_user_accounts", "Kann Konten und Zugriffsrechte verwalten"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.vorname} {self.nachname}"

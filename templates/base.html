@@ -17,7 +17,16 @@
             <div class="uk-navbar-right">
                 <a class="uk-navbar-item" href="{% url 'wohnungsverwaltung:pre_application_preview' %}">Bewerbungsvorschau</a>
                 {% if user.is_authenticated %}
-                    <a class="uk-navbar-item" href="{% url 'wohnungsverwaltung:pre_application_list' %}">Meine Bewerbungen</a>
+                    {% if perms.immobilien.access_applicant_area %}
+                        <a class="uk-navbar-item" href="{% url 'wohnungsverwaltung:pre_application_list' %}">Meine Bewerbungen</a>
+                    {% endif %}
+                    {% if perms.immobilien.access_employee_area %}
+                        <a class="uk-navbar-item" href="{% url 'verwaltung:wohnung_list' %}">Verwaltung</a>
+                        <a class="uk-navbar-item" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Übergaben</a>
+                    {% endif %}
+                    {% if perms.immobilien.manage_user_accounts %}
+                        <a class="uk-navbar-item" href="{% url 'verwaltung:user_account_list' %}">Benutzer</a>
+                    {% endif %}
                     <span class="uk-navbar-item uk-text-meta">{{ user.get_username }}</span>
                     <form method="post" action="{% url 'logout' %}">
                         {% csrf_token %}
@@ -25,10 +34,7 @@
                     </form>
                 {% else %}
                     <a class="uk-navbar-item" href="{% url 'login' %}">Anmelden</a>
-                {% endif %}
-                <a class="uk-navbar-item" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Übergaben</a>
-                {% if user.is_staff %}
-                    <a class="uk-navbar-item" href="{% url 'verwaltung:wohnung_list' %}">Verwaltung</a>
+                    <a class="uk-navbar-item" href="{% url 'register' %}">Registrieren</a>
                 {% endif %}
             </div>
         </div>

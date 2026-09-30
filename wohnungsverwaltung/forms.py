@@ -1,9 +1,22 @@
 from uuid import UUID
 
 from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models import Q
 from django.forms.formsets import BaseFormSet
 from django.forms.models import inlineformset_factory
 
+from .access import (
+    ACCESS_PERMISSION_CODENAMES,
+    APP_LABEL,
+    ROLE_NAMES,
+    ROLE_USER_MANAGEMENT,
+    USER_MANAGEMENT_PERMISSION,
+)
 from .models import (
     AbnahmeStatus,
     Bewerbung,
@@ -44,6 +57,313 @@ METER_NUMBER_FIELDS = (
     ("zaehlernummer_heizung", "Heizung"),
     ("zaehlernummer_strom", "Strom"),
 )
+
+ACCOUNT_CREATION_ERROR = "Mit diesen Angaben kann kein Konto erstellt werden."
+
+
+class RegistrationForm(forms.Form):
+    vorname = forms.CharField(
+        label="Vorname",
+        max_length=255,
+        widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "given-name"}),
+    )
+    nachname = forms.CharField(
+        label="Nachname",
+        max_length=255,
+        widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "family-name"}),
+    )
+    email = forms.EmailField(
+        label="E-Mail-Adresse",
+        max_length=255,
+        widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "email"}),
+    )
+    password1 = forms.CharField(
+        label="Passwort",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"class": "uk-input", "autocomplete": "new-password"}),
+    )
+    password2 = forms.CharField(
+        label="Passwort wiederholen",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"class": "uk-input", "autocomplete": "new-password"}),
+    )
+
+    def clean_email(self) -> str:
+        email = self.cleaned_data["email"].strip().lower()
+        user_model = get_user_model()
+        if (
+            Person.objects.filter(email__iexact=email).exists()
+            or user_model.objects.filter(
+                Q(username__iexact=email) | Q(email__iexact=email)
+            ).exists()
+        ):
+            raise forms.ValidationError(ACCOUNT_CREATION_ERROR)
+        return email
+
+    def clean(self) -> dict:
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get("password1")
+        password2 = cleaned_data.get("password2")
+        if password1 and password2 and password1 != password2:
+            self.add_error("password2", "Die Passwörter stimmen nicht überein.")
+            return cleaned_data
+        if password1 and cleaned_data.get("email"):
+            user = get_user_model()(
+                username=cleaned_data["email"],
+                email=cleaned_data["email"],
+                first_name=cleaned_data.get("vorname", ""),
+                last_name=cleaned_data.get("nachname", ""),
+            )
+            try:
+                validate_password(password1, user)
+            except ValidationError as error:
+                self.add_error("password1", error)
+        return cleaned_data
+
+    def save(self):
+        user_model = get_user_model()
+        with transaction.atomic():
+            user = user_model(
+                username=self.cleaned_data["email"],
+                email=self.cleaned_data["email"],
+                first_name=self.cleaned_data["vorname"],
+                last_name=self.cleaned_data["nachname"],
+            )
+            user.set_password(self.cleaned_data["password1"])
+            user.save()
+            Person.objects.create(
+                user=user,
+                vorname=self.cleaned_data["vorname"],
+                nachname=self.cleaned_data["nachname"],
+                email=self.cleaned_data["email"],
+            )
+            user.groups.add(Group.objects.get(name="Bewerber"))
+        return user
+
+
+class UserAccountForm(forms.Form):
+    person = forms.ModelChoiceField(
+        label="Bestehende Person",
+        queryset=Person.objects.none(),
+        required=False,
+        empty_label="Neue Person erfassen",
+        widget=forms.Select(attrs={"class": "uk-select"}),
+    )
+    vorname = forms.CharField(
+        label="Neue Person: Vorname",
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "given-name"}),
+    )
+    nachname = forms.CharField(
+        label="Neue Person: Nachname",
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "family-name"}),
+    )
+    email = forms.EmailField(
+        label="Neue Person: E-Mail-Adresse",
+        max_length=255,
+        required=False,
+        widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "email"}),
+    )
+    roles = forms.ModelMultipleChoiceField(
+        label="Rollen",
+        queryset=Group.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+    direct_permissions = forms.ModelMultipleChoiceField(
+        label="Zusätzliche Seitenrechte",
+        queryset=Permission.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+    is_active = forms.BooleanField(
+        label="Konto ist aktiv",
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={"class": "uk-checkbox"}),
+    )
+    password1 = forms.CharField(
+        label="Neues Passwort",
+        required=False,
+        strip=False,
+        widget=forms.PasswordInput(attrs={"class": "uk-input", "autocomplete": "new-password"}),
+    )
+    password2 = forms.CharField(
+        label="Neues Passwort wiederholen",
+        required=False,
+        strip=False,
+        widget=forms.PasswordInput(attrs={"class": "uk-input", "autocomplete": "new-password"}),
+    )
+
+    def __init__(self, *args, account=None, actor=None, **kwargs) -> None:
+        self.account = account
+        self.actor = actor
+        super().__init__(*args, **kwargs)
+        current_person = getattr(account, "person_profile", None) if account is not None else None
+        person_filter = Q(user__isnull=True)
+        if current_person is not None:
+            person_filter |= Q(pk=current_person.pk)
+        self.fields["person"].queryset = Person.objects.filter(person_filter).order_by(
+            "nachname", "vorname"
+        )
+        self.fields["roles"].queryset = Group.objects.filter(name__in=ROLE_NAMES).order_by("name")
+        self.fields["direct_permissions"].queryset = Permission.objects.filter(
+            content_type__app_label=APP_LABEL,
+            content_type__model="person",
+            codename__in=ACCESS_PERMISSION_CODENAMES,
+        ).order_by("name")
+        self.fields["roles"].widget.attrs["class"] = "uk-checkbox"
+        self.fields["direct_permissions"].widget.attrs["class"] = "uk-checkbox"
+        if account is not None and not self.is_bound:
+            self.initial.update(
+                {
+                    "person": current_person,
+                    "roles": account.groups.filter(name__in=ROLE_NAMES),
+                    "direct_permissions": account.user_permissions.filter(
+                        content_type__app_label=APP_LABEL,
+                        content_type__model="person",
+                        codename__in=ACCESS_PERMISSION_CODENAMES,
+                    ),
+                    "is_active": account.is_active,
+                }
+            )
+
+    def clean_email(self) -> str:
+        return self.cleaned_data["email"].strip().lower()
+
+    def clean(self) -> dict:
+        cleaned_data = super().clean()
+        selected_person = cleaned_data.get("person")
+        inline_values = {
+            field_name: cleaned_data.get(field_name, "").strip()
+            for field_name in ("vorname", "nachname", "email")
+        }
+        if selected_person is not None and any(inline_values.values()):
+            self.add_error(
+                None,
+                "Wählen Sie eine bestehende Person oder erfassen Sie eine neue Person.",
+            )
+        elif selected_person is None:
+            for field_name, value in inline_values.items():
+                if not value:
+                    self.add_error(field_name, "Bitte erfassen Sie die neue Person vollständig.")
+            email = inline_values["email"]
+            if email and Person.objects.filter(email__iexact=email).exists():
+                self.add_error("email", "Für diese E-Mail-Adresse existiert bereits eine Person.")
+
+        target_email = (
+            selected_person.email if selected_person is not None else inline_values["email"]
+        )
+        if target_email:
+            user_model = get_user_model()
+            existing_accounts = user_model.objects.filter(
+                Q(username__iexact=target_email) | Q(email__iexact=target_email)
+            )
+            if self.account is not None:
+                existing_accounts = existing_accounts.exclude(pk=self.account.pk)
+            if existing_accounts.exists():
+                self.add_error(
+                    "person" if selected_person is not None else "email",
+                    ACCOUNT_CREATION_ERROR,
+                )
+        cleaned_data["target_email"] = target_email
+
+        password1 = cleaned_data.get("password1")
+        password2 = cleaned_data.get("password2")
+        if self.account is None and not password1:
+            self.add_error("password1", "Bitte vergeben Sie ein Passwort für das neue Konto.")
+        if password1 or password2:
+            if password1 != password2:
+                self.add_error("password2", "Die Passwörter stimmen nicht überein.")
+            elif target_email:
+                user = self.account or get_user_model()()
+                user.username = target_email
+                user.email = target_email
+                try:
+                    validate_password(password1, user)
+                except ValidationError as error:
+                    self.add_error("password1", error)
+
+        self._validate_actor_lockout(cleaned_data)
+        return cleaned_data
+
+    def _validate_actor_lockout(self, cleaned_data: dict) -> None:
+        if self.account is None or self.actor is None or self.account.pk != self.actor.pk:
+            return
+        if not cleaned_data.get("is_active"):
+            self.add_error("is_active", "Sie können Ihr eigenes Konto nicht deaktivieren.")
+            return
+        roles = cleaned_data.get("roles") or []
+        direct_permissions = cleaned_data.get("direct_permissions") or []
+        will_manage_accounts = any(role.name == ROLE_USER_MANAGEMENT for role in roles) or any(
+            permission.codename == "manage_user_accounts" for permission in direct_permissions
+        )
+        if self.account.has_perm(USER_MANAGEMENT_PERMISSION) and not will_manage_accounts:
+            user_model = get_user_model()
+            has_other_manager = any(
+                user.has_perm(USER_MANAGEMENT_PERMISSION)
+                for user in user_model.objects.filter(is_active=True).exclude(pk=self.account.pk)
+            )
+            if not has_other_manager:
+                self.add_error(
+                    "roles",
+                    "Der letzte aktive Benutzerverwalter darf seine Berechtigung nicht entfernen.",
+                )
+
+    def save(self):
+        user_model = get_user_model()
+        selected_person = self.cleaned_data["person"]
+        with transaction.atomic():
+            if selected_person is None:
+                person = Person(
+                    vorname=self.cleaned_data["vorname"],
+                    nachname=self.cleaned_data["nachname"],
+                    email=self.cleaned_data["target_email"],
+                )
+            else:
+                person = Person.objects.select_for_update().get(pk=selected_person.pk)
+                if person.user_id not in (None, self.account.pk if self.account else None):
+                    raise ValidationError(
+                        "Die ausgewählte Person ist inzwischen einem Konto zugeordnet."
+                    )
+
+            if self.account is None:
+                account = user_model()
+            else:
+                account = self.account
+            account.username = self.cleaned_data["target_email"]
+            account.email = self.cleaned_data["target_email"]
+            account.first_name = person.vorname
+            account.last_name = person.nachname
+            account.is_active = self.cleaned_data["is_active"]
+            if self.cleaned_data["password1"]:
+                account.set_password(self.cleaned_data["password1"])
+            account.save()
+
+            previous_person = Person.objects.select_for_update().filter(user=account).first()
+            if previous_person is not None and previous_person != person:
+                previous_person.user = None
+                previous_person.save(update_fields=["user", "updated_at"])
+            person.user = account
+            person.save()
+
+            role_groups = list(self.cleaned_data["roles"])
+            other_groups = list(account.groups.exclude(name__in=ROLE_NAMES))
+            account.groups.set([*other_groups, *role_groups])
+
+            custom_permissions = Permission.objects.filter(
+                content_type__app_label=APP_LABEL,
+                content_type__model="person",
+                codename__in=ACCESS_PERMISSION_CODENAMES,
+            )
+            other_permissions = list(account.user_permissions.exclude(pk__in=custom_permissions))
+            account.user_permissions.set(
+                [*other_permissions, *self.cleaned_data["direct_permissions"]]
+            )
+        return account
 
 
 class BewerbungForm(forms.ModelForm):
