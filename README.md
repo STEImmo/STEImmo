@@ -116,11 +116,7 @@ docker compose exec web python manage.py create_initial_user_manager \
 
 Danach werden Konten im UIkit-Bereich **Verwaltung → Benutzer** erstellt, mit einer bestehenden konto-losen Person verknüpft oder zusammen mit einer neuen Person erfasst. Konten werden deaktiviert statt gelöscht. Die technische Rechte-Matrix und die Regel zum Ergänzen weiterer geschützter Seiten stehen in [ADR-0008](docs/decisions/0008-rollen-und-zugriffskontrolle.md).
 
-Selbstregistrierte Bewerberkonten bleiben bis zur Eingabe eines per E-Mail gesendeten, sechsstelligen Bestätigungscodes deaktiviert. Der Code ist 15 Minuten gültig; nach fünf falschen Versuchen ist ein neuer Code anzufordern. In der lokalen Entwicklungsumgebung verwendet Django den Console-Mail-Backend. Die E-Mail mitsamt Code erscheint daher in den Web-Container-Logs:
-
-~~~bash
-docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.dev.yaml logs -f web
-~~~
+Selbstregistrierte Bewerberkonten bleiben bis zur Eingabe eines per E-Mail gesendeten, sechsstelligen Bestätigungscodes deaktiviert. Der Code ist 15 Minuten gültig; nach fünf falschen Versuchen ist ein neuer Code anzufordern. Die lokale Entwicklungsumgebung startet dafür automatisch Mailpit. Das lokale Testpostfach ist unter [http://localhost:8025](http://localhost:8025) erreichbar und bewahrt höchstens 100 E-Mails bis zum Stoppen des Containers auf. Es werden keine E-Mails an externe Empfänger gesendet.
 
 Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD` und `DJANGO_EMAIL_USE_TLS`. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
 
