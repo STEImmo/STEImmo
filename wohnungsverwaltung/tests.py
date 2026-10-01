@@ -97,6 +97,7 @@ class HandoverProtocolViewsTests(TestCase):
             password="sicheres-passwort",
             is_staff=True,
         )
+        self.staff_user.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
 
     def valid_form_data(self) -> dict[str, str]:
         return {
@@ -1149,7 +1150,7 @@ class HandoverProtocolViewsTests(TestCase):
             self.client.logout()
             response = self.client.get(photo_url)
             self.assertEqual(response.status_code, 302)
-            self.assertIn("/admin/login/", response["Location"])
+            self.assertIn(reverse("login"), response["Location"])
 
     def test_photo_upload_from_overview_returns_to_the_same_checkpoint(self) -> None:
         protocol, room, checklist_item = self.checklist_item_for_photo()

@@ -790,9 +790,7 @@ def _meter_comparison_rows(
                 else ""
             ),
             "old_reading": (
-                getattr(move_in_reference, reading_field)
-                if move_in_reference is not None
-                else None
+                getattr(move_in_reference, reading_field) if move_in_reference is not None else None
             ),
             "field": form[reading_field],
         }
@@ -800,9 +798,7 @@ def _meter_comparison_rows(
     ]
 
 
-def _set_selected_person_initial(
-    form: HandoverProtocolForm, person_id: str | UUID | None
-) -> None:
+def _set_selected_person_initial(form: HandoverProtocolForm, person_id: str | UUID | None) -> None:
     """Keep the selected tenant visible after dynamic form fields reload."""
     if form.is_bound:
         return

@@ -4,11 +4,9 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('immobilien', '0013_raummerkmalfoto_inhalt_hash_sha256_and_more'),
-        ('immobilien', '0015_loginipthrottle_accountloginthrottle'),
+        ("immobilien", "0013_raummerkmalfoto_inhalt_hash_sha256_and_more"),
+        ("immobilien", "0015_loginipthrottle_accountloginthrottle"),
     ]
 
-    operations = [
-    ]
+    operations = []
