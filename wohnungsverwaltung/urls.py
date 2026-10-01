@@ -45,6 +45,21 @@ urlpatterns = [
         name="handover_protocol_checklist_item_delete",
     ),
     path(
+        "<uuid:protocol_id>/raeume/<uuid:room_id>/pruefpunkte/<uuid:item_id>/fotos/",
+        views.handover_protocol_checklist_item_photo_upload,
+        name="handover_protocol_checklist_item_photo_upload",
+    ),
+    path(
+        "<uuid:protocol_id>/raeume/<uuid:room_id>/pruefpunkte/<uuid:item_id>/fotos/<uuid:photo_id>/",
+        views.handover_protocol_checklist_item_photo_view,
+        name="handover_protocol_checklist_item_photo_view",
+    ),
+    path(
+        "<uuid:protocol_id>/raeume/<uuid:room_id>/pruefpunkte/<uuid:item_id>/fotos/<uuid:photo_id>/loeschen/",
+        views.handover_protocol_checklist_item_photo_delete,
+        name="handover_protocol_checklist_item_photo_delete",
+    ),
+    path(
         "<uuid:protocol_id>/raeume/<uuid:room_id>/",
         views.handover_protocol_room_detail,
         name="handover_protocol_room_detail",

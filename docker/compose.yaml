@@ -61,7 +61,8 @@ services:
 
 volumes:
   postgres_data:
-    name: steiimmo-postgres-data
+    name: ${POSTGRES_VOLUME_NAME:-steiimmo-postgres-data}
+    external: ${POSTGRES_VOLUME_EXTERNAL:-false}
   static_data:
     name: steiimmo-static-data
   media_data:

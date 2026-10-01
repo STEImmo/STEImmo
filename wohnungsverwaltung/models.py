@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 
 from django.conf import settings
@@ -6,6 +7,26 @@ from django.db import models
 from django.utils import timezone
 
 from .fields import PostgreSQLEnumField
+
+
+def handover_photo_upload_path(instance, _filename: str) -> str:
+    """Return an opaque, protocol-scoped storage name for a checklist photo."""
+    checklist_item = instance.raum_merkmal
+    protocol_id = checklist_item.raumprotokoll.protokoll_id
+    return f"u/{protocol_id.hex}/{checklist_item.pk.hex}/{uuid.uuid4().hex}"
+
+
+def calculate_photo_checksum(photo) -> str:
+    """Return the SHA-256 checksum while preserving the current file position."""
+    position = photo.tell()
+    digest = hashlib.sha256()
+    try:
+        photo.seek(0)
+        for chunk in photo.chunks():
+            digest.update(chunk)
+    finally:
+        photo.seek(position)
+    return digest.hexdigest()
 
 
 class Geschlecht(models.TextChoices):
@@ -454,6 +475,30 @@ class RaumMerkmal(models.Model):
 
     class Meta:
         db_table = "raum_merkmal"
+
+
+class RaumMerkmalFoto(models.Model):
+    raum_merkmal_foto_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    raum_merkmal = models.ForeignKey(
+        RaumMerkmal,
+        on_delete=models.CASCADE,
+        related_name="fotos",
+    )
+    datei = models.ImageField(upload_to=handover_photo_upload_path)
+    content_type = models.CharField(max_length=50)
+    dateigroesse = models.PositiveIntegerField()
+    inhalt_hash_sha256 = models.CharField(max_length=64, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "raum_merkmal_foto"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("raum_merkmal", "inhalt_hash_sha256"),
+                condition=~models.Q(inhalt_hash_sha256=""),
+                name="raum_merkmal_foto_hash_eindeutig",
+            )
+        ]
 
 
 class ProtokollSchluessel(models.Model):

@@ -1,0 +1,13 @@
+<section class="uk-card uk-card-default uk-card-body uk-margin-remove-top" aria-label="Zustand beim Auszug">
+    <h4 class="uk-heading-bullet uk-margin-remove-bottom">Auszug (neu)</h4>
+    <p class="uk-margin-small-top uk-margin-remove-bottom"><strong>{{ item.merkmal.bereich }}: {{ item.merkmal.bezeichnung }}</strong></p>
+    <div class="uk-margin-small-top">{{ item.wert.text }}</div>
+    {% if item.wert.angaben %}
+        <div class="uk-text-meta uk-text-small uk-margin-small-top">
+            {% for label, value in item.wert.angaben.items %}
+                <span>{{ label }}: {{ value }}</span>{% if not forloop.last %} · {% endif %}
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% include "wohnungsverwaltung/_raum_merkmal_fotos.html" with item=item protocol=protocol room=room photo_return_to="overview" %}
+</section>
