@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Benutzerkonten verwalten – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section uk-section-default">
+    <div class="uk-container">
+        <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
+            <div>
+                <h1 class="uk-heading-small uk-margin-remove-bottom">Benutzerkonten</h1>
+                <p class="uk-text-muted uk-margin-small-top">Konten, Rollen und Seitenrechte verwalten.</p>
+            </div>
+            <a class="uk-button uk-button-primary" href="{% url 'verwaltung:user_account_create' %}">Konto anlegen</a>
+        </div>
+        <div class="uk-overflow-auto">
+            <table class="uk-table uk-table-divider uk-table-middle">
+                <thead>
+                    <tr>
+                        <th>Person</th>
+                        <th>E-Mail-Adresse</th>
+                        <th>Rollen</th>
+                        <th>Status</th>
+                        <th><span class="uk-hidden">Aktion</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for account in accounts %}
+                        <tr>
+                            <td>{% if account.person_profile %}{{ account.person_profile }}{% else %}<span class="uk-text-danger">Keine Person zugeordnet</span>{% endif %}</td>
+                            <td>{{ account.email|default:account.username }}</td>
+                            <td>{% for group in account.groups.all %}<span class="uk-label uk-margin-small-right">{{ group.name }}</span>{% empty %}<span class="uk-text-muted">Keine Rolle</span>{% endfor %}</td>
+                            <td>{% if account.is_active %}<span class="uk-label uk-label-success">Aktiv</span>{% else %}<span class="uk-label uk-label-danger">Deaktiviert</span>{% endif %}</td>
+                            <td class="uk-text-right"><a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:user_account_edit' account.pk %}">Bearbeiten</a></td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="5" class="uk-text-muted">Noch keine Benutzerkonten vorhanden.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+{% endblock %}

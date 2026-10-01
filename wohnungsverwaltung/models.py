@@ -1,7 +1,10 @@
 import hashlib
+import secrets
 import uuid
+from datetime import timedelta
 
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
@@ -156,12 +159,125 @@ class Person(models.Model):
 
     class Meta:
         db_table = "person"
+        permissions = [
+            ("access_applicant_area", "Kann auf den Bewerberbereich zugreifen"),
+            ("access_tenant_area", "Kann auf den vorbereiteten Mieterbereich zugreifen"),
+            ("access_employee_area", "Kann auf den Mitarbeiterbereich zugreifen"),
+            ("manage_user_accounts", "Kann Konten und Zugriffsrechte verwalten"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.vorname} {self.nachname}"
 
 
+class RegistrationVerification(models.Model):
+    CODE_LENGTH = 6
+    CODE_VALIDITY = timedelta(minutes=15)
+    MAX_ATTEMPTS = 5
+    RESEND_DELAY = timedelta(minutes=1)
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="registration_verification",
+    )
+    code_hash = models.CharField(max_length=128)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_sent_at = models.DateTimeField()
+
+    class Meta:
+        db_table = "registration_verification"
+
+    def issue_code(self) -> str:
+        code = f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
+        while self.code_hash and check_password(code, self.code_hash):
+            code = f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
+        now = timezone.now()
+        self.code_hash = make_password(code)
+        self.expires_at = now + self.CODE_VALIDITY
+        self.attempts = 0
+        self.last_sent_at = now
+        return code
+
+    def matches(self, code: str) -> bool:
+        return (
+            self.attempts < self.MAX_ATTEMPTS
+            and self.expires_at >= timezone.now()
+            and check_password(code, self.code_hash)
+        )
+
+    def can_resend(self) -> bool:
+        return self.last_sent_at + self.RESEND_DELAY <= timezone.now()
+
+
+class EmployeeLoginVerification(models.Model):
+    CODE_LENGTH = 6
+    CODE_VALIDITY = timedelta(minutes=15)
+    MAX_ATTEMPTS = 5
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="employee_login_verification",
+    )
+    code_hash = models.CharField(max_length=128)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        db_table = "employee_login_verification"
+
+    def issue_code(self) -> str:
+        code = f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
+        while self.code_hash and check_password(code, self.code_hash):
+            code = f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
+        self.code_hash = make_password(code)
+        self.expires_at = timezone.now() + self.CODE_VALIDITY
+        self.attempts = 0
+        return code
+
+    def matches(self, code: str) -> bool:
+        return (
+            self.attempts < self.MAX_ATTEMPTS
+            and self.expires_at >= timezone.now()
+            and check_password(code, self.code_hash)
+        )
+
+
+class AccountLoginThrottle(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="login_throttle",
+    )
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+    locked_until = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "account_login_throttle"
+
+
+class LoginIpThrottle(models.Model):
+    ip_fingerprint = models.CharField(max_length=64, unique=True)
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+    window_started_at = models.DateTimeField()
+    locked_until = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "login_ip_throttle"
+
+
+class WohnungQuerySet(models.QuerySet):
+    def available(self) -> "WohnungQuerySet":
+        return self.filter(status=WohnungStatus.FREE)
+
+
 class Wohnung(models.Model):
+    objects = WohnungQuerySet.as_manager()
+
     wohnung_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     etage = models.SmallIntegerField(default=0)
     wohnungsnummer = models.CharField(max_length=255)

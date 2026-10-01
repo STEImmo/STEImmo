@@ -1,8 +1,10 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 
+from wohnungsverwaltung.access import ROLE_APPLICANT
 from wohnungsverwaltung.models import Person
 
 
@@ -47,4 +49,5 @@ class Command(BaseCommand):
         user.save()
         person.user = user
         person.save()
+        user.groups.add(Group.objects.get(name=ROLE_APPLICANT))
         self.stdout.write(self.style.SUCCESS(f"Testbewerber {email} ist bereit."))

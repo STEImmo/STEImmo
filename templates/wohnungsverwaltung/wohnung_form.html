@@ -8,7 +8,11 @@
         <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
             <div>
                 <h1 class="uk-heading-small uk-margin-remove-bottom">{{ title }}</h1>
-                {% if wohnung.pk %}<p class="uk-text-muted uk-margin-small-top">Status: {{ wohnung.status }}</p>{% endif %}
+                {% if wohnung.pk %}
+                    <p class="uk-text-muted uk-margin-small-top">Status:
+                        {% if wohnung.status == "free" %}Verfügbar{% elif wohnung.status == "taken" %}Vermietet{% else %}Gesperrt{% endif %}
+                    </p>
+                {% endif %}
             </div>
             <a class="uk-button uk-button-default" href="{% url 'verwaltung:wohnung_list' %}">Zur Übersicht</a>
         </div>
@@ -28,6 +32,7 @@
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.groesse_qm %}</div>
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.zimmeranzahl %}</div>
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.barrierefrei %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.status %}</div>
                 </div>
             </section>
 

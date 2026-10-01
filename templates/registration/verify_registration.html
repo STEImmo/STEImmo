@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Registrierung bestätigen – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <h1 class="uk-heading-medium">Registrierung bestätigen</h1>
+        <p class="uk-text-lead">Geben Sie den sechsstelligen Code aus der E-Mail ein. Der Code ist 15 Minuten gültig.</p>
+        <form method="post" autocomplete="on" class="uk-card uk-card-default uk-card-body uk-margin-top">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>
+            {% endif %}
+            {% for field in form %}
+                <div class="uk-margin">
+                    <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    <div class="uk-form-controls">{{ field }}</div>
+                    {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                </div>
+            {% endfor %}
+            <div class="uk-margin-large-top uk-flex uk-flex-right">
+                <button class="uk-button uk-button-primary" type="submit">Konto bestätigen</button>
+            </div>
+        </form>
+        <form method="post" action="{% url 'resend_registration_code' %}" class="uk-margin-top">
+            {% csrf_token %}
+            <label class="uk-form-label" for="{{ resend_form.email.id_for_label }}">{{ resend_form.email.label }}</label>
+            <div class="uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
+                <div class="uk-width-expand">{{ resend_form.email }}</div>
+                <div class="uk-width-auto"><button class="uk-button uk-button-default" type="submit">Code erneut senden</button></div>
+            </div>
+            {% for error in resend_form.email.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+        </form>
+    </div>
+</section>
+{% endblock %}

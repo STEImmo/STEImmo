@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Bewerberkonto registrieren – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <h1 class="uk-heading-medium">Bewerberkonto registrieren</h1>
+        <p class="uk-text-lead">Erstellen Sie ein Konto, um Ihre Pre-Bewerbungen geschützt zu speichern und später wieder aufzurufen.</p>
+        <form method="post" autocomplete="on" class="uk-card uk-card-default uk-card-body uk-margin-top">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>
+            {% endif %}
+            {% for field in form %}
+                <div class="uk-margin">
+                    <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    <div class="uk-form-controls">{{ field }}</div>
+                    {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                </div>
+            {% endfor %}
+            <div class="uk-margin-large-top uk-flex uk-flex-right">
+                <button class="uk-button uk-button-primary" type="submit">Konto erstellen</button>
+            </div>
+        </form>
+        <p class="uk-text-center uk-margin-top">Bereits registriert? <a href="{% url 'login' %}">Anmelden</a></p>
+    </div>
+</section>
+{% endblock %}

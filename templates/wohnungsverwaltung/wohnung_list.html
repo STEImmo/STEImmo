@@ -36,7 +36,11 @@
                             <td>{{ wohnung.etage }}</td>
                             <td>{{ wohnung.groesse_qm }} m²</td>
                             <td>{{ wohnung.zimmeranzahl }}</td>
-                            <td><span class="uk-label">{{ wohnung.status }}</span></td>
+                            <td>
+                                <span class="uk-label">
+                                    {% if wohnung.status == "free" %}Verfügbar{% elif wohnung.status == "taken" %}Vermietet{% else %}Gesperrt{% endif %}
+                                </span>
+                            </td>
                             <td class="uk-text-right">
                                 <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:wohnung_edit' wohnung.wohnung_id %}">
                                     Bearbeiten

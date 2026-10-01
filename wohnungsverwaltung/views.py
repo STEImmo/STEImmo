@@ -2,9 +2,8 @@ import json
 from uuid import UUID
 
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
-from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from django.http import (
@@ -18,6 +17,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
+from .access import applicant_required, employee_required, user_management_required
 from .forms import (
     ACCEPTANCE_STATUS_LABELS,
     HANDOVER_STATUS_LABELS,
@@ -38,6 +38,7 @@ from .forms import (
     SchluesselFormSet,
     StellplatzForm,
     StellplatzZuordnungForm,
+    UserAccountForm,
     WohnungForm,
 )
 from .models import (
@@ -57,7 +58,6 @@ from .models import (
     Stellplatz,
     StellplatzZuordnung,
     Wohnung,
-    WohnungStatus,
     calculate_photo_checksum,
 )
 
@@ -98,12 +98,12 @@ def _applicant_for_user(request: HttpRequest) -> Person:
     return applicant
 
 
-@login_required
+@applicant_required
 def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) -> HttpResponse:
     applicant = _applicant_for_user(request)
     unit = None
     if unit_id is not None:
-        unit = get_object_or_404(Wohnung.objects.filter(status=WohnungStatus.FREE), pk=unit_id)
+        unit = get_object_or_404(Wohnung.objects.available(), pk=unit_id)
 
     form = BewerbungForm(request.POST or None, applicant=applicant, unit=unit)
     application_created = False
@@ -112,10 +112,8 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
             with transaction.atomic():
                 selected_unit = (
                     Wohnung.objects.select_for_update()
-                    .filter(
-                        pk=form.cleaned_data["wohnung"].pk,
-                        status=WohnungStatus.FREE,
-                    )
+                    .available()
+                    .filter(pk=form.cleaned_data["wohnung"].pk)
                     .first()
                 )
                 if selected_unit is None:
@@ -140,7 +138,7 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
     )
 
 
-@login_required
+@applicant_required
 def pre_application_list(request: HttpRequest) -> HttpResponse:
     applicant = _applicant_for_user(request)
     applications = (
@@ -264,6 +262,7 @@ def _draft_overview_entries(request: HttpRequest) -> list[dict[str, object]]:
     return entries
 
 
+@employee_required
 def handover_protocol_draft_save(request: HttpRequest) -> JsonResponse | HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -302,6 +301,7 @@ def handover_protocol_draft_save(request: HttpRequest) -> JsonResponse | HttpRes
     )
 
 
+@employee_required
 def handover_protocol_draft_delete(request: HttpRequest, draft_id) -> JsonResponse | HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -317,6 +317,7 @@ def handover_protocol_draft_delete(request: HttpRequest, draft_id) -> JsonRespon
     return redirect("wohnungsverwaltung:handover_protocol_list")
 
 
+@employee_required
 def handover_protocol_list(request: HttpRequest) -> HttpResponse:
     protocols = Protokoll.objects.select_related("wohnung", "person").order_by("-updated_at")
     return render(
@@ -326,6 +327,7 @@ def handover_protocol_list(request: HttpRequest) -> HttpResponse:
     )
 
 
+@employee_required
 def handover_protocol_create(request: HttpRequest) -> HttpResponse:
     draft_scope = "create"
     server_draft = _draft_for_form(request, draft_scope)
@@ -394,6 +396,7 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
     )
 
 
+@employee_required
 def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
     protocol = get_object_or_404(
         Protokoll.objects.select_related("wohnung", "person").prefetch_related(
@@ -423,6 +426,7 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
     )
 
 
+@employee_required
 def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
     protocol = get_object_or_404(Protokoll, pk=protocol_id)
     if protocol.status != ProtokollStatus.OPEN:
@@ -493,6 +497,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
     )
 
 
+@employee_required
 def handover_protocol_room_create(request: HttpRequest, protocol_id) -> HttpResponse:
     protocol = get_object_or_404(Protokoll, pk=protocol_id)
     if protocol.status != ProtokollStatus.OPEN:
@@ -521,6 +526,7 @@ def handover_protocol_room_create(request: HttpRequest, protocol_id) -> HttpResp
     )
 
 
+@employee_required
 def handover_protocol_room_detail(request: HttpRequest, protocol_id, room_id) -> HttpResponse:
     protocol = get_object_or_404(Protokoll, pk=protocol_id)
     room = get_object_or_404(
@@ -558,6 +564,7 @@ def handover_protocol_room_detail(request: HttpRequest, protocol_id, room_id) ->
     )
 
 
+@employee_required
 def handover_protocol_room_delete(request: HttpRequest, protocol_id, room_id) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -575,6 +582,7 @@ def handover_protocol_room_delete(request: HttpRequest, protocol_id, room_id) ->
     return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
 
+@employee_required
 def handover_protocol_checklist_item_delete(
     request: HttpRequest, protocol_id, room_id, item_id
 ) -> HttpResponse:
@@ -599,7 +607,7 @@ def handover_protocol_checklist_item_delete(
     )
 
 
-@staff_member_required
+@employee_required
 def handover_protocol_checklist_item_photo_upload(
     request: HttpRequest, protocol_id, room_id, item_id
 ) -> HttpResponse:
@@ -657,7 +665,7 @@ def handover_protocol_checklist_item_photo_upload(
     return redirect(_photo_return_url(request, protocol, room, checklist_item))
 
 
-@staff_member_required
+@employee_required
 def handover_protocol_checklist_item_photo_view(
     request: HttpRequest, protocol_id, room_id, item_id, photo_id
 ) -> FileResponse:
@@ -673,7 +681,7 @@ def handover_protocol_checklist_item_photo_view(
     return response
 
 
-@staff_member_required
+@employee_required
 def handover_protocol_checklist_item_photo_delete(
     request: HttpRequest, protocol_id, room_id, item_id, photo_id
 ) -> HttpResponse:
@@ -850,6 +858,7 @@ def _attach_move_in_photo_references(protocol: Protokoll, rooms) -> Protokoll | 
     return move_in_protocol
 
 
+@employee_required
 def handover_protocol_key_create(request: HttpRequest, protocol_id) -> HttpResponse:
     protocol = get_object_or_404(Protokoll, pk=protocol_id)
     if protocol.status != ProtokollStatus.OPEN:
@@ -871,6 +880,7 @@ def handover_protocol_key_create(request: HttpRequest, protocol_id) -> HttpRespo
     )
 
 
+@employee_required
 def handover_protocol_key_delete(request: HttpRequest, protocol_id, key_id) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -886,6 +896,7 @@ def handover_protocol_key_delete(request: HttpRequest, protocol_id, key_id) -> H
     return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
 
+@employee_required
 def handover_protocol_confirm(request: HttpRequest, protocol_id) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -1009,18 +1020,18 @@ def _room_form_groups(room_formset) -> list[dict[str, object]]:
     return groups
 
 
-@staff_member_required
+@employee_required
 def wohnung_list(request: HttpRequest) -> HttpResponse:
     wohnungen = Wohnung.objects.order_by("etage", "wohnungsnummer")
     return render(request, "wohnungsverwaltung/wohnung_list.html", {"wohnungen": wohnungen})
 
 
-@staff_member_required
+@employee_required
 def wohnung_create(request: HttpRequest) -> HttpResponse:
     return _wohnung_form(request, Wohnung(), "Wohnung anlegen")
 
 
-@staff_member_required
+@employee_required
 def wohnung_edit(request: HttpRequest, wohnung_id) -> HttpResponse:
     wohnung = get_object_or_404(Wohnung, pk=wohnung_id)
     return _wohnung_form(request, wohnung, "Wohnung bearbeiten")
@@ -1058,13 +1069,13 @@ def _wohnung_form(request: HttpRequest, wohnung: Wohnung, title: str) -> HttpRes
     )
 
 
-@staff_member_required
+@employee_required
 def raum_create(request: HttpRequest, wohnung_id) -> HttpResponse:
     wohnung = get_object_or_404(Wohnung, pk=wohnung_id)
     return _raum_form(request, wohnung, Raum(wohnung=wohnung), "Raum anlegen")
 
 
-@staff_member_required
+@employee_required
 def raum_edit(request: HttpRequest, wohnung_id, raum_id) -> HttpResponse:
     wohnung = get_object_or_404(Wohnung, pk=wohnung_id)
     raum = get_object_or_404(Raum, pk=raum_id, wohnung=wohnung)
@@ -1091,7 +1102,7 @@ def _raum_form(request: HttpRequest, wohnung: Wohnung, raum: Raum, title: str) -
     )
 
 
-@staff_member_required
+@employee_required
 def raum_delete(request: HttpRequest, wohnung_id, raum_id) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -1106,18 +1117,18 @@ def raum_delete(request: HttpRequest, wohnung_id, raum_id) -> HttpResponse:
     return redirect("verwaltung:wohnung_edit", wohnung_id=wohnung.pk)
 
 
-@staff_member_required
+@employee_required
 def merkmal_list(request: HttpRequest) -> HttpResponse:
     merkmale = Merkmal.objects.order_by("bereich", "bezeichnung")
     return render(request, "wohnungsverwaltung/merkmal_list.html", {"merkmale": merkmale})
 
 
-@staff_member_required
+@employee_required
 def merkmal_create(request: HttpRequest) -> HttpResponse:
     return _merkmal_form(request, Merkmal(), "Merkmalvorlage anlegen")
 
 
-@staff_member_required
+@employee_required
 def merkmal_edit(request: HttpRequest, merkmal_id) -> HttpResponse:
     merkmal = get_object_or_404(Merkmal, pk=merkmal_id)
     return _merkmal_form(request, merkmal, "Merkmalvorlage bearbeiten")
@@ -1153,7 +1164,7 @@ def _merkmal_form(request: HttpRequest, merkmal: Merkmal, title: str) -> HttpRes
     )
 
 
-@staff_member_required
+@employee_required
 def stellplatz_list(request: HttpRequest) -> HttpResponse:
     stellplaetze = Stellplatz.objects.order_by("name").prefetch_related("zuordnungen__wohnung")
     return render(
@@ -1163,12 +1174,12 @@ def stellplatz_list(request: HttpRequest) -> HttpResponse:
     )
 
 
-@staff_member_required
+@employee_required
 def stellplatz_create(request: HttpRequest) -> HttpResponse:
     return _stellplatz_form(request, Stellplatz(), "Stellplatz anlegen")
 
 
-@staff_member_required
+@employee_required
 def stellplatz_edit(request: HttpRequest, stellplatz_id) -> HttpResponse:
     stellplatz = get_object_or_404(Stellplatz, pk=stellplatz_id)
     return _stellplatz_form(request, stellplatz, "Stellplatz bearbeiten")
@@ -1207,5 +1218,64 @@ def _stellplatz_form(request: HttpRequest, stellplatz: Stellplatz, title: str) -
             "stellplatz": stellplatz,
             "title": title,
             "zuordnung_form": zuordnung_form,
+        },
+    )
+
+
+@user_management_required
+def user_account_list(request: HttpRequest) -> HttpResponse:
+    user_model = get_user_model()
+    accounts = (
+        user_model.objects.select_related("person_profile")
+        .prefetch_related("groups", "user_permissions")
+        .order_by("username")
+    )
+    return render(request, "wohnungsverwaltung/user_account_list.html", {"accounts": accounts})
+
+
+@user_management_required
+def user_account_create(request: HttpRequest) -> HttpResponse:
+    form = UserAccountForm(request.POST or None, actor=request.user)
+    if request.method == "POST" and form.is_valid():
+        try:
+            account = form.save()
+        except (IntegrityError, ValidationError):
+            form.add_error(
+                None,
+                "Das Konto konnte nicht gespeichert werden. Bitte prüfen Sie die Angaben.",
+            )
+        else:
+            messages.success(request, "Das Benutzerkonto wurde angelegt.")
+            return redirect("verwaltung:user_account_edit", user_id=account.pk)
+    return render(
+        request,
+        "wohnungsverwaltung/user_account_form.html",
+        {"form": form, "title": "Benutzerkonto anlegen", "submit_label": "Konto anlegen"},
+    )
+
+
+@user_management_required
+def user_account_edit(request: HttpRequest, user_id: int) -> HttpResponse:
+    account = get_object_or_404(get_user_model(), pk=user_id)
+    form = UserAccountForm(request.POST or None, account=account, actor=request.user)
+    if request.method == "POST" and form.is_valid():
+        try:
+            form.save()
+        except (IntegrityError, ValidationError):
+            form.add_error(
+                None,
+                "Das Konto konnte nicht gespeichert werden. Bitte prüfen Sie die Angaben.",
+            )
+        else:
+            messages.success(request, "Das Benutzerkonto wurde aktualisiert.")
+            return redirect("verwaltung:user_account_edit", user_id=account.pk)
+    return render(
+        request,
+        "wohnungsverwaltung/user_account_form.html",
+        {
+            "form": form,
+            "account": account,
+            "title": "Benutzerkonto bearbeiten",
+            "submit_label": "Änderungen speichern",
         },
     )
