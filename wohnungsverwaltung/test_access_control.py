@@ -250,6 +250,40 @@ class EmployeeMfaLoginTests(TestCase):
         self.assertTrue(verification.matches(code))
         self.assertNotIn(code, verification.code_hash)
 
+    def test_direct_user_management_permission_requires_a_mailed_code_before_session_creation(
+        self,
+    ) -> None:
+        account_manager = self.user_model.objects.create_user(
+            username="direkte-verwaltung@example.test",
+            email="direkte-verwaltung@example.test",
+            password="FjordTanne!4826",
+        )
+        Person.objects.create(
+            user=account_manager,
+            vorname="Direkte",
+            nachname="Verwaltung",
+            email="direkte-verwaltung@example.test",
+        )
+        account_manager.user_permissions.add(
+            Permission.objects.get(codename="manage_user_accounts")
+        )
+
+        response = self.client.post(
+            reverse("login"),
+            {"username": account_manager.username, "password": "FjordTanne!4826"},
+        )
+
+        self.assertRedirects(response, reverse("employee_mfa_verify"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertTrue(EmployeeLoginVerification.objects.filter(user=account_manager).exists())
+        self.assertEqual(len(mail.outbox), 1)
+        code = re.search(r"\b\d{6}\b", mail.outbox[0].body).group()
+
+        response = self.client.post(reverse("employee_mfa_verify"), {"code": code})
+
+        self.assertRedirects(response, reverse("verwaltung:user_account_list"))
+        self.assertIn("_auth_user_id", self.client.session)
+
     def test_valid_mfa_code_logs_an_employee_in_and_preserves_next_url(self) -> None:
         target_url = reverse("verwaltung:wohnung_list")
         self.login_employee(next=target_url)

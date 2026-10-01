@@ -10,7 +10,11 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from wohnungsverwaltung.access import APPLICANT_ACCESS_PERMISSION, EMPLOYEE_ACCESS_PERMISSION
+from wohnungsverwaltung.access import (
+    APPLICANT_ACCESS_PERMISSION,
+    EMPLOYEE_ACCESS_PERMISSION,
+    USER_MANAGEMENT_PERMISSION,
+)
 from wohnungsverwaltung.forms import (
     ACCOUNT_CREATION_ERROR,
     EmployeeMfaCodeForm,
@@ -41,7 +45,7 @@ class RoleAwareLoginView(LoginView):
 
     def form_valid(self, form):
         user = form.get_user()
-        if user.has_perm(EMPLOYEE_ACCESS_PERMISSION):
+        if user.has_perm(EMPLOYEE_ACCESS_PERMISSION) or user.has_perm(USER_MANAGEMENT_PERMISSION):
             with transaction.atomic():
                 verification, _created = (
                     EmployeeLoginVerification.objects.select_for_update().get_or_create(
@@ -63,6 +67,8 @@ class RoleAwareLoginView(LoginView):
     def get_default_redirect_url_for_user(self, user) -> str:
         if user.has_perm(EMPLOYEE_ACCESS_PERMISSION):
             return reverse("verwaltung:wohnung_list")
+        if user.has_perm(USER_MANAGEMENT_PERMISSION):
+            return reverse("verwaltung:user_account_list")
         if user.has_perm(APPLICANT_ACCESS_PERMISSION):
             return reverse("wohnungsverwaltung:pre_application_list")
         return reverse("home")
