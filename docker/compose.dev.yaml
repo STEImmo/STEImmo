@@ -2,6 +2,24 @@ services:
   web:
     environment:
       DJANGO_DEBUG: "1"
+      DJANGO_EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
+      DJANGO_EMAIL_HOST: mailpit
+      DJANGO_EMAIL_PORT: "1025"
+      DJANGO_EMAIL_USE_TLS: "0"
+      DJANGO_DEFAULT_FROM_EMAIL: noreply@steimmo.test
+      DJANGO_CREATE_DEVELOPMENT_EMPLOYEE: "1"
+      DJANGO_DEVELOPMENT_EMPLOYEE_EMAIL: mitarbeiter@example.test
+      DJANGO_DEVELOPMENT_EMPLOYEE_PASSWORD: KometFjord!4826
     command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
     volumes:
       - ..:/app
+    depends_on:
+      mailpit:
+        condition: service_started
+
+  mailpit:
+    image: axllent/mailpit:v1.31.3
+    ports:
+      - "127.0.0.1:8025:8025"
+    environment:
+      MP_MAX_MESSAGES: "100"

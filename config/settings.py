@@ -101,6 +101,26 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "wohnungsverwaltung:pre_application_list"
+LOGIN_REDIRECT_URL = "home"
 LOGOUT_REDIRECT_URL = "home"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+LOGIN_ACCOUNT_FAILURE_LIMIT = int(os.environ.get("DJANGO_LOGIN_ACCOUNT_FAILURE_LIMIT", "3"))
+LOGIN_ACCOUNT_LOCKOUT_SECONDS = int(os.environ.get("DJANGO_LOGIN_ACCOUNT_LOCKOUT_SECONDS", "900"))
+LOGIN_IP_FAILURE_LIMIT = int(os.environ.get("DJANGO_LOGIN_IP_FAILURE_LIMIT", "10"))
+LOGIN_IP_FAILURE_WINDOW_SECONDS = int(
+    os.environ.get("DJANGO_LOGIN_IP_FAILURE_WINDOW_SECONDS", "900")
+)
+LOGIN_THROTTLE_TRUSTED_PROXY_IPS = tuple(env_list("DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS"))
+
+EMAIL_BACKEND = os.environ.get(
+    "DJANGO_EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend"
+    if DEBUG
+    else "django.core.mail.backends.smtp.EmailBackend",
+)
+DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "noreply@steimmo.local")
+EMAIL_HOST = os.environ.get("DJANGO_EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("DJANGO_EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("DJANGO_EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("DJANGO_EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("DJANGO_EMAIL_USE_TLS", default=True)

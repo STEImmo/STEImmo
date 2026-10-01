@@ -1,4 +1,4 @@
-from django.contrib.auth import views as auth_views
+from django.contrib.auth.views import LogoutView
 from django.urls import path
 
 from . import views
@@ -8,8 +8,20 @@ urlpatterns = [
     path("health/", views.health, name="health"),
     path(
         "accounts/login/",
-        auth_views.LoginView.as_view(template_name="registration/login.html"),
+        views.RoleAwareLoginView.as_view(),
         name="login",
     ),
-    path("accounts/logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path("accounts/registrieren/", views.register, name="register"),
+    path("accounts/registrieren/bestaetigen/", views.register_verify, name="register_verify"),
+    path(
+        "accounts/registrieren/code-erneut-senden/",
+        views.resend_registration_code,
+        name="resend_registration_code",
+    ),
+    path(
+        "accounts/mitarbeiter-mfa/",
+        views.employee_mfa_verify,
+        name="employee_mfa_verify",
+    ),
+    path("accounts/logout/", LogoutView.as_view(), name="logout"),
 ]

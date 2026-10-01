@@ -4,12 +4,14 @@ from io import StringIO
 
 from django import forms
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
 
+from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
 from .forms import BewerbungForm, InlineRoomChecklistFormSet, RoomChecklistItemForm
 from .models import (
     AbnahmeStatus,
@@ -52,6 +54,15 @@ class HandoverProtocolViewsTests(TestCase):
             email="emil.example@example.test",
             is_employee=True,
         )
+        self.employee_user = get_user_model().objects.create_user(
+            username="emil.example@example.test",
+            email="emil.example@example.test",
+            password="FjordTanne!4826",
+        )
+        self.employee.user = self.employee_user
+        self.employee.save()
+        self.employee_user.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
+        self.client.force_login(self.employee_user)
         self.room_feature = Merkmal.objects.create(
             bereich="Küche",
             bezeichnung="Fenster",
@@ -278,6 +289,7 @@ class HandoverProtocolViewsTests(TestCase):
         )
         draft = ProtokollEntwurf.objects.get()
         other_browser = Client()
+        other_browser.force_login(self.employee_user)
 
         response = other_browser.get(reverse("wohnungsverwaltung:handover_protocol_list"))
 
@@ -1205,6 +1217,7 @@ class PreApplicationAuthenticationTests(TestCase):
             nachname="Bewerber",
             email="testbewerber@example.test",
         )
+        self.user.groups.add(Group.objects.get(name=ROLE_APPLICANT))
         self.free_unit = Wohnung.objects.create(
             etage=4,
             wohnungsnummer="4.01",
@@ -1312,6 +1325,7 @@ class CreateTestApplicantCommandTests(TestCase):
 
         self.assertTrue(user.check_password("FjordTanne!4826"))
         self.assertEqual(person.user, user)
+        self.assertTrue(user.groups.filter(name=ROLE_APPLICANT).exists())
         self.assertFalse(person.is_employee)
         self.assertIsNone(person.wohnung)
 
