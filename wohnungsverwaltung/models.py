@@ -140,7 +140,14 @@ class Person(models.Model):
         return f"{self.vorname} {self.nachname}"
 
 
+class WohnungQuerySet(models.QuerySet):
+    def available(self) -> "WohnungQuerySet":
+        return self.filter(status=WohnungStatus.FREE)
+
+
 class Wohnung(models.Model):
+    objects = WohnungQuerySet.as_manager()
+
     wohnung_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     etage = models.SmallIntegerField(default=0)
     wohnungsnummer = models.CharField(max_length=255)
