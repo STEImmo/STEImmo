@@ -1,6 +1,12 @@
+import ipaddress
+from datetime import timedelta
+
+from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib.auth import get_user_model, login
+from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.views import LoginView
+from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.db import IntegrityError, connection, transaction
 from django.db.utils import OperationalError
@@ -8,6 +14,7 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.crypto import salted_hmac
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from wohnungsverwaltung.access import (
@@ -22,10 +29,158 @@ from wohnungsverwaltung.forms import (
     RegistrationVerificationForm,
     ResendRegistrationCodeForm,
 )
-from wohnungsverwaltung.models import EmployeeLoginVerification, RegistrationVerification
+from wohnungsverwaltung.models import (
+    AccountLoginThrottle,
+    EmployeeLoginVerification,
+    LoginIpThrottle,
+    RegistrationVerification,
+)
 
 EMPLOYEE_MFA_USER_SESSION_KEY = "employee_mfa_user_id"
 EMPLOYEE_MFA_REDIRECT_SESSION_KEY = "employee_mfa_redirect_url"
+LOGIN_FAILURE_MESSAGE = "Bitte überprüfen Sie Ihre Zugangsdaten und versuchen Sie es später erneut."
+
+
+def _login_lockout_duration() -> timedelta:
+    return timedelta(seconds=settings.LOGIN_ACCOUNT_LOCKOUT_SECONDS)
+
+
+def _ip_failure_window() -> timedelta:
+    return timedelta(seconds=settings.LOGIN_IP_FAILURE_WINDOW_SECONDS)
+
+
+def _valid_ip(value: str) -> str | None:
+    try:
+        return str(ipaddress.ip_address(value))
+    except ValueError:
+        return None
+
+
+def _client_ip_fingerprint(request: HttpRequest) -> str | None:
+    remote_ip = _valid_ip(request.META.get("REMOTE_ADDR", ""))
+    if remote_ip is None:
+        return None
+    client_ip = remote_ip
+    if remote_ip in settings.LOGIN_THROTTLE_TRUSTED_PROXY_IPS:
+        forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        forwarded_ip = _valid_ip(forwarded_for.split(",")[0].strip())
+        if forwarded_ip is not None:
+            client_ip = forwarded_ip
+    return salted_hmac("login-ip-throttle", client_ip, algorithm="sha256").hexdigest()
+
+
+def _account_for_login_identifier(identifier: str):
+    user_model = get_user_model()
+    try:
+        return user_model._default_manager.get_by_natural_key(identifier)
+    except user_model.DoesNotExist:
+        return None
+
+
+def _clear_expired_account_throttle(user, now) -> bool:
+    try:
+        throttle = AccountLoginThrottle.objects.select_for_update().get(user=user)
+    except AccountLoginThrottle.DoesNotExist:
+        return False
+    if throttle.locked_until is None:
+        return False
+    if throttle.locked_until is not None and throttle.locked_until > now:
+        return True
+    throttle.delete()
+    return False
+
+
+def _clear_expired_ip_throttle(ip_fingerprint: str | None, now) -> bool:
+    if ip_fingerprint is None:
+        return False
+    try:
+        throttle = LoginIpThrottle.objects.select_for_update().get(ip_fingerprint=ip_fingerprint)
+    except LoginIpThrottle.DoesNotExist:
+        return False
+    if throttle.locked_until is not None and throttle.locked_until > now:
+        return True
+    if throttle.window_started_at + _ip_failure_window() > now:
+        return False
+    throttle.delete()
+    return False
+
+
+def _is_login_throttled(user, ip_fingerprint: str | None) -> bool:
+    now = timezone.now()
+    with transaction.atomic():
+        if user is not None and _clear_expired_account_throttle(user, now):
+            return True
+        return _clear_expired_ip_throttle(ip_fingerprint, now)
+
+
+def _record_failed_login(user, ip_fingerprint: str | None) -> None:
+    now = timezone.now()
+    with transaction.atomic():
+        if user is not None:
+            throttle, _created = AccountLoginThrottle.objects.get_or_create(user=user)
+            throttle = AccountLoginThrottle.objects.select_for_update().get(pk=throttle.pk)
+            if throttle.locked_until is None or throttle.locked_until <= now:
+                if throttle.locked_until is not None:
+                    throttle.failed_attempts = 0
+                    throttle.locked_until = None
+                throttle.failed_attempts += 1
+                if throttle.failed_attempts >= settings.LOGIN_ACCOUNT_FAILURE_LIMIT:
+                    throttle.locked_until = now + _login_lockout_duration()
+                throttle.save(update_fields=["failed_attempts", "locked_until", "updated_at"])
+        if ip_fingerprint is not None:
+            throttle, _created = LoginIpThrottle.objects.get_or_create(
+                ip_fingerprint=ip_fingerprint,
+                defaults={"window_started_at": now},
+            )
+            throttle = LoginIpThrottle.objects.select_for_update().get(pk=throttle.pk)
+            if throttle.locked_until is None or throttle.locked_until <= now:
+                if throttle.window_started_at + _ip_failure_window() <= now:
+                    throttle.failed_attempts = 0
+                    throttle.window_started_at = now
+                throttle.failed_attempts += 1
+                if throttle.failed_attempts >= settings.LOGIN_IP_FAILURE_LIMIT:
+                    throttle.locked_until = now + _ip_failure_window()
+                throttle.save(
+                    update_fields=[
+                        "failed_attempts",
+                        "window_started_at",
+                        "locked_until",
+                        "updated_at",
+                    ]
+                )
+
+
+def _clear_account_login_throttle(user) -> None:
+    AccountLoginThrottle.objects.filter(user=user).delete()
+
+
+class ThrottledAuthenticationForm(AuthenticationForm):
+    def __init__(self, request=None, *args, **kwargs) -> None:
+        super().__init__(request, *args, **kwargs)
+        self.login_user = None
+        self.ip_fingerprint = _client_ip_fingerprint(request) if request is not None else None
+        self.login_was_throttled = False
+
+    def clean(self):
+        username = self.cleaned_data.get("username")
+        password = self.cleaned_data.get("password")
+        if username and password:
+            self.login_user = _account_for_login_identifier(username)
+            if _is_login_throttled(self.login_user, self.ip_fingerprint):
+                self.login_was_throttled = True
+                raise self.get_invalid_login_error()
+        return super().clean()
+
+    def get_invalid_login_error(self):
+        return ValidationError(LOGIN_FAILURE_MESSAGE, code="invalid_login")
+
+    @property
+    def should_record_failure(self) -> bool:
+        return (
+            not self.login_was_throttled
+            and bool(self.cleaned_data.get("username"))
+            and bool(self.cleaned_data.get("password"))
+        )
 
 
 def home(request: HttpRequest):
@@ -42,9 +197,16 @@ def health(request: HttpRequest) -> JsonResponse:
 
 class RoleAwareLoginView(LoginView):
     template_name = "registration/login.html"
+    authentication_form = ThrottledAuthenticationForm
+
+    def form_invalid(self, form):
+        if form.should_record_failure:
+            _record_failed_login(form.login_user, form.ip_fingerprint)
+        return super().form_invalid(form)
 
     def form_valid(self, form):
         user = form.get_user()
+        _clear_account_login_throttle(user)
         if user.has_perm(EMPLOYEE_ACCESS_PERMISSION) or user.has_perm(USER_MANAGEMENT_PERMISSION):
             with transaction.atomic():
                 verification, _created = (

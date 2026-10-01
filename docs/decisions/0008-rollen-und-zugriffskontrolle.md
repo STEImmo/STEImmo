@@ -28,6 +28,8 @@ Der Development-Override startet zusätzlich einen explizit fiktiven Mitarbeiter
 
 Jede Anmeldung eines Kontos mit `access_employee_area` oder `manage_user_accounts` erfordert Passwort und einen zusätzlichen E-Mail-Einmalcode. Das gilt auch für direkt zugewiesene Einzelrechte. Der Code wird ausschließlich als Passwort-Hash gespeichert, ist 15 Minuten gültig und hat höchstens fünf Versuche. Erst nach korrekter Eingabe legt die Anwendung die authentifizierte Session an; es gibt keine dauerhafte Gerätefreigabe. Eine neue Passwortanmeldung erstellt stets einen neuen Code.
 
+Die reguläre Anmeldung unter `/accounts/login/` begrenzt Passwortversuche für alle Kontoarten: Drei aufeinanderfolgende falsche Passwörter sperren das betroffene Konto für 15 Minuten. Zusätzlich begrenzen zehn Fehlversuche aus derselben IP-Adresse innerhalb von 15 Minuten weitere Anmeldungen dieser Quelle. Der Kontostatus und ein ausschließlich mit `SECRET_KEY` abgeleiteter IP-Fingerprint liegen transaktionssicher in PostgreSQL; Roh-IP-Adressen und Anmeldeprotokolle werden nicht gespeichert. Erfolgreiche Passwortanmeldungen löschen den Kontofehlerstatus, während die IP-Grenze als rollierendes Fehlversuchsfenster weiterläuft. Abgelaufene Zustände werden beim nächsten Anmeldeversuch gelöscht. Sperren verlängern sich durch weitere Anfragen nicht. Alle Fehlfälle liefern dieselbe neutrale Meldung. Standardmäßig wird `REMOTE_ADDR` verwendet; `X-Forwarded-For` gilt nur, wenn `REMOTE_ADDR` in `DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS` konfiguriert ist. Django-Admin bleibt außerhalb des Geltungsbereichs.
+
 ## Erweiterungsroutine
 
 Für eine neue geschützte Seite wird in dieser Reihenfolge vorgegangen:

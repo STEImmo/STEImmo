@@ -224,6 +224,31 @@ class EmployeeLoginVerification(models.Model):
         )
 
 
+class AccountLoginThrottle(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="login_throttle",
+    )
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+    locked_until = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "account_login_throttle"
+
+
+class LoginIpThrottle(models.Model):
+    ip_fingerprint = models.CharField(max_length=64, unique=True)
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+    window_started_at = models.DateTimeField()
+    locked_until = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "login_ip_throttle"
+
+
 class Wohnung(models.Model):
     wohnung_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     etage = models.SmallIntegerField(default=0)

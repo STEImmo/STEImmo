@@ -1,4 +1,6 @@
 import re
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from io import StringIO
 
@@ -7,9 +9,11 @@ from django.contrib.auth.models import Group, Permission
 from django.core import mail
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import TestCase, override_settings
+from django.db import close_old_connections
+from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.crypto import salted_hmac
 
 from .access import (
     APPLICANT_ACCESS_PERMISSION,
@@ -18,7 +22,13 @@ from .access import (
     ROLE_TENANT,
     ROLE_USER_MANAGEMENT,
 )
-from .models import EmployeeLoginVerification, Person, RegistrationVerification
+from .models import (
+    AccountLoginThrottle,
+    EmployeeLoginVerification,
+    LoginIpThrottle,
+    Person,
+    RegistrationVerification,
+)
 
 
 class RegistrationViewTests(TestCase):
@@ -342,6 +352,153 @@ class EmployeeMfaLoginTests(TestCase):
         response = self.client.get(reverse("employee_mfa_verify"))
 
         self.assertRedirects(response, reverse("login"))
+
+
+class PasswordLoginThrottleTests(TestCase):
+    LOGIN_FAILURE_MESSAGE = (
+        "Bitte überprüfen Sie Ihre Zugangsdaten und versuchen Sie es später erneut."
+    )
+
+    def setUp(self) -> None:
+        self.user = get_user_model().objects.create_user(
+            username="anmeldung@example.test",
+            email="anmeldung@example.test",
+            password="FjordTanne!4826",
+        )
+        Person.objects.create(
+            user=self.user,
+            vorname="Anmeldung",
+            nachname="Test",
+            email="anmeldung@example.test",
+        )
+
+    def login(self, username: str = "anmeldung@example.test", password: str = "falsch"):
+        return self.client.post(reverse("login"), {"username": username, "password": password})
+
+    def assert_login_is_rejected(self, response) -> None:
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.LOGIN_FAILURE_MESSAGE)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_three_failed_passwords_lock_an_account_without_starting_mfa(self) -> None:
+        self.user.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
+        unknown_response = self.login(username="unbekannt@example.test")
+        first_failure = self.login()
+        second_failure = self.login()
+        third_failure = self.login()
+
+        for response in (unknown_response, first_failure, second_failure, third_failure):
+            self.assert_login_is_rejected(response)
+        throttle = AccountLoginThrottle.objects.get(user=self.user)
+        self.assertEqual(throttle.failed_attempts, 3)
+        self.assertGreater(throttle.locked_until, timezone.now())
+
+        locked_response = self.login(password="FjordTanne!4826")
+
+        self.assert_login_is_rejected(locked_response)
+        self.assertFalse(EmployeeLoginVerification.objects.filter(user=self.user).exists())
+
+    def test_expired_account_lock_allows_login_and_removes_the_throttle(self) -> None:
+        for _ in range(3):
+            self.login()
+        throttle = AccountLoginThrottle.objects.get(user=self.user)
+        throttle.locked_until = timezone.now() - timedelta(seconds=1)
+        throttle.save(update_fields=["locked_until"])
+
+        response = self.login(password="FjordTanne!4826")
+
+        self.assertRedirects(response, reverse("home"))
+        self.assertIn("_auth_user_id", self.client.session)
+        self.assertFalse(AccountLoginThrottle.objects.filter(user=self.user).exists())
+
+    def test_successful_login_resets_account_failure_count(self) -> None:
+        self.login()
+        self.login()
+
+        response = self.login(password="FjordTanne!4826")
+
+        self.assertRedirects(response, reverse("home"))
+        self.assertFalse(AccountLoginThrottle.objects.filter(user=self.user).exists())
+
+    def test_ten_failed_logins_from_an_ip_limit_other_accounts_without_storing_raw_ip(self) -> None:
+        for attempt in range(10):
+            response = self.login(username=f"unbekannt-{attempt}@example.test")
+            self.assert_login_is_rejected(response)
+
+        throttle = LoginIpThrottle.objects.get()
+        self.assertEqual(throttle.failed_attempts, 10)
+        self.assertGreater(throttle.locked_until, timezone.now())
+        self.assertRegex(throttle.ip_fingerprint, r"^[0-9a-f]{64}$")
+        self.assertNotIn("127.0.0.1", throttle.ip_fingerprint)
+
+        response = self.login(password="FjordTanne!4826")
+
+        self.assert_login_is_rejected(response)
+
+    def test_untrusted_forwarded_for_header_does_not_change_the_client_ip(self) -> None:
+        response = self.client.post(
+            reverse("login"),
+            {"username": "unbekannt@example.test", "password": "falsch"},
+            REMOTE_ADDR="198.51.100.10",
+            HTTP_X_FORWARDED_FOR="203.0.113.10",
+        )
+
+        self.assert_login_is_rejected(response)
+        throttle = LoginIpThrottle.objects.get()
+        self.assertEqual(
+            throttle.ip_fingerprint,
+            salted_hmac("login-ip-throttle", "198.51.100.10", algorithm="sha256").hexdigest(),
+        )
+
+    @override_settings(LOGIN_THROTTLE_TRUSTED_PROXY_IPS=("198.51.100.10",))
+    def test_trusted_proxy_uses_the_forwarded_client_ip(self) -> None:
+        response = self.client.post(
+            reverse("login"),
+            {"username": "unbekannt@example.test", "password": "falsch"},
+            REMOTE_ADDR="198.51.100.10",
+            HTTP_X_FORWARDED_FOR="203.0.113.10",
+        )
+
+        self.assert_login_is_rejected(response)
+        throttle = LoginIpThrottle.objects.get()
+        self.assertEqual(
+            throttle.ip_fingerprint,
+            salted_hmac("login-ip-throttle", "203.0.113.10", algorithm="sha256").hexdigest(),
+        )
+
+
+class PasswordLoginThrottleConcurrencyTests(TransactionTestCase):
+    def setUp(self) -> None:
+        self.user = get_user_model().objects.create_user(
+            username="parallel@example.test",
+            email="parallel@example.test",
+            password="FjordTanne!4826",
+        )
+        self.login_url = reverse("login")
+
+    def test_parallel_failed_logins_consistently_lock_an_account(self) -> None:
+        barrier = threading.Barrier(3)
+
+        def submit_failed_login() -> int:
+            close_old_connections()
+            try:
+                client = Client()
+                barrier.wait()
+                response = client.post(
+                    self.login_url,
+                    {"username": self.user.username, "password": "falsch"},
+                )
+                return response.status_code
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            statuses = list(executor.map(lambda _index: submit_failed_login(), range(3)))
+
+        throttle = AccountLoginThrottle.objects.get(user=self.user)
+        self.assertEqual(statuses, [200, 200, 200])
+        self.assertEqual(throttle.failed_attempts, 3)
+        self.assertGreater(throttle.locked_until, timezone.now())
 
 
 class UserAccountManagementTests(TestCase):
