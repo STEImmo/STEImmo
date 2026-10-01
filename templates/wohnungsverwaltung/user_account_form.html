@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section uk-section-default">
+    <div class="uk-container uk-container-small">
+        <a class="uk-button uk-button-text" href="{% url 'verwaltung:user_account_list' %}">Zur Kontoübersicht</a>
+        <h1 class="uk-heading-small uk-margin-top">{{ title }}</h1>
+        <form method="post" autocomplete="on" class="uk-card uk-card-default uk-card-body uk-margin-top">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>
+            {% endif %}
+            <h2 class="uk-heading-divider">Person</h2>
+            <p class="uk-text-meta">Wählen Sie eine Person ohne Konto oder erfassen Sie die drei Felder für eine neue Person.</p>
+            {% for field in form %}
+                {% if field.name in "person vorname nachname email" %}
+                    <div class="uk-margin">
+                        <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <div class="uk-form-controls">{{ field }}</div>
+                        {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+            <h2 class="uk-heading-divider uk-margin-large-top">Zugriff</h2>
+            {% for field in form %}
+                {% if field.name == "roles" or field.name == "direct_permissions" %}
+                    <div class="uk-margin">
+                        <span class="uk-form-label">{{ field.label }}</span>
+                        <div class="uk-form-controls uk-margin-small-top">
+                            {% for choice in field %}
+                                <label class="uk-display-block uk-margin-small-bottom">{{ choice.tag }} {{ choice.choice_label }}</label>
+                            {% endfor %}
+                        </div>
+                        {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+            <h2 class="uk-heading-divider uk-margin-large-top">Kontostatus</h2>
+            <div class="uk-margin">
+                <label>{{ form.is_active }} {{ form.is_active.label }}</label>
+                {% for error in form.is_active.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+            </div>
+            <p class="uk-text-meta">{% if account %}Leer lassen, um das bestehende Passwort beizubehalten.{% else %}Für neue Konten ist ein Passwort erforderlich.{% endif %}</p>
+            {% for field in form %}
+                {% if field.name == "password1" or field.name == "password2" %}
+                    <div class="uk-margin">
+                        <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <div class="uk-form-controls">{{ field }}</div>
+                        {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+            <div class="uk-margin-large-top uk-flex uk-flex-between">
+                <a class="uk-button uk-button-default" href="{% url 'verwaltung:user_account_list' %}">Abbrechen</a>
+                <button class="uk-button uk-button-primary" type="submit">{{ submit_label }}</button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}
