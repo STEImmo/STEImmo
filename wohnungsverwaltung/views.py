@@ -49,7 +49,6 @@ from .models import (
     Stellplatz,
     StellplatzZuordnung,
     Wohnung,
-    WohnungStatus,
 )
 
 PROTOCOL_STATUS_LABELS = {
@@ -90,7 +89,7 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
     applicant = _applicant_for_user(request)
     unit = None
     if unit_id is not None:
-        unit = get_object_or_404(Wohnung.objects.filter(status=WohnungStatus.FREE), pk=unit_id)
+        unit = get_object_or_404(Wohnung.objects.available(), pk=unit_id)
 
     form = BewerbungForm(request.POST or None, applicant=applicant, unit=unit)
     application_created = False
@@ -99,10 +98,8 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
             with transaction.atomic():
                 selected_unit = (
                     Wohnung.objects.select_for_update()
-                    .filter(
-                        pk=form.cleaned_data["wohnung"].pk,
-                        status=WohnungStatus.FREE,
-                    )
+                    .available()
+                    .filter(pk=form.cleaned_data["wohnung"].pk)
                     .first()
                 )
                 if selected_unit is None:

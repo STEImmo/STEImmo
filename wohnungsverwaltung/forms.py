@@ -458,9 +458,7 @@ class BewerbungForm(forms.ModelForm):
     def __init__(self, *args, applicant: Person, unit: Wohnung | None = None, **kwargs) -> None:
         self.applicant = applicant
         super().__init__(*args, **kwargs)
-        available_units = Wohnung.objects.filter(status=WohnungStatus.FREE).order_by(
-            "gebaeudenummer", "wohnungsnummer"
-        )
+        available_units = Wohnung.objects.available().order_by("gebaeudenummer", "wohnungsnummer")
         self.fields["wohnung"].queryset = available_units
         if unit is not None:
             self.fields["wohnung"].queryset = available_units.filter(pk=unit.pk)
@@ -1026,6 +1024,16 @@ class UIkitFormMixin:
 
 
 class WohnungForm(UIkitFormMixin, forms.ModelForm):
+    status = forms.ChoiceField(
+        choices=(
+            (WohnungStatus.FREE, "Verfügbar"),
+            (WohnungStatus.TAKEN, "Vermietet"),
+            (WohnungStatus.BLOCKED, "Gesperrt"),
+        ),
+        label="Verfügbarkeitsstatus",
+        widget=forms.Select(attrs={"class": "uk-select"}),
+    )
+
     class Meta:
         model = Wohnung
         fields = [
@@ -1038,6 +1046,7 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "warmmiete",
             "kaution",
             "barrierefrei",
+            "status",
             "zaehlernummer_wasser_kalt",
             "zaehlernummer_wasser_warm",
             "zaehlernummer_heizung",

@@ -249,7 +249,14 @@ class LoginIpThrottle(models.Model):
         db_table = "login_ip_throttle"
 
 
+class WohnungQuerySet(models.QuerySet):
+    def available(self) -> "WohnungQuerySet":
+        return self.filter(status=WohnungStatus.FREE)
+
+
 class Wohnung(models.Model):
+    objects = WohnungQuerySet.as_manager()
+
     wohnung_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     etage = models.SmallIntegerField(default=0)
     wohnungsnummer = models.CharField(max_length=255)
