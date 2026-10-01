@@ -458,9 +458,7 @@ class BewerbungForm(forms.ModelForm):
     def __init__(self, *args, applicant: Person, unit: Wohnung | None = None, **kwargs) -> None:
         self.applicant = applicant
         super().__init__(*args, **kwargs)
-        available_units = Wohnung.objects.available().order_by(
-            "gebaeudenummer", "wohnungsnummer"
-        )
+        available_units = Wohnung.objects.available().order_by("gebaeudenummer", "wohnungsnummer")
         self.fields["wohnung"].queryset = available_units
         if unit is not None:
             self.fields["wohnung"].queryset = available_units.filter(pk=unit.pk)
