@@ -69,7 +69,7 @@ class ManagementViewTests(TestCase):
 
         self.assertRedirects(response, f"{reverse('login')}?next={url}")
 
-    def test_apartment_availability_cannot_be_changed_without_staff_access(self) -> None:
+    def test_anonymous_user_cannot_change_apartment_availability(self) -> None:
         wohnung = Wohnung.objects.create(
             gebaeudenummer="B",
             wohnungsnummer="17",
@@ -79,7 +79,28 @@ class ManagementViewTests(TestCase):
 
         response = self.client.post(url, {"status": WohnungStatus.FREE})
 
-        self.assertRedirects(response, f"/admin/login/?next={url}")
+        self.assertRedirects(response, f"{reverse('login')}?next={url}")
+        wohnung.refresh_from_db()
+        self.assertEqual(wohnung.status, WohnungStatus.BLOCKED)
+
+    def test_non_employee_user_cannot_change_apartment_availability(self) -> None:
+        user = get_user_model().objects.create_user(
+            username="bewerber",
+            password="sicheres-passwort",
+        )
+        self.client.force_login(user)
+        wohnung = Wohnung.objects.create(
+            gebaeudenummer="B",
+            wohnungsnummer="17",
+            status=WohnungStatus.BLOCKED,
+        )
+
+        response = self.client.post(
+            reverse("verwaltung:wohnung_edit", args=[wohnung.pk]),
+            {"status": WohnungStatus.FREE},
+        )
+
+        self.assertEqual(response.status_code, 403)
         wohnung.refresh_from_db()
         self.assertEqual(wohnung.status, WohnungStatus.BLOCKED)
 
@@ -93,13 +114,13 @@ class ManagementViewTests(TestCase):
         self.assertTrue(wohnung.barrierefrei)
         self.assertEqual(wohnung.zaehlernummer_strom, "ST-4")
 
-    def test_staff_can_change_apartment_availability(self) -> None:
+    def test_employee_can_change_apartment_availability(self) -> None:
         wohnung = Wohnung.objects.create(
             gebaeudenummer="B",
             wohnungsnummer="17",
             status=WohnungStatus.BLOCKED,
         )
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.employee_user)
 
         response = self.client.post(
             reverse("verwaltung:wohnung_edit", args=[wohnung.pk]),
@@ -116,7 +137,7 @@ class ManagementViewTests(TestCase):
             wohnungsnummer="17",
             status=WohnungStatus.FREE,
         )
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.employee_user)
 
         response = self.client.post(
             reverse("verwaltung:wohnung_edit", args=[wohnung.pk]),
@@ -136,7 +157,7 @@ class ManagementViewTests(TestCase):
             wohnungsnummer="17",
             status=WohnungStatus.BLOCKED,
         )
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.employee_user)
 
         response = self.client.get(reverse("verwaltung:wohnung_edit", args=[wohnung.pk]))
 
