@@ -32,7 +32,7 @@
     {% else %}
         <form id="handover-signing-form" method="post" enctype="multipart/form-data" action="{% url 'wohnungsverwaltung:handover_protocol_confirm' protocol.pk %}" class="uk-card uk-card-default uk-card-body uk-margin">
             {% csrf_token %}{{ form.content_token }}
-            <h2>Bestätigung und Unterschriften</h2>
+            <h2>Unterschriften</h2>
             <div class="uk-margin"><label>{{ form.schluessel_ueberprueft }} {{ form.schluessel_ueberprueft.label }}</label></div>
             <div class="uk-margin"><label>{{ form.bestaetigung_erklaert }} {{ form.bestaetigung_erklaert.label }}</label></div>
             {% include "wohnungsverwaltung/_signature_pad.html" with role="mitarbeiter" label="Mitarbeiter" name=snapshot.employee %}
@@ -43,7 +43,8 @@
             <div id="signature-error" class="uk-alert-danger" role="alert" tabindex="-1" hidden></div>
             <button id="signature-reload" type="button" class="uk-button uk-button-default" hidden>Aktuellen Stand prüfen und neu unterschreiben</button>
             <p class="uk-text-meta">Unterschriften werden erst beim erfolgreichen Abschluss gespeichert. Beim Verlassen oder Neuladen müssen Sie erneut unterschreiben.</p>
-            <button id="signature-submit" type="submit" class="uk-button uk-button-primary" disabled>Protokoll verbindlich abschließen</button>
+            <p>Mit der verbindlichen Bestätigung wird das PDF einschließlich der Unterschriften erstellt. Danach können Sie es herunterladen.</p>
+            <button id="signature-submit" type="submit" class="uk-button uk-button-primary" disabled>Protokoll verbindlich bestätigen und PDF erstellen</button>
             <noscript><p>Zum Unterschreiben muss JavaScript aktiviert sein.</p></noscript>
         </form>
     {% endif %}

@@ -194,7 +194,11 @@
         </div>
 
         {% if protocol.status == "open" %}
-            <a class="uk-button uk-button-primary uk-margin-top" href="{% url 'wohnungsverwaltung:handover_protocol_finalize' protocol.pk %}">Protokoll prüfen und unterschreiben</a>
+            <div class="uk-card uk-card-default uk-card-body uk-margin-top">
+                <h2 class="uk-card-title">Nächster Schritt: Unterschriften</h2>
+                <p>Nach der Prüfung unterschreiben Mitarbeiter und Mieter. Anschließend bestätigen Sie das Protokoll verbindlich und erhalten das PDF.</p>
+                <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_finalize' protocol.pk %}">Weiter zu den Unterschriften</a>
+            </div>
         {% else %}
             <div class="uk-alert-success uk-margin-top" uk-alert>Dieses Protokoll wurde am {{ protocol.bestaetigt_am|date:"d.m.Y H:i" }} bestätigt und ist gegen Änderungen gesperrt.</div>
         {% endif %}
