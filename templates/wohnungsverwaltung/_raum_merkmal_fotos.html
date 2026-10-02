@@ -1,4 +1,4 @@
-{% if request.user.is_staff %}
+{% if can_manage_handover_photos %}
     <section class="uk-margin-small-top" aria-label="Fotos zum Prüfpunkt">
         {% if item.fotos.all %}
             <div class="uk-child-width-1-3@m uk-grid-small handover-photo-grid" uk-grid>

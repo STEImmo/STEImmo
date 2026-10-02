@@ -71,6 +71,27 @@ METER_READING_FIELDS = (
 )
 
 ACCOUNT_CREATION_ERROR = "Mit diesen Angaben kann kein Konto erstellt werden."
+PHOTO_CONTENT_TYPES = {
+    "JPEG": "image/jpeg",
+    "PNG": "image/png",
+    "WEBP": "image/webp",
+}
+
+
+def photo_content_type_from_format(image_format: str) -> str | None:
+    """Return the allowed MIME type for a Pillow-verified image format."""
+
+    return PHOTO_CONTENT_TYPES.get(image_format)
+
+
+def verified_photo_content_type(photo) -> str:
+    """Return the MIME type derived from an ImageField-validated upload."""
+
+    image_format = getattr(getattr(photo, "image", None), "format", "")
+    content_type = photo_content_type_from_format(image_format)
+    if content_type is None:
+        raise ValidationError("Erlaubt sind nur JPEG-, PNG- und WebP-Bilder.")
+    return content_type
 
 
 class RegistrationForm(forms.Form):
@@ -829,8 +850,9 @@ class RoomChecklistItemForm(forms.Form):
         widget=forms.HiddenInput(attrs={"data-additional-details-value": ""}),
     )
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, room: Raumprotokoll | None = None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self.room = room
         self.fields["bereich"].choices = _feature_area_choices()
         self.fields["merkmal"].queryset = Merkmal.objects.order_by("bereich", "bezeichnung")
 
@@ -839,6 +861,12 @@ class RoomChecklistItemForm(forms.Form):
         feature = cleaned_data.get("merkmal")
         if feature is not None and feature.bereich != cleaned_data.get("bereich"):
             self.add_error("merkmal", "Die Bezeichnung gehört nicht zum gewählten Bereich.")
+        if (
+            feature is not None
+            and self.room is not None
+            and self.room.raum_merkmale.filter(merkmal=feature).exists()
+        ):
+            self.add_error("merkmal", "Dieser Prüfpunkt ist in diesem Raum bereits erfasst.")
         try:
             cleaned_data["zusatzangaben"] = _clean_additional_details(
                 cleaned_data.get("zusatzangaben", ""), feature
@@ -860,7 +888,7 @@ class MultiplePhotoInput(forms.ClearableFileInput):
 
 
 class MultiplePhotoField(forms.ImageField):
-    allowed_formats = {"JPEG", "PNG", "WEBP"}
+    allowed_formats = frozenset(PHOTO_CONTENT_TYPES)
 
     def clean(self, data, initial=None):
         if not data:
@@ -883,7 +911,7 @@ class MultiplePhotoField(forms.ImageField):
                 f"Ein Foto darf höchstens {maximum_mebibytes} MiB groß sein."
             )
         image_format = getattr(getattr(value, "image", None), "format", "")
-        if image_format not in self.allowed_formats:
+        if photo_content_type_from_format(image_format) is None:
             raise forms.ValidationError("Erlaubt sind nur JPEG-, PNG- und WebP-Bilder.")
 
 
@@ -1074,7 +1102,7 @@ class InlineRoomChecklistForm(forms.Form):
             RaumMerkmalFoto.objects.create(
                 raum_merkmal=checklist_item,
                 datei=photo,
-                content_type=photo.content_type,
+                content_type=verified_photo_content_type(photo),
                 dateigroesse=photo.size,
                 inhalt_hash_sha256=calculate_photo_checksum(photo),
             )
@@ -1085,6 +1113,7 @@ class RoomChecklistFormSet(BaseFormSet):
     def clean(self) -> None:
         super().clean()
         current_room = None
+        checklist_entries = []
         for room_form in self.forms:
             if (
                 not getattr(room_form, "cleaned_data", None)
@@ -1095,11 +1124,24 @@ class RoomChecklistFormSet(BaseFormSet):
             room = room_form.cleaned_data.get("raum")
             if room is not None:
                 current_room = room
-                continue
-            if current_room is not None:
+            elif current_room is not None:
                 room_form.cleaned_data["raum"] = current_room
+            else:
+                room_form.add_error("raum", "Bitte wählen Sie für den ersten Prüfpunkt einen Raum.")
                 continue
-            room_form.add_error("raum", "Bitte wählen Sie für den ersten Prüfpunkt einen Raum.")
+            checklist_entries.append(room_form)
+
+        seen_checkpoints = set()
+        for room_form in checklist_entries:
+            checkpoint = (
+                room_form.cleaned_data["raum"].pk,
+                room_form.cleaned_data["merkmal"].pk,
+            )
+            if checkpoint in seen_checkpoints:
+                room_form.add_error(
+                    "merkmal", "Dieser Prüfpunkt ist in diesem Raum bereits erfasst."
+                )
+            seen_checkpoints.add(checkpoint)
 
 
 InlineRoomChecklistFormSet = forms.formset_factory(

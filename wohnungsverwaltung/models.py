@@ -591,6 +591,12 @@ class RaumMerkmal(models.Model):
 
     class Meta:
         db_table = "raum_merkmal"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("raumprotokoll", "merkmal"),
+                name="raum_merkmal_eindeutig_pro_raumprotokoll",
+            )
+        ]
 
 
 class RaumMerkmalFoto(models.Model):

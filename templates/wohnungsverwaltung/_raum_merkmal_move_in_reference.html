@@ -1,4 +1,4 @@
-{% if request.user.is_staff and einzugspruefpunkt %}
+{% if can_manage_handover_photos and einzugspruefpunkt %}
     <section class="uk-card uk-card-muted uk-card-body uk-margin-remove-top" aria-label="Zustand beim Einzug">
         <h4 class="uk-heading-bullet uk-margin-remove-bottom">Einzug (alt)</h4>
         <p class="uk-text-meta uk-margin-small-top">Bestätigtes Einzugsprotokoll vom {{ einzugsprotokoll.uebergabe_zeitpunkt|date:"d.m.Y H:i" }}.</p>
@@ -23,7 +23,7 @@
             </div>
         {% endif %}
     </section>
-{% elif request.user.is_staff %}
+{% elif can_manage_handover_photos %}
     <section class="uk-card uk-card-muted uk-card-body uk-margin-remove-top" aria-label="Nicht dokumentierter Zustand beim Einzug">
         <h4 class="uk-heading-bullet uk-margin-remove-bottom">Einzug (alt)</h4>
         <p class="uk-margin-small-top uk-margin-remove-bottom"><strong>{{ item.merkmal.bereich }}: {{ item.merkmal.bezeichnung }}</strong></p>

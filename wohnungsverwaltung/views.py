@@ -8,6 +8,7 @@ from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from django.http import (
     FileResponse,
+    Http404,
     HttpRequest,
     HttpResponse,
     HttpResponseNotAllowed,
@@ -16,8 +17,15 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 
-from .access import applicant_required, employee_required, user_management_required
+from .access import (
+    EMPLOYEE_ACCESS_PERMISSION,
+    applicant_required,
+    employee_required,
+    has_permission,
+    user_management_required,
+)
 from .forms import (
     ACCEPTANCE_STATUS_LABELS,
     HANDOVER_STATUS_LABELS,
@@ -40,6 +48,8 @@ from .forms import (
     StellplatzZuordnungForm,
     UserAccountForm,
     WohnungForm,
+    photo_content_type_from_format,
+    verified_photo_content_type,
 )
 from .models import (
     Bewerbung,
@@ -68,6 +78,31 @@ PROTOCOL_STATUS_LABELS = {
 }
 
 DRAFT_MAXIMUM_SIZE = 512_000
+
+
+def _can_manage_handover_photos(request: HttpRequest) -> bool:
+    """Use the same employee permission for photo UI and all photo endpoints."""
+
+    return has_permission(request, EMPLOYEE_ACCESS_PERMISSION)
+
+
+def _stored_photo_content_type(photo: RaumMerkmalFoto) -> str:
+    """Derive a safe response MIME type from the stored image content."""
+
+    try:
+        photo.datei.open("rb")
+        with Image.open(photo.datei) as image:
+            image_format = image.format
+            image.verify()
+    except (OSError, ValueError) as error:
+        raise Http404("Das gespeicherte Foto ist kein unterstütztes Bild.") from error
+    finally:
+        photo.datei.close()
+
+    content_type = photo_content_type_from_format(image_format)
+    if content_type is None:
+        raise Http404("Das gespeicherte Foto ist kein unterstütztes Bild.")
+    return content_type
 
 
 def _valid_wohnung_id(wohnung_id: str | UUID | None) -> UUID | None:
@@ -343,13 +378,14 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
     )
     form = HandoverProtocolForm(request.POST or None, wohnung_id=selected_wohnung_id)
     _set_selected_person_initial(form, selected_person_id)
+    can_manage_handover_photos = _can_manage_handover_photos(request)
     room_formset = InlineRoomChecklistFormSet(
         data=request.POST or None,
         files=request.FILES or None,
         prefix="rooms",
         form_kwargs={
             "wohnung_id": _valid_wohnung_id(selected_wohnung_id),
-            "allow_photo_upload": request.user.is_staff,
+            "allow_photo_upload": can_manage_handover_photos,
         },
     )
     key_formset = HandoverKeyFormSet(
@@ -358,7 +394,7 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
         initial=_key_form_initial(form.selected_wohnung) if request.method != "POST" else None,
     )
     move_in_reference = None
-    if request.user.is_staff:
+    if can_manage_handover_photos:
         move_in_reference = _move_in_reference_for_apartment(
             _valid_wohnung_id(selected_wohnung_id),
             person_id=_valid_person_id(selected_person_id),
@@ -389,6 +425,7 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
             "key_formset": key_formset,
             "move_in_reference": move_in_reference,
             "meter_comparison_rows": _meter_comparison_rows(form, move_in_reference),
+            "can_manage_handover_photos": can_manage_handover_photos,
             **_move_in_reference_context(move_in_reference),
             "draft_scope": draft_scope,
             **_draft_form_context(server_draft),
@@ -406,8 +443,9 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
         ),
         pk=protocol_id,
     )
+    can_manage_handover_photos = _can_manage_handover_photos(request)
     move_in_reference = None
-    if request.user.is_staff:
+    if can_manage_handover_photos:
         move_in_reference = _attach_move_in_photo_references(protocol, protocol.raeume.all())
     return render(
         request,
@@ -419,6 +457,7 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
             "acceptance_status_label": ACCEPTANCE_STATUS_LABELS[protocol.abnahme_status],
             "protocol_status_label": PROTOCOL_STATUS_LABELS[protocol.status],
             "confirmation_form": ProtocolConfirmationForm(),
+            "can_manage_handover_photos": can_manage_handover_photos,
             "move_in_reference": move_in_reference,
             **_move_in_reference_context(move_in_reference),
             "draft_key_to_clear": request.session.pop("handover_protocol_draft_key_to_clear", ""),
@@ -445,18 +484,19 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         wohnung_id=selected_wohnung_id or protocol.wohnung_id,
     )
     _set_selected_person_initial(form, selected_person_id)
+    can_manage_handover_photos = _can_manage_handover_photos(request)
     room_formset = InlineRoomChecklistFormSet(
         data=request.POST or None,
         files=request.FILES or None,
         prefix="rooms",
         form_kwargs={
             "wohnung_id": _valid_wohnung_id(selected_wohnung_id or protocol.wohnung_id),
-            "allow_photo_upload": request.user.is_staff,
+            "allow_photo_upload": can_manage_handover_photos,
         },
     )
     key_formset = HandoverKeyFormSet(request.POST or None, prefix="keys")
     move_in_reference = None
-    if request.user.is_staff:
+    if can_manage_handover_photos:
         move_in_reference = _move_in_reference_for_apartment(
             _valid_wohnung_id(selected_wohnung_id or protocol.wohnung_id),
             person_id=_valid_person_id(selected_person_id),
@@ -490,6 +530,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
             "key_formset": key_formset,
             "move_in_reference": move_in_reference,
             "meter_comparison_rows": _meter_comparison_rows(form, move_in_reference),
+            "can_manage_handover_photos": can_manage_handover_photos,
             **_move_in_reference_context(move_in_reference),
             "draft_scope": draft_scope,
             **_draft_form_context(server_draft),
@@ -538,11 +579,12 @@ def handover_protocol_room_detail(request: HttpRequest, protocol_id, room_id) ->
         messages.warning(request, "Bestätigte Protokolle können nicht mehr bearbeitet werden.")
         return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
+    can_manage_handover_photos = _can_manage_handover_photos(request)
     move_in_reference = None
-    if request.user.is_staff:
+    if can_manage_handover_photos:
         move_in_reference = _attach_move_in_photo_references(protocol, [room])
 
-    form = RoomChecklistItemForm(request.POST or None, initial={"bereich": room.name})
+    form = RoomChecklistItemForm(request.POST or None, initial={"bereich": room.name}, room=room)
     if request.method == "POST" and form.is_valid():
         form.save(room)
         messages.success(request, "Der Prüfpunkt wurde erfasst.")
@@ -560,6 +602,7 @@ def handover_protocol_room_detail(request: HttpRequest, protocol_id, room_id) ->
             "protocol": protocol,
             "room": room,
             "move_in_reference": move_in_reference,
+            "can_manage_handover_photos": can_manage_handover_photos,
         },
     )
 
@@ -654,7 +697,7 @@ def handover_protocol_checklist_item_photo_upload(
                 RaumMerkmalFoto.objects.create(
                     raum_merkmal=checklist_item,
                     datei=photo,
-                    content_type=photo.content_type,
+                    content_type=verified_photo_content_type(photo),
                     dateigroesse=photo.size,
                     inhalt_hash_sha256=checksum,
                 )
@@ -676,7 +719,8 @@ def handover_protocol_checklist_item_photo_view(
         raum_merkmal__raumprotokoll_id=room_id,
         raum_merkmal__raumprotokoll__protokoll_id=protocol_id,
     )
-    response = FileResponse(photo.datei.open("rb"), content_type=photo.content_type)
+    content_type = _stored_photo_content_type(photo)
+    response = FileResponse(photo.datei.open("rb"), content_type=content_type)
     response["X-Content-Type-Options"] = "nosniff"
     return response
 

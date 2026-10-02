@@ -1,4 +1,4 @@
-{% if request.user.is_staff and einzugspruefpunkte %}
+{% if can_manage_handover_photos and einzugspruefpunkte %}
     <div class="uk-child-width-1-2@m uk-grid-small handover-comparison-grid uk-margin-small-top" uk-grid>
         <div>
             <section class="uk-card uk-card-muted uk-card-body uk-margin-remove-top" aria-label="Weitere Prüfpunkte beim Einzug">

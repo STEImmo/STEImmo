@@ -28,6 +28,7 @@ from .models import (
     ProtokollStatus,
     ProtokollTyp,
     Raum,
+    RaumMerkmal,
     RaumMerkmalFoto,
     Schluessel,
     UebergabeStatus,
@@ -150,13 +151,17 @@ class HandoverProtocolViewsTests(TestCase):
         return protocol, room, checklist_item
 
     @staticmethod
-    def photo_upload(name: str = "feststellung.png", color: str = "white") -> SimpleUploadedFile:
+    def photo_upload(
+        name: str = "feststellung.png",
+        color: str = "white",
+        content_type: str = "image/png",
+    ) -> SimpleUploadedFile:
         image_data = BytesIO()
         Image.new("RGB", (1, 1), color).save(image_data, format="PNG")
         return SimpleUploadedFile(
             name,
             image_data.getvalue(),
-            content_type="image/png",
+            content_type=content_type,
         )
 
     def test_create_page_shows_required_handover_fields(self) -> None:
@@ -179,8 +184,9 @@ class HandoverProtocolViewsTests(TestCase):
         self.assertIsInstance(heating_readings_field.widget, forms.TextInput)
         self.assertEqual(heating_readings_field.widget.attrs["class"], "uk-input")
 
-    def test_create_page_shows_photo_field_to_staff(self) -> None:
-        self.client.force_login(self.staff_user)
+    def test_create_page_shows_photo_field_to_employee(self) -> None:
+        self.assertFalse(self.employee_user.is_staff)
+        self.client.force_login(self.employee_user)
 
         response = self.client.get(
             reverse("wohnungsverwaltung:handover_protocol_create"),
@@ -601,7 +607,7 @@ class HandoverProtocolViewsTests(TestCase):
         )
         self.assertEqual(protocol.protokoll_schluessel.get().anzahl, 2)
 
-    def test_staff_can_add_photos_while_creating_a_protocol(self) -> None:
+    def test_employee_can_add_photos_while_creating_a_protocol(self) -> None:
         data = self.valid_form_data()
         data.update(
             {
@@ -613,9 +619,10 @@ class HandoverProtocolViewsTests(TestCase):
         )
 
         with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
-            self.client.force_login(self.staff_user)
+            self.assertFalse(self.employee_user.is_staff)
+            self.client.force_login(self.employee_user)
             data["rooms-0-fotos"] = [
-                self.photo_upload("eins.png"),
+                self.photo_upload("eins.png", content_type="text/html"),
                 self.photo_upload("zwei.png", "black"),
             ]
             response = self.client.post(
@@ -626,13 +633,17 @@ class HandoverProtocolViewsTests(TestCase):
             self.assertEqual(response.status_code, 302)
             checklist_item = Protokoll.objects.get().raeume.get().raum_merkmale.get()
             self.assertEqual(checklist_item.fotos.count(), 2)
+            self.assertEqual(
+                list(checklist_item.fotos.values_list("content_type", flat=True)),
+                ["image/png", "image/png"],
+            )
             self.assertTrue(
                 checklist_item.fotos.first().datei.storage.exists(
                     checklist_item.fotos.first().datei.name
                 )
             )
 
-    def test_non_staff_cannot_add_photos_while_creating_a_protocol(self) -> None:
+    def test_non_employee_cannot_add_photos_while_creating_a_protocol(self) -> None:
         data = self.valid_form_data()
         data.update(
             {
@@ -644,10 +655,16 @@ class HandoverProtocolViewsTests(TestCase):
             }
         )
 
+        self.client.force_login(
+            get_user_model().objects.create_user(
+                username="ohne-mitarbeiterrolle",
+                password="sicheres-passwort",
+            )
+        )
+
         response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("fotos", response.context["room_formset"].forms[0].errors)
+        self.assertEqual(response.status_code, 403)
         self.assertFalse(Protokoll.objects.exists())
 
     def test_inline_room_checklist_rejects_a_room_from_another_apartment(self) -> None:
@@ -667,6 +684,28 @@ class HandoverProtocolViewsTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("raum", response.context["room_formset"].forms[0].errors)
+        self.assertFalse(Protokoll.objects.exists())
+
+    def test_inline_room_checklist_rejects_duplicate_checkpoints(self) -> None:
+        data = self.valid_form_data()
+        data.update(
+            {
+                "rooms-TOTAL_FORMS": "2",
+                "rooms-0-raum": str(self.kitchen.pk),
+                "rooms-0-bereich": "Küche",
+                "rooms-0-merkmal": str(self.room_feature.pk),
+                "rooms-0-wert": "Kratzer am Fensterrahmen",
+                "rooms-1-raum": "",
+                "rooms-1-bereich": "Küche",
+                "rooms-1-merkmal": str(self.room_feature.pk),
+                "rooms-1-wert": "Weiterer Kratzer am Fensterrahmen",
+            }
+        )
+
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("merkmal", response.context["room_formset"].forms[1].errors)
         self.assertFalse(Protokoll.objects.exists())
 
     def test_create_skips_rooms_and_keys_marked_for_removal(self) -> None:
@@ -813,6 +852,32 @@ class HandoverProtocolViewsTests(TestCase):
         )
         self.assertContains(response, "Anzahl")
         self.assertContains(response, "3")
+
+    def test_room_detail_rejects_a_duplicate_checkpoint(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_room_detail",
+                kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+            ),
+            {
+                "bereich": "Küche",
+                "merkmal": str(checklist_item.merkmal_id),
+                "wert": "Weiterer Kratzer am Fensterrahmen",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("merkmal", response.context["form"].errors)
+        self.assertEqual(room.raum_merkmale.count(), 1)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                RaumMerkmal.objects.create(
+                    raumprotokoll=room,
+                    merkmal=checklist_item.merkmal,
+                    wert={"text": "Doppelt erfasst"},
+                )
 
     def test_open_protocol_allows_removing_rooms_and_key_positions(self) -> None:
         self.client.post(
@@ -1094,7 +1159,7 @@ class HandoverProtocolViewsTests(TestCase):
         )
         self.assertFalse(protocol.protokoll_schluessel.exists())
 
-    def test_staff_can_attach_multiple_photos_to_an_existing_checklist_item(self) -> None:
+    def test_employee_can_attach_multiple_photos_to_an_existing_checklist_item(self) -> None:
         protocol, room, checklist_item = self.checklist_item_for_photo()
         upload_url = reverse(
             "wohnungsverwaltung:handover_protocol_checklist_item_photo_upload",
@@ -1106,7 +1171,15 @@ class HandoverProtocolViewsTests(TestCase):
         )
 
         with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
-            self.client.force_login(self.staff_user)
+            self.assertFalse(self.employee_user.is_staff)
+            self.client.force_login(self.employee_user)
+            response = self.client.get(
+                reverse(
+                    "wohnungsverwaltung:handover_protocol_room_detail",
+                    kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+                )
+            )
+            self.assertContains(response, "Fotos speichern")
             response = self.client.post(
                 upload_url,
                 {
@@ -1152,6 +1225,54 @@ class HandoverProtocolViewsTests(TestCase):
             self.assertEqual(response.status_code, 302)
             self.assertIn(reverse("login"), response["Location"])
 
+    def test_photo_view_uses_a_verified_mime_type(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            uploaded_photo = self.photo_upload(content_type="text/html")
+            photo = RaumMerkmalFoto.objects.create(
+                raum_merkmal=checklist_item,
+                datei=uploaded_photo,
+                content_type="text/html",
+                dateigroesse=uploaded_photo.size,
+            )
+            self.client.force_login(self.employee_user)
+            response = self.client.get(
+                reverse(
+                    "wohnungsverwaltung:handover_protocol_checklist_item_photo_view",
+                    kwargs={
+                        "protocol_id": protocol.pk,
+                        "room_id": room.pk,
+                        "item_id": checklist_item.pk,
+                        "photo_id": photo.pk,
+                    },
+                )
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+
+    def test_photo_upload_stores_the_verified_mime_type(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+        upload_url = reverse(
+            "wohnungsverwaltung:handover_protocol_checklist_item_photo_upload",
+            kwargs={
+                "protocol_id": protocol.pk,
+                "room_id": room.pk,
+                "item_id": checklist_item.pk,
+            },
+        )
+
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            self.client.force_login(self.employee_user)
+            response = self.client.post(
+                upload_url,
+                {"fotos": self.photo_upload(content_type="text/html")},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(checklist_item.fotos.get().content_type, "image/png")
+
     def test_photo_upload_from_overview_returns_to_the_same_checkpoint(self) -> None:
         protocol, room, checklist_item = self.checklist_item_for_photo()
         upload_url = reverse(
@@ -1164,7 +1285,7 @@ class HandoverProtocolViewsTests(TestCase):
         )
 
         with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
-            self.client.force_login(self.staff_user)
+            self.client.force_login(self.employee_user)
             response = self.client.post(
                 upload_url,
                 {"fotos": self.photo_upload(), "return_to": "overview"},
@@ -1231,7 +1352,7 @@ class HandoverProtocolViewsTests(TestCase):
 
     def test_staff_can_remove_one_photo_without_affecting_other_photos(self) -> None:
         protocol, room, checklist_item = self.checklist_item_for_photo()
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.employee_user)
         with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
             first_upload = self.photo_upload("erstes.png")
             first_photo = RaumMerkmalFoto.objects.create(
@@ -1317,7 +1438,7 @@ class HandoverProtocolViewsTests(TestCase):
             self.assertEqual(response.status_code, 302)
             move_out = Protokoll.objects.exclude(pk=move_in.pk).get()
 
-            self.client.force_login(self.staff_user)
+            self.client.force_login(self.employee_user)
             response = self.client.get(
                 reverse(
                     "wohnungsverwaltung:handover_protocol_detail",
@@ -1382,7 +1503,7 @@ class HandoverProtocolViewsTests(TestCase):
         self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), move_out_data)
         move_out = Protokoll.objects.exclude(pk=move_in.pk).get()
 
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.employee_user)
         response = self.client.get(
             reverse("wohnungsverwaltung:handover_protocol_detail", args=[move_out.pk])
         )
