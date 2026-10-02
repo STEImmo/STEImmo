@@ -26,6 +26,7 @@
                 {% for wohnung in wohnungen %}
                     <article>
                         <div class="uk-card uk-card-default uk-card-body">
+                            {% include "wohnungsverwaltung/_apartment_image_placeholder.html" with wohnung=wohnung %}
                             <div class="uk-flex uk-flex-between uk-flex-middle">
                                 <h3 class="uk-card-title">Wohnung {{ wohnung.wohnungsnummer }}</h3>
                                 <span class="uk-label uk-label-success">Verfügbar</span>
@@ -42,6 +43,9 @@
                                 <dt>Barrierefrei</dt>
                                 <dd>{% if wohnung.barrierefrei %}Ja{% else %}Nein{% endif %}</dd>
                             </dl>
+                            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' wohnung.pk %}">
+                                Details ansehen
+                            </a>
                         </div>
                     </article>
                 {% endfor %}

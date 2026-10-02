@@ -73,7 +73,7 @@ def apartment_search(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(["GET"])
 
     form = ApartmentSearchForm(request.GET)
-    wohnungen = Wohnung.objects.filter(status=WohnungStatus.FREE)
+    wohnungen = Wohnung.objects.available()
     if form.is_valid():
         filter_fields = {
             "groesse_min": "groesse_qm__gte",
@@ -98,6 +98,18 @@ def apartment_search(request: HttpRequest) -> HttpResponse:
         request,
         "wohnungsverwaltung/apartment_search.html",
         {"form": form, "wohnungen": wohnungen.order_by("etage", "wohnungsnummer")},
+    )
+
+
+def apartment_detail_placeholder(request: HttpRequest, unit_id: UUID) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    wohnung = get_object_or_404(Wohnung, pk=unit_id)
+    return render(
+        request,
+        "wohnungsverwaltung/apartment_detail_placeholder.html",
+        {"wohnung": wohnung},
     )
 
 

@@ -57,6 +57,33 @@ class ApartmentSearchViewTests(TestCase):
         self.assertNotContains(response, taken_unit.wohnungsnummer)
         self.assertNotContains(response, blocked_unit.wohnungsnummer)
 
+    def test_search_result_links_to_apartment_detail_placeholder(self) -> None:
+        unit = self.create_unit("1.01")
+
+        response = self.client.get(reverse("wohnungsverwaltung_public:apartment_search"))
+
+        self.assertContains(
+            response,
+            reverse(
+                "wohnungsverwaltung_public:apartment_detail_placeholder",
+                args=[unit.pk],
+            ),
+        )
+
+    def test_apartment_detail_placeholder_says_details_will_follow(self) -> None:
+        unit = self.create_unit("1.01")
+
+        response = self.client.get(
+            reverse(
+                "wohnungsverwaltung_public:apartment_detail_placeholder",
+                args=[unit.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, unit.wohnungsnummer)
+        self.assertContains(response, "Wohnungsdetails folgen")
+
     def test_search_filters_available_units_by_apartment_attributes(self) -> None:
         matching_unit = self.create_unit("1.01")
         self.create_unit("1.02", groesse_qm=Decimal("70.00"))
