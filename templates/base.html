@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}STEImmo{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'vendor/uikit/uikit.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=3">
 </head>
 <body>
     <nav class="uk-navbar-container" uk-navbar>
@@ -56,6 +56,59 @@
 
     <script src="{% static 'vendor/uikit/uikit.min.js' %}"></script>
     <script src="{% static 'vendor/uikit/uikit-icons.min.js' %}"></script>
+    <dialog id="handover-photo-modal" class="handover-photo-modal" aria-label="Foto vergrößert anzeigen">
+        <div class="uk-card uk-card-default uk-card-body handover-photo-modal-dialog">
+            <button class="uk-icon-button handover-photo-modal-close" type="button" uk-close aria-label="Foto schließen" data-handover-photo-close></button>
+            <div class="uk-padding-small">
+                <img id="handover-photo-modal-image" class="handover-photo-modal-image" alt="">
+                <p id="handover-photo-modal-caption" class="uk-text-meta uk-text-center uk-margin-small-top uk-margin-remove-bottom"></p>
+            </div>
+        </div>
+    </dialog>
+    <script>
+        (() => {
+            const photoModal = document.getElementById("handover-photo-modal");
+            const photoModalImage = document.getElementById("handover-photo-modal-image");
+            const photoModalCaption = document.getElementById("handover-photo-modal-caption");
+
+            const closePhotoModal = () => {
+                if (photoModal?.open) {
+                    photoModal.close();
+                }
+            };
+
+            document.addEventListener("click", (event) => {
+                const photoLink = event.target.closest("[data-handover-photo]");
+                if (!photoLink || !photoModal || !photoModalImage || !photoModalCaption) {
+                    return;
+                }
+
+                if (typeof photoModal.showModal !== "function") {
+                    return;
+                }
+
+                event.preventDefault();
+                const thumbnail = photoLink.querySelector("img");
+                const caption = photoLink.dataset.caption || thumbnail?.alt || "Foto";
+                photoModalImage.src = photoLink.href;
+                photoModalImage.alt = caption;
+                photoModalCaption.textContent = caption;
+                if (!photoModal.open) {
+                    photoModal.showModal();
+                }
+            });
+
+            photoModal?.querySelector("[data-handover-photo-close]")?.addEventListener(
+                "click",
+                closePhotoModal,
+            );
+            photoModal?.addEventListener("click", (event) => {
+                if (event.target === photoModal) {
+                    closePhotoModal();
+                }
+            });
+        })();
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

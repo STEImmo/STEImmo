@@ -1,0 +1,81 @@
+<section class="uk-card uk-card-default uk-card-body uk-margin-top" aria-label="Einzugsprotokoll zum Vergleich">
+    <div class="uk-flex uk-flex-between uk-flex-top uk-flex-wrap uk-grid-small" uk-grid>
+        <div class="uk-width-expand">
+            <h2 class="uk-heading-divider uk-margin-remove">Einzugsprotokoll zum Vergleich</h2>
+            <p class="uk-text-meta uk-margin-small-top">
+                Bestätigt am {{ reference.bestaetigt_am|date:"d.m.Y H:i" }}; die Daten dienen als Referenz und werden nicht automatisch in das Auszugsprotokoll übernommen.
+            </p>
+        </div>
+        {% if not form_reference %}
+            <div class="uk-width-auto">
+                <a class="uk-button uk-button-default uk-button-small" href="{% url 'wohnungsverwaltung:handover_protocol_detail' reference.pk %}">Einzugsprotokoll öffnen</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <h3 class="uk-heading-bullet uk-margin-top">Daten beim Einzug</h3>
+    <dl class="uk-description-list uk-description-list-divider">
+        <dt>Datum und Uhrzeit</dt>
+        <dd>{{ reference.uebergabe_zeitpunkt|date:"d.m.Y H:i" }}</dd>
+        <dt>Vertretung des Vermieters</dt>
+        <dd>{{ reference.vermieter_name }}</dd>
+        <dt>Beteiligte Person</dt>
+        <dd>{{ reference.person.vorname }} {{ reference.person.nachname }}</dd>
+        <dt>Zustand bei Übergabe</dt>
+        <dd>{{ reference_handover_status_label }}</dd>
+        <dt>Abnahmestatus</dt>
+        <dd>{{ reference_acceptance_status_label }}</dd>
+    </dl>
+
+    <h3 class="uk-heading-bullet uk-margin-top">Zählerstände beim Einzug</h3>
+    <div class="uk-overflow-auto">
+        <table class="uk-table uk-table-divider uk-table-small">
+            <thead><tr><th>Zähler</th><th>Zählernummer</th><th>Zählerstand</th></tr></thead>
+            <tbody>
+                <tr><td>Kaltwasser</td><td>{{ reference.zaehlernummer_wasser_kalt }}</td><td>{{ reference.zaehlerstand_wasser_kalt }}</td></tr>
+                <tr><td>Warmwasser</td><td>{{ reference.zaehlernummer_wasser_warm }}</td><td>{{ reference.zaehlerstand_wasser_warm }}</td></tr>
+                <tr><td>Heizung</td><td>{{ reference.zaehlernummer_heizung }}</td><td>{{ reference.zaehlerstand_heizung }}</td></tr>
+                <tr><td>Strom</td><td>{{ reference.zaehlernummer_strom }}</td><td>{{ reference.zaehlerstand_strom }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3 class="uk-heading-bullet uk-margin-top">Räume, Prüfpunkte und Fotos beim Einzug</h3>
+    {% for source_room in reference.raeume.all %}
+        <section class="uk-card uk-card-muted uk-card-body uk-margin-small-top">
+            <h4 class="uk-card-title uk-margin-remove-top">{{ source_room.name }}</h4>
+            {% if source_room.raum_merkmale.all %}
+                <ul class="uk-list uk-list-divider uk-margin-small-top">
+                    {% for source_item in source_room.raum_merkmale.all %}
+                        <li>
+                            <strong>{{ source_item.merkmal.bereich }}: {{ source_item.merkmal.bezeichnung }}</strong><br>
+                            {{ source_item.wert.text }}
+                            {% if source_item.wert.angaben %}
+                                <div class="uk-text-meta uk-text-small uk-margin-small-top">
+                                    {% for label, value in source_item.wert.angaben.items %}
+                                        <span>{{ label }}: {{ value }}</span>{% if not forloop.last %} · {% endif %}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            {% if source_item.fotos.all %}
+                                <div class="uk-child-width-1-3@m uk-grid-small handover-photo-grid uk-margin-small-top" uk-grid>
+                                    {% for photo in source_item.fotos.all %}
+                                        <div>
+                                            <a href="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_photo_view' reference.pk source_room.pk source_item.pk photo.pk %}" data-handover-photo data-caption="Foto beim Einzug zu {{ source_item.merkmal.bezeichnung }}">
+                                                <img class="uk-border-rounded handover-photo-thumbnail" src="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_photo_view' reference.pk source_room.pk source_item.pk photo.pk %}" alt="Foto beim Einzug zu {{ source_item.merkmal.bezeichnung }}" loading="lazy">
+                                            </a>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="uk-text-meta uk-margin-small-top">Keine Prüfpunkte dokumentiert.</p>
+            {% endif %}
+        </section>
+    {% empty %}
+        <p class="uk-text-meta">Im Einzugsprotokoll sind keine Räume dokumentiert.</p>
+    {% endfor %}
+</section>

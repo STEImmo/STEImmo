@@ -1,0 +1,42 @@
+{% if can_manage_handover_photos and einzugspruefpunkte %}
+    <div class="uk-child-width-1-2@m uk-grid-small handover-comparison-grid uk-margin-small-top" uk-grid>
+        <div>
+            <section class="uk-card uk-card-muted uk-card-body uk-margin-remove-top" aria-label="Weitere Prüfpunkte beim Einzug">
+                <h4 class="uk-heading-bullet uk-margin-remove-bottom">Einzug (alt): weitere Prüfpunkte in diesem Raum</h4>
+                <p class="uk-text-meta uk-margin-small-top">Diese Einzugsprüfpunkte haben im Auszug noch keinen gleichnamigen Prüfpunkt.</p>
+                <ul class="uk-list uk-list-divider uk-margin-small-top">
+                    {% for source_item in einzugspruefpunkte %}
+                        <li>
+                            <strong>{{ source_item.merkmal.bereich }}: {{ source_item.merkmal.bezeichnung }}</strong><br>
+                            {{ source_item.wert.text }}
+                            {% if source_item.wert.angaben %}
+                                <div class="uk-text-meta uk-text-small uk-margin-small-top">
+                                    {% for label, value in source_item.wert.angaben.items %}
+                                        <span>{{ label }}: {{ value }}</span>{% if not forloop.last %} · {% endif %}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            {% if source_item.fotos.all %}
+                                <div class="uk-child-width-1-3@m uk-grid-small handover-photo-grid uk-margin-small-top" uk-grid>
+                                    {% for photo in source_item.fotos.all %}
+                                        <div>
+                                            <a href="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_photo_view' einzugsprotokoll.pk photo.raum_merkmal.raumprotokoll.pk source_item.pk photo.pk %}" data-handover-photo data-caption="Foto beim Einzug zu {{ source_item.merkmal.bezeichnung }}">
+                                                <img class="uk-border-rounded handover-photo-thumbnail" src="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_photo_view' einzugsprotokoll.pk photo.raum_merkmal.raumprotokoll.pk source_item.pk photo.pk %}" alt="Foto beim Einzug zu {{ source_item.merkmal.bezeichnung }}" loading="lazy">
+                                            </a>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </section>
+        </div>
+        <div>
+            <section class="uk-card uk-card-default uk-card-body uk-margin-remove-top" aria-label="Fehlende passende Prüfpunkte beim Auszug">
+                <h4 class="uk-heading-bullet uk-margin-remove-bottom">Auszug (neu)</h4>
+                <p class="uk-text-meta uk-margin-small-top uk-margin-remove-bottom">Für diese Einzugsprüfpunkte wurde beim Auszug noch kein gleichnamiger Prüfpunkt erfasst.</p>
+            </section>
+        </div>
+    </div>
+{% endif %}

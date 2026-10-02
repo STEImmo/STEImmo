@@ -1,3 +1,80 @@
+html {
+    overflow-y: scroll;
+}
+
 body {
     min-height: 100vh;
+}
+
+.handover-photo-thumbnail {
+    display: block;
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+}
+
+.handover-photo-modal {
+    box-sizing: border-box;
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    max-height: none;
+    padding: 16px;
+    border: 0;
+    background: transparent;
+}
+
+.handover-photo-modal::backdrop {
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.handover-photo-modal-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: fit-content;
+    max-width: min(95vw, 1200px);
+    margin: auto;
+}
+
+.handover-photo-modal-close {
+    position: absolute;
+    z-index: 1;
+    top: 8px;
+    right: 8px;
+}
+
+.handover-photo-modal-image {
+    display: block;
+    max-width: 100%;
+    max-height: calc(100vh - 100px);
+    width: auto;
+    margin: 0 auto;
+}
+
+@media (max-width: 639px) {
+    .handover-page-header,
+    .handover-section-header,
+    .handover-checklist-item {
+        display: block;
+        margin-left: 0;
+    }
+
+    .handover-page-header > *,
+    .handover-section-header > *,
+    .handover-checklist-item > * {
+        box-sizing: border-box;
+        width: 100% !important;
+        margin-left: 0 !important;
+    }
+
+    .handover-page-header > * + *,
+    .handover-section-header > * + *,
+    .handover-checklist-item > * + * {
+        margin-top: 10px;
+    }
+
+    .handover-page-header .uk-heading-medium,
+    .handover-section-header .uk-heading-divider {
+        overflow-wrap: anywhere;
+    }
 }

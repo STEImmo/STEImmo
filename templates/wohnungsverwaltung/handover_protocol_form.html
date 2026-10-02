@@ -9,7 +9,7 @@
         <h1 class="uk-heading-medium">{{ page_title }}</h1>
         <p class="uk-text-lead">Wählen Sie zuerst die Wohnung. Anschließend stehen nur die dieser Wohnung direkt zugeordneten Personen zur Auswahl.</p>
 
-        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top" id="handover-protocol-form" data-draft-scope="{{ draft_scope }}" data-draft-save-url="{% url 'wohnungsverwaltung:handover_protocol_draft_save' %}" data-draft-delete-url="{{ server_draft_delete_url }}">
+        <form method="post" enctype="multipart/form-data" class="uk-card uk-card-default uk-card-body uk-margin-top" id="handover-protocol-form" data-draft-scope="{{ draft_scope }}" data-draft-save-url="{% url 'wohnungsverwaltung:handover_protocol_draft_save' %}" data-draft-delete-url="{{ server_draft_delete_url }}">
             {% csrf_token %}
             <div class="uk-alert-warning" hidden data-protocol-draft-notice>
                 <p>Ein Entwurf vom <span data-protocol-draft-time></span> ist verfügbar.</p>
@@ -68,6 +68,12 @@
             } else {
                 url.searchParams.delete("wohnung");
             }
+            const personSelect = document.getElementById("id_person");
+            if (personSelect?.value) {
+                url.searchParams.set("person", personSelect.value);
+            } else {
+                url.searchParams.delete("person");
+            }
             const response = await fetch(url);
             if (!response.ok) {
                 return false;
@@ -75,10 +81,11 @@
             const updatedPage = new DOMParser().parseFromString(await response.text(), "text/html");
             [
                 "id_person",
-                "meter-number-display",
+                "meter-reading-section",
                 "key-formset-management",
                 "key-formset",
                 "room-formset-section",
+                "move-in-reference",
             ].forEach((id) => {
                 const currentElement = document.getElementById(id);
                 const updatedElement = updatedPage.getElementById(id);
@@ -93,9 +100,21 @@
             apartmentSelect.addEventListener("change", async () => {
                 saveDraft(true);
                 await updateApartmentDependentFields();
+                updateTypeSpecificSections();
+                updateMeterDifferences();
                 saveDraft(true);
             });
         }
+        document.addEventListener("change", async (event) => {
+            if (event.target.id !== "id_person") {
+                return;
+            }
+            saveDraft(true);
+            await updateApartmentDependentFields();
+            updateTypeSpecificSections();
+            updateMeterDifferences();
+            saveDraft(true);
+        });
 
         const protocolType = document.getElementById("id_protokoll_typ");
         const updateTypeSpecificSections = () => {
@@ -107,9 +126,47 @@
             });
         };
         if (protocolType) {
-            protocolType.addEventListener("change", updateTypeSpecificSections);
+            protocolType.addEventListener("change", () => {
+                updateTypeSpecificSections();
+                updateMeterDifferences();
+            });
             updateTypeSpecificSections();
         }
+
+        const meterNumber = (value) => {
+            const normalized = String(value || "").trim().replace(",", ".");
+            if (!normalized) {
+                return null;
+            }
+            const parsed = Number(normalized);
+            return Number.isFinite(parsed) ? parsed : null;
+        };
+        const meterDifferenceFormatter = new Intl.NumberFormat("de-DE", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+        const updateMeterDifferences = () => {
+            document.querySelectorAll("[data-meter-comparison-row]").forEach((row) => {
+                const oldReading = meterNumber(row.dataset.oldMeterReading);
+                const newReading = meterNumber(row.querySelector("[data-meter-reading]")?.value);
+                const difference = row.querySelector("[data-meter-difference]");
+                if (!difference) {
+                    return;
+                }
+                if (oldReading === null || newReading === null) {
+                    difference.textContent = "—";
+                    return;
+                }
+                const value = newReading - oldReading;
+                difference.textContent = `${value > 0 ? "+" : ""}${meterDifferenceFormatter.format(value)}`;
+            });
+        };
+        document.addEventListener("input", (event) => {
+            if (event.target.matches("[data-meter-reading]")) {
+                updateMeterDifferences();
+            }
+        });
+        updateMeterDifferences();
 
         const featureOptions = (container) => {
             const selectedOption = container?.querySelector("[data-feature-name-select]")?.selectedOptions[0];
@@ -542,6 +599,7 @@
                     await updateApartmentDependentFields();
                 }
                 restoreFields(protocolForm, draft.fields);
+                updateTypeSpecificSections();
                 restoreRooms(draft.rooms);
                 restoreKeys(draft.keys);
                 document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
