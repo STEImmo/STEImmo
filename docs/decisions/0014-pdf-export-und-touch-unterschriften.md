@@ -67,6 +67,7 @@ oder Unterschriftsdateien. PDFs werden privat und ohne Cache ausgeliefert.
 - Fehlende oder beschädigte Fotos verhindern einen unvollständigen Abschluss.
 - Stamm- und Referenzdatenänderungen verändern keine archivierten Dokumente.
 - PDF-Layouts sind versionierte Ausgaben; bestehende PDFs werden nicht neu gestaltet.
-- US-11 bleibt ein eigener Branch/PR auf Basis des Fotofeatures. Nach dessen
-  Integration ist der Branch auf den integrierten Stand zu setzen und gegebenenfalls
-  eine additive Merge-Migration für parallele Migrationszweige zu ergänzen.
+- US-11 bleibt ein eigener Branch/PR auf Basis des Fotofeatures. Die additive
+  Migration `0018_merge_photo_safety_and_pdf` verbindet dessen Sicherheitsmigration
+  mit der PDF-Migration. Nach dem Merge des Fotofeatures ist der US-11-Branch auf
+  den integrierten Stand zu setzen; der eigene PR enthält nur die US-11-Änderungen.
