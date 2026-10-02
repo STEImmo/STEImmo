@@ -100,7 +100,7 @@ Eine Roadmap-Phase gilt erst als abgeschlossen, wenn ihre Akzeptanzkriterien erf
 | Gruppe | Zugriff |
 |---|---|
 | `Bewerber` | Eigene Pre-Bewerbungen erstellen und einsehen |
-| `Mieter` | Für einen späteren Mieterbereich vorbereitet; derzeit keine eigene Seite |
+| `Mieter` | Eigene bestätigte Übergabeprotokolle ansehen und als PDF herunterladen |
 | `Mitarbeiter` | Verwaltungsbereich und Übergabeprotokolle |
 | `Benutzerverwaltung` | Mitarbeiterzugriff sowie Konten, Rollen und Seitenrechte verwalten |
 
@@ -133,6 +133,15 @@ Der lokale Bootstrap reaktiviert dieses fiktive Konto und setzt sein Passwort be
 Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD` und `DJANGO_EMAIL_USE_TLS`. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
 
 ## Lokale Entwicklung
+
+Übergabeprotokolle werden über **Protokoll prüfen und unterschreiben** abgeschlossen.
+Mitarbeiter und Mieter unterschreiben mit Finger, Stift oder Maus auf demselben
+Gerät. Fehlt die Mieterunterschrift, muss der Mitarbeiter dies begründen.
+Nach erfolgreichem Abschluss steht die dauerhaft gespeicherte PDF-Fassung bereit;
+Mieter finden ihre Downloads unter **Meine Übergabeprotokolle**. Für Altprotokolle
+gibt es einen ausdrücklich gekennzeichneten nachträglichen Export.
+Die Entscheidungen und Speicherregeln stehen in
+[ADR-0014](docs/decisions/0014-pdf-export-und-touch-unterschriften.md).
 
 Die lokale Entwicklungsumgebung läuft vollständig über Docker. Python und PostgreSQL müssen daher nicht separat auf dem Entwicklungsrechner installiert werden.
 

@@ -16,7 +16,6 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils import timezone
 from PIL import Image
 
 from .access import (
@@ -38,7 +37,6 @@ from .forms import (
     InlineRoomChecklistFormSet,
     MerkmalForm,
     MerkmalOptionFormSet,
-    ProtocolConfirmationForm,
     RaumForm,
     RoomChecklistItemForm,
     RoomChecklistPhotoUploadForm,
@@ -51,6 +49,7 @@ from .forms import (
     photo_content_type_from_format,
     verified_photo_content_type,
 )
+from .handover_lock import protocol_mutation
 from .models import (
     Bewerbung,
     BewerbungStatus,
@@ -456,7 +455,6 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
             "handover_status_label": HANDOVER_STATUS_LABELS[protocol.uebergabe_status],
             "acceptance_status_label": ACCEPTANCE_STATUS_LABELS[protocol.abnahme_status],
             "protocol_status_label": PROTOCOL_STATUS_LABELS[protocol.status],
-            "confirmation_form": ProtocolConfirmationForm(),
             "can_manage_handover_photos": can_manage_handover_photos,
             "move_in_reference": move_in_reference,
             **_move_in_reference_context(move_in_reference),
@@ -466,6 +464,7 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
     protocol = get_object_or_404(Protokoll, pk=protocol_id)
     if protocol.status != ProtokollStatus.OPEN:
@@ -539,6 +538,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_room_create(request: HttpRequest, protocol_id) -> HttpResponse:
     protocol = get_object_or_404(Protokoll, pk=protocol_id)
     if protocol.status != ProtokollStatus.OPEN:
@@ -568,6 +568,7 @@ def handover_protocol_room_create(request: HttpRequest, protocol_id) -> HttpResp
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_room_detail(request: HttpRequest, protocol_id, room_id) -> HttpResponse:
     protocol = get_object_or_404(Protokoll, pk=protocol_id)
     room = get_object_or_404(
@@ -608,6 +609,7 @@ def handover_protocol_room_detail(request: HttpRequest, protocol_id, room_id) ->
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_room_delete(request: HttpRequest, protocol_id, room_id) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -626,6 +628,7 @@ def handover_protocol_room_delete(request: HttpRequest, protocol_id, room_id) ->
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_checklist_item_delete(
     request: HttpRequest, protocol_id, room_id, item_id
 ) -> HttpResponse:
@@ -651,6 +654,7 @@ def handover_protocol_checklist_item_delete(
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_checklist_item_photo_upload(
     request: HttpRequest, protocol_id, room_id, item_id
 ) -> HttpResponse:
@@ -726,6 +730,7 @@ def handover_protocol_checklist_item_photo_view(
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_checklist_item_photo_delete(
     request: HttpRequest, protocol_id, room_id, item_id, photo_id
 ) -> HttpResponse:
@@ -899,6 +904,7 @@ def _attach_move_in_photo_references(protocol: Protokoll, rooms) -> Protokoll | 
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_key_create(request: HttpRequest, protocol_id) -> HttpResponse:
     protocol = get_object_or_404(Protokoll, pk=protocol_id)
     if protocol.status != ProtokollStatus.OPEN:
@@ -921,6 +927,7 @@ def handover_protocol_key_create(request: HttpRequest, protocol_id) -> HttpRespo
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_key_delete(request: HttpRequest, protocol_id, key_id) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -933,47 +940,6 @@ def handover_protocol_key_delete(request: HttpRequest, protocol_id, key_id) -> H
 
     key.delete()
     messages.success(request, "Die Schlüsselposition wurde aus dem Übergabeprotokoll entfernt.")
-    return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
-
-
-@employee_required
-def handover_protocol_confirm(request: HttpRequest, protocol_id) -> HttpResponse:
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
-
-    protocol = get_object_or_404(
-        Protokoll.objects.prefetch_related("raeume__raum_merkmale", "protokoll_schluessel"),
-        pk=protocol_id,
-    )
-    if protocol.status != ProtokollStatus.OPEN:
-        messages.warning(request, "Das Protokoll wurde bereits bestätigt.")
-        return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
-
-    form = ProtocolConfirmationForm(request.POST)
-    completion_errors = _protocol_completion_errors(protocol)
-    if not form.is_valid() or completion_errors:
-        for error in completion_errors:
-            messages.error(request, error)
-        if not form.is_valid():
-            messages.error(request, "Bitte bestätigen Sie die beiden Erklärungen vor Abschluss.")
-        return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
-
-    protocol.status = ProtokollStatus.SIGNED
-    protocol.bestaetigt_am = timezone.now()
-    protocol.schluessel_ueberprueft = form.cleaned_data["schluessel_ueberprueft"]
-    protocol.bestaetigung_erklaert = form.cleaned_data["bestaetigung_erklaert"]
-    protocol.save(
-        update_fields=[
-            "status",
-            "bestaetigt_am",
-            "schluessel_ueberprueft",
-            "bestaetigung_erklaert",
-            "updated_at",
-        ]
-    )
-    messages.success(
-        request, "Das Übergabeprotokoll wurde bestätigt und gegen Änderungen gesperrt."
-    )
     return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
 

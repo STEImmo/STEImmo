@@ -35,10 +35,13 @@ from .models import (
     Wohnung,
     WohnungStatus,
 )
+from .test_handover_export import signature_file
 
 
 class HandoverProtocolViewsTests(TestCase):
     def setUp(self) -> None:
+        media_root = self.enterContext(TemporaryDirectory())
+        self.enterContext(self.settings(MEDIA_ROOT=media_root))
         self.wohnung = Wohnung.objects.create(
             etage=2,
             wohnungsnummer="2.04",
@@ -954,6 +957,19 @@ class HandoverProtocolViewsTests(TestCase):
         )
         self.assertFalse(protocol.protokoll_schluessel.filter(pk=key.pk).exists())
 
+    def signing_data(self, protocol):
+        page = self.client.get(
+            reverse("wohnungsverwaltung:handover_protocol_finalize", args=[protocol.pk])
+        )
+        return {
+            "bestaetigung_erklaert": "on",
+            "schluessel_ueberprueft": "on",
+            "content_token": page.context["form"].initial["content_token"],
+            "tenant_mode": "signed",
+            "mitarbeiter": signature_file(),
+            "mieter": signature_file(),
+        }
+
     def test_confirmation_rejects_incomplete_room_protocols(self) -> None:
         self.client.post(
             reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
@@ -966,17 +982,12 @@ class HandoverProtocolViewsTests(TestCase):
                 "wohnungsverwaltung:handover_protocol_confirm",
                 kwargs={"protocol_id": protocol.pk},
             ),
-            {"bestaetigung_erklaert": "on", "schluessel_ueberprueft": "on"},
+            self.signing_data(protocol),
         )
 
         protocol.refresh_from_db()
-        self.assertRedirects(
-            response,
-            reverse(
-                "wohnungsverwaltung:handover_protocol_detail",
-                kwargs={"protocol_id": protocol.pk},
-            ),
-        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Prüfpunkt", response.json()["error"])
         self.assertEqual(protocol.status, ProtokollStatus.OPEN)
 
     def test_confirmation_signs_complete_protocol_and_locks_edits(self) -> None:
@@ -1004,17 +1015,12 @@ class HandoverProtocolViewsTests(TestCase):
                 "wohnungsverwaltung:handover_protocol_confirm",
                 kwargs={"protocol_id": protocol.pk},
             ),
-            {"bestaetigung_erklaert": "on", "schluessel_ueberprueft": "on"},
+            self.signing_data(protocol),
         )
 
         protocol.refresh_from_db()
-        self.assertRedirects(
-            response,
-            reverse(
-                "wohnungsverwaltung:handover_protocol_detail",
-                kwargs={"protocol_id": protocol.pk},
-            ),
-        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("redirect", response.json())
 
         response = self.client.post(
             reverse(
@@ -1102,16 +1108,11 @@ class HandoverProtocolViewsTests(TestCase):
                 "wohnungsverwaltung:handover_protocol_confirm",
                 kwargs={"protocol_id": protocol.pk},
             ),
-            {"bestaetigung_erklaert": "on", "schluessel_ueberprueft": "on"},
+            self.signing_data(protocol),
         )
 
-        self.assertRedirects(
-            response,
-            reverse(
-                "wohnungsverwaltung:handover_protocol_detail",
-                kwargs={"protocol_id": protocol.pk},
-            ),
-        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Schlüsselposition", response.json()["error"])
         protocol.refresh_from_db()
         self.assertEqual(protocol.status, ProtokollStatus.OPEN)
 

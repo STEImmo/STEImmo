@@ -1,0 +1,11 @@
+{% if protocol.status == "signed" %}
+    {% if protocol.dokument_pfad %}
+        <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_pdf' protocol.pk %}">PDF herunterladen</a>
+    {% else %}
+        <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_pdf_create' protocol.pk %}">
+            {% csrf_token %}
+            <p>Für dieses Altprotokoll wird der heute vorhandene Stand einmalig gesichert. Zwischenzeitliche Stammdatenänderungen sind nicht rekonstruierbar; historische Unterschriften wurden nicht erfasst. Das PDF weist darauf hin.</p>
+            <button class="uk-button uk-button-default" type="submit">PDF nachträglich erstellen</button>
+        </form>
+    {% endif %}
+{% endif %}

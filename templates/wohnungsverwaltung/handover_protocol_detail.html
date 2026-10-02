@@ -194,17 +194,11 @@
         </div>
 
         {% if protocol.status == "open" %}
-            <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_confirm' protocol.pk %}" class="uk-card uk-card-primary uk-card-body uk-light uk-margin-top">
-                {% csrf_token %}
-                <h2 class="uk-card-title">Übergabeprotokoll bestätigen</h2>
-                <p>Vor der Bestätigung prüft STEImmo alle Pflichtangaben sowie die vollständigen Raumprüfpunkte.</p>
-                <div class="uk-margin"><label>{{ confirmation_form.schluessel_ueberprueft }} {{ confirmation_form.schluessel_ueberprueft.label }}</label></div>
-                <div class="uk-margin"><label>{{ confirmation_form.bestaetigung_erklaert }} {{ confirmation_form.bestaetigung_erklaert.label }}</label></div>
-                <button class="uk-button uk-button-default" type="submit">Protokoll verbindlich bestätigen</button>
-            </form>
+            <a class="uk-button uk-button-primary uk-margin-top" href="{% url 'wohnungsverwaltung:handover_protocol_finalize' protocol.pk %}">Protokoll prüfen und unterschreiben</a>
         {% else %}
             <div class="uk-alert-success uk-margin-top" uk-alert>Dieses Protokoll wurde am {{ protocol.bestaetigt_am|date:"d.m.Y H:i" }} bestätigt und ist gegen Änderungen gesperrt.</div>
         {% endif %}
+        {% include "wohnungsverwaltung/_protocol_pdf_action.html" %}
     </div>
 </section>
 {% if draft_key_to_clear %}

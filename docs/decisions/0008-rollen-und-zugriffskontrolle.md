@@ -12,7 +12,7 @@ Django `User`, `Group` und `Permission` bilden die technische Grundlage. Die fac
 |---|---|---|---|
 | Öffentlich | keine | keine | Startseite, Gesundheitscheck, Bewerbungsvorschau, Anmeldung, Registrierung und Code-Bestätigung |
 | Bewerber | `Bewerber` | `access_applicant_area` | eigene Pre-Bewerbungen erstellen und einsehen |
-| Mieter | `Mieter` | `access_tenant_area` | vorbereitet; noch keine Seite im MVP-Stand |
+| Mieter | `Mieter` | `access_tenant_area` | eigene bestätigte Übergabeprotokolle und deren PDF-Export |
 | Mitarbeiter | `Mitarbeiter` | `access_employee_area` | Verwaltung und alle Übergabeprotokoll-Endpunkte |
 | Benutzerverwaltung | `Benutzerverwaltung` | `access_employee_area`, `manage_user_accounts` | zusätzlich Konto-, Rollen- und Rechteverwaltung |
 
@@ -43,6 +43,6 @@ Für eine neue geschützte Seite wird in dieser Reihenfolge vorgegangen:
 ## Konsequenzen
 
 - Nicht angemeldete Besucher sind ein Zugriffszustand, keine Rolle.
-- Der Mieterbereich ist bewusst nur vorbereitet; eine spätere User Story definiert seine Seiten und Datenfreigaben.
+- Der Mieterbereich zeigt eigene bestätigte Übergabeprotokolle. Die Zuordnung erfolgt über `Protokoll.person.user`; die aktuelle Wohnung allein gewährt keinen Zugriff. Gemeinsame PDF-Endpunkte verwenden `handover_reader_required` und diese Objektprüfung. Abschluss und Bearbeitung bleiben Mitarbeitern vorbehalten (ADR-0014).
 - Kontoerstellung, Registrierung und der Bootstrap-Command erzwingen die Personenverknüpfung. Verknüpfungslose Alt-Konten erhalten keinen Zugriff auf geschützte Bewerberdaten.
 - Die E-Mail-Verifikation ist auf die Selbstregistrierung beschränkt. Passwort-Reset per E-Mail und Kontolöschung gehören nicht zum MVP.

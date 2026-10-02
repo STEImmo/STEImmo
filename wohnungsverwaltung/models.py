@@ -481,6 +481,17 @@ class Protokoll(models.Model):
     bestaetigt_am = models.DateTimeField(blank=True, null=True)
     dokument_pfad = models.TextField(blank=True, default="")
     dokument_hash_sha256 = models.CharField(max_length=64, blank=True, default="")
+    export_snapshot = models.JSONField(default=dict, blank=True)
+    gesichert_am = models.DateTimeField(null=True, blank=True)
+    nachtraeglich_gesichert = models.BooleanField(default=False)
+    mieter_unterschrift_fehlt_grund = models.CharField(max_length=1000, blank=True, default="")
+    abgeschlossen_von = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="abgeschlossene_protokolle",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -502,6 +513,29 @@ class Protokoll(models.Model):
             models.CheckConstraint(
                 condition=models.Q(zaehlerstand_strom__gte=0),
                 name="protokoll_strom_nicht_negativ",
+            ),
+        ]
+
+
+class ProtokollUnterschrift(models.Model):
+    protokoll = models.ForeignKey(
+        Protokoll, on_delete=models.CASCADE, related_name="unterschriften"
+    )
+    rolle = models.CharField(
+        max_length=20, choices=[("mitarbeiter", "Mitarbeiter"), ("mieter", "Mieter")]
+    )
+    name = models.CharField(max_length=511)
+    # Storage-relative private name; no public ImageField URL is exposed.
+    datei = models.TextField()
+    hash_sha256 = models.CharField(max_length=64)
+    erfasst_am = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("protokoll", "rolle"), name="unterschrift_pro_rolle"),
+            models.CheckConstraint(
+                condition=models.Q(rolle__in=["mitarbeiter", "mieter"]),
+                name="unterschrift_gueltige_rolle",
             ),
         ]
 

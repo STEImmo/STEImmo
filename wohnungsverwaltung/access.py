@@ -1,11 +1,13 @@
 """Fachliche Rollen und wiederverwendbarer Zugriffsschutz für STEImmo."""
 
 from collections.abc import Callable
+from functools import wraps
 from typing import ParamSpec, TypeVar
 
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
 
 APP_LABEL = "immobilien"
@@ -58,6 +60,21 @@ def _access_required(permission: str) -> Callable[[Callable[P, R]], Callable[P, 
 
 applicant_required = _access_required(APPLICANT_ACCESS_PERMISSION)
 tenant_required = _access_required(TENANT_ACCESS_PERMISSION)
+
+
+def handover_reader_required(view):
+    @login_required
+    @wraps(view)
+    def wrapped(request, *args, **kwargs):
+        if not any(
+            request.user.has_perm(p) for p in (EMPLOYEE_ACCESS_PERMISSION, TENANT_ACCESS_PERMISSION)
+        ):
+            raise PermissionDenied
+        return view(request, *args, **kwargs)
+
+    return wrapped
+
+
 employee_required = _access_required(EMPLOYEE_ACCESS_PERMISSION)
 user_management_required = _access_required(USER_MANAGEMENT_PERMISSION)
 
