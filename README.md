@@ -85,13 +85,52 @@ flowchart TD
 | 1. Foundation | Django-Projekt, Docker Compose, PostgreSQL, Umgebungsvariablen, Ruff, CI-Grundlage | Container startet, Datenbankverbindung und Basischecks funktionieren | ✅ |
 | 2. Webapp-Basis | Settings, URL-Struktur, Static/Media, Base-Templates, lokale UIkit-Assets | Eine Basis-Seite läuft mit einheitlichem UI | ✅ |
 | 3. Domänenmodell | Eine Immobilie, 25 Einheiten, Anfragen, Bewerbungen und Dokumente als Django-Modelle inklusive Migrationen | Modelle, Migrationen und Testdaten funktionieren | ⬜ |
-| 4. Authentifizierung | Django-User, Gruppen, Rollen und Berechtigungen für Studierende und Immobiliengesellschaft | Zugriffsschutz ist umgesetzt und getestet | ⬜ |
+| 4. Authentifizierung | Django-User, Gruppen, Rollen und Berechtigungen für Studierende und Immobiliengesellschaft | Zugriffsschutz ist umgesetzt und getestet | 🔄 |
 | 5. Verwaltungsbereich | Verwaltungsansichten und Formulare für Einheiten, Anfragen, Bewerbungen und Dokumente | Gesellschaft kann den Bestand und Vorgänge verwalten | ⬜ |
 | 6. Studentenbereich | ORM-Suche, Filter, Pagination und Detailansichten | Studierende können Einheiten zuverlässig finden und ansehen | ⬜ |
 | 7. Anfrage und Bewerbung | Formulare, Statusverwaltung, Datepicker, Upload-Validierung und Dateispeicherung | Kernabläufe inklusive Fehlerfällen sind getestet | ⬜ |
 | 8. Qualität und Betrieb | Tests, Django-Checks, Ruff, Produktionssettings, Gunicorn, Static/Media und Deployment | CI ist erfolgreich und Deployment auf dem Uni-Server funktioniert | ⬜ |
 
 Eine Roadmap-Phase gilt erst als abgeschlossen, wenn ihre Akzeptanzkriterien erfüllt, getestet und im zugehörigen GitHub-Issue dokumentiert sind.
+
+## Benutzerkonten und Zugriff
+
+Öffentliche Seiten sind ohne Konto erreichbar. Angemeldete Konten erhalten Zugriffe über feste Gruppen; zusätzliche Seitenrechte können in der Benutzerverwaltung gezielt pro Konto vergeben werden.
+
+| Gruppe | Zugriff |
+|---|---|
+| `Bewerber` | Eigene Pre-Bewerbungen erstellen und einsehen |
+| `Mieter` | Für einen späteren Mieterbereich vorbereitet; derzeit keine eigene Seite |
+| `Mitarbeiter` | Verwaltungsbereich und Übergabeprotokolle |
+| `Benutzerverwaltung` | Mitarbeiterzugriff sowie Konten, Rollen und Seitenrechte verwalten |
+
+Konten mit Mitarbeiterzugriff oder Benutzerverwaltung – auch bei direkt zugewiesenem Einzelrecht – benötigen bei jeder Anmeldung zusätzlich zum Passwort einen sechsstelligen E-Mail-Einmalcode. Der Code ist 15 Minuten gültig, wird nur gehasht gespeichert und erlaubt höchstens fünf Versuche. Es gibt bewusst keine dauerhafte Browserfreigabe. In der lokalen Entwicklungsumgebung erscheint der Code im automatisch gestarteten Mailpit-Postfach unter [http://localhost:8025](http://localhost:8025); Produktion verwendet den konfigurierten SMTP-Backend.
+
+Die reguläre Anmeldung unter `/accounts/login/` sperrt nach drei falschen Passwörtern das betroffene Konto für 15 Minuten. Zusätzlich werden zehn fehlgeschlagene Anmeldungen derselben IP-Adresse innerhalb von 15 Minuten begrenzt. Die Anwendung speichert dafür nie die IP-Adresse selbst, sondern nur einen mit dem Servergeheimnis abgeleiteten Fingerprint. Falsches Passwort, unbekanntes Konto und Sperren liefern dieselbe neutrale Meldung. Django-Admin ist bewusst nicht Teil dieser Anmeldestrecke. Hinter einem Reverse-Proxy darf `DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS` ausschließlich mit dessen vertrauenswürdigen IP-Adressen gesetzt werden; nur dann wird dessen `X-Forwarded-For` berücksichtigt.
+
+Nach dem Ausführen der Migrationen wird der erste Benutzerverwalter einmalig angelegt:
+
+~~~bash
+docker compose exec web python manage.py create_initial_user_manager \
+  --email verwaltung@example.test \
+  --password 'ein-sicheres-passwort' \
+  --first-name Verwaltung \
+  --last-name Beispiel
+~~~
+
+Danach werden Konten im UIkit-Bereich **Verwaltung → Benutzer** erstellt, mit einer bestehenden konto-losen Person verknüpft oder zusammen mit einer neuen Person erfasst. Konten werden deaktiviert statt gelöscht. Die technische Rechte-Matrix und die Regel zum Ergänzen weiterer geschützter Seiten stehen in [ADR-0008](docs/decisions/0008-rollen-und-zugriffskontrolle.md).
+
+Selbstregistrierte Bewerberkonten bleiben bis zur Eingabe eines per E-Mail gesendeten, sechsstelligen Bestätigungscodes deaktiviert. Der Code ist 15 Minuten gültig; nach fünf falschen Versuchen ist ein neuer Code anzufordern. Die lokale Entwicklungsumgebung startet dafür automatisch Mailpit. Das lokale Testpostfach ist unter [http://localhost:8025](http://localhost:8025) erreichbar und bewahrt höchstens 100 E-Mails bis zum Stoppen des Containers auf. Es werden keine E-Mails an externe Empfänger gesendet.
+
+Mit dem Development-Override wird beim Containerstart außerdem ein ausschließlich lokales Mitarbeiterkonto bereitgestellt. Es existiert nicht in der Produktions-Compose-Konfiguration und der zugrunde liegende Command verweigert die Ausführung bei `DEBUG=False`.
+
+| E-Mail-Adresse | Passwort | Zugriff |
+|---|---|---|
+| `mitarbeiter@example.test` | `KometFjord!4826` | Mitarbeiterbereich und Übergaben |
+
+Der lokale Bootstrap reaktiviert dieses fiktive Konto und setzt sein Passwort bei jedem Entwicklungsstart auf den dokumentierten Wert zurück. Die Zugangsdaten sind absichtlich öffentlich und dürfen niemals außerhalb der lokalen Entwicklungsumgebung verwendet werden.
+
+Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD` und `DJANGO_EMAIL_USE_TLS`. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
 
 ## Lokale Entwicklung
 

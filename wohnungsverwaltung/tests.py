@@ -4,12 +4,14 @@ from io import StringIO
 
 from django import forms
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
 
+from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
 from .forms import BewerbungForm, InlineRoomChecklistFormSet, RoomChecklistItemForm
 from .models import (
     AbnahmeStatus,
@@ -128,6 +130,15 @@ class HandoverProtocolViewsTests(TestCase):
             email="emil.example@example.test",
             is_employee=True,
         )
+        self.employee_user = get_user_model().objects.create_user(
+            username="emil.example@example.test",
+            email="emil.example@example.test",
+            password="FjordTanne!4826",
+        )
+        self.employee.user = self.employee_user
+        self.employee.save()
+        self.employee_user.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
+        self.client.force_login(self.employee_user)
         self.room_feature = Merkmal.objects.create(
             bereich="Küche",
             bezeichnung="Fenster",
@@ -354,6 +365,7 @@ class HandoverProtocolViewsTests(TestCase):
         )
         draft = ProtokollEntwurf.objects.get()
         other_browser = Client()
+        other_browser.force_login(self.employee_user)
 
         response = other_browser.get(reverse("wohnungsverwaltung:handover_protocol_list"))
 
@@ -1281,6 +1293,7 @@ class PreApplicationAuthenticationTests(TestCase):
             nachname="Bewerber",
             email="testbewerber@example.test",
         )
+        self.user.groups.add(Group.objects.get(name=ROLE_APPLICANT))
         self.free_unit = Wohnung.objects.create(
             etage=4,
             wohnungsnummer="4.01",
@@ -1325,6 +1338,19 @@ class PreApplicationAuthenticationTests(TestCase):
         application = Bewerbung.objects.get()
         self.assertEqual(application.person, self.applicant)
         self.assertEqual(application.wohnung, self.free_unit)
+
+    def test_linked_user_cannot_submit_for_a_unit_that_became_unavailable(self) -> None:
+        self.assertTrue(self.client.login(username=self.user.username, password="FjordTanne!4826"))
+        self.free_unit.status = WohnungStatus.BLOCKED
+        self.free_unit.save(update_fields=["status"])
+
+        response = self.client.post(
+            reverse("wohnungsverwaltung:pre_application_create"), self.valid_form_data()
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("wohnung", response.context["form"].errors)
+        self.assertFalse(Bewerbung.objects.exists())
 
     def test_linked_user_sees_their_submitted_application(self) -> None:
         Bewerbung.objects.create(
@@ -1373,6 +1399,7 @@ class CreateTestApplicantCommandTests(TestCase):
 
         self.assertTrue(user.check_password("FjordTanne!4826"))
         self.assertEqual(person.user, user)
+        self.assertTrue(user.groups.filter(name=ROLE_APPLICANT).exists())
         self.assertFalse(person.is_employee)
         self.assertIsNone(person.wohnung)
 

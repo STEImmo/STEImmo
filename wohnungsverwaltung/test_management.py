@@ -1,9 +1,11 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 
+from .access import ROLE_EMPLOYEE
 from .forms import MerkmalForm
 from .models import (
     Merkmal,
@@ -19,16 +21,24 @@ from .models import (
     StellplatzZuordnung,
     UebergabeStatus,
     Wohnung,
+    WohnungStatus,
 )
 
 
 class ManagementViewTests(TestCase):
     def setUp(self) -> None:
-        self.staff_user = get_user_model().objects.create_user(
+        self.employee_user = get_user_model().objects.create_user(
             username="mitarbeiter",
             password="sicheres-passwort",
-            is_staff=True,
         )
+        Person.objects.create(
+            user=self.employee_user,
+            vorname="Mitarbeiter",
+            nachname="Test",
+            email="mitarbeiter@example.test",
+            is_employee=True,
+        )
+        self.employee_user.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
 
     def wohnung_payload(self) -> dict[str, str]:
         return {
@@ -41,6 +51,7 @@ class ManagementViewTests(TestCase):
             "warmmiete": "790.00",
             "kaution": "1300.00",
             "barrierefrei": "on",
+            "status": WohnungStatus.FREE,
             "zaehlernummer_wasser_kalt": "KW-1",
             "zaehlernummer_wasser_warm": "WW-2",
             "zaehlernummer_heizung": "HZ-3",
@@ -51,15 +62,50 @@ class ManagementViewTests(TestCase):
             "schluessel-MAX_NUM_FORMS": "1000",
         }
 
-    def test_management_requires_staff_user(self) -> None:
+    def test_management_requires_employee_permission(self) -> None:
         url = reverse("verwaltung:wohnung_list")
 
         response = self.client.get(url)
 
-        self.assertRedirects(response, f"/admin/login/?next={url}")
+        self.assertRedirects(response, f"{reverse('login')}?next={url}")
+
+    def test_anonymous_user_cannot_change_apartment_availability(self) -> None:
+        wohnung = Wohnung.objects.create(
+            gebaeudenummer="B",
+            wohnungsnummer="17",
+            status=WohnungStatus.BLOCKED,
+        )
+        url = reverse("verwaltung:wohnung_edit", args=[wohnung.pk])
+
+        response = self.client.post(url, {"status": WohnungStatus.FREE})
+
+        self.assertRedirects(response, f"{reverse('login')}?next={url}")
+        wohnung.refresh_from_db()
+        self.assertEqual(wohnung.status, WohnungStatus.BLOCKED)
+
+    def test_non_employee_user_cannot_change_apartment_availability(self) -> None:
+        user = get_user_model().objects.create_user(
+            username="bewerber",
+            password="sicheres-passwort",
+        )
+        self.client.force_login(user)
+        wohnung = Wohnung.objects.create(
+            gebaeudenummer="B",
+            wohnungsnummer="17",
+            status=WohnungStatus.BLOCKED,
+        )
+
+        response = self.client.post(
+            reverse("verwaltung:wohnung_edit", args=[wohnung.pk]),
+            {"status": WohnungStatus.FREE},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        wohnung.refresh_from_db()
+        self.assertEqual(wohnung.status, WohnungStatus.BLOCKED)
 
     def test_apartment_can_be_created_with_all_master_data(self) -> None:
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.employee_user)
 
         response = self.client.post(reverse("verwaltung:wohnung_create"), self.wohnung_payload())
 
@@ -68,8 +114,60 @@ class ManagementViewTests(TestCase):
         self.assertTrue(wohnung.barrierefrei)
         self.assertEqual(wohnung.zaehlernummer_strom, "ST-4")
 
+    def test_employee_can_change_apartment_availability(self) -> None:
+        wohnung = Wohnung.objects.create(
+            gebaeudenummer="B",
+            wohnungsnummer="17",
+            status=WohnungStatus.BLOCKED,
+        )
+        self.client.force_login(self.employee_user)
+
+        response = self.client.post(
+            reverse("verwaltung:wohnung_edit", args=[wohnung.pk]),
+            self.wohnung_payload(),
+        )
+
+        self.assertRedirects(response, reverse("verwaltung:wohnung_edit", args=[wohnung.pk]))
+        wohnung.refresh_from_db()
+        self.assertEqual(wohnung.status, WohnungStatus.FREE)
+
+    def test_blocked_apartment_is_removed_from_pre_application_choices(self) -> None:
+        wohnung = Wohnung.objects.create(
+            gebaeudenummer="B",
+            wohnungsnummer="17",
+            status=WohnungStatus.FREE,
+        )
+        self.client.force_login(self.employee_user)
+
+        response = self.client.post(
+            reverse("verwaltung:wohnung_edit", args=[wohnung.pk]),
+            self.wohnung_payload() | {"status": WohnungStatus.BLOCKED},
+        )
+        self.assertRedirects(response, reverse("verwaltung:wohnung_edit", args=[wohnung.pk]))
+
+        response = self.client.get(reverse("wohnungsverwaltung:pre_application_preview"))
+
+        self.assertEqual(response.status_code, 200)
+        selectable_units = response.context["form"].fields["wohnung"].queryset
+        self.assertFalse(selectable_units.filter(pk=wohnung.pk).exists())
+
+    def test_apartment_edit_shows_availability_choices(self) -> None:
+        wohnung = Wohnung.objects.create(
+            gebaeudenummer="B",
+            wohnungsnummer="17",
+            status=WohnungStatus.BLOCKED,
+        )
+        self.client.force_login(self.employee_user)
+
+        response = self.client.get(reverse("verwaltung:wohnung_edit", args=[wohnung.pk]))
+
+        self.assertContains(response, "Verfügbarkeitsstatus")
+        self.assertContains(response, "Verfügbar")
+        self.assertContains(response, "Vermietet")
+        self.assertContains(response, "Gesperrt")
+
     def test_key_is_managed_with_apartment(self) -> None:
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.employee_user)
         payload = self.wohnung_payload()
         payload.update(
             {
@@ -89,7 +187,7 @@ class ManagementViewTests(TestCase):
 
     def test_stellplatz_miete_is_independent_from_wohnung_zuordnung(self) -> None:
         wohnung = Wohnung.objects.create(gebaeudenummer="A", wohnungsnummer="1")
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.employee_user)
 
         response = self.client.post(
             reverse("verwaltung:stellplatz_create"),
@@ -110,7 +208,7 @@ class ManagementViewTests(TestCase):
         wohnung = Wohnung.objects.create(gebaeudenummer="A", wohnungsnummer="1")
         Raum.objects.create(wohnung=wohnung, name="Wohnzimmer")
         Raum.objects.create(wohnung=wohnung, name="Bad")
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.employee_user)
 
         response = self.client.get(reverse("verwaltung:wohnung_edit", args=[wohnung.pk]))
 
@@ -164,7 +262,7 @@ class ManagementViewTests(TestCase):
             abnahme_status="accepted",
         )
         Raumprotokoll.objects.create(protokoll=protocol, raum=room, name="Küche")
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.employee_user)
 
         response = self.client.post(
             reverse("verwaltung:raum_delete", args=[wohnung.pk, room.pk]),
@@ -176,7 +274,7 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, "bereits in einem Übergabeprotokoll verwendet")
 
     def test_global_feature_dashboard_stores_non_technical_option_rows(self) -> None:
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.employee_user)
 
         response = self.client.post(
             reverse("verwaltung:merkmal_create"),
