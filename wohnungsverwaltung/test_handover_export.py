@@ -177,6 +177,26 @@ class HandoverExportTests(TestCase):
         self.assertIn("Mieter hat nicht unterschrieben", text)
         self.assertIn("Mieter lehnt die Unterschrift ab.", text)
 
+    def test_representative_signature_and_pdf_use_same_frozen_employee_name(self):
+        self.protocol.vermieter_name = "Andere Vertretung"
+        self.protocol.save()
+        response = self.client.get(self.url("finalize"))
+        rows = dict(response.context["snapshot"]["sections"][0]["rows"])
+        self.assertEqual(rows["Vertretung des Unternehmens"], "Eva Verwaltung")
+        self.assertContains(self.client.get(self.url("detail")), "Eva Verwaltung")
+        self.finalize()
+        self.assertEqual(self.protocol.vermieter_name, "Eva Verwaltung")
+        self.assertEqual(
+            self.protocol.unterschriften.get(rolle="mitarbeiter").name, "Eva Verwaltung"
+        )
+        text = "\n".join(page.extract_text() for page in self.pdf()[1].pages)
+        self.assertNotIn("Andere Vertretung", text)
+        self.assertIn("Vertretung des Unternehmens: Eva Verwaltung", text)
+        self.employee.first_name = "Neuer Name"
+        self.employee.save()
+        response = self.client.get(self.url("detail"))
+        self.assertContains(response, "<dd>Eva Verwaltung</dd>", html=True)
+
     def test_employee_signature_cannot_be_omitted(self):
         data = self.signing_data(tenant_mode="missing", reason="Abwesend")
         data.pop("mitarbeiter")

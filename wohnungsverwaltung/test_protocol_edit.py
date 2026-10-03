@@ -116,6 +116,30 @@ class ProtocolEditPreservationTests(TestCase):
         self.assertTrue(ProtokollSchluessel.objects.filter(pk=self.key.pk).exists())
         self.assertTrue(self.item.fotos.filter(pk=self.photo.pk).exists())
 
+    def test_form_uses_signed_in_employee_and_removes_separate_additional_fields(self):
+        response = self.client.get(self.edit_url)
+        field = response.context["form"]["vermieter_name"]
+        self.assertTrue(field.field.disabled)
+        self.assertEqual(field.value(), str(self.employee))
+        self.assertNotContains(response, "data-additional-details hidden")
+        self.assertContains(response, 'uk-icon="icon: camera"')
+        self.assertContains(response, "data-photo-previews")
+        data = self.payload()
+        data["vermieter_name"] = "Fremder Mitarbeiter"
+        self.assertEqual(self.client.post(self.edit_url, data).status_code, 302)
+        self.protocol.refresh_from_db()
+        self.assertEqual(self.protocol.vermieter_name, str(self.employee))
+
+    def test_edit_accepts_multiple_new_photos_and_preserves_existing_photo(self):
+        data = self.payload()
+        data["rooms-0-fotos"] = [
+            self.photo_upload("a.png", "red"),
+            self.photo_upload("b.png", "blue"),
+        ]
+        self.assertEqual(self.client.post(self.edit_url, data).status_code, 302)
+        self.assertEqual(self.item.fotos.count(), 3)
+        self.assertTrue(self.item.fotos.filter(pk=self.photo.pk).exists())
+
     def test_foreign_checkpoint_and_key_ids_are_rejected(self):
         other, _, other_item = self.checklist_item_for_photo_without_create()
         other_key = ProtokollSchluessel.objects.create(

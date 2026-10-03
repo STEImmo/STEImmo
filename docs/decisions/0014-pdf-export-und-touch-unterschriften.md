@@ -13,6 +13,15 @@ nicht leere Begründung mit höchstens 1.000 Zeichen erfasst. Ein Mieterkonto is
 zum Unterschreiben nicht notwendig. Die Bilder dokumentieren diese gemeinsame
 Erfassung; sie sind keine separate Anmeldung oder Identitätsprüfung des Mieters.
 
+Die Unternehmensvertretung entspricht dem angemeldeten Mitarbeiterprofil und
+ist im Formular nicht separat auswählbar. Übersicht, Abschluss und PDF verwenden
+denselben Namen; beim Abschluss wird er zusammen mit der Unterschrift eingefroren.
+Prüfpunkte erfassen neue Angaben im Feststellungstext. Die gesonderten dynamischen
+Zusatzfelder entfallen; bereits gespeicherte Zusatzangaben bleiben erhalten.
+Ein gemeinsames UIkit-Partial bietet Foto-Icon, Mehrfachauswahl und lokale Vorschau.
+Weitere Auswahlen ergänzen die vorhandene Auswahl; einzelne ausgewählte Bilder
+können vor dem Speichern entfernt werden. Erst das Speichern überträgt die Dateien.
+
 Der Abschlussbildschirm zeigt genau die für das PDF verwendeten Daten, Fotos und
 Einzugsreferenzen. Ein signierter Inhaltsfingerprint bindet die Bestätigung an
 diesen Stand und das Mitarbeiterkonto. Bei Änderungen ist eine erneute Prüfung

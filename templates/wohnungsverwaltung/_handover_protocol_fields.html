@@ -9,6 +9,7 @@
             <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
             <div class="uk-form-controls">
                 {{ field }}
+                {% if field.help_text %}<p class="uk-text-meta">{{ field.help_text }}</p>{% endif %}
                 {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
             </div>
         </div>
@@ -168,10 +169,7 @@
                                                 <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                                                 <div class="uk-form-controls">
                                                     {% if field.name == "fotos" %}
-                                                        <div class="uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid data-photo-selection>
-                                                            <div class="uk-width-expand">{{ field }}</div>
-                                                            <div><button class="uk-button uk-button-default uk-button-small" type="button" onclick="this.closest('[data-photo-selection]').querySelector('input[type=file]').value = '';">Auswahl entfernen</button></div>
-                                                        </div>
+                                                        {% include "wohnungsverwaltung/_photo_picker.html" with field=field %}
                                                     {% else %}
                                                         {{ field }}
                                                     {% endif %}
@@ -184,7 +182,6 @@
                                 </div>
                                 {{ checklist_form.zusatzangaben }}
                                 {% for error in checklist_form.zusatzangaben.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
-                                <div class="uk-margin-top" data-additional-details hidden></div>
                                 <button class="uk-button uk-button-danger uk-button-small uk-margin-small-top" type="button" data-remove-room-checklist>Prüfpunkt entfernen</button>
                             </div>
                         {% endfor %}
@@ -219,10 +216,7 @@
                                         <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                                         <div class="uk-form-controls">
                                             {% if field.name == "fotos" %}
-                                                <div class="uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid data-photo-selection>
-                                                    <div class="uk-width-expand">{{ field }}</div>
-                                                    <div><button class="uk-button uk-button-default uk-button-small" type="button" onclick="this.closest('[data-photo-selection]').querySelector('input[type=file]').value = '';">Auswahl entfernen</button></div>
-                                                </div>
+                                                {% include "wohnungsverwaltung/_photo_picker.html" with field=field %}
                                             {% else %}
                                                 {{ field }}
                                             {% endif %}
@@ -233,7 +227,6 @@
                             {% endfor %}
                         </div>
                         {{ room_formset.empty_form.zusatzangaben }}
-                        <div class="uk-margin-top" data-additional-details hidden></div>
                         <button class="uk-button uk-button-danger uk-button-small uk-margin-small-top" type="button" data-remove-room-checklist>Prüfpunkt entfernen</button>
                     </div>
                 </div>
@@ -253,10 +246,7 @@
                             <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                             <div class="uk-form-controls">
                                 {% if field.name == "fotos" %}
-                                    <div class="uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid data-photo-selection>
-                                        <div class="uk-width-expand">{{ field }}</div>
-                                        <div><button class="uk-button uk-button-default uk-button-small" type="button" onclick="this.closest('[data-photo-selection]').querySelector('input[type=file]').value = '';">Auswahl entfernen</button></div>
-                                    </div>
+                                    {% include "wohnungsverwaltung/_photo_picker.html" with field=field %}
                                 {% else %}
                                     {{ field }}
                                 {% endif %}
@@ -267,7 +257,6 @@
                 {% endfor %}
             </div>
             {{ room_formset.empty_form.zusatzangaben }}
-            <div class="uk-margin-top" data-additional-details hidden></div>
             <button class="uk-button uk-button-danger uk-button-small uk-margin-small-top" type="button" data-remove-room-checklist>Prüfpunkt entfernen</button>
         </div>
     </template>

@@ -128,7 +128,7 @@ def build_snapshot(protocol, name=""):
                 ),
                 ("Etage", protocol.wohnung.etage),
                 ("Mieter", str(protocol.person)),
-                ("Vermietervertretung", protocol.vermieter_name),
+                ("Vertretung des Unternehmens", name or protocol.vermieter_name),
                 ("Übergabetyp", HANDOVER_TYPE_LABELS[protocol.protokoll_typ]),
                 ("Übergabezeitpunkt", protocol.uebergabe_zeitpunkt),
                 ("Übergabezustand", HANDOVER_STATUS_LABELS[protocol.uebergabe_status]),
@@ -469,6 +469,7 @@ def archive_protocol(
     protocol.gesichert_am = now
     protocol.nachtraeglich_gesichert = legacy
     if not legacy:
+        protocol.vermieter_name = snapshot["employee"]
         protocol.bestaetigt_am = now
         protocol.status = ProtokollStatus.SIGNED
         protocol.schluessel_ueberprueft = True

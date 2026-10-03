@@ -375,7 +375,9 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
         or request.GET.get("person")
         or (_draft_field_value(server_draft, "person") if server_draft else None)
     )
-    form = HandoverProtocolForm(request.POST or None, wohnung_id=selected_wohnung_id)
+    form = HandoverProtocolForm(
+        request.POST or None, wohnung_id=selected_wohnung_id, employee=request.user
+    )
     _set_selected_person_initial(form, selected_person_id)
     can_manage_handover_photos = _can_manage_handover_photos(request)
     room_formset = InlineRoomChecklistFormSet(
@@ -451,6 +453,7 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
         "wohnungsverwaltung/handover_protocol_detail.html",
         {
             "protocol": protocol,
+            "representative_name": _representative_name(protocol, request.user),
             "protocol_type_label": HANDOVER_TYPE_LABELS[protocol.protokoll_typ],
             "handover_status_label": HANDOVER_STATUS_LABELS[protocol.uebergabe_status],
             "acceptance_status_label": ACCEPTANCE_STATUS_LABELS[protocol.abnahme_status],
@@ -481,6 +484,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         request.POST or None,
         instance=protocol,
         wohnung_id=selected_wohnung_id or protocol.wohnung_id,
+        employee=request.user,
     )
     _set_selected_person_initial(form, selected_person_id)
     can_manage_handover_photos = _can_manage_handover_photos(request)
@@ -948,6 +952,15 @@ def handover_protocol_key_delete(request: HttpRequest, protocol_id, key_id) -> H
     key.delete()
     messages.success(request, "Die Schlüsselposition wurde aus dem Übergabeprotokoll entfernt.")
     return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
+
+
+def _representative_name(protocol, user):
+    from .handover_export import employee_name
+
+    if protocol.status == ProtokollStatus.OPEN:
+        return employee_name(user) or protocol.vermieter_name
+    signature = protocol.unterschriften.filter(rolle="mitarbeiter").first()
+    return signature.name if signature else protocol.vermieter_name
 
 
 def _protocol_completion_errors(protocol: Protokoll) -> list[str]:

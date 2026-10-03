@@ -289,15 +289,14 @@ class HandoverProtocolViewsTests(TestCase):
         self.assertIn((str(self.employee), str(self.employee)), landlord_choices)
         self.assertNotIn((str(self.person), str(self.person)), landlord_choices)
 
-    def test_create_rejects_a_non_employee_as_landlord_representative(self) -> None:
+    def test_create_uses_logged_in_employee_despite_submitted_representative(self) -> None:
         data = self.valid_form_data()
         data["vermieter_name"] = str(self.person)
 
         response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("vermieter_name", response.context["form"].errors)
-        self.assertFalse(Protokoll.objects.exists())
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Protokoll.objects.get().vermieter_name, str(self.employee))
 
     def test_create_page_updates_people_without_a_full_page_reload(self) -> None:
         response = self.client.get(reverse("wohnungsverwaltung:handover_protocol_create"))

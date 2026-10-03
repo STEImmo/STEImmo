@@ -583,7 +583,7 @@ class HandoverProtocolForm(forms.ModelForm):
             "nachbesserung_beschreibung": forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
         }
 
-    def __init__(self, *args, wohnung_id: str | None = None, **kwargs) -> None:
+    def __init__(self, *args, wohnung_id: str | None = None, employee=None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.fields["wohnung"].queryset = Wohnung.objects.order_by(
             "gebaeudenummer", "wohnungsnummer"
@@ -609,6 +609,15 @@ class HandoverProtocolForm(forms.ModelForm):
                 )
             ],
         ]
+        if employee is not None:
+            from .handover_export import employee_name
+
+            name = employee_name(employee)
+            self.fields["vermieter_name"].choices = [(name, name)] if name else [("", "Name fehlt")]
+            self.fields["vermieter_name"].disabled = True
+            self.fields["vermieter_name"].label = "Vertretung des Unternehmens"
+            self.initial["vermieter_name"] = name
+            self.fields["vermieter_name"].help_text = "Diese Person unterschreibt das Protokoll."
         self.fields["mieter_zukuenftige_anschrift"].required = False
         self.fields["protokoll_typ"].choices = HANDOVER_TYPE_LABELS.items()
         self.fields["uebergabe_status"].choices = HANDOVER_STATUS_LABELS.items()
