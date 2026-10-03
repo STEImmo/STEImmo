@@ -1,6 +1,8 @@
 import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from datetime import date, timedelta
+from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
@@ -380,6 +382,107 @@ class HandoverExportTests(TestCase):
         reader = self.pdf()[1]
         self.assertGreater(len(reader.pages), 5)
         self.assertIn("äöü ß < & >", "\n".join(p.extract_text() for p in reader.pages))
+
+    def test_all_move_out_fields_and_matched_photo_sides_are_exported(self):
+        def add_photo(item, color, name):
+            image = Image.new("RGB", (640, 320), color)
+            stream = BytesIO()
+            image.save(stream, "PNG")
+            upload = SimpleUploadedFile(name, stream.getvalue(), content_type="image/png")
+            return RaumMerkmalFoto.objects.create(
+                raum_merkmal=item, datei=upload, content_type="image/png", dateigroesse=upload.size
+            )
+
+        old_photo = add_photo(self.item, "red", "einzug.png")
+        self.protocol.status = ProtokollStatus.SIGNED
+        self.protocol.uebergabe_zeitpunkt = timezone.now() - timedelta(days=100)
+        self.protocol.save()
+        old_protocol = self.protocol
+        self.protocol = Protokoll.objects.get(pk=old_protocol.pk)
+        self.protocol.pk = None
+        self.protocol.status = ProtokollStatus.OPEN
+        self.protocol.protokoll_typ = ProtokollTyp.MOVE_OUT
+        self.protocol.uebergabe_zeitpunkt = timezone.now()
+        self.protocol.mieter_zukuenftige_anschrift = "Neue Straße 24, 12345 Teststadt"
+        self.protocol.nachbesserung_beschreibung = "Fensterrahmen ausbessern & Tür prüfen."
+        self.protocol.nachbesserung_bis = date(2027, 3, 14)
+        self.protocol.anlagenblaetter_anzahl = 3
+        for index, suffix in enumerate(["wasser_kalt", "wasser_warm", "heizung", "strom"], 1):
+            setattr(self.protocol, f"zaehlernummer_{suffix}", f"TEST-ZÄHLER-{index}")
+            setattr(self.protocol, f"zaehlerstand_{suffix}", Decimal(f"{index}23.45"))
+        self.protocol.save()
+        room = Raumprotokoll.objects.create(
+            protokoll=self.protocol, raum=self.master_room, name="Küche"
+        )
+        current_item = RaumMerkmal.objects.create(
+            raumprotokoll=room,
+            merkmal=self.feature,
+            wert={"text": "NEUER Schaden: Rahmen gebrochen", "angaben": {"Länge": "25 cm"}},
+        )
+        new_photo = add_photo(current_item, "blue", "auszug.png")
+        ProtokollSchluessel.objects.create(
+            protokoll=self.protocol,
+            anzahl=4,
+            raum_bezeichnung="Nebeneingang",
+            aufschrift="TEST-AUFSCHRIFT",
+            schluesselnummer="TEST-SCHLÜSSEL-42",
+            fehlt=True,
+            fehlgrund="Ein Schlüssel verloren",
+            nachlieferung_am=date(2027, 3, 15),
+        )
+        self.finalize()
+        _, reader = self.pdf()
+        text = "\n".join(page.extract_text() for page in reader.pages)
+        for expected in [
+            "Neue Straße 24, 12345 Teststadt",
+            "Fensterrahmen ausbessern & Tür prüfen.",
+            "14.03.2027",
+            "Erfasste Anlagenblattanzahl",
+            "Nebeneingang",
+            "Anzahl: 4",
+            "TEST-AUFSCHRIFT",
+            "TEST-SCHLÜSSEL-42",
+            "Fehlt: Ja",
+            "Ein Schlüssel verloren",
+            "15.03.2027",
+            "IE 120 / IA 110",
+            "Kratzer am Fenster",
+            "Anzahl: 2",
+            "NEUER Schaden: Rahmen gebrochen",
+            "Länge: 25 cm",
+            "Küche / Küche: Fenster / Einzug (Referenz) / Foto 1",
+            "Küche / Küche: Fenster / Auszug / Foto 1",
+        ]:
+            self.assertIn(expected, text)
+        for index in range(1, 5):
+            self.assertIn(f"TEST-ZÄHLER-{index}", text)
+            self.assertIn(f"{index}23,45", text)
+        sides = self.protocol.export_snapshot["rooms"][0]["items"][0]["sides"]
+        self.assertEqual(sides[0]["photos"][0]["path"], old_photo.datei.name)
+        self.assertEqual(sides[1]["photos"][0]["path"], new_photo.datei.name)
+        photo_pages = []
+        for page in reader.pages:
+            images = {image.name.rsplit(".", 1)[0]: image for image in page.images}
+            # Resource dictionaries are unordered; inspect actual drawing operations.
+            for operands, operator in page.get_contents().operations:
+                if operator != b"Do":
+                    continue
+                image = images[str(operands[0]).lstrip("/")]
+                pixel = image.image.convert("RGB").getpixel((10, 10))
+                if pixel in [(255, 0, 0), (0, 0, 255)]:
+                    photo_pages.append((pixel, page.extract_text()))
+        self.assertEqual([pixel for pixel, _ in photo_pages], [(255, 0, 0), (0, 0, 255)])
+        self.assertIn("Einzug (Referenz) / Foto 1", photo_pages[0][1])
+        self.assertIn("Auszug / Foto 1", photo_pages[1][1])
+
+    def test_move_in_evidence_values_are_in_pdf(self):
+        self.protocol.kaution_nachweis_vorhanden = True
+        self.protocol.erste_miete_nachweis_vorhanden = False
+        self.protocol.save()
+        self.finalize()
+        text = "\n".join(page.extract_text() for page in self.pdf()[1].pages)
+        self.assertIn("Kautionsbeleg vorhanden: Ja", text)
+        self.assertIn("Erste Miete: Beleg vorhanden: Nein", text)
 
 
 class HandoverExportConcurrencyTests(TransactionTestCase):
