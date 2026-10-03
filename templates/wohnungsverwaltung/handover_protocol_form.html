@@ -121,8 +121,26 @@
             if (!protocolType) {
                 return;
             }
+            // Repeated meter fields must retain their values when switching type.
+            const activeValues = new Map();
+            document.querySelectorAll("[data-protocol-types]").forEach((section) => {
+                if (!section.hidden) {
+                    section.querySelectorAll("input[name], select[name], textarea[name]").forEach((field) => {
+                        if (!field.disabled && field.type !== "checkbox") {
+                            activeValues.set(field.name, field.value);
+                        }
+                    });
+                }
+            });
             document.querySelectorAll("[data-protocol-types]").forEach((section) => {
                 section.hidden = !section.dataset.protocolTypes.split(" ").includes(protocolType.value);
+                section.querySelectorAll("input, select, textarea").forEach((field) => {
+                    if (activeValues.has(field.name)) {
+                        field.value = activeValues.get(field.name);
+                    }
+                    // Hidden required controls must neither block nor duplicate submission.
+                    field.disabled = section.hidden;
+                });
             });
         };
         if (protocolType) {
@@ -432,7 +450,9 @@
         ];
 
         const fieldForName = (container, fieldName) => (
-            container?.querySelector(`[name="${fieldName}"]`)
+            container?.querySelector(`[name="${fieldName}"]:not(:disabled)`)
+            || container?.querySelector(`[name$="-${fieldName}"]:not(:disabled)`)
+            || container?.querySelector(`[name="${fieldName}"]`)
             || container?.querySelector(`[name$="-${fieldName}"]`)
         );
         const serializeFields = (container, fieldNames) => Object.fromEntries(
@@ -638,7 +658,7 @@
             showDraftStatus("Entwurf verworfen");
         };
 
-        protocolForm?.addEventListener("input", saveDraft);
+        protocolForm?.addEventListener("input", () => saveDraft());
         protocolForm?.addEventListener("change", () => saveDraft(true));
         protocolForm?.querySelectorAll("a[href]").forEach((link) => {
             link.addEventListener("click", () => saveDraft(true));
