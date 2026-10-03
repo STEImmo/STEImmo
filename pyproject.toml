@@ -12,11 +12,13 @@ dependencies = [
     "gunicorn>=23,<24",
     "Pillow>=11,<12",
     "psycopg[binary]>=3.2,<4",
+    "reportlab>=4.4,<5",
 ]
 
 [project.optional-dependencies]
 dev = [
     "ruff>=0.13,<0.14",
+    "pypdf>=6,<7",
 ]
 
 [tool.setuptools.packages.find]

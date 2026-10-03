@@ -1,10 +1,24 @@
 from django.urls import path
 
-from . import views
+from . import export_views, views
 
 app_name = "wohnungsverwaltung"
 
 urlpatterns = [
+    path("meine/", export_views.handover_protocol_mine, name="handover_protocol_mine"),
+    path(
+        "<uuid:protocol_id>/abschluss/",
+        export_views.handover_protocol_finalize,
+        name="handover_protocol_finalize",
+    ),
+    path(
+        "<uuid:protocol_id>/pdf/", export_views.handover_protocol_pdf, name="handover_protocol_pdf"
+    ),
+    path(
+        "<uuid:protocol_id>/pdf/erstellen/",
+        export_views.handover_protocol_pdf_create,
+        name="handover_protocol_pdf_create",
+    ),
     path("bewerbung/meine/", views.pre_application_list, name="pre_application_list"),
     path("bewerbung/neu/", views.pre_application_create, name="pre_application_create"),
     path(
@@ -86,7 +100,7 @@ urlpatterns = [
     ),
     path(
         "<uuid:protocol_id>/bestaetigen/",
-        views.handover_protocol_confirm,
+        export_views.handover_protocol_confirm,
         name="handover_protocol_confirm",
     ),
     path("<uuid:protocol_id>/", views.handover_protocol_detail, name="handover_protocol_detail"),
