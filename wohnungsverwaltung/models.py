@@ -341,6 +341,14 @@ class Bewerbung(models.Model):
         default=BewerbungStatus.OPEN,
         max_length=255,
     )
+    main_application_unlocked = models.BooleanField(
+        default=False,
+        help_text=(
+            "Wird durch die Mitarbeiterseite nach Besichtigung und positiver Eignungsentscheidung "
+            "gesetzt."
+        ),
+    )
+    interest_withdrawn_at = models.DateTimeField(blank=True, null=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -348,7 +356,10 @@ class Bewerbung(models.Model):
         db_table = "bewerbung"
         constraints = [
             models.UniqueConstraint(
-                condition=models.Q(status=BewerbungStatus.OPEN),
+                condition=models.Q(
+                    status=BewerbungStatus.OPEN,
+                    interest_withdrawn_at__isnull=True,
+                ),
                 fields=("person",),
                 name="bewerbung_eine_offene_pro_person",
             ),
@@ -360,6 +371,36 @@ class Bewerbung(models.Model):
                 condition=models.Q(score__gte=0), name="bewerbung_score_nicht_negativ"
             ),
         ]
+
+    @property
+    def main_application_accessible(self) -> bool:
+        return (
+            self.main_application_unlocked
+            and self.status == BewerbungStatus.OPEN
+            and self.interest_withdrawn_at is None
+        )
+
+    def get_applicant_status_display(self) -> str:
+        if self.interest_withdrawn_at is not None:
+            return "Zurückgezogen"
+        if self.status == BewerbungStatus.DECLINED:
+            return "Abgelehnt"
+        if self.status == BewerbungStatus.BLOCKED:
+            return "Gesperrt"
+        if self.main_application_unlocked:
+            return "Main-Bewerbung freigeschaltet"
+        return "In Bearbeitung"
+
+    def get_applicant_next_step(self) -> str:
+        if self.interest_withdrawn_at is not None:
+            return "Für diese Bewerbung sind keine weiteren Schritte möglich."
+        if self.status == BewerbungStatus.DECLINED:
+            return "Die Bewerbung wurde beendet."
+        if self.status == BewerbungStatus.BLOCKED:
+            return "Die Bewerbung ist derzeit gesperrt."
+        if self.main_application_unlocked:
+            return "Ihre Main-Bewerbung ist freigeschaltet."
+        return "Warten Sie auf die nächste Rückmeldung zu Ihrer Bewerbung."
 
 
 class Stellplatz(models.Model):

@@ -20,6 +20,7 @@ from .forms import BewerbungForm, InlineRoomChecklistFormSet, RoomChecklistItemF
 from .models import (
     AbnahmeStatus,
     Bewerbung,
+    BewerbungStatus,
     Merkmal,
     MerkmalDatentyp,
     Person,
@@ -1908,6 +1909,24 @@ class BewerbungDatabaseConstraintTests(TestCase):
                     ueber_mich="Ich suche ebenfalls diese Wohnung.",
                 )
 
+    def test_database_allows_a_new_open_application_after_withdrawal(self) -> None:
+        Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.first_unit,
+            personenanzahl=1,
+            ueber_mich="Ich suche eine Wohnung.",
+            interest_withdrawn_at=datetime.now(UTC),
+        )
+
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.second_unit,
+            personenanzahl=1,
+            ueber_mich="Ich suche erneut eine Wohnung.",
+        )
+
+        self.assertEqual(application.person, self.applicant)
+
 
 class PreApplicationAuthenticationTests(TestCase):
     def setUp(self) -> None:
@@ -1993,8 +2012,245 @@ class PreApplicationAuthenticationTests(TestCase):
         response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Meine Pre-Bewerbungen")
+        self.assertContains(response, "Meine Bewerbungen")
         self.assertContains(response, "Gebäude 1, Wohnung 4.01")
+        self.assertContains(response, "In Bearbeitung")
+        self.assertContains(response, "Warten Sie auf die nächste Rückmeldung")
+
+    def test_linked_user_can_open_the_main_application_status_when_unlocked(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        list_response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+        main_response = self.client.get(
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
+        )
+
+        self.assertContains(list_response, "Main-Bewerbung freigeschaltet")
+        self.assertContains(
+            list_response,
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk]),
+        )
+        self.assertEqual(main_response.status_code, 200)
+        self.assertContains(main_response, "Die Main-Bewerbung ist freigeschaltet.")
+        self.assertContains(main_response, "Interesse zurückziehen")
+
+    def test_main_application_access_state_is_scoped_to_each_application(self) -> None:
+        previous_application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Eine frühere Bewerbung.",
+            status=BewerbungStatus.DECLINED,
+            main_application_unlocked=True,
+        )
+        active_application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Meine aktuelle Bewerbung.",
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+
+        self.assertContains(
+            response,
+            reverse("wohnungsverwaltung:main_application_status", args=[active_application.pk]),
+        )
+        self.assertNotContains(
+            response,
+            reverse(
+                "wohnungsverwaltung:main_application_status",
+                args=[previous_application.pk],
+            ),
+        )
+        self.assertContains(response, "Abgelehnt")
+        self.assertContains(response, "Main-Bewerbung freigeschaltet")
+
+    def test_locked_application_has_no_main_access(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.get(
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_main_application_status_is_read_only_in_issue_19(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.post(
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk]),
+            {"ueber_mich": "Geänderte Angaben"},
+        )
+
+        self.assertEqual(response.status_code, 405)
+        application.refresh_from_db()
+        self.assertEqual(application.ueber_mich, "Ich möchte mich für diese Wohnung bewerben.")
+
+    def test_applicant_cannot_open_another_persons_main_application(self) -> None:
+        other_user = get_user_model().objects.create_user(
+            username="andere-person@example.test",
+            email="andere-person@example.test",
+            password="FjordTanne!4826",
+        )
+        other_applicant = Person.objects.create(
+            user=other_user,
+            vorname="Andere",
+            nachname="Person",
+            email="andere-person@example.test",
+        )
+        other_unit = Wohnung.objects.create(
+            etage=4,
+            wohnungsnummer="4.02",
+            gebaeudenummer="1",
+            status=WohnungStatus.FREE,
+        )
+        other_application = Bewerbung.objects.create(
+            person=other_applicant,
+            wohnung=other_unit,
+            personenanzahl=1,
+            ueber_mich="Vertrauliche Angaben einer anderen Person.",
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        list_response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+        detail_response = self.client.get(
+            reverse("wohnungsverwaltung:main_application_status", args=[other_application.pk])
+        )
+
+        self.assertNotContains(list_response, "Vertrauliche Angaben einer anderen Person.")
+        self.assertNotContains(list_response, str(other_unit))
+        self.assertEqual(detail_response.status_code, 404)
+
+    def test_declined_application_cannot_open_main_application_even_if_unlocked(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Die Bewerbung wurde beendet.",
+            status=BewerbungStatus.DECLINED,
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.get(
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_applicant_can_withdraw_an_unlocked_application(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+        withdraw_url = reverse("wohnungsverwaltung:application_withdraw", args=[application.pk])
+
+        confirmation_response = self.client.get(withdraw_url)
+        self.assertEqual(confirmation_response.status_code, 200)
+        self.assertIsNone(Bewerbung.objects.get(pk=application.pk).interest_withdrawn_at)
+
+        response = self.client.post(withdraw_url)
+
+        self.assertRedirects(response, reverse("wohnungsverwaltung:pre_application_list"))
+        application.refresh_from_db()
+        self.assertIsNotNone(application.interest_withdrawn_at)
+        self.assertContains(
+            self.client.get(reverse("wohnungsverwaltung:pre_application_list")),
+            "Zurückgezogen",
+        )
+
+    def test_applicant_cannot_withdraw_a_locked_application(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.post(
+            reverse("wohnungsverwaltung:application_withdraw", args=[application.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertIsNone(Bewerbung.objects.get(pk=application.pk).interest_withdrawn_at)
+
+    def test_applicant_cannot_withdraw_another_persons_application(self) -> None:
+        other_user = get_user_model().objects.create_user(
+            username="fremd@example.test",
+            email="fremd@example.test",
+            password="FjordTanne!4826",
+        )
+        other_applicant = Person.objects.create(
+            user=other_user,
+            vorname="Fremde",
+            nachname="Person",
+            email="fremd@example.test",
+        )
+        other_application = Bewerbung.objects.create(
+            person=other_applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Vertrauliche Angaben einer anderen Person.",
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.post(
+            reverse("wohnungsverwaltung:application_withdraw", args=[other_application.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertIsNone(Bewerbung.objects.get(pk=other_application.pk).interest_withdrawn_at)
+
+    def test_withdrawn_application_cannot_be_reactivated_or_withdrawn_again(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+            main_application_unlocked=True,
+            interest_withdrawn_at=datetime.now(UTC),
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        main_response = self.client.get(
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
+        )
+        withdrawal_response = self.client.post(
+            reverse("wohnungsverwaltung:application_withdraw", args=[application.pk])
+        )
+
+        self.assertEqual(main_response.status_code, 404)
+        self.assertEqual(withdrawal_response.status_code, 404)
 
     def test_list_disables_new_application_button_for_open_application(self) -> None:
         Bewerbung.objects.create(

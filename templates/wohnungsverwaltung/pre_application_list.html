@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Meine Pre-Bewerbungen – STEImmo{% endblock %}
+{% block title %}Meine Bewerbungen – STEImmo{% endblock %}
 
 {% block content %}
 <section class="uk-section">
     <div class="uk-container uk-container-small">
         <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
-            <div><h1 class="uk-heading-medium">Meine Pre-Bewerbungen</h1></div>
+            <div><h1 class="uk-heading-medium">Meine Bewerbungen</h1></div>
             <div>
                 {% if has_open_application %}
                     <button class="uk-button uk-button-default" type="button" disabled>Neue Pre-Bewerbung</button>
@@ -18,9 +18,16 @@
         </div>
         {% for application in applications %}
             <article class="uk-card uk-card-default uk-card-body uk-margin-top">
-                <span class="uk-label">{{ application.get_status_display }}</span>
+                <span class="uk-label">{{ application.get_applicant_status_display }}</span>
                 <h2 class="uk-card-title">{{ application.wohnung }}</h2>
                 <p>{{ application.personenanzahl }} Person{{ application.personenanzahl|pluralize:"en" }} im Haushalt</p>
+                <p>{{ application.get_applicant_next_step }}</p>
+                {% if application.main_application_accessible %}
+                    <a class="uk-button uk-button-primary"
+                       href="{% url 'wohnungsverwaltung:main_application_status' application.pk %}">
+                        Main-Bewerbung öffnen
+                    </a>
+                {% endif %}
             </article>
         {% empty %}
             <div class="uk-alert-primary uk-margin-top" uk-alert>
