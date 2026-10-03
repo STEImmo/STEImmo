@@ -31,6 +31,7 @@ from .forms import (
     HANDOVER_STATUS_LABELS,
     HANDOVER_TYPE_LABELS,
     METER_READING_FIELDS,
+    ApartmentSearchForm,
     BewerbungForm,
     HandoverKeyForm,
     HandoverKeyFormSet,
@@ -114,6 +115,51 @@ def _valid_wohnung_id(wohnung_id: str | UUID | None) -> UUID | None:
 
 def _valid_person_id(person_id: str | UUID | None) -> UUID | None:
     return _valid_wohnung_id(person_id)
+
+
+def apartment_search(request: HttpRequest) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    form = ApartmentSearchForm(request.GET)
+    wohnungen = Wohnung.objects.available()
+    if form.is_valid():
+        filter_fields = {
+            "groesse_min": "groesse_qm__gte",
+            "groesse_max": "groesse_qm__lte",
+            "kaltmiete_min": "kaltmiete__gte",
+            "kaltmiete_max": "kaltmiete__lte",
+            "zimmer_min": "zimmeranzahl__gte",
+            "zimmer_max": "zimmeranzahl__lte",
+            "etage": "etage",
+            "barrierefrei": "barrierefrei",
+        }
+        filters = {
+            lookup: form.cleaned_data[field_name]
+            for field_name, lookup in filter_fields.items()
+            if form.cleaned_data[field_name] not in (None, "")
+        }
+        wohnungen = wohnungen.filter(**filters)
+    else:
+        wohnungen = wohnungen.none()
+
+    return render(
+        request,
+        "wohnungsverwaltung/apartment_search.html",
+        {"form": form, "wohnungen": wohnungen.order_by("etage", "wohnungsnummer")},
+    )
+
+
+def apartment_detail_placeholder(request: HttpRequest, unit_id: UUID) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    wohnung = get_object_or_404(Wohnung, pk=unit_id)
+    return render(
+        request,
+        "wohnungsverwaltung/apartment_detail_placeholder.html",
+        {"wohnung": wohnung},
+    )
 
 
 def pre_application_preview(request: HttpRequest) -> HttpResponse:

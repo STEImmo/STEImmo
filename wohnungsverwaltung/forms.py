@@ -504,6 +504,89 @@ class BewerbungForm(forms.ModelForm):
         return application
 
 
+class ApartmentSearchForm(forms.Form):
+    groesse_min = forms.DecimalField(
+        label="Wohnfläche ab (m²)",
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "uk-input", "min": "0", "step": "1"}),
+    )
+    groesse_max = forms.DecimalField(
+        label="Wohnfläche bis (m²)",
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "uk-input", "min": "0", "step": "1"}),
+    )
+    kaltmiete_min = forms.DecimalField(
+        label="Kaltmiete ab (€)",
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "uk-input", "min": "0", "step": "10"}),
+    )
+    kaltmiete_max = forms.DecimalField(
+        label="Kaltmiete bis (€)",
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "uk-input", "min": "0", "step": "10"}),
+    )
+    zimmer_min = forms.DecimalField(
+        label="Zimmer ab",
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "uk-input", "min": "0", "step": "0.5"}),
+    )
+    zimmer_max = forms.DecimalField(
+        label="Zimmer bis",
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "uk-input", "min": "0", "step": "0.5"}),
+    )
+    etage = forms.ChoiceField(
+        label="Etage",
+        required=False,
+        choices=(("", "Alle Etagen"),),
+        widget=forms.Select(attrs={"class": "uk-select"}),
+    )
+    barrierefrei = forms.TypedChoiceField(
+        label="Barrierefrei",
+        required=False,
+        choices=(("", "Beliebig"), ("true", "Ja"), ("false", "Nein")),
+        coerce=lambda value: value == "true",
+        empty_value=None,
+        widget=forms.Select(attrs={"class": "uk-select"}),
+    )
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        floors = Wohnung.objects.order_by("etage").values_list("etage", flat=True).distinct()
+        self.fields["etage"].choices = (("", "Alle Etagen"),) + tuple(
+            (str(floor), "Erdgeschoss" if floor == 0 else f"Etage {floor}") for floor in floors
+        )
+
+    def clean(self) -> dict[str, object]:
+        cleaned_data = super().clean()
+        ranges = (
+            ("groesse_min", "groesse_max"),
+            ("kaltmiete_min", "kaltmiete_max"),
+            ("zimmer_min", "zimmer_max"),
+        )
+        for minimum_field, maximum_field in ranges:
+            minimum = cleaned_data.get(minimum_field)
+            maximum = cleaned_data.get(maximum_field)
+            if minimum is not None and maximum is not None and minimum > maximum:
+                self.add_error(
+                    maximum_field,
+                    "Der Höchstwert muss mindestens dem Mindestwert entsprechen.",
+                )
+        return cleaned_data
+
+
 class HandoverProtocolForm(forms.ModelForm):
     vermieter_name = forms.ChoiceField(
         label="Anwesend für den Vermieter",
