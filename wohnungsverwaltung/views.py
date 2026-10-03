@@ -20,18 +20,18 @@ from django.utils import timezone
 from PIL import Image
 
 from .access import (
-    applicant_required,
     EMPLOYEE_ACCESS_PERMISSION,
+    applicant_required,
     employee_required,
     has_permission,
     user_management_required,
 )
 from .forms import (
     ACCEPTANCE_STATUS_LABELS,
-    ApartmentSearchForm,
     HANDOVER_STATUS_LABELS,
     HANDOVER_TYPE_LABELS,
     METER_READING_FIELDS,
+    ApartmentSearchForm,
     BewerbungForm,
     HandoverKeyForm,
     HandoverKeyFormSet,
@@ -55,7 +55,6 @@ from .forms import (
 from .models import (
     Bewerbung,
     BewerbungStatus,
-    calculate_photo_checksum,
     Merkmal,
     Person,
     Protokoll,
@@ -70,6 +69,7 @@ from .models import (
     Stellplatz,
     StellplatzZuordnung,
     Wohnung,
+    calculate_photo_checksum,
 )
 
 PROTOCOL_STATUS_LABELS = {
