@@ -65,6 +65,13 @@ oder Unterschriftsdateien. PDFs werden privat und ohne Cache ausgeliefert.
 
 - Neue Abschlüsse benötigen JavaScript und eine erfolgreich gespeicherte PDF-Datei.
 - Fehlende oder beschädigte Fotos verhindern einen unvollständigen Abschluss.
+- Vor dem Abschluss bearbeitet die Maske vorhandene Prüfpunkte und Schlüssel über
+  ihre zum Protokoll gehörenden IDs. Gespeicherte Fotos behalten ihre Zuordnung;
+  ältere Entwürfe ohne Prüfpunkt-ID werden über Raum und Merkmal zugeordnet.
+  Die Entwurfswiederherstellung ergänzt bestehende Formularfelder, statt sie neu
+  aufzubauen. Dadurch bleiben gespeicherte Fotos und im geöffneten Formular
+  ausgewählte Dateien erhalten. Nach einem Neuladen müssen ungespeicherte
+  Dateien aus Sicherheitsgründen erneut ausgewählt werden.
 - Stamm- und Referenzdatenänderungen verändern keine archivierten Dokumente.
 - PDF-Layouts sind versionierte Ausgaben; bestehende PDFs werden nicht neu gestaltet.
 - US-11 bleibt ein eigener Branch/PR auf Basis des Fotofeatures. Die additive

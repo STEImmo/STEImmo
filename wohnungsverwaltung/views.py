@@ -488,12 +488,19 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         data=request.POST or None,
         files=request.FILES or None,
         prefix="rooms",
+        initial=_protocol_room_initial(protocol) if request.method != "POST" else None,
         form_kwargs={
             "wohnung_id": _valid_wohnung_id(selected_wohnung_id or protocol.wohnung_id),
             "allow_photo_upload": can_manage_handover_photos,
+            "protocol": protocol,
         },
     )
-    key_formset = HandoverKeyFormSet(request.POST or None, prefix="keys")
+    key_formset = HandoverKeyFormSet(
+        request.POST or None,
+        prefix="keys",
+        initial=_protocol_key_initial(protocol) if request.method != "POST" else None,
+        form_kwargs={"protocol": protocol},
+    )
     move_in_reference = None
     if can_manage_handover_photos:
         move_in_reference = _move_in_reference_for_apartment(
@@ -997,6 +1004,12 @@ def _key_form_initial(wohnung) -> list[dict[str, object]]:
 
 def _save_inline_protocol_entries(protocol, room_formset, key_formset) -> None:
     for room_form in room_formset:
+        if room_form.cleaned_data.get("DELETE"):
+            item = room_form.cleaned_data.get("pruefpunkt")
+            if item is not None:
+                _delete_checklist_photos(item.fotos.all())
+                item.delete()
+            continue
         if (
             room_form.cleaned_data
             and not room_form.cleaned_data.get("DELETE")
@@ -1005,11 +1018,45 @@ def _save_inline_protocol_entries(protocol, room_formset, key_formset) -> None:
             room_form.save(protocol)
 
     for key_form in key_formset:
-        if not key_form.cleaned_data or key_form.cleaned_data.get("DELETE"):
+        if key_form.cleaned_data.get("DELETE"):
+            key = key_form.cleaned_data.get("schluessel")
+            if key is not None:
+                key.delete()
+            continue
+        if not key_form.cleaned_data:
             continue
         key = key_form.save(commit=False)
         key.protokoll = protocol
         key.save()
+
+
+def _protocol_room_initial(protocol):
+    values = []
+    for room in protocol.raeume.prefetch_related("raum_merkmale__merkmal").order_by("name", "pk"):
+        items = list(room.raum_merkmale.all())
+        if not items:
+            values.append({"raum": room.raum_id})
+        for item in items:
+            value = item.wert if isinstance(item.wert, dict) else {}
+            values.append(
+                {
+                    "pruefpunkt": item.pk,
+                    "raum": room.raum_id,
+                    "bereich": item.merkmal.bereich,
+                    "merkmal": item.merkmal_id,
+                    "wert": value.get("text", ""),
+                    "zusatzangaben": json.dumps(value.get("angaben", {}), ensure_ascii=False),
+                }
+            )
+    return values
+
+
+def _protocol_key_initial(protocol):
+    fields = HandoverKeyForm._meta.fields
+    return [
+        {"schluessel": key.pk, **{field: getattr(key, field) for field in fields}}
+        for key in protocol.protokoll_schluessel.order_by("raum_bezeichnung", "pk")
+    ]
 
 
 def _room_form_groups(room_formset) -> list[dict[str, object]]:

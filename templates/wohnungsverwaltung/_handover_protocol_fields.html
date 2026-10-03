@@ -130,6 +130,7 @@
     </div>
     <p class="uk-text-meta">Wählen Sie einen Raum aus den Stammdaten der gewählten Wohnung.</p>
     {{ room_formset.management_form }}
+    {% if room_formset.non_form_errors %}<div class="uk-alert-danger" role="alert">{{ room_formset.non_form_errors }}</div>{% endif %}
     <div id="room-formset">
         {% for group in room_form_groups %}
             <article class="uk-card uk-card-default uk-margin" data-room-card>
@@ -151,6 +152,11 @@
                     <div data-room-checklist-items>
                         {% for checklist_form in group.checklist_forms %}
                             <div class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-room-checklist-form>
+                                {{ checklist_form.pruefpunkt }}
+                                {% for error in checklist_form.pruefpunkt.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                                {% if checklist_form.existing_item %}
+                                    {% include "wohnungsverwaltung/_protocol_saved_photos.html" with item=checklist_form.existing_item %}
+                                {% endif %}
                                 <div hidden>{{ checklist_form.DELETE }}</div>
                                 {% if not forloop.first %}
                                     <input type="hidden" name="{{ checklist_form.raum.html_name }}" id="{{ checklist_form.raum.id_for_label }}" value="{{ checklist_form.raum.value|default_if_none:'' }}" data-room-value>
@@ -204,6 +210,7 @@
                 <h4 class="uk-heading-bullet">Prüfpunkte</h4>
                 <div data-room-checklist-items>
                     <div class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-room-checklist-form>
+                        {{ room_formset.empty_form.pruefpunkt }}
                         <div hidden>{{ room_formset.empty_form.DELETE }}</div>
                         <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
                             {% for field in room_formset.empty_form.visible_fields %}
@@ -236,6 +243,7 @@
     </template>
     <template id="room-checklist-empty-form">
         <div class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-room-checklist-form>
+            {{ room_formset.empty_form.pruefpunkt }}
             <input type="hidden" name="rooms-__prefix__-raum" id="id_rooms-__prefix__-raum" data-room-value>
             <div hidden>{{ room_formset.empty_form.DELETE }}</div>
             <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
@@ -275,7 +283,7 @@
     <div id="key-formset">
         {% for inline_form in key_formset %}
             <article class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-formset-row data-key-formset-row>
-                {% for hidden in inline_form.hidden_fields %}{{ hidden }}{% endfor %}
+                {% for hidden in inline_form.hidden_fields %}{{ hidden }}{% for error in hidden.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}{% endfor %}
                 <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
                     {% for field in inline_form.visible_fields %}
                         {% if field.name != "DELETE" %}

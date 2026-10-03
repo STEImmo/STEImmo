@@ -58,6 +58,7 @@
         const csrfToken = () => protocolForm?.querySelector("[name=csrfmiddlewaretoken]")?.value || "";
 
         const apartmentSelect = document.getElementById("id_wohnung");
+        let loadedApartmentId = apartmentSelect?.value || "";
         const updateApartmentDependentFields = async () => {
             if (!apartmentSelect) {
                 return false;
@@ -79,6 +80,10 @@
                 return false;
             }
             const updatedPage = new DOMParser().parseFromString(await response.text(), "text/html");
+            const apartmentChanged = loadedApartmentId !== apartmentSelect.value;
+            const meterValues = new Map(Array.from(document.querySelectorAll(
+                '#meter-reading-section input[name]:not(:disabled)',
+            )).map((field) => [field.name, field.value]));
             [
                 "id_person",
                 "meter-reading-section",
@@ -87,12 +92,23 @@
                 "room-formset-section",
                 "move-in-reference",
             ].forEach((id) => {
+                if (!apartmentChanged && ["key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
+                    return;
+                }
                 const currentElement = document.getElementById(id);
                 const updatedElement = updatedPage.getElementById(id);
                 if (currentElement && updatedElement) {
                     currentElement.replaceWith(updatedElement);
                 }
             });
+            document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
+                if (meterValues.has(field.name)) {
+                    field.value = meterValues.get(field.name);
+                }
+            });
+            loadedApartmentId = apartmentSelect.value;
+            document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
+            document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
             window.history.replaceState(null, "", url);
             return true;
         };
@@ -438,8 +454,10 @@
             "nachbesserung_bis",
             "nachbesserung_beschreibung",
         ];
-        const checklistFieldNames = ["bereich", "merkmal", "wert", "zusatzangaben"];
+        const checklistFieldNames = ["pruefpunkt", "bereich", "merkmal", "wert", "zusatzangaben", "DELETE"];
         const keyFieldNames = [
+            "schluessel",
+            "DELETE",
             "anzahl",
             "raum_bezeichnung",
             "aufschrift",
@@ -485,15 +503,12 @@
             savedAt: Date.now(),
             fields: serializeFields(protocolForm, protocolFieldNames),
             rooms: Array.from(document.querySelectorAll("[data-room-card]"))
-                .filter((card) => !card.hidden)
                 .map((card) => ({
                     raum: card.querySelector("[data-room-source]")?.value || "",
                     items: Array.from(card.querySelectorAll("[data-room-checklist-form]"))
-                        .filter((item) => !item.hidden)
                         .map((item) => serializeFields(item, checklistFieldNames)),
                 })),
             keys: Array.from(document.querySelectorAll("[data-key-formset-row]"))
-                .filter((card) => !card.hidden)
                 .map((card) => serializeFields(card, keyFieldNames)),
         });
         const showDraftStatus = (message) => {
@@ -575,23 +590,55 @@
             if (!totalForms || !target) {
                 return;
             }
-            target.innerHTML = "";
-            totalForms.value = "0";
             (rooms || []).forEach((savedRoom) => {
-                addRoom();
-                const card = target.lastElementChild;
+                let card = Array.from(target.querySelectorAll("[data-room-card]")).find((existing) => (
+                    existing.querySelector("[data-room-source]")?.value === savedRoom.raum
+                ));
+                if (!card) {
+                    card = Array.from(target.querySelectorAll("[data-room-card]")).find((existing) => (
+                        !existing.querySelector("[data-room-source]")?.value
+                    ));
+                }
+                if (!card) {
+                    addRoom();
+                    card = target.lastElementChild;
+                }
                 const roomInput = card?.querySelector("[data-room-source]");
                 if (roomInput) {
                     roomInput.value = savedRoom.raum || "";
                 }
                 const savedItems = savedRoom.items?.length ? savedRoom.items : [{}];
-                while (card?.querySelectorAll("[data-room-checklist-form]").length < savedItems.length) {
-                    addRoomChecklistItem(card);
-                }
-                card?.querySelectorAll("[data-room-checklist-form]").forEach((item, index) => {
-                    restoreFields(item, savedItems[index]);
+                const restored = new Set();
+                savedItems.forEach((savedItem) => {
+                    const id = savedItem.pruefpunkt?.value;
+                    const feature = savedItem.merkmal?.value;
+                    let item = Array.from(target.querySelectorAll("[data-room-checklist-form]")).find((existing) => (
+                        id && fieldForName(existing, "pruefpunkt")?.value === id
+                    ));
+                    if (!item) {
+                        item = Array.from(card.querySelectorAll("[data-room-checklist-form]")).find((existing) => (
+                            !restored.has(existing) && fieldForName(existing, "merkmal")?.value === feature
+                        ));
+                    }
+                    if (!item) {
+                        item = Array.from(card.querySelectorAll("[data-room-checklist-form]")).find((existing) => (
+                            !restored.has(existing) && !fieldForName(existing, "merkmal")?.value
+                            && !fieldForName(existing, "pruefpunkt")?.value
+                        ));
+                    }
+                    if (!item) {
+                        addRoomChecklistItem(card);
+                        item = card.querySelector("[data-room-checklist-items]").lastElementChild;
+                    }
+                    if (!card.contains(item)) {
+                        card.querySelector("[data-room-checklist-items]").append(item);
+                    }
+                    restored.add(item);
+                    restoreFields(item, savedItem);
+                    item.hidden = Boolean(savedItem.DELETE?.checked);
                     filterFeatureNames(item);
                 });
+                card.hidden = Array.from(card.querySelectorAll("[data-room-checklist-form]")).every((item) => item.hidden);
                 synchronizeRoomCard(card);
             });
         };
@@ -601,10 +648,26 @@
             if (!totalForms || !target) {
                 return;
             }
-            target.innerHTML = "";
-            totalForms.value = "0";
+            const restored = new Set();
             (keys || []).forEach((savedKey) => {
-                restoreFields(addKeyForm(), savedKey);
+                let card = Array.from(target.children).find((existing) => (
+                    savedKey.schluessel?.value && fieldForName(existing, "schluessel")?.value === savedKey.schluessel.value
+                ));
+                if (!card) {
+                    card = Array.from(target.children).find((existing) => (
+                        !restored.has(existing) && fieldForName(existing, "raum_bezeichnung")?.value === savedKey.raum_bezeichnung?.value
+                        && fieldForName(existing, "schluesselnummer")?.value === savedKey.schluesselnummer?.value
+                    ));
+                }
+                if (!card) {
+                    card = Array.from(target.children).find((existing) => (
+                        !restored.has(existing) && !fieldForName(existing, "raum_bezeichnung")?.value
+                    ));
+                }
+                card = card || addKeyForm();
+                restored.add(card);
+                restoreFields(card, savedKey);
+                card.hidden = Boolean(savedKey.DELETE?.checked);
             });
         };
         const restoreDraft = async (draft) => {
