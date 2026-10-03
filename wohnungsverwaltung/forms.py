@@ -580,7 +580,10 @@ class ApartmentSearchForm(forms.Form):
             minimum = cleaned_data.get(minimum_field)
             maximum = cleaned_data.get(maximum_field)
             if minimum is not None and maximum is not None and minimum > maximum:
-                self.add_error(maximum_field, "Der Höchstwert muss mindestens dem Mindestwert entsprechen.")
+                self.add_error(
+                    maximum_field,
+                    "Der Höchstwert muss mindestens dem Mindestwert entsprechen.",
+                )
         return cleaned_data
 
 
