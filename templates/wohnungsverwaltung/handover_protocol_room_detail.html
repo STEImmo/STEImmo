@@ -12,25 +12,33 @@
         {% if room.raum_merkmale.all %}
             <div class="uk-card uk-card-default uk-card-body uk-margin-top">
                 <h2 class="uk-heading-divider">Erfasste Prüfpunkte</h2>
+                {% include "wohnungsverwaltung/_room_move_in_unmatched_references.html" with room=room einzugspruefpunkte=room.einzugspruefpunkte_ohne_match einzugsprotokoll=move_in_reference %}
                 <dl class="uk-description-list uk-description-list-divider">
                     {% for item in room.raum_merkmale.all %}
                         <dt>{{ item.merkmal.bereich }}: {{ item.merkmal.bezeichnung }}</dt>
-                        <dd class="uk-flex uk-flex-between uk-flex-middle">
-                            <div>
-                                <div>{{ item.wert.text }}</div>
-                                {% if item.wert.angaben %}
-                                    <dl class="uk-description-list uk-description-list-divider uk-margin-small-top">
-                                        {% for label, value in item.wert.angaben.items %}
-                                            <dt>{{ label }}</dt>
-                                            <dd>{{ value }}</dd>
-                                        {% endfor %}
-                                    </dl>
-                                {% endif %}
+                        <dd>
+                            <div class="uk-flex uk-flex-between uk-flex-top uk-flex-wrap uk-grid-small" uk-grid>
+                                <div class="uk-width-expand">
+                                    {% include "wohnungsverwaltung/_raum_merkmal_move_in_reference.html" with item=item einzugspruefpunkt=item.einzugspruefpunkt einzugsfotos=item.einzugsfotos einzugsprotokoll=item.einzugsprotokoll %}
+                                    {% if protocol.protokoll_typ == "move_out" %}<h4 class="uk-heading-bullet uk-margin-small-top uk-margin-remove-bottom">Auszug (neu)</h4>{% endif %}
+                                    <div>{{ item.wert.text }}</div>
+                                    {% if item.wert.angaben %}
+                                        <dl class="uk-description-list uk-description-list-divider uk-margin-small-top">
+                                            {% for label, value in item.wert.angaben.items %}
+                                                <dt>{{ label }}</dt>
+                                                <dd>{{ value }}</dd>
+                                            {% endfor %}
+                                        </dl>
+                                    {% endif %}
+                                    {% include "wohnungsverwaltung/_raum_merkmal_fotos.html" with item=item protocol=protocol room=room %}
+                                </div>
+                                <div class="uk-width-auto">
+                                    <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_delete' protocol.pk room.pk item.pk %}">
+                                        {% csrf_token %}
+                                        <button class="uk-button uk-button-danger uk-button-small" type="submit">Prüfpunkt löschen</button>
+                                    </form>
+                                </div>
                             </div>
-                            <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_delete' protocol.pk room.pk item.pk %}">
-                                {% csrf_token %}
-                                <button class="uk-button uk-button-danger uk-button-small" type="submit">Prüfpunkt löschen</button>
-                            </form>
                         </dd>
                     {% endfor %}
                 </dl>

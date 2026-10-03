@@ -2,6 +2,7 @@ import json
 from uuid import UUID
 
 from django import forms
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.password_validation import validate_password
@@ -28,6 +29,7 @@ from .models import (
     ProtokollTyp,
     Raum,
     RaumMerkmal,
+    RaumMerkmalFoto,
     Raumprotokoll,
     Schluessel,
     Stellplatz,
@@ -35,6 +37,7 @@ from .models import (
     UebergabeStatus,
     Wohnung,
     WohnungStatus,
+    calculate_photo_checksum,
 )
 
 HANDOVER_TYPE_LABELS = {
@@ -60,7 +63,35 @@ METER_NUMBER_FIELDS = (
     ("zaehlernummer_strom", "Strom"),
 )
 
+METER_READING_FIELDS = (
+    ("zaehlerstand_wasser_kalt", "zaehlernummer_wasser_kalt", "Kaltwasser"),
+    ("zaehlerstand_wasser_warm", "zaehlernummer_wasser_warm", "Warmwasser"),
+    ("zaehlerstand_heizung", "zaehlernummer_heizung", "Heizung"),
+    ("zaehlerstand_strom", "zaehlernummer_strom", "Strom"),
+)
+
 ACCOUNT_CREATION_ERROR = "Mit diesen Angaben kann kein Konto erstellt werden."
+PHOTO_CONTENT_TYPES = {
+    "JPEG": "image/jpeg",
+    "PNG": "image/png",
+    "WEBP": "image/webp",
+}
+
+
+def photo_content_type_from_format(image_format: str) -> str | None:
+    """Return the allowed MIME type for a Pillow-verified image format."""
+
+    return PHOTO_CONTENT_TYPES.get(image_format)
+
+
+def verified_photo_content_type(photo) -> str:
+    """Return the MIME type derived from an ImageField-validated upload."""
+
+    image_format = getattr(getattr(photo, "image", None), "format", "")
+    content_type = photo_content_type_from_format(image_format)
+    if content_type is None:
+        raise ValidationError("Erlaubt sind nur JPEG-, PNG- und WebP-Bilder.")
+    return content_type
 
 
 class RegistrationForm(forms.Form):
@@ -660,6 +691,9 @@ class HandoverProtocolForm(forms.ModelForm):
         self.fields["protokoll_typ"].choices = HANDOVER_TYPE_LABELS.items()
         self.fields["uebergabe_status"].choices = HANDOVER_STATUS_LABELS.items()
         self.fields["abnahme_status"].choices = ACCEPTANCE_STATUS_LABELS.items()
+        for field_name, _number_field, label in METER_READING_FIELDS:
+            self.fields[field_name].widget.attrs["data-meter-reading"] = ""
+            self.fields[field_name].widget.attrs["aria-label"] = f"{label}, Auszug neu"
 
     def clean(self) -> dict:
         cleaned_data = super().clean()
@@ -752,11 +786,8 @@ class HandoverProtocolForm(forms.ModelForm):
         return tuple(
             self[field_name]
             for field_name in (
-                "zaehlerstand_wasser_kalt",
-                "zaehlerstand_wasser_warm",
-                "zaehlerstand_heizung",
+                *[field_name for field_name, *_rest in METER_READING_FIELDS],
                 "heizungsablesungen",
-                "zaehlerstand_strom",
             )
         )
 
@@ -899,8 +930,9 @@ class RoomChecklistItemForm(forms.Form):
         widget=forms.HiddenInput(attrs={"data-additional-details-value": ""}),
     )
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, room: Raumprotokoll | None = None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self.room = room
         self.fields["bereich"].choices = _feature_area_choices()
         self.fields["merkmal"].queryset = Merkmal.objects.order_by("bereich", "bezeichnung")
 
@@ -909,6 +941,12 @@ class RoomChecklistItemForm(forms.Form):
         feature = cleaned_data.get("merkmal")
         if feature is not None and feature.bereich != cleaned_data.get("bereich"):
             self.add_error("merkmal", "Die Bezeichnung gehört nicht zum gewählten Bereich.")
+        if (
+            feature is not None
+            and self.room is not None
+            and self.room.raum_merkmale.filter(merkmal=feature).exists()
+        ):
+            self.add_error("merkmal", "Dieser Prüfpunkt ist in diesem Raum bereits erfasst.")
         try:
             cleaned_data["zusatzangaben"] = _clean_additional_details(
                 cleaned_data.get("zusatzangaben", ""), feature
@@ -923,6 +961,64 @@ class RoomChecklistItemForm(forms.Form):
             merkmal=self.cleaned_data["merkmal"],
             wert=_finding_value(self.cleaned_data["wert"], self.cleaned_data["zusatzangaben"]),
         )
+
+
+class MultiplePhotoInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultiplePhotoField(forms.ImageField):
+    allowed_formats = frozenset(PHOTO_CONTENT_TYPES)
+
+    def clean(self, data, initial=None):
+        if not data:
+            if self.required:
+                return super().clean(data, initial)
+            return []
+        single_photo_clean = super().clean
+        photos = data if isinstance(data, (list, tuple)) else [data]
+        cleaned_photos = [single_photo_clean(photo, initial) for photo in photos]
+        checksums = [calculate_photo_checksum(photo) for photo in cleaned_photos]
+        if len(checksums) != len(set(checksums)):
+            raise forms.ValidationError("Dasselbe Foto kann nur einmal ausgewählt werden.")
+        return cleaned_photos
+
+    def validate(self, value) -> None:
+        super().validate(value)
+        if value.size > settings.HANDOVER_PHOTO_MAX_SIZE:
+            maximum_mebibytes = settings.HANDOVER_PHOTO_MAX_SIZE // (1024 * 1024)
+            raise forms.ValidationError(
+                f"Ein Foto darf höchstens {maximum_mebibytes} MiB groß sein."
+            )
+        image_format = getattr(getattr(value, "image", None), "format", "")
+        if photo_content_type_from_format(image_format) is None:
+            raise forms.ValidationError("Erlaubt sind nur JPEG-, PNG- und WebP-Bilder.")
+
+
+class RoomChecklistPhotoUploadForm(forms.Form):
+    fotos = MultiplePhotoField(
+        label="Fotos",
+        widget=MultiplePhotoInput(
+            attrs={
+                "class": "uk-input",
+                "accept": "image/jpeg,image/png,image/webp",
+                "multiple": True,
+            }
+        ),
+    )
+
+    def __init__(self, *args, existing_photo_count: int, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.existing_photo_count = existing_photo_count
+
+    def clean_fotos(self):
+        photos = self.cleaned_data["fotos"]
+        maximum = settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM
+        if self.existing_photo_count + len(photos) > maximum:
+            raise forms.ValidationError(
+                f"Für einen Prüfpunkt sind höchstens {maximum} Fotos erlaubt."
+            )
+        return photos
 
 
 class HandoverKeyForm(forms.ModelForm):
@@ -1002,13 +1098,31 @@ class InlineRoomChecklistForm(forms.Form):
         required=False,
         widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 5}),
     )
+    fotos = MultiplePhotoField(
+        label="Fotos zur Feststellung",
+        required=False,
+        widget=MultiplePhotoInput(
+            attrs={
+                "class": "uk-input",
+                "accept": "image/jpeg,image/png,image/webp",
+                "multiple": True,
+            }
+        ),
+    )
     zusatzangaben = forms.CharField(
         required=False,
         widget=forms.HiddenInput(attrs={"data-additional-details-value": ""}),
     )
 
-    def __init__(self, *args, wohnung_id: UUID | None = None, **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        wohnung_id: UUID | None = None,
+        allow_photo_upload: bool = False,
+        **kwargs,
+    ) -> None:
         super().__init__(*args, **kwargs)
+        self.allow_photo_upload = allow_photo_upload
         if wohnung_id is not None:
             self.fields["raum"].queryset = Raum.objects.filter(wohnung_id=wohnung_id).order_by(
                 "name"
@@ -1018,6 +1132,7 @@ class InlineRoomChecklistForm(forms.Form):
 
     def clean(self) -> dict:
         cleaned_data = super().clean()
+        photos = cleaned_data.get("fotos", [])
         values = {
             "raum": cleaned_data.get("raum"),
             "bereich": cleaned_data.get("bereich", "").strip(),
@@ -1025,6 +1140,8 @@ class InlineRoomChecklistForm(forms.Form):
             "wert": cleaned_data.get("wert", "").strip(),
         }
         if not any((values["bereich"], values["merkmal"], values["wert"])):
+            if photos:
+                self.add_error("fotos", "Bitte erfassen Sie den zugehörigen Prüfpunkt vollständig.")
             return cleaned_data
         for field_name in ("bereich", "merkmal", "wert"):
             value = values[field_name]
@@ -1039,6 +1156,11 @@ class InlineRoomChecklistForm(forms.Form):
             )
         except forms.ValidationError as error:
             self.add_error("zusatzangaben", error)
+        if photos and not self.allow_photo_upload:
+            self.add_error("fotos", "Nur die Verwaltung darf Fotos hochladen.")
+        if len(photos) > settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM:
+            maximum = settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM
+            self.add_error("fotos", f"Für einen Prüfpunkt sind höchstens {maximum} Fotos erlaubt.")
         return cleaned_data
 
     def has_entry(self) -> bool:
@@ -1051,17 +1173,27 @@ class InlineRoomChecklistForm(forms.Form):
             raum=raum,
             defaults={"name": raum.name},
         )
-        return RaumMerkmal.objects.create(
+        checklist_item = RaumMerkmal.objects.create(
             raumprotokoll=room,
             merkmal=self.cleaned_data["merkmal"],
             wert=_finding_value(self.cleaned_data["wert"], self.cleaned_data["zusatzangaben"]),
         )
+        for photo in self.cleaned_data["fotos"]:
+            RaumMerkmalFoto.objects.create(
+                raum_merkmal=checklist_item,
+                datei=photo,
+                content_type=verified_photo_content_type(photo),
+                dateigroesse=photo.size,
+                inhalt_hash_sha256=calculate_photo_checksum(photo),
+            )
+        return checklist_item
 
 
 class RoomChecklistFormSet(BaseFormSet):
     def clean(self) -> None:
         super().clean()
         current_room = None
+        checklist_entries = []
         for room_form in self.forms:
             if (
                 not getattr(room_form, "cleaned_data", None)
@@ -1072,11 +1204,24 @@ class RoomChecklistFormSet(BaseFormSet):
             room = room_form.cleaned_data.get("raum")
             if room is not None:
                 current_room = room
-                continue
-            if current_room is not None:
+            elif current_room is not None:
                 room_form.cleaned_data["raum"] = current_room
+            else:
+                room_form.add_error("raum", "Bitte wählen Sie für den ersten Prüfpunkt einen Raum.")
                 continue
-            room_form.add_error("raum", "Bitte wählen Sie für den ersten Prüfpunkt einen Raum.")
+            checklist_entries.append(room_form)
+
+        seen_checkpoints = set()
+        for room_form in checklist_entries:
+            checkpoint = (
+                room_form.cleaned_data["raum"].pk,
+                room_form.cleaned_data["merkmal"].pk,
+            )
+            if checkpoint in seen_checkpoints:
+                room_form.add_error(
+                    "merkmal", "Dieser Prüfpunkt ist in diesem Raum bereits erfasst."
+                )
+            seen_checkpoints.add(checkpoint)
 
 
 InlineRoomChecklistFormSet = forms.formset_factory(

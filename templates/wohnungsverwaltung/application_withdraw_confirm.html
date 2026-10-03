@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Interesse zurückziehen – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <article class="uk-card uk-card-default uk-card-body">
+            <h1 class="uk-card-title">Interesse zurückziehen?</h1>
+            <p>
+                Möchten Sie Ihr Interesse an der Bewerbung für {{ application.wohnung }} wirklich
+                zurückziehen? Dieser Schritt kann nicht rückgängig gemacht werden.
+            </p>
+            <div class="uk-flex uk-flex-wrap uk-grid-small" uk-grid>
+                <form method="post">
+                    {% csrf_token %}
+                    <button class="uk-button uk-button-danger" type="submit">
+                        Interesse endgültig zurückziehen
+                    </button>
+                </form>
+                <a class="uk-button uk-button-default"
+                   href="{% url 'wohnungsverwaltung:main_application_status' application.pk %}">
+                    Abbrechen
+                </a>
+            </div>
+        </article>
+    </div>
+</section>
+{% endblock %}

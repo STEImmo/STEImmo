@@ -1,3 +1,4 @@
+import hashlib
 import secrets
 import uuid
 from datetime import timedelta
@@ -9,6 +10,26 @@ from django.db import models
 from django.utils import timezone
 
 from .fields import PostgreSQLEnumField
+
+
+def handover_photo_upload_path(instance, _filename: str) -> str:
+    """Return an opaque, protocol-scoped storage name for a checklist photo."""
+    checklist_item = instance.raum_merkmal
+    protocol_id = checklist_item.raumprotokoll.protokoll_id
+    return f"u/{protocol_id.hex}/{checklist_item.pk.hex}/{uuid.uuid4().hex}"
+
+
+def calculate_photo_checksum(photo) -> str:
+    """Return the SHA-256 checksum while preserving the current file position."""
+    position = photo.tell()
+    digest = hashlib.sha256()
+    try:
+        photo.seek(0)
+        for chunk in photo.chunks():
+            digest.update(chunk)
+    finally:
+        photo.seek(position)
+    return digest.hexdigest()
 
 
 class Geschlecht(models.TextChoices):
@@ -320,6 +341,14 @@ class Bewerbung(models.Model):
         default=BewerbungStatus.OPEN,
         max_length=255,
     )
+    main_application_unlocked = models.BooleanField(
+        default=False,
+        help_text=(
+            "Wird durch die Mitarbeiterseite nach Besichtigung und positiver Eignungsentscheidung "
+            "gesetzt."
+        ),
+    )
+    interest_withdrawn_at = models.DateTimeField(blank=True, null=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -327,7 +356,10 @@ class Bewerbung(models.Model):
         db_table = "bewerbung"
         constraints = [
             models.UniqueConstraint(
-                condition=models.Q(status=BewerbungStatus.OPEN),
+                condition=models.Q(
+                    status=BewerbungStatus.OPEN,
+                    interest_withdrawn_at__isnull=True,
+                ),
                 fields=("person",),
                 name="bewerbung_eine_offene_pro_person",
             ),
@@ -339,6 +371,36 @@ class Bewerbung(models.Model):
                 condition=models.Q(score__gte=0), name="bewerbung_score_nicht_negativ"
             ),
         ]
+
+    @property
+    def main_application_accessible(self) -> bool:
+        return (
+            self.main_application_unlocked
+            and self.status == BewerbungStatus.OPEN
+            and self.interest_withdrawn_at is None
+        )
+
+    def get_applicant_status_display(self) -> str:
+        if self.interest_withdrawn_at is not None:
+            return "Zurückgezogen"
+        if self.status == BewerbungStatus.DECLINED:
+            return "Abgelehnt"
+        if self.status == BewerbungStatus.BLOCKED:
+            return "Gesperrt"
+        if self.main_application_unlocked:
+            return "Main-Bewerbung freigeschaltet"
+        return "In Bearbeitung"
+
+    def get_applicant_next_step(self) -> str:
+        if self.interest_withdrawn_at is not None:
+            return "Für diese Bewerbung sind keine weiteren Schritte möglich."
+        if self.status == BewerbungStatus.DECLINED:
+            return "Die Bewerbung wurde beendet."
+        if self.status == BewerbungStatus.BLOCKED:
+            return "Die Bewerbung ist derzeit gesperrt."
+        if self.main_application_unlocked:
+            return "Ihre Main-Bewerbung ist freigeschaltet."
+        return "Warten Sie auf die nächste Rückmeldung zu Ihrer Bewerbung."
 
 
 class Stellplatz(models.Model):
@@ -570,6 +632,36 @@ class RaumMerkmal(models.Model):
 
     class Meta:
         db_table = "raum_merkmal"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("raumprotokoll", "merkmal"),
+                name="raum_merkmal_eindeutig_pro_raumprotokoll",
+            )
+        ]
+
+
+class RaumMerkmalFoto(models.Model):
+    raum_merkmal_foto_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    raum_merkmal = models.ForeignKey(
+        RaumMerkmal,
+        on_delete=models.CASCADE,
+        related_name="fotos",
+    )
+    datei = models.ImageField(upload_to=handover_photo_upload_path)
+    content_type = models.CharField(max_length=50)
+    dateigroesse = models.PositiveIntegerField()
+    inhalt_hash_sha256 = models.CharField(max_length=64, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "raum_merkmal_foto"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("raum_merkmal", "inhalt_hash_sha256"),
+                condition=~models.Q(inhalt_hash_sha256=""),
+                name="raum_merkmal_foto_hash_eindeutig",
+            )
+        ]
 
 
 class ProtokollSchluessel(models.Model):

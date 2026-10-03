@@ -1,21 +1,26 @@
 import json
+from datetime import UTC, datetime
 from decimal import Decimal
-from io import StringIO
+from io import BytesIO, StringIO
+from tempfile import TemporaryDirectory
 
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
+from PIL import Image
 
 from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
 from .forms import BewerbungForm, InlineRoomChecklistFormSet, RoomChecklistItemForm
 from .models import (
     AbnahmeStatus,
     Bewerbung,
+    BewerbungStatus,
     Merkmal,
     MerkmalDatentyp,
     Person,
@@ -24,6 +29,8 @@ from .models import (
     ProtokollStatus,
     ProtokollTyp,
     Raum,
+    RaumMerkmal,
+    RaumMerkmalFoto,
     Schluessel,
     UebergabeStatus,
     Wohnung,
@@ -190,6 +197,12 @@ class HandoverProtocolViewsTests(TestCase):
             aufschrift="A",
             status="in_use",
         )
+        self.staff_user = get_user_model().objects.create_user(
+            username="uebergabe-verwaltung",
+            password="sicheres-passwort",
+            is_staff=True,
+        )
+        self.staff_user.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
 
     def valid_form_data(self) -> dict[str, str]:
         return {
@@ -229,6 +242,32 @@ class HandoverProtocolViewsTests(TestCase):
             "keys": [],
         }
 
+    def checklist_item_for_photo(self):
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
+        )
+        protocol = Protokoll.objects.get()
+        room = protocol.raeume.create(raum=self.kitchen, name=self.kitchen.name)
+        checklist_item = room.raum_merkmale.create(
+            merkmal=self.room_feature,
+            wert={"text": "Kratzer am Fensterrahmen"},
+        )
+        return protocol, room, checklist_item
+
+    @staticmethod
+    def photo_upload(
+        name: str = "feststellung.png",
+        color: str = "white",
+        content_type: str = "image/png",
+    ) -> SimpleUploadedFile:
+        image_data = BytesIO()
+        Image.new("RGB", (1, 1), color).save(image_data, format="PNG")
+        return SimpleUploadedFile(
+            name,
+            image_data.getvalue(),
+            content_type=content_type,
+        )
+
     def test_create_page_shows_required_handover_fields(self) -> None:
         response = self.client.get(
             reverse("wohnungsverwaltung:handover_protocol_create"),
@@ -248,6 +287,19 @@ class HandoverProtocolViewsTests(TestCase):
         heating_readings_field = response.context["form"].fields["heizungsablesungen"]
         self.assertIsInstance(heating_readings_field.widget, forms.TextInput)
         self.assertEqual(heating_readings_field.widget.attrs["class"], "uk-input")
+
+    def test_create_page_shows_photo_field_to_employee(self) -> None:
+        self.assertFalse(self.employee_user.is_staff)
+        self.client.force_login(self.employee_user)
+
+        response = self.client.get(
+            reverse("wohnungsverwaltung:handover_protocol_create"),
+            {"wohnung": self.wohnung.pk},
+        )
+
+        self.assertContains(response, "Fotos zur Feststellung")
+        self.assertContains(response, 'accept="image/jpeg,image/png,image/webp"')
+        self.assertContains(response, "Auswahl entfernen")
 
     def test_create_page_only_lists_people_assigned_to_the_selected_unit(self) -> None:
         other_unit = Wohnung.objects.create(
@@ -659,6 +711,66 @@ class HandoverProtocolViewsTests(TestCase):
         )
         self.assertEqual(protocol.protokoll_schluessel.get().anzahl, 2)
 
+    def test_employee_can_add_photos_while_creating_a_protocol(self) -> None:
+        data = self.valid_form_data()
+        data.update(
+            {
+                "rooms-0-raum": str(self.kitchen.pk),
+                "rooms-0-bereich": "Küche",
+                "rooms-0-merkmal": str(self.room_feature.pk),
+                "rooms-0-wert": "Kratzer am Fensterrahmen",
+            }
+        )
+
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            self.assertFalse(self.employee_user.is_staff)
+            self.client.force_login(self.employee_user)
+            data["rooms-0-fotos"] = [
+                self.photo_upload("eins.png", content_type="text/html"),
+                self.photo_upload("zwei.png", "black"),
+            ]
+            response = self.client.post(
+                reverse("wohnungsverwaltung:handover_protocol_create"),
+                data,
+            )
+
+            self.assertEqual(response.status_code, 302)
+            checklist_item = Protokoll.objects.get().raeume.get().raum_merkmale.get()
+            self.assertEqual(checklist_item.fotos.count(), 2)
+            self.assertEqual(
+                list(checklist_item.fotos.values_list("content_type", flat=True)),
+                ["image/png", "image/png"],
+            )
+            self.assertTrue(
+                checklist_item.fotos.first().datei.storage.exists(
+                    checklist_item.fotos.first().datei.name
+                )
+            )
+
+    def test_non_employee_cannot_add_photos_while_creating_a_protocol(self) -> None:
+        data = self.valid_form_data()
+        data.update(
+            {
+                "rooms-0-raum": str(self.kitchen.pk),
+                "rooms-0-bereich": "Küche",
+                "rooms-0-merkmal": str(self.room_feature.pk),
+                "rooms-0-wert": "Kratzer am Fensterrahmen",
+                "rooms-0-fotos": self.photo_upload(),
+            }
+        )
+
+        self.client.force_login(
+            get_user_model().objects.create_user(
+                username="ohne-mitarbeiterrolle",
+                password="sicheres-passwort",
+            )
+        )
+
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Protokoll.objects.exists())
+
     def test_inline_room_checklist_rejects_a_room_from_another_apartment(self) -> None:
         other_unit = Wohnung.objects.create(etage=1, wohnungsnummer="1.03", gebaeudenummer="1")
         other_room = Raum.objects.create(wohnung=other_unit, name="Bad")
@@ -676,6 +788,28 @@ class HandoverProtocolViewsTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("raum", response.context["room_formset"].forms[0].errors)
+        self.assertFalse(Protokoll.objects.exists())
+
+    def test_inline_room_checklist_rejects_duplicate_checkpoints(self) -> None:
+        data = self.valid_form_data()
+        data.update(
+            {
+                "rooms-TOTAL_FORMS": "2",
+                "rooms-0-raum": str(self.kitchen.pk),
+                "rooms-0-bereich": "Küche",
+                "rooms-0-merkmal": str(self.room_feature.pk),
+                "rooms-0-wert": "Kratzer am Fensterrahmen",
+                "rooms-1-raum": "",
+                "rooms-1-bereich": "Küche",
+                "rooms-1-merkmal": str(self.room_feature.pk),
+                "rooms-1-wert": "Weiterer Kratzer am Fensterrahmen",
+            }
+        )
+
+        response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("merkmal", response.context["room_formset"].forms[1].errors)
         self.assertFalse(Protokoll.objects.exists())
 
     def test_create_skips_rooms_and_keys_marked_for_removal(self) -> None:
@@ -822,6 +956,32 @@ class HandoverProtocolViewsTests(TestCase):
         )
         self.assertContains(response, "Anzahl")
         self.assertContains(response, "3")
+
+    def test_room_detail_rejects_a_duplicate_checkpoint(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_room_detail",
+                kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+            ),
+            {
+                "bereich": "Küche",
+                "merkmal": str(checklist_item.merkmal_id),
+                "wert": "Weiterer Kratzer am Fensterrahmen",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("merkmal", response.context["form"].errors)
+        self.assertEqual(room.raum_merkmale.count(), 1)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                RaumMerkmal.objects.create(
+                    raumprotokoll=room,
+                    merkmal=checklist_item.merkmal,
+                    wert={"text": "Doppelt erfasst"},
+                )
 
     def test_open_protocol_allows_removing_rooms_and_key_positions(self) -> None:
         self.client.post(
@@ -1103,6 +1263,552 @@ class HandoverProtocolViewsTests(TestCase):
         )
         self.assertFalse(protocol.protokoll_schluessel.exists())
 
+    def test_employee_can_attach_multiple_photos_to_an_existing_checklist_item(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+        upload_url = reverse(
+            "wohnungsverwaltung:handover_protocol_checklist_item_photo_upload",
+            kwargs={
+                "protocol_id": protocol.pk,
+                "room_id": room.pk,
+                "item_id": checklist_item.pk,
+            },
+        )
+
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            self.assertFalse(self.employee_user.is_staff)
+            self.client.force_login(self.employee_user)
+            response = self.client.get(
+                reverse(
+                    "wohnungsverwaltung:handover_protocol_room_detail",
+                    kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+                )
+            )
+            self.assertContains(response, "Fotos speichern")
+            response = self.client.post(
+                upload_url,
+                {
+                    "fotos": [
+                        self.photo_upload("erstes.png"),
+                        self.photo_upload("zweites.png", "black"),
+                    ]
+                },
+            )
+
+            self.assertRedirects(
+                response,
+                reverse(
+                    "wohnungsverwaltung:handover_protocol_room_detail",
+                    kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+                ),
+            )
+            photos = list(checklist_item.fotos.order_by("created_at"))
+            self.assertEqual(len(photos), 2)
+            self.assertTrue(
+                photos[0].datei.name.startswith(f"u/{protocol.pk.hex}/{checklist_item.pk.hex}/")
+            )
+            self.assertTrue(photos[0].datei.storage.exists(photos[0].datei.name))
+
+            photo_url = reverse(
+                "wohnungsverwaltung:handover_protocol_checklist_item_photo_view",
+                kwargs={
+                    "protocol_id": protocol.pk,
+                    "room_id": room.pk,
+                    "item_id": checklist_item.pk,
+                    "photo_id": photos[0].pk,
+                },
+            )
+            response = self.client.get(photo_url)
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response["Content-Type"], "image/png")
+            self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+            self.assertEqual(photos[0].raum_merkmal_id, checklist_item.pk)
+
+            self.client.logout()
+            response = self.client.get(photo_url)
+            self.assertEqual(response.status_code, 302)
+            self.assertIn(reverse("login"), response["Location"])
+
+    def test_photo_view_uses_a_verified_mime_type(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            uploaded_photo = self.photo_upload(content_type="text/html")
+            photo = RaumMerkmalFoto.objects.create(
+                raum_merkmal=checklist_item,
+                datei=uploaded_photo,
+                content_type="text/html",
+                dateigroesse=uploaded_photo.size,
+            )
+            self.client.force_login(self.employee_user)
+            response = self.client.get(
+                reverse(
+                    "wohnungsverwaltung:handover_protocol_checklist_item_photo_view",
+                    kwargs={
+                        "protocol_id": protocol.pk,
+                        "room_id": room.pk,
+                        "item_id": checklist_item.pk,
+                        "photo_id": photo.pk,
+                    },
+                )
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+
+    def test_photo_upload_stores_the_verified_mime_type(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+        upload_url = reverse(
+            "wohnungsverwaltung:handover_protocol_checklist_item_photo_upload",
+            kwargs={
+                "protocol_id": protocol.pk,
+                "room_id": room.pk,
+                "item_id": checklist_item.pk,
+            },
+        )
+
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            self.client.force_login(self.employee_user)
+            response = self.client.post(
+                upload_url,
+                {"fotos": self.photo_upload(content_type="text/html")},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(checklist_item.fotos.get().content_type, "image/png")
+
+    def test_photo_upload_from_overview_returns_to_the_same_checkpoint(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+        upload_url = reverse(
+            "wohnungsverwaltung:handover_protocol_checklist_item_photo_upload",
+            kwargs={
+                "protocol_id": protocol.pk,
+                "room_id": room.pk,
+                "item_id": checklist_item.pk,
+            },
+        )
+
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            self.client.force_login(self.employee_user)
+            response = self.client.post(
+                upload_url,
+                {"fotos": self.photo_upload(), "return_to": "overview"},
+            )
+
+        expected_url = (
+            f"{reverse('wohnungsverwaltung:handover_protocol_detail', args=[protocol.pk])}"
+            f"#pruefpunkt-{checklist_item.pk}"
+        )
+        self.assertEqual(response["Location"], expected_url)
+        self.assertEqual(checklist_item.fotos.count(), 1)
+
+    def test_photo_upload_does_not_store_identical_content_twice(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+        upload_url = reverse(
+            "wohnungsverwaltung:handover_protocol_checklist_item_photo_upload",
+            kwargs={
+                "protocol_id": protocol.pk,
+                "room_id": room.pk,
+                "item_id": checklist_item.pk,
+            },
+        )
+
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            self.client.force_login(self.staff_user)
+            self.client.post(upload_url, {"fotos": self.photo_upload("erstes.png")})
+            response = self.client.post(
+                upload_url,
+                {"fotos": self.photo_upload("identisch.png")},
+                follow=True,
+            )
+
+        self.assertEqual(checklist_item.fotos.count(), 1)
+        self.assertContains(response, "Dieses Foto ist für den Prüfpunkt bereits gespeichert.")
+
+    def test_photo_upload_detects_a_duplicate_of_a_legacy_photo_without_a_hash(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+        upload_url = reverse(
+            "wohnungsverwaltung:handover_protocol_checklist_item_photo_upload",
+            kwargs={
+                "protocol_id": protocol.pk,
+                "room_id": room.pk,
+                "item_id": checklist_item.pk,
+            },
+        )
+
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            legacy_upload = self.photo_upload("vorhanden.png")
+            RaumMerkmalFoto.objects.create(
+                raum_merkmal=checklist_item,
+                datei=legacy_upload,
+                content_type=legacy_upload.content_type,
+                dateigroesse=legacy_upload.size,
+            )
+            self.client.force_login(self.staff_user)
+            response = self.client.post(
+                upload_url,
+                {"fotos": self.photo_upload("nochmal.png")},
+                follow=True,
+            )
+
+        self.assertEqual(checklist_item.fotos.count(), 1)
+        self.assertContains(response, "Dieses Foto ist für den Prüfpunkt bereits gespeichert.")
+
+    def test_staff_can_remove_one_photo_without_affecting_other_photos(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+        self.client.force_login(self.employee_user)
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            first_upload = self.photo_upload("erstes.png")
+            first_photo = RaumMerkmalFoto.objects.create(
+                raum_merkmal=checklist_item,
+                datei=first_upload,
+                content_type=first_upload.content_type,
+                dateigroesse=first_upload.size,
+            )
+            second_upload = self.photo_upload("zweites.png", "black")
+            second_photo = RaumMerkmalFoto.objects.create(
+                raum_merkmal=checklist_item,
+                datei=second_upload,
+                content_type=second_upload.content_type,
+                dateigroesse=second_upload.size,
+            )
+            first_stored_name = first_photo.datei.name
+            second_stored_name = second_photo.datei.name
+
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    reverse(
+                        "wohnungsverwaltung:handover_protocol_checklist_item_photo_delete",
+                        kwargs={
+                            "protocol_id": protocol.pk,
+                            "room_id": room.pk,
+                            "item_id": checklist_item.pk,
+                            "photo_id": first_photo.pk,
+                        },
+                    )
+                )
+
+            self.assertRedirects(
+                response,
+                reverse(
+                    "wohnungsverwaltung:handover_protocol_room_detail",
+                    kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+                ),
+            )
+            self.assertFalse(checklist_item.fotos.filter(pk=first_photo.pk).exists())
+            self.assertTrue(checklist_item.fotos.filter(pk=second_photo.pk).exists())
+            self.assertFalse(first_photo.datei.storage.exists(first_stored_name))
+            self.assertTrue(second_photo.datei.storage.exists(second_stored_name))
+
+    def test_move_out_shows_matching_photos_from_the_latest_signed_move_in(self) -> None:
+        move_in, move_in_room, move_in_item = self.checklist_item_for_photo()
+        move_in.status = ProtokollStatus.SIGNED
+        move_in.save(update_fields=["status"])
+
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            matching_upload = self.photo_upload("einzug-fenster.png")
+            matching_photo = RaumMerkmalFoto.objects.create(
+                raum_merkmal=move_in_item,
+                datei=matching_upload,
+                content_type=matching_upload.content_type,
+                dateigroesse=matching_upload.size,
+            )
+            other_item = move_in_room.raum_merkmale.create(
+                merkmal=self.second_room_feature,
+                wert={"text": "Boden ohne Schäden"},
+            )
+            other_upload = self.photo_upload("einzug-boden.png", "black")
+            other_photo = RaumMerkmalFoto.objects.create(
+                raum_merkmal=other_item,
+                datei=other_upload,
+                content_type=other_upload.content_type,
+                dateigroesse=other_upload.size,
+            )
+            move_out_data = self.valid_form_data()
+            move_out_data.update(
+                {
+                    "protokoll_typ": ProtokollTyp.MOVE_OUT,
+                    "uebergabe_zeitpunkt": "2026-10-01T10:30",
+                    "mieter_zukuenftige_anschrift": "Neue Adresse 1, 12345 Beispielstadt",
+                    "rooms-0-raum": str(self.kitchen.pk),
+                    "rooms-0-bereich": "Küche",
+                    "rooms-0-merkmal": str(self.room_feature.pk),
+                    "rooms-0-wert": "Kratzer am Fensterrahmen",
+                }
+            )
+            response = self.client.post(
+                reverse("wohnungsverwaltung:handover_protocol_create"), move_out_data
+            )
+            self.assertEqual(response.status_code, 302)
+            move_out = Protokoll.objects.exclude(pk=move_in.pk).get()
+
+            self.client.force_login(self.employee_user)
+            response = self.client.get(
+                reverse(
+                    "wohnungsverwaltung:handover_protocol_detail",
+                    kwargs={"protocol_id": move_out.pk},
+                )
+            )
+
+            matching_photo_url = reverse(
+                "wohnungsverwaltung:handover_protocol_checklist_item_photo_view",
+                kwargs={
+                    "protocol_id": move_in.pk,
+                    "room_id": move_in_room.pk,
+                    "item_id": move_in_item.pk,
+                    "photo_id": matching_photo.pk,
+                },
+            )
+            other_photo_url = reverse(
+                "wohnungsverwaltung:handover_protocol_checklist_item_photo_view",
+                kwargs={
+                    "protocol_id": move_in.pk,
+                    "room_id": move_in_room.pk,
+                    "item_id": other_item.pk,
+                    "photo_id": other_photo.pk,
+                },
+            )
+            self.assertContains(response, "Einzug (alt)")
+            self.assertContains(response, "Auszug (neu)")
+            self.assertContains(response, "Einzug (alt)</th><th>Auszug (neu)")
+            self.assertContains(response, "handover-photo-modal")
+            self.assertContains(response, "data-handover-photo")
+            self.assertContains(response, matching_photo_url)
+            self.assertContains(response, "weitere Prüfpunkte in diesem Raum")
+            self.assertContains(response, other_photo_url)
+            move_out_item = list(
+                list(response.context["protocol"].raeume.all())[0].raum_merkmale.all()
+            )[0]
+            self.assertEqual(move_out_item.einzugsprotokoll.pk, move_in.pk)
+            self.assertEqual(move_out_item.einzugspruefpunkt.pk, move_in_item.pk)
+            self.assertEqual(
+                [photo.pk for photo in move_out_item.einzugsfotos],
+                [matching_photo.pk],
+            )
+            self.assertFalse(move_out_item.fotos.exists())
+
+    def test_move_out_uses_same_person_reference_when_entry_is_documented_later(self) -> None:
+        move_in, _move_in_room, _move_in_item = self.checklist_item_for_photo()
+        move_in.status = ProtokollStatus.SIGNED
+        move_in.uebergabe_zeitpunkt = datetime(2026, 10, 1, 11, 0, tzinfo=UTC)
+        move_in.save(update_fields=["status", "uebergabe_zeitpunkt"])
+        move_out_data = self.valid_form_data()
+        move_out_data.update(
+            {
+                "protokoll_typ": ProtokollTyp.MOVE_OUT,
+                "uebergabe_zeitpunkt": "2026-10-01T10:30",
+                "mieter_zukuenftige_anschrift": "Neue Adresse 1, 12345 Beispielstadt",
+                "rooms-0-raum": str(self.kitchen.pk),
+                "rooms-0-bereich": "Küche",
+                "rooms-0-merkmal": str(self.room_feature.pk),
+                "rooms-0-wert": "Kratzer am Fensterrahmen",
+            }
+        )
+        self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), move_out_data)
+        move_out = Protokoll.objects.exclude(pk=move_in.pk).get()
+
+        self.client.force_login(self.employee_user)
+        response = self.client.get(
+            reverse("wohnungsverwaltung:handover_protocol_detail", args=[move_out.pk])
+        )
+
+        self.assertEqual(response.context["move_in_reference"].pk, move_in.pk)
+        self.assertContains(response, "Einzug (alt)</th><th>Auszug (neu)")
+        self.assertContains(response, "Einzug (alt)")
+
+    def test_move_out_form_shows_the_signed_move_in_as_a_reference(self) -> None:
+        move_in, move_in_room, move_in_item = self.checklist_item_for_photo()
+        move_in.status = ProtokollStatus.SIGNED
+        move_in.save(update_fields=["status"])
+
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            photo_upload = self.photo_upload("einzug-fenster.png")
+            photo = RaumMerkmalFoto.objects.create(
+                raum_merkmal=move_in_item,
+                datei=photo_upload,
+                content_type=photo_upload.content_type,
+                dateigroesse=photo_upload.size,
+            )
+            self.client.force_login(self.staff_user)
+            response = self.client.get(
+                reverse("wohnungsverwaltung:handover_protocol_create"),
+                {"wohnung": self.wohnung.pk},
+            )
+
+        photo_url = reverse(
+            "wohnungsverwaltung:handover_protocol_checklist_item_photo_view",
+            kwargs={
+                "protocol_id": move_in.pk,
+                "room_id": move_in_room.pk,
+                "item_id": move_in_item.pk,
+                "photo_id": photo.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["move_in_reference"].pk, move_in.pk)
+        self.assertContains(response, "Einzugsprotokoll zum Vergleich")
+        self.assertContains(response, photo_url)
+
+    def test_move_out_form_compares_meter_readings_with_the_signed_move_in(self) -> None:
+        move_in, _move_in_room, _move_in_item = self.checklist_item_for_photo()
+        move_in.status = ProtokollStatus.SIGNED
+        move_in.save(update_fields=["status"])
+
+        self.client.force_login(self.staff_user)
+        response = self.client.get(
+            reverse("wohnungsverwaltung:handover_protocol_create"),
+            {"wohnung": self.wohnung.pk, "person": self.person.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["move_in_reference"].pk, move_in.pk)
+        self.assertContains(response, "Einzug (alt)")
+        self.assertContains(response, "Auszug (neu)")
+        self.assertContains(response, "Differenz (neu − alt)")
+        self.assertContains(response, 'data-old-meter-reading="12,50"')
+        self.assertContains(response, "data-meter-difference")
+        self.assertEqual(response.context["form"].initial["person"], self.person.pk)
+
+    def test_photo_upload_rejects_non_image_files(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+        self.client.force_login(self.staff_user)
+
+        response = self.client.post(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_checklist_item_photo_upload",
+                kwargs={
+                    "protocol_id": protocol.pk,
+                    "room_id": room.pk,
+                    "item_id": checklist_item.pk,
+                },
+            ),
+            {"fotos": SimpleUploadedFile("keine-bilddatei.jpg", b"kein Bild", "image/jpeg")},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse(
+                "wohnungsverwaltung:handover_protocol_room_detail",
+                kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+            ),
+        )
+        self.assertFalse(RaumMerkmalFoto.objects.exists())
+
+    def test_photo_upload_enforces_size_and_count_limits(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+        upload_url = reverse(
+            "wohnungsverwaltung:handover_protocol_checklist_item_photo_upload",
+            kwargs={
+                "protocol_id": protocol.pk,
+                "room_id": room.pk,
+                "item_id": checklist_item.pk,
+            },
+        )
+        self.client.force_login(self.staff_user)
+
+        with self.settings(HANDOVER_PHOTO_MAX_SIZE=1):
+            response = self.client.post(upload_url, {"fotos": self.photo_upload()})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(RaumMerkmalFoto.objects.exists())
+
+        with (
+            TemporaryDirectory() as media_root,
+            self.settings(
+                MEDIA_ROOT=media_root,
+                HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM=1,
+            ),
+        ):
+            self.client.post(upload_url, {"fotos": self.photo_upload()})
+            response = self.client.post(
+                upload_url,
+                {"fotos": self.photo_upload("zweites.png", "black")},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(checklist_item.fotos.count(), 1)
+
+    def test_confirmed_protocol_rejects_photo_changes(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+        self.client.force_login(self.staff_user)
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            upload_url = reverse(
+                "wohnungsverwaltung:handover_protocol_checklist_item_photo_upload",
+                kwargs={
+                    "protocol_id": protocol.pk,
+                    "room_id": room.pk,
+                    "item_id": checklist_item.pk,
+                },
+            )
+            self.client.post(upload_url, {"fotos": self.photo_upload()})
+            photo = checklist_item.fotos.get()
+            protocol.status = ProtokollStatus.SIGNED
+            protocol.save(update_fields=["status"])
+
+            response = self.client.post(upload_url, {"fotos": self.photo_upload("neu.png")})
+            self.assertRedirects(
+                response,
+                reverse(
+                    "wohnungsverwaltung:handover_protocol_detail",
+                    kwargs={"protocol_id": protocol.pk},
+                ),
+            )
+            self.assertEqual(checklist_item.fotos.count(), 1)
+
+            response = self.client.post(
+                reverse(
+                    "wohnungsverwaltung:handover_protocol_checklist_item_photo_delete",
+                    kwargs={
+                        "protocol_id": protocol.pk,
+                        "room_id": room.pk,
+                        "item_id": checklist_item.pk,
+                        "photo_id": photo.pk,
+                    },
+                )
+            )
+            self.assertRedirects(
+                response,
+                reverse(
+                    "wohnungsverwaltung:handover_protocol_detail",
+                    kwargs={"protocol_id": protocol.pk},
+                ),
+            )
+            self.assertTrue(checklist_item.fotos.filter(pk=photo.pk).exists())
+
+    def test_deleting_a_checklist_item_removes_its_stored_photos(self) -> None:
+        protocol, room, checklist_item = self.checklist_item_for_photo()
+        self.client.force_login(self.staff_user)
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            self.client.post(
+                reverse(
+                    "wohnungsverwaltung:handover_protocol_checklist_item_photo_upload",
+                    kwargs={
+                        "protocol_id": protocol.pk,
+                        "room_id": room.pk,
+                        "item_id": checklist_item.pk,
+                    },
+                ),
+                {"fotos": self.photo_upload()},
+            )
+            photo = checklist_item.fotos.get()
+            stored_name = photo.datei.name
+
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    reverse(
+                        "wohnungsverwaltung:handover_protocol_checklist_item_delete",
+                        kwargs={
+                            "protocol_id": protocol.pk,
+                            "room_id": room.pk,
+                            "item_id": checklist_item.pk,
+                        },
+                    )
+                )
+
+            self.assertEqual(response.status_code, 302)
+            self.assertFalse(RaumMerkmalFoto.objects.filter(pk=photo.pk).exists())
+            self.assertFalse(photo.datei.storage.exists(stored_name))
+
 
 class SeedStandardDataCommandTests(TestCase):
     def test_command_creates_25_units_and_is_idempotent(self) -> None:
@@ -1306,6 +2012,24 @@ class BewerbungDatabaseConstraintTests(TestCase):
                     ueber_mich="Ich suche ebenfalls diese Wohnung.",
                 )
 
+    def test_database_allows_a_new_open_application_after_withdrawal(self) -> None:
+        Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.first_unit,
+            personenanzahl=1,
+            ueber_mich="Ich suche eine Wohnung.",
+            interest_withdrawn_at=datetime.now(UTC),
+        )
+
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.second_unit,
+            personenanzahl=1,
+            ueber_mich="Ich suche erneut eine Wohnung.",
+        )
+
+        self.assertEqual(application.person, self.applicant)
+
 
 class PreApplicationAuthenticationTests(TestCase):
     def setUp(self) -> None:
@@ -1391,8 +2115,245 @@ class PreApplicationAuthenticationTests(TestCase):
         response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Meine Pre-Bewerbungen")
+        self.assertContains(response, "Meine Bewerbungen")
         self.assertContains(response, "Gebäude 1, Wohnung 4.01")
+        self.assertContains(response, "In Bearbeitung")
+        self.assertContains(response, "Warten Sie auf die nächste Rückmeldung")
+
+    def test_linked_user_can_open_the_main_application_status_when_unlocked(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        list_response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+        main_response = self.client.get(
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
+        )
+
+        self.assertContains(list_response, "Main-Bewerbung freigeschaltet")
+        self.assertContains(
+            list_response,
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk]),
+        )
+        self.assertEqual(main_response.status_code, 200)
+        self.assertContains(main_response, "Die Main-Bewerbung ist freigeschaltet.")
+        self.assertContains(main_response, "Interesse zurückziehen")
+
+    def test_main_application_access_state_is_scoped_to_each_application(self) -> None:
+        previous_application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Eine frühere Bewerbung.",
+            status=BewerbungStatus.DECLINED,
+            main_application_unlocked=True,
+        )
+        active_application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Meine aktuelle Bewerbung.",
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+
+        self.assertContains(
+            response,
+            reverse("wohnungsverwaltung:main_application_status", args=[active_application.pk]),
+        )
+        self.assertNotContains(
+            response,
+            reverse(
+                "wohnungsverwaltung:main_application_status",
+                args=[previous_application.pk],
+            ),
+        )
+        self.assertContains(response, "Abgelehnt")
+        self.assertContains(response, "Main-Bewerbung freigeschaltet")
+
+    def test_locked_application_has_no_main_access(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.get(
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_main_application_status_is_read_only_in_issue_19(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.post(
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk]),
+            {"ueber_mich": "Geänderte Angaben"},
+        )
+
+        self.assertEqual(response.status_code, 405)
+        application.refresh_from_db()
+        self.assertEqual(application.ueber_mich, "Ich möchte mich für diese Wohnung bewerben.")
+
+    def test_applicant_cannot_open_another_persons_main_application(self) -> None:
+        other_user = get_user_model().objects.create_user(
+            username="andere-person@example.test",
+            email="andere-person@example.test",
+            password="FjordTanne!4826",
+        )
+        other_applicant = Person.objects.create(
+            user=other_user,
+            vorname="Andere",
+            nachname="Person",
+            email="andere-person@example.test",
+        )
+        other_unit = Wohnung.objects.create(
+            etage=4,
+            wohnungsnummer="4.02",
+            gebaeudenummer="1",
+            status=WohnungStatus.FREE,
+        )
+        other_application = Bewerbung.objects.create(
+            person=other_applicant,
+            wohnung=other_unit,
+            personenanzahl=1,
+            ueber_mich="Vertrauliche Angaben einer anderen Person.",
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        list_response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+        detail_response = self.client.get(
+            reverse("wohnungsverwaltung:main_application_status", args=[other_application.pk])
+        )
+
+        self.assertNotContains(list_response, "Vertrauliche Angaben einer anderen Person.")
+        self.assertNotContains(list_response, str(other_unit))
+        self.assertEqual(detail_response.status_code, 404)
+
+    def test_declined_application_cannot_open_main_application_even_if_unlocked(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Die Bewerbung wurde beendet.",
+            status=BewerbungStatus.DECLINED,
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.get(
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_applicant_can_withdraw_an_unlocked_application(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+        withdraw_url = reverse("wohnungsverwaltung:application_withdraw", args=[application.pk])
+
+        confirmation_response = self.client.get(withdraw_url)
+        self.assertEqual(confirmation_response.status_code, 200)
+        self.assertIsNone(Bewerbung.objects.get(pk=application.pk).interest_withdrawn_at)
+
+        response = self.client.post(withdraw_url)
+
+        self.assertRedirects(response, reverse("wohnungsverwaltung:pre_application_list"))
+        application.refresh_from_db()
+        self.assertIsNotNone(application.interest_withdrawn_at)
+        self.assertContains(
+            self.client.get(reverse("wohnungsverwaltung:pre_application_list")),
+            "Zurückgezogen",
+        )
+
+    def test_applicant_cannot_withdraw_a_locked_application(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.post(
+            reverse("wohnungsverwaltung:application_withdraw", args=[application.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertIsNone(Bewerbung.objects.get(pk=application.pk).interest_withdrawn_at)
+
+    def test_applicant_cannot_withdraw_another_persons_application(self) -> None:
+        other_user = get_user_model().objects.create_user(
+            username="fremd@example.test",
+            email="fremd@example.test",
+            password="FjordTanne!4826",
+        )
+        other_applicant = Person.objects.create(
+            user=other_user,
+            vorname="Fremde",
+            nachname="Person",
+            email="fremd@example.test",
+        )
+        other_application = Bewerbung.objects.create(
+            person=other_applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Vertrauliche Angaben einer anderen Person.",
+            main_application_unlocked=True,
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        response = self.client.post(
+            reverse("wohnungsverwaltung:application_withdraw", args=[other_application.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertIsNone(Bewerbung.objects.get(pk=other_application.pk).interest_withdrawn_at)
+
+    def test_withdrawn_application_cannot_be_reactivated_or_withdrawn_again(self) -> None:
+        application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.free_unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+            main_application_unlocked=True,
+            interest_withdrawn_at=datetime.now(UTC),
+        )
+        self.client.login(username=self.user.username, password="FjordTanne!4826")
+
+        main_response = self.client.get(
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
+        )
+        withdrawal_response = self.client.post(
+            reverse("wohnungsverwaltung:application_withdraw", args=[application.pk])
+        )
+
+        self.assertEqual(main_response.status_code, 404)
+        self.assertEqual(withdrawal_response.status_code, 404)
 
     def test_list_disables_new_application_button_for_open_application(self) -> None:
         Bewerbung.objects.create(

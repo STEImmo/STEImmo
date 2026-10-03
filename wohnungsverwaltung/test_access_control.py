@@ -174,6 +174,13 @@ class AccessControlTests(TestCase):
         self.assertEqual(management_response.status_code, 403)
         self.assertEqual(handover_response.status_code, 403)
 
+    def test_employee_cannot_open_the_applicant_application_overview(self) -> None:
+        self.client.force_login(self.employee)
+
+        response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+
+        self.assertEqual(response.status_code, 403)
+
     def test_employee_can_open_management_and_handover_pages_without_staff_flag(self) -> None:
         self.client.force_login(self.employee)
 

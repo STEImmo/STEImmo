@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Main-Bewerbung – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <p>
+            <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:pre_application_list' %}">
+                Zurück zu meinen Bewerbungen
+            </a>
+        </p>
+        <article class="uk-card uk-card-default uk-card-body">
+            <span class="uk-label">{{ application.get_applicant_status_display }}</span>
+            <h1 class="uk-card-title">Main-Bewerbung für {{ application.wohnung }}</h1>
+            <p>Die Main-Bewerbung ist freigeschaltet.</p>
+            <p>{{ application.get_applicant_next_step }}</p>
+            <a class="uk-button uk-button-danger uk-margin-small-top"
+               href="{% url 'wohnungsverwaltung:application_withdraw' application.pk %}">
+                Interesse zurückziehen
+            </a>
+        </article>
+
+        <article class="uk-card uk-card-default uk-card-body uk-margin-top">
+            <h2 class="uk-card-title">Vorschau: weitere Angaben und Nachweise</h2>
+            <p>
+                Dies ist eine erste Formularvorschau. Angaben werden noch nicht gespeichert und
+                Dateien noch nicht hochgeladen. Die sichere Verarbeitung folgt mit Issue #20.
+            </p>
+
+            <fieldset class="uk-fieldset" disabled>
+                <div class="uk-margin">
+                    <label class="uk-form-label" for="main-additional-information">
+                        Ergänzende Angaben
+                    </label>
+                    <div class="uk-form-controls">
+                        <textarea class="uk-textarea"
+                                  id="main-additional-information"
+                                  rows="4"
+                                  placeholder="Weitere Informationen zu Ihrer Bewerbung"></textarea>
+                    </div>
+                </div>
+
+                <h3>Nachweise</h3>
+                <p>Vorgesehen sind PNG- oder PDF-Dateien mit maximal 8 MiB je Datei.</p>
+                <div class="uk-margin">
+                    <label class="uk-form-label" for="identity-proof">Identitätsnachweis</label>
+                    <div class="uk-form-controls">
+                        <input class="uk-input" id="identity-proof" type="file"
+                               accept=".png,.pdf,image/png,application/pdf">
+                    </div>
+                </div>
+                <div class="uk-margin">
+                    <label class="uk-form-label" for="payment-proof">Zahlungsnachweis</label>
+                    <div class="uk-form-controls">
+                        <input class="uk-input" id="payment-proof" type="file"
+                               accept=".png,.pdf,image/png,application/pdf">
+                    </div>
+                </div>
+                <div class="uk-margin">
+                    <label class="uk-form-label" for="schufa-proof">SCHUFA-Unterlage</label>
+                    <div class="uk-form-controls">
+                        <input class="uk-input" id="schufa-proof" type="file"
+                               accept=".png,.pdf,image/png,application/pdf">
+                    </div>
+                </div>
+                <button class="uk-button uk-button-primary" type="button">
+                    Angaben einreichen
+                </button>
+            </fieldset>
+        </article>
+    </div>
+</section>
+{% endblock %}

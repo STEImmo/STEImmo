@@ -17,6 +17,16 @@ urlpatterns = [
         views.pre_application_preview,
         name="pre_application_preview",
     ),
+    path(
+        "bewerbung/<uuid:application_id>/main/",
+        views.main_application_status,
+        name="main_application_status",
+    ),
+    path(
+        "bewerbung/<uuid:application_id>/zurueckziehen/",
+        views.application_withdraw,
+        name="application_withdraw",
+    ),
     path("", views.handover_protocol_list, name="handover_protocol_list"),
     path("neu/", views.handover_protocol_create, name="handover_protocol_create"),
     path(
@@ -43,6 +53,21 @@ urlpatterns = [
         "<uuid:protocol_id>/raeume/<uuid:room_id>/pruefpunkte/<uuid:item_id>/loeschen/",
         views.handover_protocol_checklist_item_delete,
         name="handover_protocol_checklist_item_delete",
+    ),
+    path(
+        "<uuid:protocol_id>/raeume/<uuid:room_id>/pruefpunkte/<uuid:item_id>/fotos/",
+        views.handover_protocol_checklist_item_photo_upload,
+        name="handover_protocol_checklist_item_photo_upload",
+    ),
+    path(
+        "<uuid:protocol_id>/raeume/<uuid:room_id>/pruefpunkte/<uuid:item_id>/fotos/<uuid:photo_id>/",
+        views.handover_protocol_checklist_item_photo_view,
+        name="handover_protocol_checklist_item_photo_view",
+    ),
+    path(
+        "<uuid:protocol_id>/raeume/<uuid:room_id>/pruefpunkte/<uuid:item_id>/fotos/<uuid:photo_id>/loeschen/",
+        views.handover_protocol_checklist_item_photo_delete,
+        name="handover_protocol_checklist_item_photo_delete",
     ),
     path(
         "<uuid:protocol_id>/raeume/<uuid:room_id>/",

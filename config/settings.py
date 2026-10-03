@@ -98,6 +98,10 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+HANDOVER_PHOTO_MAX_SIZE = int(os.environ.get("HANDOVER_PHOTO_MAX_SIZE", 8 * 1024 * 1024))
+HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM = int(
+    os.environ.get("HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM", 10)
+)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "login"

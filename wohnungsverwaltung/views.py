@@ -6,17 +6,32 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
-from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
+from django.http import (
+    FileResponse,
+    Http404,
+    HttpRequest,
+    HttpResponse,
+    HttpResponseNotAllowed,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 
-from .access import applicant_required, employee_required, user_management_required
+from .access import (
+    EMPLOYEE_ACCESS_PERMISSION,
+    applicant_required,
+    employee_required,
+    has_permission,
+    user_management_required,
+)
 from .forms import (
     ACCEPTANCE_STATUS_LABELS,
     ApartmentSearchForm,
     HANDOVER_STATUS_LABELS,
     HANDOVER_TYPE_LABELS,
+    METER_READING_FIELDS,
     BewerbungForm,
     HandoverKeyForm,
     HandoverKeyFormSet,
@@ -27,12 +42,15 @@ from .forms import (
     ProtocolConfirmationForm,
     RaumForm,
     RoomChecklistItemForm,
+    RoomChecklistPhotoUploadForm,
     RoomProtocolForm,
     SchluesselFormSet,
     StellplatzForm,
     StellplatzZuordnungForm,
     UserAccountForm,
     WohnungForm,
+    photo_content_type_from_format,
+    verified_photo_content_type,
 )
 from .models import (
     Bewerbung,
@@ -46,10 +64,12 @@ from .models import (
     ProtokollTyp,
     Raum,
     RaumMerkmal,
+    RaumMerkmalFoto,
     Raumprotokoll,
     Stellplatz,
     StellplatzZuordnung,
     Wohnung,
+    calculate_photo_checksum,
 )
 
 PROTOCOL_STATUS_LABELS = {
@@ -61,11 +81,40 @@ PROTOCOL_STATUS_LABELS = {
 DRAFT_MAXIMUM_SIZE = 512_000
 
 
+def _can_manage_handover_photos(request: HttpRequest) -> bool:
+    """Use the same employee permission for photo UI and all photo endpoints."""
+
+    return has_permission(request, EMPLOYEE_ACCESS_PERMISSION)
+
+
+def _stored_photo_content_type(photo: RaumMerkmalFoto) -> str:
+    """Derive a safe response MIME type from the stored image content."""
+
+    try:
+        photo.datei.open("rb")
+        with Image.open(photo.datei) as image:
+            image_format = image.format
+            image.verify()
+    except (OSError, ValueError) as error:
+        raise Http404("Das gespeicherte Foto ist kein unterstütztes Bild.") from error
+    finally:
+        photo.datei.close()
+
+    content_type = photo_content_type_from_format(image_format)
+    if content_type is None:
+        raise Http404("Das gespeicherte Foto ist kein unterstütztes Bild.")
+    return content_type
+
+
 def _valid_wohnung_id(wohnung_id: str | UUID | None) -> UUID | None:
     try:
         return UUID(str(wohnung_id))
     except (TypeError, ValueError):
         return None
+
+
+def _valid_person_id(person_id: str | UUID | None) -> UUID | None:
+    return _valid_wohnung_id(person_id)
 
 
 def apartment_search(request: HttpRequest) -> HttpResponse:
@@ -181,9 +230,70 @@ def pre_application_list(request: HttpRequest) -> HttpResponse:
         "wohnungsverwaltung/pre_application_list.html",
         {
             "applications": applications,
-            "has_open_application": applications.filter(status=BewerbungStatus.OPEN).exists(),
+            "has_open_application": applications.filter(
+                status=BewerbungStatus.OPEN,
+                interest_withdrawn_at__isnull=True,
+            ).exists(),
         },
     )
+
+
+@applicant_required
+def main_application_status(request: HttpRequest, application_id: UUID) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    applicant = _applicant_for_user(request)
+    application = get_object_or_404(
+        Bewerbung.objects.select_related("wohnung").filter(
+            person=applicant,
+            status=BewerbungStatus.OPEN,
+            interest_withdrawn_at__isnull=True,
+            main_application_unlocked=True,
+        ),
+        pk=application_id,
+    )
+    return render(
+        request,
+        "wohnungsverwaltung/main_application_status.html",
+        {"application": application},
+    )
+
+
+@applicant_required
+def application_withdraw(request: HttpRequest, application_id: UUID) -> HttpResponse:
+    if request.method not in {"GET", "POST"}:
+        return HttpResponseNotAllowed(["GET", "POST"])
+
+    applicant = _applicant_for_user(request)
+    eligible_applications = Bewerbung.objects.filter(
+        person=applicant,
+        status=BewerbungStatus.OPEN,
+        interest_withdrawn_at__isnull=True,
+        main_application_unlocked=True,
+    )
+
+    if request.method == "GET":
+        application = get_object_or_404(
+            eligible_applications.select_related("wohnung"),
+            pk=application_id,
+        )
+        return render(
+            request,
+            "wohnungsverwaltung/application_withdraw_confirm.html",
+            {"application": application},
+        )
+
+    with transaction.atomic():
+        application = get_object_or_404(
+            eligible_applications.select_for_update(),
+            pk=application_id,
+        )
+        application.interest_withdrawn_at = timezone.now()
+        application.save(update_fields=["interest_withdrawn_at", "updated_at"])
+
+    messages.success(request, "Ihr Interesse an dieser Bewerbung wurde zurückgezogen.")
+    return redirect("wohnungsverwaltung:pre_application_list")
 
 
 def _draft_session_key(request: HttpRequest) -> str:
@@ -368,17 +478,34 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
         or request.GET.get("wohnung")
         or (_draft_field_value(server_draft, "wohnung") if server_draft else None)
     )
+    selected_person_id = (
+        request.POST.get("person")
+        or request.GET.get("person")
+        or (_draft_field_value(server_draft, "person") if server_draft else None)
+    )
     form = HandoverProtocolForm(request.POST or None, wohnung_id=selected_wohnung_id)
+    _set_selected_person_initial(form, selected_person_id)
+    can_manage_handover_photos = _can_manage_handover_photos(request)
     room_formset = InlineRoomChecklistFormSet(
-        request.POST or None,
+        data=request.POST or None,
+        files=request.FILES or None,
         prefix="rooms",
-        form_kwargs={"wohnung_id": _valid_wohnung_id(selected_wohnung_id)},
+        form_kwargs={
+            "wohnung_id": _valid_wohnung_id(selected_wohnung_id),
+            "allow_photo_upload": can_manage_handover_photos,
+        },
     )
     key_formset = HandoverKeyFormSet(
         request.POST or None,
         prefix="keys",
         initial=_key_form_initial(form.selected_wohnung) if request.method != "POST" else None,
     )
+    move_in_reference = None
+    if can_manage_handover_photos:
+        move_in_reference = _move_in_reference_for_apartment(
+            _valid_wohnung_id(selected_wohnung_id),
+            person_id=_valid_person_id(selected_person_id),
+        )
     if (
         request.method == "POST"
         and form.is_valid()
@@ -403,6 +530,10 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
             "room_formset": room_formset,
             "room_form_groups": _room_form_groups(room_formset),
             "key_formset": key_formset,
+            "move_in_reference": move_in_reference,
+            "meter_comparison_rows": _meter_comparison_rows(form, move_in_reference),
+            "can_manage_handover_photos": can_manage_handover_photos,
+            **_move_in_reference_context(move_in_reference),
             "draft_scope": draft_scope,
             **_draft_form_context(server_draft),
         },
@@ -413,10 +544,16 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
 def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
     protocol = get_object_or_404(
         Protokoll.objects.select_related("wohnung", "person").prefetch_related(
-            "protokoll_schluessel", "raeume__raum_merkmale__merkmal"
+            "protokoll_schluessel",
+            "raeume__raum_merkmale__merkmal",
+            "raeume__raum_merkmale__fotos",
         ),
         pk=protocol_id,
     )
+    can_manage_handover_photos = _can_manage_handover_photos(request)
+    move_in_reference = None
+    if can_manage_handover_photos:
+        move_in_reference = _attach_move_in_photo_references(protocol, protocol.raeume.all())
     return render(
         request,
         "wohnungsverwaltung/handover_protocol_detail.html",
@@ -427,6 +564,9 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
             "acceptance_status_label": ACCEPTANCE_STATUS_LABELS[protocol.abnahme_status],
             "protocol_status_label": PROTOCOL_STATUS_LABELS[protocol.status],
             "confirmation_form": ProtocolConfirmationForm(),
+            "can_manage_handover_photos": can_manage_handover_photos,
+            "move_in_reference": move_in_reference,
+            **_move_in_reference_context(move_in_reference),
             "draft_key_to_clear": request.session.pop("handover_protocol_draft_key_to_clear", ""),
         },
     )
@@ -442,17 +582,32 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
     draft_scope = f"edit:{protocol.pk}"
     server_draft = _draft_for_form(request, draft_scope)
     selected_wohnung_id = request.POST.get("wohnung") or request.GET.get("wohnung")
+    selected_person_id = (
+        request.POST.get("person") or request.GET.get("person") or protocol.person_id
+    )
     form = HandoverProtocolForm(
         request.POST or None,
         instance=protocol,
         wohnung_id=selected_wohnung_id or protocol.wohnung_id,
     )
+    _set_selected_person_initial(form, selected_person_id)
+    can_manage_handover_photos = _can_manage_handover_photos(request)
     room_formset = InlineRoomChecklistFormSet(
-        request.POST or None,
+        data=request.POST or None,
+        files=request.FILES or None,
         prefix="rooms",
-        form_kwargs={"wohnung_id": _valid_wohnung_id(selected_wohnung_id or protocol.wohnung_id)},
+        form_kwargs={
+            "wohnung_id": _valid_wohnung_id(selected_wohnung_id or protocol.wohnung_id),
+            "allow_photo_upload": can_manage_handover_photos,
+        },
     )
     key_formset = HandoverKeyFormSet(request.POST or None, prefix="keys")
+    move_in_reference = None
+    if can_manage_handover_photos:
+        move_in_reference = _move_in_reference_for_apartment(
+            _valid_wohnung_id(selected_wohnung_id or protocol.wohnung_id),
+            person_id=_valid_person_id(selected_person_id),
+        )
     if (
         request.method == "POST"
         and form.is_valid()
@@ -480,6 +635,10 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
             "room_formset": room_formset,
             "room_form_groups": _room_form_groups(room_formset),
             "key_formset": key_formset,
+            "move_in_reference": move_in_reference,
+            "meter_comparison_rows": _meter_comparison_rows(form, move_in_reference),
+            "can_manage_handover_photos": can_manage_handover_photos,
+            **_move_in_reference_context(move_in_reference),
             "draft_scope": draft_scope,
             **_draft_form_context(server_draft),
         },
@@ -519,7 +678,7 @@ def handover_protocol_room_create(request: HttpRequest, protocol_id) -> HttpResp
 def handover_protocol_room_detail(request: HttpRequest, protocol_id, room_id) -> HttpResponse:
     protocol = get_object_or_404(Protokoll, pk=protocol_id)
     room = get_object_or_404(
-        Raumprotokoll.objects.prefetch_related("raum_merkmale__merkmal"),
+        Raumprotokoll.objects.prefetch_related("raum_merkmale__merkmal", "raum_merkmale__fotos"),
         pk=room_id,
         protokoll=protocol,
     )
@@ -527,7 +686,12 @@ def handover_protocol_room_detail(request: HttpRequest, protocol_id, room_id) ->
         messages.warning(request, "Bestätigte Protokolle können nicht mehr bearbeitet werden.")
         return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
-    form = RoomChecklistItemForm(request.POST or None, initial={"bereich": room.name})
+    can_manage_handover_photos = _can_manage_handover_photos(request)
+    move_in_reference = None
+    if can_manage_handover_photos:
+        move_in_reference = _attach_move_in_photo_references(protocol, [room])
+
+    form = RoomChecklistItemForm(request.POST or None, initial={"bereich": room.name}, room=room)
     if request.method == "POST" and form.is_valid():
         form.save(room)
         messages.success(request, "Der Prüfpunkt wurde erfasst.")
@@ -540,7 +704,13 @@ def handover_protocol_room_detail(request: HttpRequest, protocol_id, room_id) ->
     return render(
         request,
         "wohnungsverwaltung/handover_protocol_room_detail.html",
-        {"form": form, "protocol": protocol, "room": room},
+        {
+            "form": form,
+            "protocol": protocol,
+            "room": room,
+            "move_in_reference": move_in_reference,
+            "can_manage_handover_photos": can_manage_handover_photos,
+        },
     )
 
 
@@ -555,7 +725,9 @@ def handover_protocol_room_delete(request: HttpRequest, protocol_id, room_id) ->
         messages.warning(request, "Bestätigte Protokolle können nicht mehr bearbeitet werden.")
         return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
-    room.delete()
+    with transaction.atomic():
+        _delete_checklist_photos(RaumMerkmalFoto.objects.filter(raum_merkmal__raumprotokoll=room))
+        room.delete()
     messages.success(request, "Der Raum wurde aus dem Übergabeprotokoll entfernt.")
     return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
@@ -574,13 +746,263 @@ def handover_protocol_checklist_item_delete(
         messages.warning(request, "Bestätigte Protokolle können nicht mehr bearbeitet werden.")
         return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
-    checklist_item.delete()
+    with transaction.atomic():
+        _delete_checklist_photos(checklist_item.fotos.all())
+        checklist_item.delete()
     messages.success(request, "Der Prüfpunkt wurde aus dem Raum entfernt.")
     return redirect(
         "wohnungsverwaltung:handover_protocol_room_detail",
         protocol_id=protocol.pk,
         room_id=room.pk,
     )
+
+
+@employee_required
+def handover_protocol_checklist_item_photo_upload(
+    request: HttpRequest, protocol_id, room_id, item_id
+) -> HttpResponse:
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    protocol = get_object_or_404(Protokoll, pk=protocol_id)
+    room = get_object_or_404(Raumprotokoll, pk=room_id, protokoll=protocol)
+    checklist_item = get_object_or_404(RaumMerkmal, pk=item_id, raumprotokoll=room)
+    if protocol.status != ProtokollStatus.OPEN:
+        messages.warning(request, "Bestätigte Protokolle können nicht mehr bearbeitet werden.")
+        return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
+
+    form = RoomChecklistPhotoUploadForm(
+        request.POST,
+        request.FILES,
+        existing_photo_count=checklist_item.fotos.count(),
+    )
+    if not form.is_valid():
+        for errors in form.errors.values():
+            for error in errors:
+                messages.error(request, error)
+        return redirect(_photo_return_url(request, protocol, room, checklist_item))
+
+    existing_checksums = {
+        photo.inhalt_hash_sha256 or calculate_photo_checksum(photo.datei)
+        for photo in checklist_item.fotos.all()
+    }
+    photos_to_save = []
+    for photo in form.cleaned_data["fotos"]:
+        checksum = calculate_photo_checksum(photo)
+        if checksum in existing_checksums:
+            continue
+        existing_checksums.add(checksum)
+        photos_to_save.append((photo, checksum))
+
+    if not photos_to_save:
+        messages.info(request, "Dieses Foto ist für den Prüfpunkt bereits gespeichert.")
+        return redirect(_photo_return_url(request, protocol, room, checklist_item))
+
+    try:
+        with transaction.atomic():
+            for photo, checksum in photos_to_save:
+                RaumMerkmalFoto.objects.create(
+                    raum_merkmal=checklist_item,
+                    datei=photo,
+                    content_type=verified_photo_content_type(photo),
+                    dateigroesse=photo.size,
+                    inhalt_hash_sha256=checksum,
+                )
+    except IntegrityError:
+        messages.info(request, "Dieses Foto ist für den Prüfpunkt bereits gespeichert.")
+    else:
+        messages.success(request, "Die Fotos wurden am Prüfpunkt gespeichert.")
+    return redirect(_photo_return_url(request, protocol, room, checklist_item))
+
+
+@employee_required
+def handover_protocol_checklist_item_photo_view(
+    request: HttpRequest, protocol_id, room_id, item_id, photo_id
+) -> FileResponse:
+    photo = get_object_or_404(
+        RaumMerkmalFoto.objects.select_related("raum_merkmal__raumprotokoll__protokoll"),
+        pk=photo_id,
+        raum_merkmal_id=item_id,
+        raum_merkmal__raumprotokoll_id=room_id,
+        raum_merkmal__raumprotokoll__protokoll_id=protocol_id,
+    )
+    content_type = _stored_photo_content_type(photo)
+    response = FileResponse(photo.datei.open("rb"), content_type=content_type)
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@employee_required
+def handover_protocol_checklist_item_photo_delete(
+    request: HttpRequest, protocol_id, room_id, item_id, photo_id
+) -> HttpResponse:
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    protocol = get_object_or_404(Protokoll, pk=protocol_id)
+    room = get_object_or_404(Raumprotokoll, pk=room_id, protokoll=protocol)
+    checklist_item = get_object_or_404(RaumMerkmal, pk=item_id, raumprotokoll=room)
+    photo = get_object_or_404(RaumMerkmalFoto, pk=photo_id, raum_merkmal=checklist_item)
+    if protocol.status != ProtokollStatus.OPEN:
+        messages.warning(request, "Bestätigte Protokolle können nicht mehr bearbeitet werden.")
+        return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
+
+    _delete_checklist_photos([photo])
+    messages.success(request, "Das Foto wurde vom Prüfpunkt entfernt.")
+    return redirect(_photo_return_url(request, protocol, room, checklist_item))
+
+
+def _delete_checklist_photos(photos) -> None:
+    for photo in list(photos):
+        storage = photo.datei.storage
+        stored_name = photo.datei.name
+        photo.delete()
+        if stored_name:
+            transaction.on_commit(
+                lambda storage=storage, stored_name=stored_name: storage.delete(stored_name)
+            )
+
+
+def _photo_return_url(
+    request: HttpRequest,
+    protocol: Protokoll,
+    room: Raumprotokoll,
+    checklist_item: RaumMerkmal,
+) -> str:
+    if request.POST.get("return_to") == "overview":
+        detail_url = reverse("wohnungsverwaltung:handover_protocol_detail", args=[protocol.pk])
+        return f"{detail_url}#pruefpunkt-{checklist_item.pk}"
+    return reverse(
+        "wohnungsverwaltung:handover_protocol_room_detail",
+        kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
+    )
+
+
+def _move_in_reference_for_apartment(
+    wohnung_id,
+    before=None,
+    person_id=None,
+) -> Protokoll | None:
+    if wohnung_id is None:
+        return None
+    references = Protokoll.objects.filter(
+        wohnung_id=wohnung_id,
+        protokoll_typ=ProtokollTyp.MOVE_IN,
+        status=ProtokollStatus.SIGNED,
+    )
+    if person_id is not None:
+        references = references.filter(person_id=person_id)
+    if before is not None:
+        historical_reference = _latest_move_in_reference(
+            references.filter(uebergabe_zeitpunkt__lte=before)
+        )
+        if historical_reference is not None or person_id is None:
+            return historical_reference
+    return _latest_move_in_reference(references)
+
+
+def _latest_move_in_reference(references) -> Protokoll | None:
+    return (
+        references.select_related("person")
+        .prefetch_related(
+            "raeume__raum_merkmale__merkmal",
+            "raeume__raum_merkmale__fotos",
+        )
+        .order_by("-uebergabe_zeitpunkt", "-created_at")
+        .first()
+    )
+
+
+def _move_in_reference_context(move_in_reference: Protokoll | None) -> dict[str, str]:
+    if move_in_reference is None:
+        return {
+            "reference_handover_status_label": "",
+            "reference_acceptance_status_label": "",
+        }
+    return {
+        "reference_handover_status_label": HANDOVER_STATUS_LABELS[
+            move_in_reference.uebergabe_status
+        ],
+        "reference_acceptance_status_label": ACCEPTANCE_STATUS_LABELS[
+            move_in_reference.abnahme_status
+        ],
+    }
+
+
+def _meter_comparison_rows(
+    form: HandoverProtocolForm, move_in_reference: Protokoll | None
+) -> list[dict[str, object]]:
+    return [
+        {
+            "label": label,
+            "number": (
+                getattr(form.selected_wohnung, number_field)
+                if form.selected_wohnung is not None
+                else ""
+            ),
+            "old_reading": (
+                getattr(move_in_reference, reading_field) if move_in_reference is not None else None
+            ),
+            "field": form[reading_field],
+        }
+        for reading_field, number_field, label in METER_READING_FIELDS
+    ]
+
+
+def _set_selected_person_initial(form: HandoverProtocolForm, person_id: str | UUID | None) -> None:
+    """Keep the selected tenant visible after dynamic form fields reload."""
+    if form.is_bound:
+        return
+    selected_person_id = _valid_person_id(person_id)
+    if selected_person_id is None:
+        return
+    if form.fields["person"].queryset.filter(pk=selected_person_id).exists():
+        form.initial["person"] = selected_person_id
+
+
+def _attach_move_in_photo_references(protocol: Protokoll, rooms) -> Protokoll | None:
+    """Attach photos from the latest signed move-in to matching move-out items."""
+    if protocol.protokoll_typ != ProtokollTyp.MOVE_OUT:
+        return None
+
+    move_in_protocol = _move_in_reference_for_apartment(
+        protocol.wohnung_id,
+        before=protocol.uebergabe_zeitpunkt,
+        person_id=protocol.person_id,
+    )
+    if move_in_protocol is None:
+        return None
+
+    move_in_rooms_by_id = {
+        move_in_room.raum_id: move_in_room for move_in_room in move_in_protocol.raeume.all()
+    }
+    move_in_items_by_checkpoint = {}
+    for move_in_room in move_in_protocol.raeume.all():
+        for move_in_item in move_in_room.raum_merkmale.all():
+            checkpoint_key = (move_in_room.raum_id, move_in_item.merkmal_id)
+            move_in_items_by_checkpoint[checkpoint_key] = move_in_item
+
+    for room in rooms:
+        move_in_room = move_in_rooms_by_id.get(room.raum_id)
+        current_feature_ids = {
+            checklist_item.merkmal_id for checklist_item in room.raum_merkmale.all()
+        }
+        room.einzugspruefpunkte_ohne_match = (
+            [
+                move_in_item
+                for move_in_item in move_in_room.raum_merkmale.all()
+                if move_in_item.merkmal_id not in current_feature_ids
+            ]
+            if move_in_room
+            else []
+        )
+        for checklist_item in room.raum_merkmale.all():
+            checkpoint_key = (room.raum_id, checklist_item.merkmal_id)
+            move_in_item = move_in_items_by_checkpoint.get(checkpoint_key)
+            checklist_item.einzugspruefpunkt = move_in_item
+            checklist_item.einzugsfotos = list(move_in_item.fotos.all()) if move_in_item else []
+            checklist_item.einzugsprotokoll = move_in_protocol if move_in_item else None
+    return move_in_protocol
 
 
 @employee_required

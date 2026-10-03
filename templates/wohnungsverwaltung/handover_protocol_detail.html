@@ -6,13 +6,13 @@
 <section class="uk-section">
     <div class="uk-container">
         <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Zur Übersicht</a>
-        <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-small-top">
-            <div>
+        <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-grid-small uk-margin-small-top handover-page-header" uk-grid>
+            <div class="uk-width-expand">
                 <span class="uk-label">{{ protocol_status_label }}</span>
                 <h1 class="uk-heading-medium uk-margin-small-top">Übergabeprotokoll: {{ protocol_type_label }}</h1>
             </div>
             {% if protocol.status == "open" %}
-                <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_edit' protocol.pk %}">Bearbeiten</a>
+                <div class="uk-width-auto"><a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_edit' protocol.pk %}">Bearbeiten</a></div>
             {% endif %}
         </div>
 
@@ -42,17 +42,31 @@
             </dl>
 
             <h2 class="uk-heading-divider uk-margin-large-top">Zählerstände</h2>
-            <table class="uk-table uk-table-divider uk-table-small">
-                <thead><tr><th>Zähler</th><th>Zählernummer</th><th>Zählerstand</th></tr></thead>
-                <tbody>
-                    <tr><td>Kaltwasser</td><td>{{ protocol.zaehlernummer_wasser_kalt }}</td><td>{{ protocol.zaehlerstand_wasser_kalt }}</td></tr>
-                    <tr><td>Warmwasser</td><td>{{ protocol.zaehlernummer_wasser_warm }}</td><td>{{ protocol.zaehlerstand_wasser_warm }}</td></tr>
-                    <tr><td>Heizung</td><td>{{ protocol.zaehlernummer_heizung }}</td><td>{{ protocol.zaehlerstand_heizung }}</td></tr>
-                    <tr><td>Strom</td><td>{{ protocol.zaehlernummer_strom }}</td><td>{{ protocol.zaehlerstand_strom }}</td></tr>
-                </tbody>
-            </table>
+            <div class="uk-overflow-auto">
+                <table class="uk-table uk-table-divider uk-table-small">
+                    <thead>
+                        <tr>
+                            <th>Zähler</th>
+                            <th>Zählernummer</th>
+                            {% if move_in_reference %}<th>Einzug (alt)</th><th>Auszug (neu)</th>{% else %}<th>Zählerstand</th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Kaltwasser</td><td>{{ protocol.zaehlernummer_wasser_kalt }}</td>{% if move_in_reference %}<td>{{ move_in_reference.zaehlerstand_wasser_kalt }}</td>{% endif %}<td>{{ protocol.zaehlerstand_wasser_kalt }}</td></tr>
+                        <tr><td>Warmwasser</td><td>{{ protocol.zaehlernummer_wasser_warm }}</td>{% if move_in_reference %}<td>{{ move_in_reference.zaehlerstand_wasser_warm }}</td>{% endif %}<td>{{ protocol.zaehlerstand_wasser_warm }}</td></tr>
+                        <tr><td>Heizung</td><td>{{ protocol.zaehlernummer_heizung }}</td>{% if move_in_reference %}<td>{{ move_in_reference.zaehlerstand_heizung }}</td>{% endif %}<td>{{ protocol.zaehlerstand_heizung }}</td></tr>
+                        <tr><td>Strom</td><td>{{ protocol.zaehlernummer_strom }}</td>{% if move_in_reference %}<td>{{ move_in_reference.zaehlerstand_strom }}</td>{% endif %}<td>{{ protocol.zaehlerstand_strom }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
             <dl class="uk-description-list uk-description-list-divider">
-                <dt>Heizungsablesungen IE, IA und Ib</dt>
+                {% if move_in_reference %}
+                    <dt>Heizungsablesungen beim Einzug</dt>
+                    <dd>{{ move_in_reference.heizungsablesungen|linebreaksbr }}</dd>
+                    <dt>Heizungsablesungen beim Auszug</dt>
+                {% else %}
+                    <dt>Heizungsablesungen IE, IA und Ib</dt>
+                {% endif %}
                 <dd>{{ protocol.heizungsablesungen|linebreaksbr }}</dd>
             </dl>
 
@@ -74,68 +88,87 @@
         </div>
 
         <div class="uk-card uk-card-default uk-card-body uk-margin-top">
-            <div class="uk-flex uk-flex-between uk-flex-middle">
-                <h2 class="uk-heading-divider uk-margin-remove">Schlüsselübergabe</h2>
-                {% if protocol.status == "open" %}<a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:handover_protocol_key_create' protocol.pk %}">Schlüssel erfassen</a>{% endif %}
+            <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-grid-small handover-section-header" uk-grid>
+                <div class="uk-width-expand"><h2 class="uk-heading-divider uk-margin-remove">Schlüsselübergabe</h2></div>
+                {% if protocol.status == "open" %}<div class="uk-width-auto"><a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:handover_protocol_key_create' protocol.pk %}">Schlüssel erfassen</a></div>{% endif %}
             </div>
             {% if protocol.protokoll_schluessel.all %}
-                <table class="uk-table uk-table-divider uk-table-small">
-                    <thead><tr><th>Stück</th><th>Raum / Bezeichnung</th><th>Aufschrift / Nummer</th><th>Status</th>{% if protocol.status == "open" %}<th></th>{% endif %}</tr></thead>
-                    <tbody>
-                        {% for key in protocol.protokoll_schluessel.all %}
-                            <tr>
-                                <td>{{ key.anzahl }}</td><td>{{ key.raum_bezeichnung }}</td>
-                                <td>{{ key.aufschrift }}{% if key.aufschrift and key.schluesselnummer %} / {% endif %}{{ key.schluesselnummer }}</td>
-                                <td>{% if key.fehlt %}Fehlt: {{ key.fehlgrund }}{% if key.nachlieferung_am %} (Nachlieferung {{ key.nachlieferung_am|date:"d.m.Y" }}){% endif %}{% else %}Übergeben{% endif %}</td>
-                                {% if protocol.status == "open" %}
-                                    <td>
-                                        <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_key_delete' protocol.pk key.pk %}">
-                                            {% csrf_token %}
-                                            <button class="uk-button uk-button-danger uk-button-small" type="submit">Schlüsselposition löschen</button>
-                                        </form>
-                                    </td>
-                                {% endif %}
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <div class="uk-overflow-auto">
+                    <table class="uk-table uk-table-divider uk-table-small">
+                        <thead><tr><th>Stück</th><th>Raum / Bezeichnung</th><th>Aufschrift / Nummer</th><th>Status</th>{% if protocol.status == "open" %}<th></th>{% endif %}</tr></thead>
+                        <tbody>
+                            {% for key in protocol.protokoll_schluessel.all %}
+                                <tr>
+                                    <td>{{ key.anzahl }}</td><td>{{ key.raum_bezeichnung }}</td>
+                                    <td>{{ key.aufschrift }}{% if key.aufschrift and key.schluesselnummer %} / {% endif %}{{ key.schluesselnummer }}</td>
+                                    <td>{% if key.fehlt %}Fehlt: {{ key.fehlgrund }}{% if key.nachlieferung_am %} (Nachlieferung {{ key.nachlieferung_am|date:"d.m.Y" }}){% endif %}{% else %}Übergeben{% endif %}</td>
+                                    {% if protocol.status == "open" %}
+                                        <td>
+                                            <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_key_delete' protocol.pk key.pk %}">
+                                                {% csrf_token %}
+                                                <button class="uk-button uk-button-danger uk-button-small" type="submit">Schlüsselposition löschen</button>
+                                            </form>
+                                        </td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             {% else %}
                 <p class="uk-text-meta">Noch keine Schlüsselposition erfasst. Die Prüfung wird vor der Bestätigung ausdrücklich bestätigt.</p>
             {% endif %}
         </div>
 
         <div class="uk-card uk-card-default uk-card-body uk-margin-top">
-            <div class="uk-flex uk-flex-between uk-flex-middle">
-                <h2 class="uk-heading-divider uk-margin-remove">Räume und Prüfpunkte</h2>
-                {% if protocol.status == "open" %}<a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:handover_protocol_room_create' protocol.pk %}">Raum hinzufügen</a>{% endif %}
+            <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-grid-small handover-section-header" uk-grid>
+                <div class="uk-width-expand"><h2 class="uk-heading-divider uk-margin-remove">Räume und Prüfpunkte</h2></div>
+                {% if protocol.status == "open" %}<div class="uk-width-auto"><a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:handover_protocol_room_create' protocol.pk %}">Raum hinzufügen</a></div>{% endif %}
             </div>
             {% if protocol.raeume.all %}
-                <div class="uk-child-width-1-2@m uk-grid-small uk-margin-top" uk-grid>
+                <div class="uk-child-width-1-1 uk-grid-small uk-margin-top" uk-grid>
                     {% for room in protocol.raeume.all %}
                         <div>
                             <article class="uk-card uk-card-muted uk-card-body">
                                 <h3 class="uk-card-title">{{ room.name }}</h3>
+                                {% include "wohnungsverwaltung/_room_move_in_unmatched_references.html" with room=room einzugspruefpunkte=room.einzugspruefpunkte_ohne_match einzugsprotokoll=move_in_reference %}
                                 {% if room.raum_merkmale.all %}
                                     <ul class="uk-list uk-list-divider">
                                         {% for item in room.raum_merkmale.all %}
-                                            <li class="uk-flex uk-flex-between uk-flex-middle">
-                                                <div>
-                                                    <strong>{{ item.merkmal.bereich }}: {{ item.merkmal.bezeichnung }}</strong><br>
-                                                    {{ item.wert.text }}
-                                                    {% if item.wert.angaben %}
-                                                        <div class="uk-text-meta uk-text-small uk-margin-small-top">
-                                                            {% for label, value in item.wert.angaben.items %}
-                                                                <span>{{ label }}: {{ value }}</span>{% if not forloop.last %} · {% endif %}
-                                                            {% endfor %}
+                                            <li id="pruefpunkt-{{ item.pk }}">
+                                                <div class="uk-flex uk-flex-between uk-flex-top uk-flex-wrap uk-grid-small handover-checklist-item" uk-grid>
+                                                    <div class="uk-width-expand">
+                                                        {% if protocol.protokoll_typ == "move_out" %}
+                                                            <div class="uk-child-width-1-2@m uk-grid-small handover-comparison-grid" uk-grid>
+                                                                <div>
+                                                                    {% include "wohnungsverwaltung/_raum_merkmal_move_in_reference.html" with item=item einzugspruefpunkt=item.einzugspruefpunkt einzugsfotos=item.einzugsfotos einzugsprotokoll=item.einzugsprotokoll %}
+                                                                </div>
+                                                                <div>
+                                                                    {% include "wohnungsverwaltung/_raum_merkmal_move_out_current.html" with item=item protocol=protocol room=room %}
+                                                                </div>
+                                                            </div>
+                                                        {% else %}
+                                                            <strong>{{ item.merkmal.bereich }}: {{ item.merkmal.bezeichnung }}</strong><br>
+                                                            {{ item.wert.text }}
+                                                            {% if item.wert.angaben %}
+                                                                <div class="uk-text-meta uk-text-small uk-margin-small-top">
+                                                                    {% for label, value in item.wert.angaben.items %}
+                                                                        <span>{{ label }}: {{ value }}</span>{% if not forloop.last %} · {% endif %}
+                                                                    {% endfor %}
+                                                                </div>
+                                                            {% endif %}
+                                                            {% include "wohnungsverwaltung/_raum_merkmal_fotos.html" with item=item protocol=protocol room=room photo_return_to="overview" %}
+                                                        {% endif %}
+                                                    </div>
+                                                    {% if protocol.status == "open" %}
+                                                        <div class="uk-width-auto">
+                                                            <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_delete' protocol.pk room.pk item.pk %}">
+                                                                {% csrf_token %}
+                                                                <button class="uk-button uk-button-danger uk-button-small" type="submit">Prüfpunkt löschen</button>
+                                                            </form>
                                                         </div>
                                                     {% endif %}
                                                 </div>
-                                                {% if protocol.status == "open" %}
-                                                    <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_delete' protocol.pk room.pk item.pk %}">
-                                                        {% csrf_token %}
-                                                        <button class="uk-button uk-button-danger uk-button-small" type="submit">Prüfpunkt löschen</button>
-                                                    </form>
-                                                {% endif %}
                                             </li>
                                         {% endfor %}
                                     </ul>

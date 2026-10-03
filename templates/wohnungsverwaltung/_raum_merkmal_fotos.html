@@ -1,0 +1,38 @@
+{% if can_manage_handover_photos %}
+    <section class="uk-margin-small-top" aria-label="Fotos zum Prüfpunkt">
+        {% if item.fotos.all %}
+            <div class="uk-child-width-1-3@m uk-grid-small handover-photo-grid" uk-grid>
+                {% for photo in item.fotos.all %}
+                    <div>
+                        <a href="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_photo_view' protocol.pk room.pk item.pk photo.pk %}" data-handover-photo data-caption="Foto zu {{ item.merkmal.bezeichnung }}">
+                            <img class="uk-border-rounded handover-photo-thumbnail" src="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_photo_view' protocol.pk room.pk item.pk photo.pk %}" alt="Foto zu {{ item.merkmal.bezeichnung }}" loading="lazy">
+                        </a>
+                        {% if protocol.status == "open" %}
+                            <form method="post" action="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_photo_delete' protocol.pk room.pk item.pk photo.pk %}" class="uk-margin-small-top">
+                                {% csrf_token %}
+                                {% if photo_return_to == "overview" %}<input type="hidden" name="return_to" value="overview">{% endif %}
+                                <button class="uk-button uk-button-danger uk-button-small uk-width-1-1" type="submit" onclick="return confirm('Dieses Foto wirklich entfernen?');">Entfernen</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% if protocol.status == "open" %}
+            <form method="post" enctype="multipart/form-data" action="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_photo_upload' protocol.pk room.pk item.pk %}" class="uk-margin-small-top">
+                {% csrf_token %}
+                {% if photo_return_to == "overview" %}<input type="hidden" name="return_to" value="overview">{% endif %}
+                <label class="uk-form-label" for="photos-{{ item.pk }}">Fotos zur Feststellung</label>
+                <div data-photo-selection>
+                    <input class="uk-input" id="photos-{{ item.pk }}" type="file" name="fotos" accept="image/jpeg,image/png,image/webp" multiple required>
+                    <div class="uk-margin-small-top uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
+                        <div><button class="uk-button uk-button-default uk-button-small" type="button" onclick="this.closest('[data-photo-selection]').querySelector('input[type=file]').value = '';">Auswahl entfernen</button></div>
+                        <div><button class="uk-button uk-button-primary uk-button-small" type="submit">Fotos speichern</button></div>
+                    </div>
+                </div>
+                <p class="uk-text-meta uk-margin-small-top">JPEG, PNG oder WebP; höchstens 8 MiB je Foto und zehn Fotos pro Prüfpunkt.</p>
+            </form>
+        {% endif %}
+    </section>
+{% endif %}
