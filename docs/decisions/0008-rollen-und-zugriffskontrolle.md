@@ -11,12 +11,14 @@ Django `User`, `Group` und `Permission` bilden die technische Grundlage. Die fac
 | Zugriff | Django-Gruppe | Berechtigung | Aktuelle Seiten |
 |---|---|---|---|
 | Öffentlich | keine | keine | Startseite, Gesundheitscheck, Bewerbungsvorschau, Anmeldung, Registrierung und Code-Bestätigung |
-| Bewerber | `Bewerber` | `access_applicant_area` | eigene Pre-Bewerbungen erstellen und einsehen |
+| Bewerber | `Bewerber` | `access_applicant_area` | eigene Bewerbungen erstellen, Status einsehen und freigeschaltete Bewerbungen zurückziehen |
 | Mieter | `Mieter` | `access_tenant_area` | vorbereitet; noch keine Seite im MVP-Stand |
 | Mitarbeiter | `Mitarbeiter` | `access_employee_area` | Verwaltung und alle Übergabeprotokoll-Endpunkte |
 | Benutzerverwaltung | `Benutzerverwaltung` | `access_employee_area`, `manage_user_accounts` | zusätzlich Konto-, Rollen- und Rechteverwaltung |
 
 Gruppen definieren die Standardrollen. Die vier Seitenrechte können zusätzlich direkt einem einzelnen Konto zugeordnet werden. Beim Übergang vom Bewerber zum Mieter bleibt die Bewerbergruppe bestehen; die Mietergruppe wird ergänzt.
+
+Die Bewerbungsübersicht lädt ausschließlich Bewerbungen der mit dem angemeldeten Konto verknüpften Person. Ein Bewerber kann den Main-Bereich nur für eine eigene, offene und nicht zurückgezogene Bewerbung mit gesetztem `main_application_unlocked`-Status öffnen. Dieser Status gilt pro Bewerbung; der Mitarbeiterworkflow soll ihn nach Besichtigung und positiver Eignungsentscheidung setzen. Das Zurückziehen speichert einen endgültigen Zeitstempel an der Bewerbung.
 
 Die Rollen und Permissions werden über Migration und idempotent nach `post_migrate` angelegt. Damit stehen sie auch nach einem Django-Testdatenbank-Flush zuverlässig bereit. Bestehende, mit einer Person verknüpfte Konten erhalten bei der Migration abhängig von `Person.is_employee` die Gruppe `Bewerber` oder `Mitarbeiter`.
 

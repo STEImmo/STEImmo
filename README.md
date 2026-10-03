@@ -99,7 +99,7 @@ Eine Roadmap-Phase gilt erst als abgeschlossen, wenn ihre Akzeptanzkriterien erf
 
 | Gruppe | Zugriff |
 |---|---|
-| `Bewerber` | Eigene Pre-Bewerbungen erstellen und einsehen |
+| `Bewerber` | Eigene Bewerbungen erstellen, Bearbeitungsstände einsehen und freigeschaltete Bewerbungen zurückziehen |
 | `Mieter` | Für einen späteren Mieterbereich vorbereitet; derzeit keine eigene Seite |
 | `Mitarbeiter` | Verwaltungsbereich und Übergabeprotokolle |
 | `Benutzerverwaltung` | Mitarbeiterzugriff sowie Konten, Rollen und Seitenrechte verwalten |

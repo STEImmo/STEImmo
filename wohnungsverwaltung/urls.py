@@ -17,6 +17,16 @@ urlpatterns = [
         views.pre_application_preview,
         name="pre_application_preview",
     ),
+    path(
+        "bewerbung/<uuid:application_id>/main/",
+        views.main_application_status,
+        name="main_application_status",
+    ),
+    path(
+        "bewerbung/<uuid:application_id>/zurueckziehen/",
+        views.application_withdraw,
+        name="application_withdraw",
+    ),
     path("", views.handover_protocol_list, name="handover_protocol_list"),
     path("neu/", views.handover_protocol_create, name="handover_protocol_create"),
     path(
