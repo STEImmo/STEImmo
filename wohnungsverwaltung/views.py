@@ -184,9 +184,70 @@ def pre_application_list(request: HttpRequest) -> HttpResponse:
         "wohnungsverwaltung/pre_application_list.html",
         {
             "applications": applications,
-            "has_open_application": applications.filter(status=BewerbungStatus.OPEN).exists(),
+            "has_open_application": applications.filter(
+                status=BewerbungStatus.OPEN,
+                interest_withdrawn_at__isnull=True,
+            ).exists(),
         },
     )
+
+
+@applicant_required
+def main_application_status(request: HttpRequest, application_id: UUID) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    applicant = _applicant_for_user(request)
+    application = get_object_or_404(
+        Bewerbung.objects.select_related("wohnung").filter(
+            person=applicant,
+            status=BewerbungStatus.OPEN,
+            interest_withdrawn_at__isnull=True,
+            main_application_unlocked=True,
+        ),
+        pk=application_id,
+    )
+    return render(
+        request,
+        "wohnungsverwaltung/main_application_status.html",
+        {"application": application},
+    )
+
+
+@applicant_required
+def application_withdraw(request: HttpRequest, application_id: UUID) -> HttpResponse:
+    if request.method not in {"GET", "POST"}:
+        return HttpResponseNotAllowed(["GET", "POST"])
+
+    applicant = _applicant_for_user(request)
+    eligible_applications = Bewerbung.objects.filter(
+        person=applicant,
+        status=BewerbungStatus.OPEN,
+        interest_withdrawn_at__isnull=True,
+        main_application_unlocked=True,
+    )
+
+    if request.method == "GET":
+        application = get_object_or_404(
+            eligible_applications.select_related("wohnung"),
+            pk=application_id,
+        )
+        return render(
+            request,
+            "wohnungsverwaltung/application_withdraw_confirm.html",
+            {"application": application},
+        )
+
+    with transaction.atomic():
+        application = get_object_or_404(
+            eligible_applications.select_for_update(),
+            pk=application_id,
+        )
+        application.interest_withdrawn_at = timezone.now()
+        application.save(update_fields=["interest_withdrawn_at", "updated_at"])
+
+    messages.success(request, "Ihr Interesse an dieser Bewerbung wurde zurückgezogen.")
+    return redirect("wohnungsverwaltung:pre_application_list")
 
 
 def _draft_session_key(request: HttpRequest) -> str:
