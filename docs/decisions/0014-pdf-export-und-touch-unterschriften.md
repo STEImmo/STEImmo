@@ -72,6 +72,23 @@ oder Unterschriftsdateien. PDFs werden privat und ohne Cache ausgeliefert.
 
 ## Konsequenzen
 
+Der Abschluss begrenzt Multipart-Anfragen vor CSRF- und Formularverarbeitung auf
+2 MiB; ein vorgeschalteter Upload-Handler begrenzt einzelne Dateien auf 512 KiB
+und alle Dateien zusammen auf 1 MiB. Zusätzlich zählt ein begrenzter Eingabestream
+die tatsächlich gelesenen Bytes. Überschreitungen liefern HTTP 413, temporäre
+Uploads werden geschlossen, und die Zeichnungen bleiben im geöffneten Formular.
+
+Der Export verarbeitet höchstens 40 Fotos mit insgesamt 64 MiB einschließlich
+aller Einzugsreferenzen. Jede Datei wird begrenzt gelesen (höchstens 8 MiB),
+und Bilder über 16 Megapixel werden vor dem Dekodieren abgelehnt. Die gesamte
+Bildsammlung im PDF darf nach der Aufbereitung höchstens 12 Megapixel und 24 MiB
+belegen; damit sind auch stark komprimierbare Bilder im Arbeitsspeicher begrenzt.
+Ein begrenzter Ausgabepuffer akzeptiert höchstens 32 MiB PDF-Daten. Diese Grenzen
+gelten ebenso für historische Exporte. Sie verhindern unbeschränkte Arbeit im
+synchronen Worker ohne neue Infrastruktur. Bei Überschreitung erfolgt kein
+Abschluss und keine unvollständige Archivierung; Bilder werden niemals still
+weggelassen. Bereits archivierte PDFs bleiben unverändert herunterladbar.
+
 - Neue Abschlüsse benötigen JavaScript und eine erfolgreich gespeicherte PDF-Datei.
 - Fehlende oder beschädigte Fotos verhindern einen unvollständigen Abschluss.
 - Vor dem Abschluss bearbeitet die Maske vorhandene Prüfpunkte und Schlüssel über

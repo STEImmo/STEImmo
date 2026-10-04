@@ -34,6 +34,44 @@ DECLARATIONS = [
     "Die Angaben entsprechen nach bestem Wissen dem tatsächlichen Zustand der Mieträume.",
 ]
 
+PHOTO_COUNT_LIMIT = 40
+PHOTO_BYTES_LIMIT = 64 * 1024 * 1024
+IMAGE_PIXELS_LIMIT = 16_000_000
+NORMALIZED_BYTES_LIMIT = 24 * 1024 * 1024
+NORMALIZED_PIXELS_LIMIT = 12_000_000
+PDF_BYTES_LIMIT = 32 * 1024 * 1024
+
+
+class ExportLimitExceeded(ValueError):
+    pass
+
+
+class ExportBudget:
+    def __init__(self):
+        self.count = 0
+        self.bytes = 0
+        self.normalized_bytes = 0
+        self.normalized_pixels = 0
+
+    def read_photo(self, source):
+        self.count += 1
+        if self.count > PHOTO_COUNT_LIMIT:
+            raise ExportLimitExceeded(
+                "Maximal 40 Fotos einschließlich Einzugsvergleich exportierbar."
+            )
+        data = source.read(min(8 * 1024 * 1024, PHOTO_BYTES_LIMIT - self.bytes) + 1)
+        self.bytes += len(data)
+        if len(data) > 8 * 1024 * 1024 or self.bytes > PHOTO_BYTES_LIMIT:
+            raise ExportLimitExceeded("Fotos überschreiten das Exportlimit von insgesamt 64 MiB.")
+        return data
+
+
+class LimitedPDFBuffer(BytesIO):
+    def write(self, data):
+        if self.tell() + len(data) > PDF_BYTES_LIMIT:
+            raise ExportLimitExceeded("Das PDF überschreitet das Exportlimit von 32 MiB.")
+        return super().write(data)
+
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
@@ -75,14 +113,14 @@ def _section(title, values):
     return {"title": title, "rows": [[label, display(value)] for label, value in values]}
 
 
-def _side(item, label):
+def _side(item, label, budget):
     if item is None:
         return {"label": label, "text": "Kein Gegenstück erfasst", "details": [], "photos": []}
     value = item.wert if isinstance(item.wert, dict) else {}
     photos = []
     for photo in sorted(item.fotos.all(), key=lambda p: (p.created_at, str(p.pk))):
         with photo.datei.open("rb") as stream:
-            checksum = digest(stream.read())
+            checksum = digest(budget.read_photo(stream))
         photos.append(
             {
                 "path": photo.datei.name,
@@ -223,6 +261,7 @@ def build_snapshot(protocol, name=""):
     rooms = {str(r.raum_id): r for r in protocol.raeume.all()}
     old_rooms = {str(r.raum_id): r for r in reference.raeume.all()} if reference else {}
     groups = []
+    budget = ExportBudget()
     for room_id in sorted(
         rooms.keys() | old_rooms.keys(),
         key=lambda pk: ((rooms.get(pk) or old_rooms[pk]).name, pk),
@@ -242,9 +281,9 @@ def build_snapshot(protocol, name=""):
             item = current.get(feature_id) or old[feature_id]
             sides = []
             if protocol.protokoll_typ == ProtokollTyp.MOVE_OUT:
-                sides.append(_side(old.get(feature_id), "Einzug (Referenz)"))
+                sides.append(_side(old.get(feature_id), "Einzug (Referenz)", budget))
             sides.append(
-                _side(current.get(feature_id), HANDOVER_TYPE_LABELS[protocol.protokoll_typ])
+                _side(current.get(feature_id), HANDOVER_TYPE_LABELS[protocol.protokoll_typ], budget)
             )
             items.append(
                 {"title": f"{item.merkmal.bereich}: {item.merkmal.bezeichnung}", "sides": sides}
@@ -303,13 +342,25 @@ def clean_signature(upload):
         ) from error
 
 
-def _image(data, max_width=170 * mm, max_height=85 * mm):
+def _image(data, max_width=170 * mm, max_height=85 * mm, budget=None):
     with Image.open(BytesIO(data)) as original:
+        if original.width * original.height > IMAGE_PIXELS_LIMIT:
+            raise ExportLimitExceeded("Ein Foto überschreitet die Grenze von 16 Megapixeln.")
         original.load()
         normalized = ImageOps.exif_transpose(original).convert("RGB")
         normalized.thumbnail((2000, 1600))
+        if budget is not None:
+            budget.normalized_pixels += normalized.width * normalized.height
+            if budget.normalized_pixels > NORMALIZED_PIXELS_LIMIT:
+                raise ExportLimitExceeded(
+                    "Die aufbereiteten Fotos überschreiten insgesamt 12 Megapixel."
+                )
         stream = BytesIO()
         normalized.save(stream, "PNG")
+        if budget is not None:
+            budget.normalized_bytes += stream.tell()
+            if budget.normalized_bytes > NORMALIZED_BYTES_LIMIT:
+                raise ExportLimitExceeded("Die aufbereiteten Fotos überschreiten insgesamt 24 MiB.")
         width, height = normalized.size
     scale = min(max_width / width, max_height / height)
     stream.seek(0)
@@ -317,6 +368,7 @@ def _image(data, max_width=170 * mm, max_height=85 * mm):
 
 
 def render_pdf(snapshot, signatures):
+    budget = ExportBudget()
     fonts = Path(reportlab.__file__).parent / "fonts"
     if "Handover" not in pdfmetrics.getRegisteredFontNames():
         pdfmetrics.registerFont(TTFont("Handover", str(fonts / "Vera.ttf")))
@@ -372,13 +424,13 @@ def render_pdf(snapshot, signatures):
                 story.extend(paragraph(f"{k}: {v}") for k, v in side["details"])
                 for index, photo in enumerate(side["photos"], 1):
                     with default_storage.open(photo["path"], "rb") as source:
-                        data = source.read()
+                        data = budget.read_photo(source)
                     if digest(data) != photo["sha256"]:
                         raise OSError("Foto wurde zwischenzeitlich verändert.")
                     story.append(
                         KeepTogether(
                             [
-                                _image(data),
+                                _image(data, budget=budget),
                                 paragraph(
                                     f"{room['title']} / {item['title']} / "
                                     f"{side['label']} / Foto {index}"
@@ -413,7 +465,7 @@ def render_pdf(snapshot, signatures):
             )
         else:
             story.append(paragraph(f"{label}: Keine historische Unterschrift erfasst"))
-    output = BytesIO()
+    output = LimitedPDFBuffer()
 
     def footer(canvas, doc):
         canvas.saveState()

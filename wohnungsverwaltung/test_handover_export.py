@@ -127,6 +127,91 @@ class HandoverExportTests(TestCase):
         data = b"".join(response.streaming_content)
         return data, PdfReader(BytesIO(data))
 
+    def test_large_signature_is_stopped_before_validation_and_temp_files_are_cleaned(self):
+        data = self.signing_data()
+        data["mitarbeiter"] = SimpleUploadedFile("large.png", b"x" * (512 * 1024 + 1))
+        with (
+            override_settings(
+                FILE_UPLOAD_MAX_MEMORY_SIZE=0, FILE_UPLOAD_TEMP_DIR=self.directory.name
+            ),
+            patch("wohnungsverwaltung.export_forms.ProtocolSigningForm.is_valid") as validate,
+        ):
+            response = self.client.post(self.url("confirm"), data)
+        self.assertEqual(response.status_code, 413)
+        validate.assert_not_called()
+        self.protocol.refresh_from_db()
+        self.assertEqual(self.protocol.status, ProtokollStatus.OPEN)
+        self.assertFalse(self.protocol.unterschriften.exists())
+        self.assertFalse(list(Path(self.directory.name).glob("*.upload*")))
+
+    def test_total_request_limit_rejects_non_file_fields_before_validation(self):
+        data = self.signing_data()
+        data["padding"] = "x" * (2 * 1024 * 1024)
+        with patch("wohnungsverwaltung.export_forms.ProtocolSigningForm.is_valid") as validate:
+            response = self.client.post(self.url("confirm"), data)
+        self.assertEqual(response.status_code, 413)
+        validate.assert_not_called()
+
+    def test_stream_limit_is_enforced_without_relying_on_content_length(self):
+        from .export_limits import REQUEST_BYTES, LimitedStream, UploadLimitExceeded
+
+        stream = LimitedStream(BytesIO(b"x" * (REQUEST_BYTES + 10)))
+        self.assertEqual(len(stream.read(REQUEST_BYTES)), REQUEST_BYTES)
+        with self.assertRaises(UploadLimitExceeded):
+            stream.read()
+
+    def test_combined_signature_uploads_have_a_total_limit(self):
+        from .export_limits import SignatureUploadLimit, UploadLimitExceeded
+
+        handler = SignatureUploadLimit(None)
+        for index in range(2):
+            handler.new_file(str(index), "signature.png", "image/png", None)
+            handler.receive_data_chunk(b"x" * (512 * 1024), 0)
+        handler.new_file("extra", "signature.png", "image/png", None)
+        with self.assertRaises(UploadLimitExceeded):
+            handler.receive_data_chunk(b"x", 0)
+
+    def test_photo_count_and_volume_limits_leave_protocol_open(self):
+        photo = signature_file()
+        RaumMerkmalFoto.objects.create(
+            raum_merkmal=self.item, datei=photo, content_type="image/png", dateigroesse=photo.size
+        )
+        for name, limit in [("PHOTO_COUNT_LIMIT", 0), ("PHOTO_BYTES_LIMIT", 10)]:
+            data = self.signing_data()
+            with (
+                self.subTest(limit=name),
+                patch(f"wohnungsverwaltung.handover_export.{name}", limit),
+            ):
+                response = self.client.post(self.url("confirm"), data)
+            self.assertEqual(response.status_code, 413)
+            self.protocol.refresh_from_db()
+            self.assertEqual(self.protocol.status, ProtokollStatus.OPEN)
+            self.assertFalse(self.protocol.dokument_pfad)
+            self.assertFalse(self.protocol.unterschriften.exists())
+
+    def test_pdf_and_normalized_photo_limits_do_not_store_partial_archives(self):
+        photo = signature_file()
+        RaumMerkmalFoto.objects.create(
+            raum_merkmal=self.item, datei=photo, content_type="image/png", dateigroesse=photo.size
+        )
+        for name, limit in [
+            ("PDF_BYTES_LIMIT", 1024),
+            ("NORMALIZED_BYTES_LIMIT", 1),
+            ("NORMALIZED_PIXELS_LIMIT", 100),
+            ("IMAGE_PIXELS_LIMIT", 100),
+        ]:
+            data = self.signing_data()
+            with (
+                self.subTest(limit=name),
+                patch(f"wohnungsverwaltung.handover_export.{name}", limit),
+            ):
+                response = self.client.post(self.url("confirm"), data)
+            self.assertEqual(response.status_code, 413)
+            self.protocol.refresh_from_db()
+            self.assertEqual(self.protocol.status, ProtokollStatus.OPEN)
+            self.assertFalse(self.protocol.unterschriften.exists())
+            self.assertFalse(list(Path(self.directory.name).glob("private/handovers/**/*.*")))
+
     def test_signatures_and_full_content_are_embedded_in_an_immutable_pdf(self):
         photo = signature_file()
         RaumMerkmalFoto.objects.create(

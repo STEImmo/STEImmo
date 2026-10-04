@@ -19,6 +19,7 @@ from .access import (
 )
 from .export_forms import ProtocolSigningForm
 from .handover_export import (
+    ExportLimitExceeded,
     archive_protocol,
     build_snapshot,
     content_token,
@@ -59,6 +60,9 @@ def handover_protocol_finalize(request, protocol_id):
         errors.append("Bitte hinterlegen Sie zuerst vollständige Namen für Mitarbeiter und Mieter.")
     try:
         snapshot = build_snapshot(protocol, name)
+    except ExportLimitExceeded as error:
+        messages.error(request, str(error))
+        return redirect(_detail_url(protocol.pk))
     except (OSError, ValueError):
         messages.error(
             request, "Ein Protokollfoto kann nicht gelesen werden. Bitte prüfen Sie die Fotos."
@@ -137,6 +141,9 @@ def handover_protocol_confirm(request, protocol_id):
                 reason=form.cleaned_data["reason"],
                 user=request.user,
             )
+    except ExportLimitExceeded as error:
+        _cleanup(stored)
+        return JsonResponse({"error": str(error)}, status=413)
     except (OSError, ValueError):
         _cleanup(stored)
         logger.error("Übergabeabschluss wegen Export- oder Speicherfehler abgebrochen.")
@@ -216,6 +223,10 @@ def handover_protocol_pdf_create(request, protocol_id):
                 archive_protocol(
                     protocol, build_snapshot(protocol), {}, timezone.now(), stored, legacy=True
                 )
+    except ExportLimitExceeded as error:
+        _cleanup(stored)
+        messages.error(request, str(error))
+        return render(request, "wohnungsverwaltung/handover_export_error.html", status=413)
     except (OSError, ValueError):
         _cleanup(stored)
         return render(request, "wohnungsverwaltung/handover_export_error.html", status=503)
