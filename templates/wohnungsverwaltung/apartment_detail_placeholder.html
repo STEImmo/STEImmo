@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Wohnungsdetails folgen – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section uk-section-default">
+    <div class="uk-container">
+        <div class="uk-text-center">
+            <h1 class="uk-heading-small">Wohnungsdetails folgen</h1>
+            <p>Details zu Wohnung {{ wohnung.wohnungsnummer }} werden später ergänzt.</p>
+            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">
+                Zurück zur Wohnungssuche
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}
