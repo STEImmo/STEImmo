@@ -1,0 +1,10 @@
+<div data-existing-photos>
+    {% if item.fotos.all %}
+        <p class="uk-text-meta">Bereits gespeicherte Fotos bleiben beim Bearbeiten und Wiederherstellen erhalten.</p>
+        <div class="uk-child-width-1-2@s uk-grid-small" uk-grid>
+            {% for photo in item.fotos.all %}
+                <div><img class="handover-photo-thumbnail uk-border-rounded" src="{% url 'wohnungsverwaltung:handover_protocol_checklist_item_photo_view' item.raumprotokoll.protokoll_id item.raumprotokoll_id item.pk photo.pk %}" alt="Gespeichertes Foto {{ forloop.counter }} zum Prüfpunkt {{ item.merkmal }}"><p class="uk-text-meta">Gespeichertes Foto {{ forloop.counter }}</p></div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>

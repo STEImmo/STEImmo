@@ -24,13 +24,8 @@
                 {% csrf_token %}
                 {% if photo_return_to == "overview" %}<input type="hidden" name="return_to" value="overview">{% endif %}
                 <label class="uk-form-label" for="photos-{{ item.pk }}">Fotos zur Feststellung</label>
-                <div data-photo-selection>
-                    <input class="uk-input" id="photos-{{ item.pk }}" type="file" name="fotos" accept="image/jpeg,image/png,image/webp" multiple required>
-                    <div class="uk-margin-small-top uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
-                        <div><button class="uk-button uk-button-default uk-button-small" type="button" onclick="this.closest('[data-photo-selection]').querySelector('input[type=file]').value = '';">Auswahl entfernen</button></div>
-                        <div><button class="uk-button uk-button-primary uk-button-small" type="submit">Fotos speichern</button></div>
-                    </div>
-                </div>
+                {% include "wohnungsverwaltung/_photo_picker.html" with input_id=item.pk %}
+                <button class="uk-button uk-button-primary uk-button-small uk-margin-small-top" type="submit">Fotos speichern</button>
                 <p class="uk-text-meta uk-margin-small-top">JPEG, PNG oder WebP; höchstens 8 MiB je Foto und zehn Fotos pro Prüfpunkt.</p>
             </form>
         {% endif %}

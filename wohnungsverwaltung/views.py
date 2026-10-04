@@ -38,7 +38,6 @@ from .forms import (
     InlineRoomChecklistFormSet,
     MerkmalForm,
     MerkmalOptionFormSet,
-    ProtocolConfirmationForm,
     RaumForm,
     RoomChecklistItemForm,
     RoomChecklistPhotoUploadForm,
@@ -51,6 +50,7 @@ from .forms import (
     photo_content_type_from_format,
     verified_photo_content_type,
 )
+from .handover_lock import protocol_mutation
 from .models import (
     Bewerbung,
     BewerbungStatus,
@@ -437,7 +437,9 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
         or request.GET.get("person")
         or (_draft_field_value(server_draft, "person") if server_draft else None)
     )
-    form = HandoverProtocolForm(request.POST or None, wohnung_id=selected_wohnung_id)
+    form = HandoverProtocolForm(
+        request.POST or None, wohnung_id=selected_wohnung_id, employee=request.user
+    )
     _set_selected_person_initial(form, selected_person_id)
     can_manage_handover_photos = _can_manage_handover_photos(request)
     room_formset = InlineRoomChecklistFormSet(
@@ -513,11 +515,11 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
         "wohnungsverwaltung/handover_protocol_detail.html",
         {
             "protocol": protocol,
+            "representative_name": _representative_name(protocol, request.user),
             "protocol_type_label": HANDOVER_TYPE_LABELS[protocol.protokoll_typ],
             "handover_status_label": HANDOVER_STATUS_LABELS[protocol.uebergabe_status],
             "acceptance_status_label": ACCEPTANCE_STATUS_LABELS[protocol.abnahme_status],
             "protocol_status_label": PROTOCOL_STATUS_LABELS[protocol.status],
-            "confirmation_form": ProtocolConfirmationForm(),
             "can_manage_handover_photos": can_manage_handover_photos,
             "move_in_reference": move_in_reference,
             **_move_in_reference_context(move_in_reference),
@@ -527,6 +529,7 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
     protocol = get_object_or_404(Protokoll, pk=protocol_id)
     if protocol.status != ProtokollStatus.OPEN:
@@ -543,6 +546,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         request.POST or None,
         instance=protocol,
         wohnung_id=selected_wohnung_id or protocol.wohnung_id,
+        employee=request.user,
     )
     _set_selected_person_initial(form, selected_person_id)
     can_manage_handover_photos = _can_manage_handover_photos(request)
@@ -550,12 +554,19 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         data=request.POST or None,
         files=request.FILES or None,
         prefix="rooms",
+        initial=_protocol_room_initial(protocol) if request.method != "POST" else None,
         form_kwargs={
             "wohnung_id": _valid_wohnung_id(selected_wohnung_id or protocol.wohnung_id),
             "allow_photo_upload": can_manage_handover_photos,
+            "protocol": protocol,
         },
     )
-    key_formset = HandoverKeyFormSet(request.POST or None, prefix="keys")
+    key_formset = HandoverKeyFormSet(
+        request.POST or None,
+        prefix="keys",
+        initial=_protocol_key_initial(protocol) if request.method != "POST" else None,
+        form_kwargs={"protocol": protocol},
+    )
     move_in_reference = None
     if can_manage_handover_photos:
         move_in_reference = _move_in_reference_for_apartment(
@@ -600,6 +611,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_room_create(request: HttpRequest, protocol_id) -> HttpResponse:
     protocol = get_object_or_404(Protokoll, pk=protocol_id)
     if protocol.status != ProtokollStatus.OPEN:
@@ -629,6 +641,7 @@ def handover_protocol_room_create(request: HttpRequest, protocol_id) -> HttpResp
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_room_detail(request: HttpRequest, protocol_id, room_id) -> HttpResponse:
     protocol = get_object_or_404(Protokoll, pk=protocol_id)
     room = get_object_or_404(
@@ -669,6 +682,7 @@ def handover_protocol_room_detail(request: HttpRequest, protocol_id, room_id) ->
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_room_delete(request: HttpRequest, protocol_id, room_id) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -687,6 +701,7 @@ def handover_protocol_room_delete(request: HttpRequest, protocol_id, room_id) ->
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_checklist_item_delete(
     request: HttpRequest, protocol_id, room_id, item_id
 ) -> HttpResponse:
@@ -712,6 +727,7 @@ def handover_protocol_checklist_item_delete(
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_checklist_item_photo_upload(
     request: HttpRequest, protocol_id, room_id, item_id
 ) -> HttpResponse:
@@ -787,6 +803,7 @@ def handover_protocol_checklist_item_photo_view(
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_checklist_item_photo_delete(
     request: HttpRequest, protocol_id, room_id, item_id, photo_id
 ) -> HttpResponse:
@@ -960,6 +977,7 @@ def _attach_move_in_photo_references(protocol: Protokoll, rooms) -> Protokoll | 
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_key_create(request: HttpRequest, protocol_id) -> HttpResponse:
     protocol = get_object_or_404(Protokoll, pk=protocol_id)
     if protocol.status != ProtokollStatus.OPEN:
@@ -982,6 +1000,7 @@ def handover_protocol_key_create(request: HttpRequest, protocol_id) -> HttpRespo
 
 
 @employee_required
+@protocol_mutation
 def handover_protocol_key_delete(request: HttpRequest, protocol_id, key_id) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -997,45 +1016,13 @@ def handover_protocol_key_delete(request: HttpRequest, protocol_id, key_id) -> H
     return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
 
-@employee_required
-def handover_protocol_confirm(request: HttpRequest, protocol_id) -> HttpResponse:
-    if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
+def _representative_name(protocol, user):
+    from .handover_export import employee_name
 
-    protocol = get_object_or_404(
-        Protokoll.objects.prefetch_related("raeume__raum_merkmale", "protokoll_schluessel"),
-        pk=protocol_id,
-    )
-    if protocol.status != ProtokollStatus.OPEN:
-        messages.warning(request, "Das Protokoll wurde bereits bestätigt.")
-        return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
-
-    form = ProtocolConfirmationForm(request.POST)
-    completion_errors = _protocol_completion_errors(protocol)
-    if not form.is_valid() or completion_errors:
-        for error in completion_errors:
-            messages.error(request, error)
-        if not form.is_valid():
-            messages.error(request, "Bitte bestätigen Sie die beiden Erklärungen vor Abschluss.")
-        return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
-
-    protocol.status = ProtokollStatus.SIGNED
-    protocol.bestaetigt_am = timezone.now()
-    protocol.schluessel_ueberprueft = form.cleaned_data["schluessel_ueberprueft"]
-    protocol.bestaetigung_erklaert = form.cleaned_data["bestaetigung_erklaert"]
-    protocol.save(
-        update_fields=[
-            "status",
-            "bestaetigt_am",
-            "schluessel_ueberprueft",
-            "bestaetigung_erklaert",
-            "updated_at",
-        ]
-    )
-    messages.success(
-        request, "Das Übergabeprotokoll wurde bestätigt und gegen Änderungen gesperrt."
-    )
-    return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
+    if protocol.status == ProtokollStatus.OPEN:
+        return employee_name(user) or protocol.vermieter_name
+    signature = protocol.unterschriften.filter(rolle="mitarbeiter").first()
+    return signature.name if signature else protocol.vermieter_name
 
 
 def _protocol_completion_errors(protocol: Protokoll) -> list[str]:
@@ -1092,6 +1079,12 @@ def _key_form_initial(wohnung) -> list[dict[str, object]]:
 
 def _save_inline_protocol_entries(protocol, room_formset, key_formset) -> None:
     for room_form in room_formset:
+        if room_form.cleaned_data.get("DELETE"):
+            item = room_form.cleaned_data.get("pruefpunkt")
+            if item is not None:
+                _delete_checklist_photos(item.fotos.all())
+                item.delete()
+            continue
         if (
             room_form.cleaned_data
             and not room_form.cleaned_data.get("DELETE")
@@ -1100,11 +1093,45 @@ def _save_inline_protocol_entries(protocol, room_formset, key_formset) -> None:
             room_form.save(protocol)
 
     for key_form in key_formset:
-        if not key_form.cleaned_data or key_form.cleaned_data.get("DELETE"):
+        if key_form.cleaned_data.get("DELETE"):
+            key = key_form.cleaned_data.get("schluessel")
+            if key is not None:
+                key.delete()
+            continue
+        if not key_form.cleaned_data:
             continue
         key = key_form.save(commit=False)
         key.protokoll = protocol
         key.save()
+
+
+def _protocol_room_initial(protocol):
+    values = []
+    for room in protocol.raeume.prefetch_related("raum_merkmale__merkmal").order_by("name", "pk"):
+        items = list(room.raum_merkmale.all())
+        if not items:
+            values.append({"raum": room.raum_id})
+        for item in items:
+            value = item.wert if isinstance(item.wert, dict) else {}
+            values.append(
+                {
+                    "pruefpunkt": item.pk,
+                    "raum": room.raum_id,
+                    "bereich": item.merkmal.bereich,
+                    "merkmal": item.merkmal_id,
+                    "wert": value.get("text", ""),
+                    "zusatzangaben": json.dumps(value.get("angaben", {}), ensure_ascii=False),
+                }
+            )
+    return values
+
+
+def _protocol_key_initial(protocol):
+    fields = HandoverKeyForm._meta.fields
+    return [
+        {"schluessel": key.pk, **{field: getattr(key, field) for field in fields}}
+        for key in protocol.protokoll_schluessel.order_by("raum_bezeichnung", "pk")
+    ]
 
 
 def _room_form_groups(room_formset) -> list[dict[str, object]]:
