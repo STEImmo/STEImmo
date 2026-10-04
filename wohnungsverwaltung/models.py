@@ -19,6 +19,22 @@ def handover_photo_upload_path(instance, _filename: str) -> str:
     return f"u/{protocol_id.hex}/{checklist_item.pk.hex}/{uuid.uuid4().hex}"
 
 
+def _application_proof_upload_path(instance, category: str) -> str:
+    return f"bewerbungen/{instance.pk.hex}/{category}/{uuid.uuid4().hex}"
+
+
+def income_proof_upload_path(instance, _filename: str) -> str:
+    return _application_proof_upload_path(instance, "einkommen")
+
+
+def identity_proof_upload_path(instance, _filename: str) -> str:
+    return _application_proof_upload_path(instance, "identitaet")
+
+
+def credit_report_proof_upload_path(instance, _filename: str) -> str:
+    return _application_proof_upload_path(instance, "bonitaet")
+
+
 def calculate_photo_checksum(photo) -> str:
     """Return the SHA-256 checksum while preserving the current file position."""
     position = photo.tell()
@@ -349,6 +365,13 @@ class Bewerbung(models.Model):
         ),
     )
     interest_withdrawn_at = models.DateTimeField(blank=True, null=True, editable=False)
+    income_proof = models.FileField(upload_to=income_proof_upload_path, blank=True)
+    identity_proof = models.FileField(upload_to=identity_proof_upload_path, blank=True)
+    credit_report_proof = models.FileField(
+        upload_to=credit_report_proof_upload_path,
+        blank=True,
+    )
+    submitted_at = models.DateTimeField(blank=True, null=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -387,6 +410,8 @@ class Bewerbung(models.Model):
             return "Abgelehnt"
         if self.status == BewerbungStatus.BLOCKED:
             return "Gesperrt"
+        if self.submitted_at is not None:
+            return "Main-Bewerbung eingereicht"
         if self.main_application_unlocked:
             return "Main-Bewerbung freigeschaltet"
         return "In Bearbeitung"
@@ -398,8 +423,10 @@ class Bewerbung(models.Model):
             return "Die Bewerbung wurde beendet."
         if self.status == BewerbungStatus.BLOCKED:
             return "Die Bewerbung ist derzeit gesperrt."
+        if self.submitted_at is not None:
+            return "Sie können Ihre Nachweise bis zum Ende der Freigabe korrigieren."
         if self.main_application_unlocked:
-            return "Ihre Main-Bewerbung ist freigeschaltet."
+            return "Bitte reichen Sie die Main-Bewerbung mit allen drei Nachweisen ein."
         return "Warten Sie auf die nächste Rückmeldung zu Ihrer Bewerbung."
 
 

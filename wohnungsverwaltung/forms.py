@@ -1,4 +1,5 @@
 import json
+import warnings
 from uuid import UUID
 
 from django import forms
@@ -11,6 +12,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.forms.formsets import BaseFormSet
 from django.forms.models import inlineformset_factory
+from PIL import Image, UnidentifiedImageError
 
 from .access import (
     ACCESS_PERMISSION_CODENAMES,
@@ -502,6 +504,110 @@ class BewerbungForm(forms.ModelForm):
         if commit:
             application.save()
         return application
+
+
+class MainApplicationForm(forms.ModelForm):
+    action = forms.CharField(required=False, widget=forms.HiddenInput)
+    income_proof = forms.FileField(
+        label="Gehaltsabrechnungen",
+        required=False,
+        widget=forms.FileInput(
+            attrs={"class": "uk-input", "accept": ".png,.pdf,image/png,application/pdf"}
+        ),
+    )
+    identity_proof = forms.FileField(
+        label="Identitätsnachweis",
+        required=False,
+        widget=forms.FileInput(
+            attrs={"class": "uk-input", "accept": ".png,.pdf,image/png,application/pdf"}
+        ),
+    )
+    credit_report_proof = forms.FileField(
+        label="SCHUFA-Unterlage",
+        required=False,
+        widget=forms.FileInput(
+            attrs={"class": "uk-input", "accept": ".png,.pdf,image/png,application/pdf"}
+        ),
+    )
+
+    class Meta:
+        model = Bewerbung
+        fields = ("income_proof", "identity_proof", "credit_report_proof")
+
+    def clean(self) -> dict:
+        cleaned_data = super().clean()
+        action = self.data.get("action") or "save_draft"
+        if action not in {"save_draft", "submit"}:
+            raise forms.ValidationError("Bitte wählen Sie eine gültige Aktion.")
+        cleaned_data["action"] = action
+
+        if action == "submit":
+            for field_name in ("income_proof", "identity_proof", "credit_report_proof"):
+                if not cleaned_data.get(field_name):
+                    self.add_error(
+                        field_name,
+                        "Dieser Nachweis ist für die Einreichung erforderlich.",
+                    )
+        elif self.instance.submitted_at is not None:
+            for field_name in ("income_proof", "identity_proof", "credit_report_proof"):
+                if not cleaned_data.get(field_name):
+                    self.add_error(
+                        field_name,
+                        "Ein eingereichter Nachweis kann nur durch eine neue Datei ersetzt werden.",
+                    )
+        return cleaned_data
+
+    def _clean_proof(self, field_name: str):
+        upload = self.cleaned_data.get(field_name)
+        if not upload or getattr(upload, "_committed", False):
+            return upload
+
+        if upload.size > settings.MAIN_APPLICATION_PROOF_MAX_SIZE:
+            maximum_mib = settings.MAIN_APPLICATION_PROOF_MAX_SIZE / (1024 * 1024)
+            raise forms.ValidationError(f"Die Datei darf höchstens {maximum_mib:g} MiB groß sein.")
+
+        original_position = upload.tell()
+        try:
+            upload.seek(0)
+            header = upload.read(1024)
+            if header.startswith(b"%PDF-"):
+                upload.seek(max(0, upload.size - 1024))
+                if b"%%EOF" not in upload.read():
+                    raise forms.ValidationError("Die PDF-Datei ist beschädigt oder ungültig.")
+                return upload
+
+            upload.seek(0)
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", Image.DecompressionBombWarning)
+                with Image.open(upload) as image:
+                    if image.format != "PNG":
+                        raise forms.ValidationError("Erlaubt sind nur PNG- oder PDF-Dateien.")
+                    image.verify()
+            return upload
+        except forms.ValidationError:
+            raise
+        except (
+            Image.DecompressionBombError,
+            Image.DecompressionBombWarning,
+            OSError,
+            SyntaxError,
+            UnidentifiedImageError,
+            ValueError,
+        ) as error:
+            raise forms.ValidationError(
+                "Erlaubt sind nur gültige PNG- oder PDF-Dateien."
+            ) from error
+        finally:
+            upload.seek(original_position)
+
+    def clean_income_proof(self):
+        return self._clean_proof("income_proof")
+
+    def clean_identity_proof(self):
+        return self._clean_proof("identity_proof")
+
+    def clean_credit_report_proof(self):
+        return self._clean_proof("credit_report_proof")
 
 
 class HandoverProtocolForm(forms.ModelForm):

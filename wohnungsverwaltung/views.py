@@ -1,6 +1,7 @@
 import json
 from uuid import UUID
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -36,6 +37,7 @@ from .forms import (
     HandoverKeyFormSet,
     HandoverProtocolForm,
     InlineRoomChecklistFormSet,
+    MainApplicationForm,
     MerkmalForm,
     MerkmalOptionFormSet,
     ProtocolConfirmationForm,
@@ -194,8 +196,8 @@ def pre_application_list(request: HttpRequest) -> HttpResponse:
 
 @applicant_required
 def main_application_status(request: HttpRequest, application_id: UUID) -> HttpResponse:
-    if request.method != "GET":
-        return HttpResponseNotAllowed(["GET"])
+    if request.method not in {"GET", "POST"}:
+        return HttpResponseNotAllowed(["GET", "POST"])
 
     applicant = _applicant_for_user(request)
     application = get_object_or_404(
@@ -207,11 +209,157 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
         ),
         pk=application_id,
     )
+
+    if request.method == "POST":
+        try:
+            content_length = int(request.META.get("CONTENT_LENGTH") or 0)
+        except (TypeError, ValueError):
+            content_length = 0
+        if content_length > settings.MAIN_APPLICATION_MAX_REQUEST_SIZE:
+            form = MainApplicationForm(data={}, files={}, instance=application)
+            form.add_error(
+                None,
+                "Die Gesamtgröße des Uploads ist zu groß. Bitte laden Sie kleinere Dateien hoch.",
+            )
+            return render(
+                request,
+                "wohnungsverwaltung/main_application_status.html",
+                {"application": application, "form": form},
+                status=413,
+            )
+
+        previous_files = {
+            field_name: (
+                getattr(application, field_name).storage,
+                getattr(application, field_name).name,
+            )
+            for field_name in ("income_proof", "identity_proof", "credit_report_proof")
+            if getattr(application, field_name)
+        }
+        form = MainApplicationForm(
+            request.POST,
+            request.FILES,
+            instance=application,
+        )
+        if form.is_valid():
+            action = form.cleaned_data["action"]
+            with transaction.atomic():
+                updated_application = form.save(commit=False)
+                if action == "submit" and updated_application.submitted_at is None:
+                    updated_application.submitted_at = timezone.now()
+                updated_application.save()
+
+                for field_name, (storage, previous_name) in previous_files.items():
+                    current_file = getattr(updated_application, field_name)
+                    if previous_name != getattr(current_file, "name", None):
+                        transaction.on_commit(
+                            lambda storage=storage, name=previous_name: storage.delete(name)
+                        )
+
+            if action == "submit":
+                messages.success(request, "Ihre Main-Bewerbung wurde erfolgreich eingereicht.")
+            else:
+                messages.success(request, "Ihr Entwurf wurde gespeichert.")
+            return redirect(
+                "wohnungsverwaltung:main_application_status",
+                application_id=application.pk,
+            )
+    else:
+        form = MainApplicationForm(instance=application)
+
     return render(
         request,
         "wohnungsverwaltung/main_application_status.html",
-        {"application": application},
+        {"application": application, "form": form},
     )
+
+
+@employee_required
+def employee_application_list(request: HttpRequest) -> HttpResponse:
+    applications = (
+        Bewerbung.objects.filter(submitted_at__isnull=False)
+        .select_related("person", "wohnung")
+        .order_by("-submitted_at")
+    )
+    return render(
+        request,
+        "wohnungsverwaltung/employee_application_list.html",
+        {"applications": applications},
+    )
+
+
+@employee_required
+def employee_application_detail(request: HttpRequest, application_id: UUID) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    application = get_object_or_404(
+        Bewerbung.objects.filter(submitted_at__isnull=False).select_related("person", "wohnung"),
+        pk=application_id,
+    )
+    proofs = (
+        ("income_proof", "Gehaltsnachweise", bool(application.income_proof)),
+        ("identity_proof", "Identitätsnachweis", bool(application.identity_proof)),
+        ("credit_report_proof", "SCHUFA-Unterlage", bool(application.credit_report_proof)),
+    )
+    return render(
+        request,
+        "wohnungsverwaltung/employee_application_detail.html",
+        {"application": application, "proofs": proofs},
+    )
+
+
+@employee_required
+def employee_application_document(
+    request: HttpRequest,
+    application_id: UUID,
+    document_type: str,
+) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    document_labels = {
+        "income_proof": ("Gehaltsnachweise", "Gehaltsnachweis"),
+        "identity_proof": ("Identitätsnachweis", "Identitaetsnachweis"),
+        "credit_report_proof": ("SCHUFA-Unterlage", "SCHUFA-Unterlage"),
+    }
+    if document_type not in document_labels:
+        raise Http404("Dieser Nachweis existiert nicht.")
+
+    application = get_object_or_404(
+        Bewerbung.objects.filter(submitted_at__isnull=False),
+        pk=application_id,
+    )
+    proof = getattr(application, document_type)
+    if not proof:
+        raise Http404("Dieser Nachweis wurde noch nicht hochgeladen.")
+
+    try:
+        proof.open("rb")
+        header = proof.read(1024)
+        proof.seek(max(0, proof.size - 1024))
+        footer = proof.read()
+    except OSError as error:
+        proof.close()
+        raise Http404("Der gespeicherte Nachweis kann nicht geöffnet werden.") from error
+    finally:
+        proof.close()
+
+    if header.startswith(b"%PDF-") and b"%%EOF" in footer:
+        extension = "pdf"
+    elif header.startswith(b"\x89PNG\r\n\x1a\n"):
+        extension = "png"
+    else:
+        raise Http404("Der gespeicherte Nachweis hat ein ungültiges Dateiformat.")
+
+    response = FileResponse(
+        proof.open("rb"),
+        as_attachment=True,
+        filename=f"{document_labels[document_type][1]}.{extension}",
+        content_type="application/octet-stream",
+    )
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 @applicant_required

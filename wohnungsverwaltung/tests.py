@@ -2090,7 +2090,7 @@ class PreApplicationAuthenticationTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
-    def test_main_application_status_is_read_only_in_issue_19(self) -> None:
+    def test_main_application_status_can_save_a_draft_in_issue_20(self) -> None:
         application = Bewerbung.objects.create(
             person=self.applicant,
             wohnung=self.free_unit,
@@ -2102,10 +2102,13 @@ class PreApplicationAuthenticationTests(TestCase):
 
         response = self.client.post(
             reverse("wohnungsverwaltung:main_application_status", args=[application.pk]),
-            {"ueber_mich": "Geänderte Angaben"},
+            {"action": "save_draft", "ueber_mich": "Geänderte Angaben"},
         )
 
-        self.assertEqual(response.status_code, 405)
+        self.assertRedirects(
+            response,
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk]),
+        )
         application.refresh_from_db()
         self.assertEqual(application.ueber_mich, "Ich möchte mich für diese Wohnung bewerben.")
 
@@ -2268,6 +2271,291 @@ class PreApplicationAuthenticationTests(TestCase):
             'type="button" disabled>Neue Pre-Bewerbung</button>',
         )
         self.assertContains(response, "Sie haben bereits eine offene Pre-Bewerbung.")
+
+
+class MainApplicationUploadTests(TestCase):
+    def setUp(self) -> None:
+        self.media_directory = TemporaryDirectory()
+        self.addCleanup(self.media_directory.cleanup)
+        media_settings = self.settings(MEDIA_ROOT=self.media_directory.name)
+        media_settings.enable()
+        self.addCleanup(media_settings.disable)
+
+        self.applicant_user = get_user_model().objects.create_user(
+            username="bewerber@example.test",
+            email="bewerber@example.test",
+            password="FjordTanne!4826",
+        )
+        self.applicant = Person.objects.create(
+            user=self.applicant_user,
+            vorname="Berta",
+            nachname="Bewerber",
+            email="bewerber@example.test",
+        )
+        self.applicant_user.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+        self.employee_user = get_user_model().objects.create_user(
+            username="mitarbeiter@example.test",
+            email="mitarbeiter@example.test",
+            password="KometFjord!4826",
+        )
+        self.employee_user.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
+        self.other_user = get_user_model().objects.create_user(
+            username="andere@example.test",
+            email="andere@example.test",
+            password="KieselWolke!4826",
+        )
+        self.other_user.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+        self.other_applicant = Person.objects.create(
+            user=self.other_user,
+            vorname="Andere",
+            nachname="Person",
+            email="andere@example.test",
+        )
+        self.unit = Wohnung.objects.create(
+            etage=4,
+            wohnungsnummer="4.11",
+            gebaeudenummer="1",
+            status=WohnungStatus.FREE,
+        )
+        self.application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=self.unit,
+            personenanzahl=1,
+            ueber_mich="Ich möchte mich für diese Wohnung bewerben.",
+            main_application_unlocked=True,
+        )
+        self.main_url = reverse(
+            "wohnungsverwaltung:main_application_status", args=[self.application.pk]
+        )
+
+    @staticmethod
+    def png_upload(name: str = "nachweis.png") -> SimpleUploadedFile:
+        image_buffer = BytesIO()
+        Image.new("RGB", (2, 2), color="white").save(image_buffer, format="PNG")
+        return SimpleUploadedFile(name, image_buffer.getvalue(), content_type="image/png")
+
+    @staticmethod
+    def pdf_upload(name: str = "nachweis.pdf", size: int = 36) -> SimpleUploadedFile:
+        content = b"%PDF-1.4\n" + b"x" * max(0, size - 15) + b"\n%%EOF"
+        return SimpleUploadedFile(name, content, content_type="application/pdf")
+
+    def complete_upload_data(self) -> dict[str, object]:
+        return {
+            "action": "submit",
+            "income_proof": self.pdf_upload("gehaltsabrechnungen.pdf"),
+            "identity_proof": self.png_upload("personalausweis.png"),
+            "credit_report_proof": self.pdf_upload("schufa.pdf"),
+        }
+
+    def applicant_post(self, data: dict[str, object], url: str | None = None):
+        self.client.force_login(self.applicant_user)
+        return self.client.post(url or self.main_url, data)
+
+    def test_main_application_page_renders_only_the_three_document_uploads(self) -> None:
+        self.client.force_login(self.applicant_user)
+
+        response = self.client.get(self.main_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'enctype="multipart/form-data"')
+        self.assertContains(response, 'name="income_proof"')
+        self.assertContains(response, 'name="identity_proof"')
+        self.assertContains(response, 'name="credit_report_proof"')
+        self.assertContains(response, "Entwurf speichern")
+        self.assertNotContains(response, "Ergänzende Angaben")
+        self.assertNotContains(response, "/media/")
+
+    def test_applicant_can_save_an_incomplete_draft(self) -> None:
+        response = self.applicant_post(
+            {"action": "save_draft", "identity_proof": self.png_upload("ausweis.png")}
+        )
+
+        self.assertRedirects(response, self.main_url, fetch_redirect_response=False)
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.submitted_at)
+        self.assertTrue(self.application.identity_proof)
+        self.assertTrue(
+            self.application.identity_proof.storage.exists(self.application.identity_proof.name)
+        )
+        self.assertContains(self.client.get(self.main_url), "Ihr Entwurf wurde gespeichert.")
+
+    def test_applicant_can_submit_all_three_required_proofs(self) -> None:
+        response = self.applicant_post(self.complete_upload_data())
+
+        self.assertRedirects(response, self.main_url)
+        self.application.refresh_from_db()
+        self.assertIsNotNone(self.application.submitted_at)
+        for field_name in ("income_proof", "identity_proof", "credit_report_proof"):
+            stored_file = getattr(self.application, field_name)
+            self.assertTrue(stored_file)
+            self.assertTrue(stored_file.storage.exists(stored_file.name))
+            self.assertNotIn("gehaltsabrechnungen", stored_file.name)
+            self.assertNotIn("personalausweis", stored_file.name)
+            self.assertNotIn("schufa.pdf", stored_file.name)
+        self.assertContains(self.client.get(self.main_url), "Main-Bewerbung eingereicht")
+
+    def test_final_submission_requires_every_proof(self) -> None:
+        data = self.complete_upload_data()
+        data.pop("credit_report_proof")
+
+        response = self.applicant_post(data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("credit_report_proof", response.context["form"].errors)
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.submitted_at)
+
+    def test_applicant_can_replace_a_proof_while_application_is_unlocked(self) -> None:
+        self.applicant_post(self.complete_upload_data())
+        self.application.refresh_from_db()
+        previous_identity_name = self.application.identity_proof.name
+        previous_income_name = self.application.income_proof.name
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.applicant_post(
+                {"action": "submit", "identity_proof": self.pdf_upload("neue-datei.pdf")}
+            )
+
+        self.assertRedirects(response, self.main_url)
+        self.application.refresh_from_db()
+        self.assertNotEqual(self.application.identity_proof.name, previous_identity_name)
+        self.assertFalse(self.application.identity_proof.storage.exists(previous_identity_name))
+        self.assertEqual(self.application.income_proof.name, previous_income_name)
+        self.assertTrue(self.application.income_proof.storage.exists(previous_income_name))
+
+    def test_invalid_or_tampered_file_contents_are_rejected(self) -> None:
+        data = self.complete_upload_data()
+        data["identity_proof"] = SimpleUploadedFile(
+            "personalausweis.png", b"<html>kein PNG</html>", content_type="image/png"
+        )
+
+        response = self.applicant_post(data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("identity_proof", response.context["form"].errors)
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.submitted_at)
+
+    def test_pdf_without_a_valid_header_and_end_marker_is_rejected(self) -> None:
+        data = self.complete_upload_data()
+        data["credit_report_proof"] = SimpleUploadedFile(
+            "schufa.pdf",
+            b"%PDF-1.4\nkein vollstaendiges PDF",
+            content_type="application/pdf",
+        )
+
+        response = self.applicant_post(data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("credit_report_proof", response.context["form"].errors)
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.submitted_at)
+
+    def test_proof_larger_than_eight_mib_is_rejected(self) -> None:
+        data = self.complete_upload_data()
+        data["income_proof"] = self.pdf_upload(size=8 * 1024 * 1024 + 1)
+
+        response = self.applicant_post(data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("income_proof", response.context["form"].errors)
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.submitted_at)
+
+    def test_total_request_size_is_limited_before_multipart_fields_are_read(self) -> None:
+        with self.settings(MAIN_APPLICATION_MAX_REQUEST_SIZE=1024):
+            response = self.applicant_post(
+                {
+                    "action": "save_draft",
+                    "income_proof": self.pdf_upload(size=2048),
+                }
+            )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertContains(response, "Gesamtgröße des Uploads", status_code=413)
+
+    def test_locked_application_cannot_be_edited_or_have_documents_downloaded(self) -> None:
+        self.application.main_application_unlocked = False
+        self.application.save(update_fields=["main_application_unlocked"])
+        self.client.force_login(self.applicant_user)
+
+        response = self.client.get(self.main_url)
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_applicant_cannot_access_another_applicants_form_or_files(self) -> None:
+        other_application = Bewerbung.objects.create(
+            person=self.other_applicant,
+            wohnung=self.unit,
+            personenanzahl=1,
+            ueber_mich="Private Angaben.",
+            main_application_unlocked=True,
+        )
+        self.applicant_post(self.complete_upload_data())
+        self.client.force_login(self.applicant_user)
+
+        foreign_form = self.client.get(
+            reverse("wohnungsverwaltung:main_application_status", args=[other_application.pk])
+        )
+        foreign_document = self.client.get(
+            reverse(
+                "wohnungsverwaltung:employee_application_document",
+                args=[other_application.pk, "income_proof"],
+            )
+        )
+
+        self.assertEqual(foreign_form.status_code, 404)
+        self.assertEqual(foreign_document.status_code, 403)
+
+    def test_only_employees_can_list_review_and_download_submitted_proofs(self) -> None:
+        self.applicant_post(self.complete_upload_data())
+        list_url = reverse("wohnungsverwaltung:employee_application_list")
+        detail_url = reverse(
+            "wohnungsverwaltung:employee_application_detail", args=[self.application.pk]
+        )
+        download_url = reverse(
+            "wohnungsverwaltung:employee_application_document",
+            args=[self.application.pk, "identity_proof"],
+        )
+
+        applicant_list = self.client.get(list_url)
+        applicant_download = self.client.get(download_url)
+        self.client.force_login(self.other_user)
+        other_applicant_list = self.client.get(list_url)
+        self.client.force_login(self.employee_user)
+        employee_list = self.client.get(list_url)
+        employee_detail = self.client.get(detail_url)
+        employee_download = self.client.get(download_url)
+
+        self.assertEqual(applicant_list.status_code, 403)
+        self.assertEqual(applicant_download.status_code, 403)
+        self.assertEqual(other_applicant_list.status_code, 403)
+        self.assertContains(employee_list, "Berta Bewerber")
+        self.assertEqual(employee_detail.status_code, 200)
+        self.assertContains(employee_detail, "Gehaltsnachweise")
+        self.assertNotContains(employee_detail, "/media/")
+        self.assertEqual(employee_download.status_code, 200)
+        self.assertEqual(employee_download["X-Content-Type-Options"], "nosniff")
+        self.assertIn("attachment", employee_download["Content-Disposition"])
+        self.assertIn("application/octet-stream", employee_download["Content-Type"])
+
+    def test_employee_can_still_view_and_download_proofs_after_withdrawal(self) -> None:
+        self.applicant_post(self.complete_upload_data())
+        self.application.refresh_from_db()
+        self.application.interest_withdrawn_at = datetime.now(UTC)
+        self.application.save(update_fields=["interest_withdrawn_at"])
+        self.client.force_login(self.employee_user)
+
+        list_response = self.client.get(reverse("wohnungsverwaltung:employee_application_list"))
+        download_response = self.client.get(
+            reverse(
+                "wohnungsverwaltung:employee_application_document",
+                args=[self.application.pk, "credit_report_proof"],
+            )
+        )
+
+        self.assertContains(list_response, "Zurückgezogen")
+        self.assertEqual(download_response.status_code, 200)
 
 
 class CreateTestApplicantCommandTests(TestCase):
