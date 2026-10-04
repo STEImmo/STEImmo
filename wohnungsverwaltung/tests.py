@@ -91,6 +91,23 @@ class ApartmentSearchViewTests(TestCase):
         self.assertContains(response, unit.wohnungsnummer)
         self.assertContains(response, "Wohnungsdetails folgen")
 
+    def test_apartment_detail_placeholder_returns_404_for_unavailable_units(self) -> None:
+        unavailable_units = (
+            self.create_unit("1.02", status=WohnungStatus.TAKEN),
+            self.create_unit("1.03", status=WohnungStatus.BLOCKED),
+        )
+
+        for unit in unavailable_units:
+            with self.subTest(status=unit.status):
+                response = self.client.get(
+                    reverse(
+                        "wohnungsverwaltung_public:apartment_detail_placeholder",
+                        args=[unit.pk],
+                    )
+                )
+
+                self.assertEqual(response.status_code, 404)
+
     def test_search_filters_available_units_by_apartment_attributes(self) -> None:
         matching_unit = self.create_unit("1.01")
         self.create_unit("1.02", groesse_qm=Decimal("70.00"))

@@ -28,10 +28,10 @@ from .access import (
 )
 from .forms import (
     ACCEPTANCE_STATUS_LABELS,
-    ApartmentSearchForm,
     HANDOVER_STATUS_LABELS,
     HANDOVER_TYPE_LABELS,
     METER_READING_FIELDS,
+    ApartmentSearchForm,
     BewerbungForm,
     HandoverKeyForm,
     HandoverKeyFormSet,
@@ -154,7 +154,7 @@ def apartment_detail_placeholder(request: HttpRequest, unit_id: UUID) -> HttpRes
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
 
-    wohnung = get_object_or_404(Wohnung, pk=unit_id)
+    wohnung = get_object_or_404(Wohnung.objects.available(), pk=unit_id)
     return render(
         request,
         "wohnungsverwaltung/apartment_detail_placeholder.html",
