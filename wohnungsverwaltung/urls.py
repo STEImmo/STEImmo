@@ -23,6 +23,16 @@ urlpatterns = [
         name="main_application_status",
     ),
     path(
+        "bewerbung/<uuid:application_id>/nachweise/<str:document_type>/",
+        views.applicant_application_document,
+        name="applicant_application_document",
+    ),
+    path(
+        "bewerbung/<uuid:application_id>/nachweise/datei/<uuid:proof_id>/",
+        views.applicant_application_proof_download,
+        name="applicant_application_proof_download",
+    ),
+    path(
         "bewerbung/<uuid:application_id>/zurueckziehen/",
         views.application_withdraw,
         name="application_withdraw",

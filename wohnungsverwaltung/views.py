@@ -201,7 +201,21 @@ def pre_application_list(request: HttpRequest) -> HttpResponse:
     )
 
 
-def _application_proof_groups(application: Bewerbung) -> list[dict]:
+def _application_proof_groups(
+    application: Bewerbung,
+    *,
+    employee: bool = False,
+) -> list[dict]:
+    legacy_download_view = (
+        "wohnungsverwaltung:employee_application_document"
+        if employee
+        else "wohnungsverwaltung:applicant_application_document"
+    )
+    proof_download_view = (
+        "wohnungsverwaltung:employee_application_proof_download"
+        if employee
+        else "wohnungsverwaltung:applicant_application_proof_download"
+    )
     uploaded_by_category = {
         category: [] for category, _field_name, _label in APPLICATION_PROOF_GROUPS
     }
@@ -219,7 +233,7 @@ def _application_proof_groups(application: Bewerbung) -> list[dict]:
                     "name": original_name or "Dateiname dieses älteren Uploads nicht erfasst",
                     "delete_id": f"legacy:{legacy_field}",
                     "download_url": reverse(
-                        "wohnungsverwaltung:employee_application_document",
+                        legacy_download_view,
                         args=(application.pk, legacy_field),
                     ),
                     "can_remove": application.submitted_at is None,
@@ -232,7 +246,7 @@ def _application_proof_groups(application: Bewerbung) -> list[dict]:
                     "name": proof.original_name,
                     "delete_id": str(proof.pk),
                     "download_url": reverse(
-                        "wohnungsverwaltung:employee_application_proof_download",
+                        proof_download_view,
                         args=(application.pk, proof.pk),
                     ),
                     "can_remove": application.submitted_at is None,
@@ -243,7 +257,13 @@ def _application_proof_groups(application: Bewerbung) -> list[dict]:
         if can_remove_submitted_files:
             for document in documents:
                 document["can_remove"] = True
-        groups.append({"label": label, "documents": documents})
+        groups.append(
+            {
+                "field_name": legacy_field,
+                "label": label,
+                "documents": documents,
+            }
+        )
     return groups
 
 
@@ -442,7 +462,7 @@ def employee_application_detail(request: HttpRequest, application_id: UUID) -> H
         "wohnungsverwaltung/employee_application_detail.html",
         {
             "application": application,
-            "proof_groups": _application_proof_groups(application),
+            "proof_groups": _application_proof_groups(application, employee=True),
         },
     )
 
@@ -521,6 +541,68 @@ def employee_application_proof_download(
         ),
         pk=proof_id,
     )
+    download_labels = {
+        ApplicationProofCategory.INCOME: "Gehaltsnachweis",
+        ApplicationProofCategory.IDENTITY: "Identitaetsnachweis",
+        ApplicationProofCategory.CREDIT_REPORT: "SCHUFA-Unterlage",
+    }
+    return _application_document_response(proof.file, download_labels[proof.category])
+
+
+@applicant_required
+def applicant_application_document(
+    request: HttpRequest,
+    application_id: UUID,
+    document_type: str,
+) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    applicant = _applicant_for_user(request)
+    application = get_object_or_404(
+        Bewerbung.objects.filter(
+            person=applicant,
+            status=BewerbungStatus.OPEN,
+            interest_withdrawn_at__isnull=True,
+            main_application_unlocked=True,
+        ),
+        pk=application_id,
+    )
+    document_labels = {
+        "income_proof": ("Gehaltsnachweise", "Gehaltsnachweis"),
+        "identity_proof": ("Identitätsnachweis", "Identitaetsnachweis"),
+        "credit_report_proof": ("SCHUFA-Unterlage", "SCHUFA-Unterlage"),
+    }
+    if document_type not in document_labels:
+        raise Http404("Dieser Nachweis existiert nicht.")
+
+    proof_file = getattr(application, document_type)
+    if not proof_file:
+        raise Http404("Dieser Nachweis wurde nicht hochgeladen.")
+
+    return _application_document_response(proof_file, document_labels[document_type][1])
+
+
+@applicant_required
+def applicant_application_proof_download(
+    request: HttpRequest,
+    application_id: UUID,
+    proof_id: UUID,
+) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    applicant = _applicant_for_user(request)
+    application = get_object_or_404(
+        Bewerbung.objects.filter(
+            person=applicant,
+            status=BewerbungStatus.OPEN,
+            interest_withdrawn_at__isnull=True,
+            main_application_unlocked=True,
+        ),
+        pk=application_id,
+    )
+    proof = get_object_or_404(application.proof_files.all(), pk=proof_id)
     download_labels = {
         ApplicationProofCategory.INCOME: "Gehaltsnachweis",
         ApplicationProofCategory.IDENTITY: "Identitaetsnachweis",
