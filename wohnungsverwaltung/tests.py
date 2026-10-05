@@ -115,7 +115,6 @@ class ApartmentSearchViewTests(TestCase):
         self.create_unit("1.03", kaltmiete=Decimal("900.00"))
         self.create_unit("1.04", zimmeranzahl=Decimal("3.00"))
         self.create_unit("2.01", etage=2)
-        self.create_unit("1.06", barrierefrei=False)
 
         response = self.client.get(
             reverse("wohnungsverwaltung_public:apartment_search"),
@@ -126,12 +125,39 @@ class ApartmentSearchViewTests(TestCase):
                 "zimmer_min": "1",
                 "zimmer_max": "2",
                 "etage": "1",
-                "barrierefrei": "true",
             },
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertQuerySetEqual(response.context["wohnungen"], [matching_unit])
+
+    def test_search_omits_accessibility_filter_and_result_attribute(self) -> None:
+        self.create_unit("1.01")
+        self.create_unit("1.02", barrierefrei=False)
+
+        response = self.client.get(reverse("wohnungsverwaltung_public:apartment_search"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("barrierefrei", response.context["form"].fields)
+        self.assertNotContains(response, "Barrierefrei")
+        self.assertNotContains(response, "barrierefrei")
+
+    def test_search_ignores_legacy_accessibility_query_parameter(self) -> None:
+        first_unit = self.create_unit("1.01")
+        second_unit = self.create_unit("1.02", barrierefrei=False)
+        self.create_unit("1.03", groesse_qm=Decimal("70.00"))
+        self.create_unit("1.04", status=WohnungStatus.BLOCKED)
+
+        for value in ("true", "false", "ungueltig"):
+            with self.subTest(value=value):
+                response = self.client.get(
+                    reverse("wohnungsverwaltung_public:apartment_search"),
+                    {"barrierefrei": value, "groesse_max": "60"},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertNotIn("barrierefrei", response.context["form"].cleaned_data)
+                self.assertQuerySetEqual(response.context["wohnungen"], [first_unit, second_unit])
 
     def test_empty_search_shows_all_available_units(self) -> None:
         first_unit = self.create_unit("1.01")

@@ -553,14 +553,6 @@ class ApartmentSearchForm(forms.Form):
         choices=(("", "Alle Etagen"),),
         widget=forms.Select(attrs={"class": "uk-select"}),
     )
-    barrierefrei = forms.TypedChoiceField(
-        label="Barrierefrei",
-        required=False,
-        choices=(("", "Beliebig"), ("true", "Ja"), ("false", "Nein")),
-        coerce=lambda value: value == "true",
-        empty_value=None,
-        widget=forms.Select(attrs={"class": "uk-select"}),
-    )
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
