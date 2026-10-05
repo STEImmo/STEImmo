@@ -50,7 +50,6 @@ class ManagementViewTests(TestCase):
             "kaltmiete": "650.00",
             "warmmiete": "790.00",
             "kaution": "1300.00",
-            "barrierefrei": "on",
             "status": WohnungStatus.FREE,
             "zaehlernummer_wasser_kalt": "KW-1",
             "zaehlernummer_wasser_warm": "WW-2",
@@ -111,8 +110,71 @@ class ManagementViewTests(TestCase):
 
         wohnung = Wohnung.objects.get(wohnungsnummer="17")
         self.assertRedirects(response, reverse("verwaltung:wohnung_edit", args=[wohnung.pk]))
-        self.assertTrue(wohnung.barrierefrei)
+        self.assertFalse(wohnung.barrierefrei)
         self.assertEqual(wohnung.zaehlernummer_strom, "ST-4")
+
+    def test_apartment_forms_omit_accessibility_field(self) -> None:
+        wohnung = Wohnung.objects.create(
+            gebaeudenummer="B",
+            wohnungsnummer="17",
+            barrierefrei=True,
+        )
+        self.client.force_login(self.employee_user)
+        urls = (
+            reverse("verwaltung:wohnung_create"),
+            reverse("verwaltung:wohnung_edit", args=[wohnung.pk]),
+        )
+
+        for url in urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+
+                self.assertEqual(response.status_code, 200)
+                self.assertNotIn("barrierefrei", response.context["form"].fields)
+                self.assertNotContains(response, "Barrierefrei")
+                self.assertNotContains(response, 'name="barrierefrei"')
+
+    def test_apartment_creation_ignores_forged_accessibility_field(self) -> None:
+        self.client.force_login(self.employee_user)
+
+        response = self.client.post(
+            reverse("verwaltung:wohnung_create"),
+            self.wohnung_payload() | {"barrierefrei": "on"},
+        )
+
+        wohnung = Wohnung.objects.get(wohnungsnummer="17")
+        self.assertRedirects(response, reverse("verwaltung:wohnung_edit", args=[wohnung.pk]))
+        self.assertFalse(wohnung.barrierefrei)
+        self.assertEqual(wohnung.zaehlernummer_strom, "ST-4")
+
+    def test_apartment_edit_preserves_legacy_accessibility_value(self) -> None:
+        self.client.force_login(self.employee_user)
+
+        for initial_value in (True, False):
+            for submitted_value in (None, "", "on"):
+                with self.subTest(initial_value=initial_value, submitted_value=submitted_value):
+                    wohnung = Wohnung.objects.create(
+                        gebaeudenummer="B",
+                        wohnungsnummer="17",
+                        barrierefrei=initial_value,
+                        status=WohnungStatus.BLOCKED,
+                    )
+                    payload = self.wohnung_payload()
+                    if submitted_value is not None:
+                        payload["barrierefrei"] = submitted_value
+
+                    response = self.client.post(
+                        reverse("verwaltung:wohnung_edit", args=[wohnung.pk]),
+                        payload,
+                    )
+
+                    self.assertRedirects(
+                        response, reverse("verwaltung:wohnung_edit", args=[wohnung.pk])
+                    )
+                    wohnung.refresh_from_db()
+                    self.assertEqual(wohnung.barrierefrei, initial_value)
+                    self.assertEqual(wohnung.status, WohnungStatus.FREE)
+                    self.assertEqual(wohnung.zaehlernummer_strom, "ST-4")
 
     def test_employee_can_change_apartment_availability(self) -> None:
         wohnung = Wohnung.objects.create(
