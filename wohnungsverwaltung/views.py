@@ -54,6 +54,8 @@ from .forms import (
     verified_photo_content_type,
 )
 from .models import (
+    ApplicationProof,
+    ApplicationProofCategory,
     Bewerbung,
     BewerbungStatus,
     Merkmal,
@@ -80,6 +82,11 @@ PROTOCOL_STATUS_LABELS = {
 }
 
 DRAFT_MAXIMUM_SIZE = 512_000
+APPLICATION_PROOF_GROUPS = (
+    (ApplicationProofCategory.INCOME, "income_proof", "Gehaltsnachweise"),
+    (ApplicationProofCategory.IDENTITY, "identity_proof", "Identitätsnachweis"),
+    (ApplicationProofCategory.CREDIT_REPORT, "credit_report_proof", "SCHUFA-Unterlage"),
+)
 
 
 def _can_manage_handover_photos(request: HttpRequest) -> bool:
@@ -194,6 +201,141 @@ def pre_application_list(request: HttpRequest) -> HttpResponse:
     )
 
 
+def _application_proof_groups(application: Bewerbung) -> list[dict]:
+    uploaded_by_category = {
+        category: [] for category, _field_name, _label in APPLICATION_PROOF_GROUPS
+    }
+    for proof in application.proof_files.all():
+        uploaded_by_category[proof.category].append(proof)
+
+    groups = []
+    for category, legacy_field, label in APPLICATION_PROOF_GROUPS:
+        documents = []
+        legacy_file = getattr(application, legacy_field)
+        if legacy_file:
+            original_name = getattr(application, f"{legacy_field}_original_name")
+            documents.append(
+                {
+                    "name": original_name or "Dateiname dieses älteren Uploads nicht erfasst",
+                    "delete_id": f"legacy:{legacy_field}",
+                    "download_url": reverse(
+                        "wohnungsverwaltung:employee_application_document",
+                        args=(application.pk, legacy_field),
+                    ),
+                    "can_remove": application.submitted_at is None,
+                }
+            )
+
+        for proof in uploaded_by_category[category]:
+            documents.append(
+                {
+                    "name": proof.original_name,
+                    "delete_id": str(proof.pk),
+                    "download_url": reverse(
+                        "wohnungsverwaltung:employee_application_proof_download",
+                        args=(application.pk, proof.pk),
+                    ),
+                    "can_remove": application.submitted_at is None,
+                }
+            )
+
+        can_remove_submitted_files = application.submitted_at is not None and len(documents) > 1
+        if can_remove_submitted_files:
+            for document in documents:
+                document["can_remove"] = True
+        groups.append({"label": label, "documents": documents})
+    return groups
+
+
+def _application_proof_count(application: Bewerbung, category: str, legacy_field: str) -> int:
+    return (
+        int(bool(getattr(application, legacy_field)))
+        + application.proof_files.filter(category=category).count()
+    )
+
+
+def _remove_application_proof(
+    request: HttpRequest,
+    application: Bewerbung,
+    application_id: UUID,
+) -> HttpResponse:
+    reference = request.POST.get("remove_proof", "")
+    if reference.startswith("legacy:"):
+        legacy_field = reference.removeprefix("legacy:")
+        category = next(
+            (
+                category
+                for category, field_name, _label in APPLICATION_PROOF_GROUPS
+                if field_name == legacy_field
+            ),
+            None,
+        )
+        if category is None:
+            raise Http404("Dieser Nachweis existiert nicht.")
+
+        proof_file = getattr(application, legacy_field)
+        if not proof_file:
+            raise Http404("Dieser Nachweis wurde bereits entfernt.")
+        if (
+            application.submitted_at is not None
+            and _application_proof_count(application, category, legacy_field) <= 1
+        ):
+            messages.error(
+                request,
+                "Nach der Einreichung muss pro Kategorie mindestens ein Nachweis vorliegen. "
+                "Laden Sie zuerst eine Ersatzdatei hoch.",
+            )
+            return redirect(
+                "wohnungsverwaltung:main_application_status", application_id=application_id
+            )
+
+        storage, stored_name = proof_file.storage, proof_file.name
+        original_name_field = f"{legacy_field}_original_name"
+        with transaction.atomic():
+            setattr(application, legacy_field, "")
+            setattr(application, original_name_field, "")
+            application.save(update_fields=(legacy_field, original_name_field, "updated_at"))
+            transaction.on_commit(lambda: storage.delete(stored_name))
+    else:
+        try:
+            proof_id = UUID(reference)
+        except ValueError as error:
+            raise Http404("Dieser Nachweis existiert nicht.") from error
+        proof = get_object_or_404(
+            ApplicationProof.objects.filter(application=application),
+            pk=proof_id,
+        )
+        if (
+            application.submitted_at is not None
+            and _application_proof_count(
+                application,
+                proof.category,
+                next(
+                    field_name
+                    for category, field_name, _label in APPLICATION_PROOF_GROUPS
+                    if category == proof.category
+                ),
+            )
+            <= 1
+        ):
+            messages.error(
+                request,
+                "Nach der Einreichung muss pro Kategorie mindestens ein Nachweis vorliegen. "
+                "Laden Sie zuerst eine Ersatzdatei hoch.",
+            )
+            return redirect(
+                "wohnungsverwaltung:main_application_status", application_id=application_id
+            )
+
+        storage, stored_name = proof.file.storage, proof.file.name
+        with transaction.atomic():
+            proof.delete()
+            transaction.on_commit(lambda: storage.delete(stored_name))
+
+    messages.success(request, "Der Nachweis wurde entfernt.")
+    return redirect("wohnungsverwaltung:main_application_status", application_id=application_id)
+
+
 @applicant_required
 def main_application_status(request: HttpRequest, application_id: UUID) -> HttpResponse:
     if request.method not in {"GET", "POST"}:
@@ -210,13 +352,14 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
         pk=application_id,
     )
 
+    proof_groups = _application_proof_groups(application)
     if request.method == "POST":
         try:
             content_length = int(request.META.get("CONTENT_LENGTH") or 0)
         except (TypeError, ValueError):
             content_length = 0
         if content_length > settings.MAIN_APPLICATION_MAX_REQUEST_SIZE:
-            form = MainApplicationForm(data={}, files={}, instance=application)
+            form = MainApplicationForm(instance=application)
             form.add_error(
                 None,
                 "Die Gesamtgröße des Uploads ist zu groß. Bitte laden Sie kleinere Dateien hoch.",
@@ -224,18 +367,17 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
             return render(
                 request,
                 "wohnungsverwaltung/main_application_status.html",
-                {"application": application, "form": form},
+                {
+                    "application": application,
+                    "form": form,
+                    "proof_groups": proof_groups,
+                },
                 status=413,
             )
 
-        previous_files = {
-            field_name: (
-                getattr(application, field_name).storage,
-                getattr(application, field_name).name,
-            )
-            for field_name in ("income_proof", "identity_proof", "credit_report_proof")
-            if getattr(application, field_name)
-        }
+        if "remove_proof" in request.POST:
+            return _remove_application_proof(request, application, application_id)
+
         form = MainApplicationForm(
             request.POST,
             request.FILES,
@@ -244,17 +386,12 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
         if form.is_valid():
             action = form.cleaned_data["action"]
             with transaction.atomic():
-                updated_application = form.save(commit=False)
-                if action == "submit" and updated_application.submitted_at is None:
-                    updated_application.submitted_at = timezone.now()
-                updated_application.save()
-
-                for field_name, (storage, previous_name) in previous_files.items():
-                    current_file = getattr(updated_application, field_name)
-                    if previous_name != getattr(current_file, "name", None):
-                        transaction.on_commit(
-                            lambda storage=storage, name=previous_name: storage.delete(name)
-                        )
+                form.save_uploaded_proofs()
+                if action == "submit" and application.submitted_at is None:
+                    application.submitted_at = timezone.now()
+                    application.save(update_fields=("submitted_at", "updated_at"))
+                else:
+                    application.save(update_fields=("updated_at",))
 
             if action == "submit":
                 messages.success(request, "Ihre Main-Bewerbung wurde erfolgreich eingereicht.")
@@ -270,7 +407,11 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
     return render(
         request,
         "wohnungsverwaltung/main_application_status.html",
-        {"application": application, "form": form},
+        {
+            "application": application,
+            "form": form,
+            "proof_groups": proof_groups,
+        },
     )
 
 
@@ -296,16 +437,44 @@ def employee_application_detail(request: HttpRequest, application_id: UUID) -> H
         Bewerbung.objects.filter(submitted_at__isnull=False).select_related("person", "wohnung"),
         pk=application_id,
     )
-    proofs = (
-        ("income_proof", "Gehaltsnachweise", bool(application.income_proof)),
-        ("identity_proof", "Identitätsnachweis", bool(application.identity_proof)),
-        ("credit_report_proof", "SCHUFA-Unterlage", bool(application.credit_report_proof)),
-    )
     return render(
         request,
         "wohnungsverwaltung/employee_application_detail.html",
-        {"application": application, "proofs": proofs},
+        {
+            "application": application,
+            "proof_groups": _application_proof_groups(application),
+        },
     )
+
+
+def _application_document_response(proof_file, download_label: str) -> FileResponse:
+    try:
+        proof_file.open("rb")
+        header = proof_file.read(1024)
+        proof_file.seek(max(0, proof_file.size - 1024))
+        footer = proof_file.read()
+    except OSError as error:
+        proof_file.close()
+        raise Http404("Der gespeicherte Nachweis kann nicht geöffnet werden.") from error
+    finally:
+        proof_file.close()
+
+    if header.startswith(b"%PDF-") and b"%%EOF" in footer:
+        extension = "pdf"
+    elif header.startswith(b"\x89PNG\r\n\x1a\n"):
+        extension = "png"
+    else:
+        raise Http404("Der gespeicherte Nachweis hat ein ungültiges Dateiformat.")
+
+    response = FileResponse(
+        proof_file.open("rb"),
+        as_attachment=True,
+        filename=f"{download_label}.{extension}",
+        content_type="application/octet-stream",
+    )
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 @employee_required
@@ -333,33 +502,31 @@ def employee_application_document(
     if not proof:
         raise Http404("Dieser Nachweis wurde noch nicht hochgeladen.")
 
-    try:
-        proof.open("rb")
-        header = proof.read(1024)
-        proof.seek(max(0, proof.size - 1024))
-        footer = proof.read()
-    except OSError as error:
-        proof.close()
-        raise Http404("Der gespeicherte Nachweis kann nicht geöffnet werden.") from error
-    finally:
-        proof.close()
+    return _application_document_response(proof, document_labels[document_type][1])
 
-    if header.startswith(b"%PDF-") and b"%%EOF" in footer:
-        extension = "pdf"
-    elif header.startswith(b"\x89PNG\r\n\x1a\n"):
-        extension = "png"
-    else:
-        raise Http404("Der gespeicherte Nachweis hat ein ungültiges Dateiformat.")
 
-    response = FileResponse(
-        proof.open("rb"),
-        as_attachment=True,
-        filename=f"{document_labels[document_type][1]}.{extension}",
-        content_type="application/octet-stream",
+@employee_required
+def employee_application_proof_download(
+    request: HttpRequest,
+    application_id: UUID,
+    proof_id: UUID,
+) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    proof = get_object_or_404(
+        ApplicationProof.objects.filter(
+            application__pk=application_id,
+            application__submitted_at__isnull=False,
+        ),
+        pk=proof_id,
     )
-    response["X-Content-Type-Options"] = "nosniff"
-    response["Cache-Control"] = "private, no-store"
-    return response
+    download_labels = {
+        ApplicationProofCategory.INCOME: "Gehaltsnachweis",
+        ApplicationProofCategory.IDENTITY: "Identitaetsnachweis",
+        ApplicationProofCategory.CREDIT_REPORT: "SCHUFA-Unterlage",
+    }
+    return _application_document_response(proof.file, download_labels[proof.category])
 
 
 @applicant_required

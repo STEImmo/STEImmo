@@ -29,21 +29,24 @@
 
         <article class="uk-card uk-card-default uk-card-body uk-margin-top">
             <h2 class="uk-card-title">Nachweise</h2>
-            <ul class="uk-list uk-list-divider">
-                {% for field_name, label, has_file in proofs %}
-                    <li class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
-                        <span>{{ label }}</span>
-                        {% if has_file %}
-                            <a class="uk-button uk-button-default uk-button-small"
-                               href="{% url 'wohnungsverwaltung:employee_application_document' application.pk field_name %}">
-                                Sicher herunterladen
-                            </a>
-                        {% else %}
-                            <span class="uk-text-danger">Nicht vorhanden</span>
-                        {% endif %}
-                    </li>
-                {% endfor %}
-            </ul>
+            {% for group in proof_groups %}
+                <h3 class="uk-h4">{{ group.label }}</h3>
+                {% if group.documents %}
+                    <ul class="uk-list uk-list-divider">
+                        {% for document in group.documents %}
+                            <li class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
+                                <span>{{ document.name }}</span>
+                                <a class="uk-button uk-button-default uk-button-small"
+                                   href="{{ document.download_url }}">
+                                    Sicher herunterladen
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="uk-text-danger">Nicht vorhanden</p>
+                {% endif %}
+            {% endfor %}
         </article>
     </div>
 </section>

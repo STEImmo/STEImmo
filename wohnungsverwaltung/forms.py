@@ -23,6 +23,8 @@ from .access import (
 )
 from .models import (
     AbnahmeStatus,
+    ApplicationProof,
+    ApplicationProofCategory,
     Bewerbung,
     Merkmal,
     Person,
@@ -506,33 +508,63 @@ class BewerbungForm(forms.ModelForm):
         return application
 
 
-class MainApplicationForm(forms.ModelForm):
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    widget = MultipleFileInput
+
+    def clean(self, data, initial=None):
+        if not data:
+            return []
+        uploads = data if isinstance(data, (list, tuple)) else [data]
+        cleaned_uploads = []
+        for upload in uploads:
+            if upload not in (None, ""):
+                cleaned_uploads.append(super().clean(upload, initial))
+        return cleaned_uploads
+
+
+class MainApplicationForm(forms.Form):
+    MAX_FILES_PER_CATEGORY = 10
+    PROOF_FIELDS = (
+        (ApplicationProofCategory.INCOME, "income_proof", "Gehaltsnachweise"),
+        (ApplicationProofCategory.IDENTITY, "identity_proof", "Identitätsnachweis"),
+        (ApplicationProofCategory.CREDIT_REPORT, "credit_report_proof", "SCHUFA-Unterlage"),
+    )
+
     action = forms.CharField(required=False, widget=forms.HiddenInput)
-    income_proof = forms.FileField(
+    income_proof = MultipleFileField(
         label="Gehaltsabrechnungen",
         required=False,
-        widget=forms.FileInput(
+        widget=MultipleFileInput(
             attrs={"class": "uk-input", "accept": ".png,.pdf,image/png,application/pdf"}
         ),
     )
-    identity_proof = forms.FileField(
+    identity_proof = MultipleFileField(
         label="Identitätsnachweis",
         required=False,
-        widget=forms.FileInput(
+        widget=MultipleFileInput(
             attrs={"class": "uk-input", "accept": ".png,.pdf,image/png,application/pdf"}
         ),
     )
-    credit_report_proof = forms.FileField(
+    credit_report_proof = MultipleFileField(
         label="SCHUFA-Unterlage",
         required=False,
-        widget=forms.FileInput(
+        widget=MultipleFileInput(
             attrs={"class": "uk-input", "accept": ".png,.pdf,image/png,application/pdf"}
         ),
     )
 
-    class Meta:
-        model = Bewerbung
-        fields = ("income_proof", "identity_proof", "credit_report_proof")
+    def __init__(self, *args, instance: Bewerbung, **kwargs):
+        self.instance = instance
+        super().__init__(*args, **kwargs)
+        for _category, field_name, label in self.PROOF_FIELDS:
+            self.fields[field_name].help_text = (
+                f"Wählen Sie mehrere Dateien für {label} aus. Maximal "
+                f"{self.MAX_FILES_PER_CATEGORY} Dateien pro Nachweiskategorie."
+            )
 
     def clean(self) -> dict:
         cleaned_data = super().clean()
@@ -541,27 +573,41 @@ class MainApplicationForm(forms.ModelForm):
             raise forms.ValidationError("Bitte wählen Sie eine gültige Aktion.")
         cleaned_data["action"] = action
 
-        if action == "submit":
-            for field_name in ("income_proof", "identity_proof", "credit_report_proof"):
-                if not cleaned_data.get(field_name):
-                    self.add_error(
-                        field_name,
-                        "Dieser Nachweis ist für die Einreichung erforderlich.",
-                    )
-        elif self.instance.submitted_at is not None:
-            for field_name in ("income_proof", "identity_proof", "credit_report_proof"):
-                if not cleaned_data.get(field_name):
-                    self.add_error(
-                        field_name,
-                        "Ein eingereichter Nachweis kann nur durch eine neue Datei ersetzt werden.",
-                    )
+        for category, field_name, _label in self.PROOF_FIELDS:
+            existing_count = int(bool(getattr(self.instance, field_name)))
+            existing_count += self.instance.proof_files.filter(category=category).count()
+            uploaded_count = len(cleaned_data.get(field_name) or [])
+
+            if existing_count + uploaded_count > self.MAX_FILES_PER_CATEGORY:
+                self.add_error(
+                    field_name,
+                    f"Pro Nachweiskategorie sind höchstens {self.MAX_FILES_PER_CATEGORY} "
+                    "Dateien erlaubt.",
+                )
+            if action == "submit" and existing_count + uploaded_count == 0:
+                self.add_error(
+                    field_name,
+                    "Mindestens eine Datei dieses Nachweises ist für die Einreichung erforderlich.",
+                )
         return cleaned_data
 
-    def _clean_proof(self, field_name: str):
-        upload = self.cleaned_data.get(field_name)
-        if not upload or getattr(upload, "_committed", False):
-            return upload
+    def save_uploaded_proofs(self) -> None:
+        for category, field_name, _label in self.PROOF_FIELDS:
+            for upload in self.cleaned_data.get(field_name, []):
+                ApplicationProof.objects.create(
+                    application=self.instance,
+                    category=category,
+                    file=upload,
+                    original_name=self._display_filename(upload.name),
+                )
 
+    @staticmethod
+    def _display_filename(filename: str) -> str:
+        display_name = filename.replace("\\", "/").rsplit("/", 1)[-1]
+        display_name = "".join(character for character in display_name if character.isprintable())
+        return display_name.strip()[:255] or "Datei"
+
+    def _clean_proof(self, upload):
         if upload.size > settings.MAIN_APPLICATION_PROOF_MAX_SIZE:
             maximum_mib = settings.MAIN_APPLICATION_PROOF_MAX_SIZE / (1024 * 1024)
             raise forms.ValidationError(f"Die Datei darf höchstens {maximum_mib:g} MiB groß sein.")
@@ -600,14 +646,17 @@ class MainApplicationForm(forms.ModelForm):
         finally:
             upload.seek(original_position)
 
+    def _clean_proof_files(self, field_name: str):
+        return [self._clean_proof(upload) for upload in self.cleaned_data.get(field_name, [])]
+
     def clean_income_proof(self):
-        return self._clean_proof("income_proof")
+        return self._clean_proof_files("income_proof")
 
     def clean_identity_proof(self):
-        return self._clean_proof("identity_proof")
+        return self._clean_proof_files("identity_proof")
 
     def clean_credit_report_proof(self):
-        return self._clean_proof("credit_report_proof")
+        return self._clean_proof_files("credit_report_proof")
 
 
 class HandoverProtocolForm(forms.ModelForm):

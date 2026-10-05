@@ -42,6 +42,11 @@ urlpatterns = [
         views.employee_application_document,
         name="employee_application_document",
     ),
+    path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/nachweise/datei/<uuid:proof_id>/",
+        views.employee_application_proof_download,
+        name="employee_application_proof_download",
+    ),
     path("", views.handover_protocol_list, name="handover_protocol_list"),
     path("neu/", views.handover_protocol_create, name="handover_protocol_create"),
     path(

@@ -28,10 +28,51 @@
         </article>
 
         <article class="uk-card uk-card-default uk-card-body uk-margin-top">
+            <h2 class="uk-card-title">Bereits hochgeladene Dateien</h2>
+            {% if application.submitted_at %}
+                <p class="uk-text-meta">
+                    Nach der Einreichung muss pro Kategorie mindestens eine Datei vorhanden sein.
+                    Fügen Sie zum Ersetzen erst eine neue Datei hinzu.
+                </p>
+            {% else %}
+                <p class="uk-text-meta">
+                    Einzelne Dateien können entfernt werden, ohne die anderen Dateien zu ändern.
+                </p>
+            {% endif %}
+            {% for group in proof_groups %}
+                <h3 class="uk-h4">{{ group.label }}</h3>
+                {% if group.documents %}
+                    <ul class="uk-list uk-list-divider">
+                        {% for document in group.documents %}
+                            <li class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
+                                <span>{{ document.name }}</span>
+                                {% if document.can_remove %}
+                                    <form method="post"
+                                          onsubmit="return confirm('Diesen Nachweis endgültig entfernen?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="remove_proof"
+                                               value="{{ document.delete_id }}">
+                                        <button class="uk-button uk-button-danger uk-button-small"
+                                                type="submit">
+                                            Entfernen
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="uk-text-meta">Noch keine Datei gespeichert.</p>
+                {% endif %}
+            {% endfor %}
+        </article>
+
+        <article class="uk-card uk-card-default uk-card-body uk-margin-top">
             <h2 class="uk-card-title">Erforderliche Nachweise</h2>
             <p>
                 Reichen Sie alle drei Nachweise ein. Erlaubt sind PNG- und PDF-Dateien mit
-                höchstens 8 MiB je Datei. Gehaltsabrechnungen bitte zu einer Datei zusammenfassen.
+                höchstens 8 MiB je Datei und maximal 10 Dateien pro Kategorie. Pro Speichervorgang
+                gilt ein Gesamtlimit von 25 MiB.
             </p>
             <form method="post" enctype="multipart/form-data" novalidate>
                 {% csrf_token %}
@@ -50,11 +91,8 @@
                             </label>
                             <div class="uk-form-controls">
                                 {{ field }}
-                                {% if field.value %}
-                                    <p class="uk-text-success uk-text-small">
-                                        Für diesen Nachweis ist bereits eine Datei gespeichert.
-                                        Eine neue Datei ersetzt sie.
-                                    </p>
+                                {% if field.help_text %}
+                                    <p class="uk-text-meta uk-text-small">{{ field.help_text }}</p>
                                 {% endif %}
                                 {% if field.errors %}
                                     <ul class="uk-text-danger uk-text-small">
