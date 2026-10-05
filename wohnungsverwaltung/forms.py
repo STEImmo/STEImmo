@@ -553,14 +553,6 @@ class ApartmentSearchForm(forms.Form):
         choices=(("", "Alle Etagen"),),
         widget=forms.Select(attrs={"class": "uk-select"}),
     )
-    barrierefrei = forms.TypedChoiceField(
-        label="Barrierefrei",
-        required=False,
-        choices=(("", "Beliebig"), ("true", "Ja"), ("false", "Nein")),
-        coerce=lambda value: value == "true",
-        empty_value=None,
-        widget=forms.Select(attrs={"class": "uk-select"}),
-    )
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -1356,7 +1348,6 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "kaltmiete",
             "warmmiete",
             "kaution",
-            "barrierefrei",
             "status",
             "zaehlernummer_wasser_kalt",
             "zaehlernummer_wasser_warm",
@@ -1372,7 +1363,6 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "kaltmiete": "Kaltmiete (€)",
             "warmmiete": "Warmmiete (€)",
             "kaution": "Kaution (€)",
-            "barrierefrei": "Barrierefrei",
             "zaehlernummer_wasser_kalt": "Zählernummer Kaltwasser",
             "zaehlernummer_wasser_warm": "Zählernummer Warmwasser",
             "zaehlernummer_heizung": "Zählernummer Heizung",

@@ -132,7 +132,6 @@ def apartment_search(request: HttpRequest) -> HttpResponse:
             "zimmer_min": "zimmeranzahl__gte",
             "zimmer_max": "zimmeranzahl__lte",
             "etage": "etage",
-            "barrierefrei": "barrierefrei",
         }
         filters = {
             lookup: form.cleaned_data[field_name]

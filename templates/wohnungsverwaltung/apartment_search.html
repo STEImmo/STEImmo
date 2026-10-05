@@ -40,8 +40,6 @@
                                 <dd>{{ wohnung.zimmeranzahl }}</dd>
                                 <dt>Kaltmiete</dt>
                                 <dd>{{ wohnung.kaltmiete }} €</dd>
-                                <dt>Barrierefrei</dt>
-                                <dd>{% if wohnung.barrierefrei %}Ja{% else %}Nein{% endif %}</dd>
                             </dl>
                             <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' wohnung.pk %}">
                                 Details ansehen
