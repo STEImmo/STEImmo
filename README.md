@@ -165,6 +165,19 @@ Der lokale Bootstrap reaktiviert dieses fiktive Konto und setzt sein Passwort be
 
 Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD` und `DJANGO_EMAIL_USE_TLS`. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
 
+## Bewerbungen im Betreiberbereich
+
+Unter **Bewerbungen** sehen berechtigte Mitarbeiter alle Wohnungen mit der Anzahl
+zugeordneter Bewerbungen. Nach Auswahl einer Wohnung erscheint eine Tabelle mit
+Name, Personenanzahl, Haustieren, Bearbeitungsstatus und Pre-Eingangsdatum.
+Auch abgelehnte, gesperrte und zurückgezogene Bewerbungen bleiben sichtbar.
+Die neuesten Pre-Bewerbungen stehen zuerst; pro Seite werden 20 Bewerbungen angezeigt.
+
+Die Detailansicht zeigt Kontaktdaten und Pre-Angaben sowie einen getrennten
+Main-Bereich. Main-Nachweise werden erst nach der Einreichung sichtbar und
+weiterhin ausschließlich über geschützte Downloads bereitgestellt.
+Kategorienfilter, Priorisierung und Einladungen folgen in Issue #22.
+
 ## Lokale Entwicklung
 
 Übergabeprotokolle werden über **Protokoll prüfen und unterschreiben** abgeschlossen.

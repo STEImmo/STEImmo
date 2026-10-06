@@ -1,34 +1,86 @@
 {% extends "base.html" %}
 
-{% block title %}Eingereichte Bewerbungen – STEImmo{% endblock %}
+{% block title %}Bewerbungen – STEImmo{% endblock %}
 
 {% block content %}
 <section class="uk-section">
     <div class="uk-container">
-        <h1 class="uk-heading-medium">Eingereichte Main-Bewerbungen</h1>
-        {% for application in applications %}
-            <article class="uk-card uk-card-default uk-card-body uk-margin-top">
-                <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
-                    <div>
-                        <span class="uk-label">{{ application.get_applicant_status_display }}</span>
-                        <h2 class="uk-card-title uk-margin-small-top">
-                            {{ application.person }} – {{ application.wohnung }}
-                        </h2>
-                        <p class="uk-margin-remove">
-                            Eingereicht am {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr
-                        </p>
-                    </div>
-                    <a class="uk-button uk-button-primary"
-                       href="{% url 'wohnungsverwaltung:employee_application_detail' application.pk %}">
-                        Bewerbung ansehen
-                    </a>
+        {% if unit %}
+            <ul class="uk-breadcrumb">
+                <li><a href="{% url 'wohnungsverwaltung:employee_application_list' %}">Bewerbungen je Wohnung</a></li>
+                <li><span>{{ unit }}</span></li>
+            </ul>
+            <h1 class="uk-heading-medium">Bewerbungen</h1>
+            <h2 class="uk-h3">{{ unit }}</h2>
+            <p class="uk-text-meta">{{ page_obj.paginator.count }} Bewerbung{{ page_obj.paginator.count|pluralize:"en" }} · Neueste Pre-Bewerbungen zuerst</p>
+            {% if applications %}
+                <div class="uk-overflow-auto" tabindex="0" role="region" aria-label="Bewerbungstabelle">
+                    <table class="uk-table uk-table-divider uk-table-middle">
+                        <caption class="uk-text-left">Bewerbungen für {{ unit }}</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Name</th>
+                                <th scope="col">Personenanzahl</th>
+                                <th scope="col">Haustiere</th>
+                                <th scope="col">Bearbeitungsstatus</th>
+                                <th scope="col">Pre-Eingang</th>
+                                <th scope="col">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for application in applications %}
+                                <tr>
+                                    <th scope="row">{{ application.person }}</th>
+                                    <td>{{ application.personenanzahl }}</td>
+                                    <td>{{ application.haustiere|yesno:"Ja,Nein" }}</td>
+                                    <td><span class="uk-label">{{ application.get_applicant_status_display }}</span></td>
+                                    <td class="uk-text-nowrap">{{ application.created_at|date:"d.m.Y, H:i" }} Uhr</td>
+                                    <td>
+                                        <a class="uk-button uk-button-default uk-button-small uk-text-nowrap"
+                                           href="{% url 'wohnungsverwaltung:employee_application_detail' application.pk %}"
+                                           aria-label="Bewerbung von {{ application.person }} ansehen">Ansehen</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-            </article>
-        {% empty %}
-            <div class="uk-alert-primary uk-margin-top" uk-alert>
-                <p>Es wurden noch keine Main-Bewerbungen eingereicht.</p>
+                {% if page_obj.has_other_pages %}
+                    <nav aria-label="Seiten der Bewerbungen">
+                        <ul class="uk-pagination uk-flex-center uk-flex-middle">
+                            {% if page_obj.has_previous %}
+                                <li><a href="?wohnung={{ unit.pk }}&amp;page={{ page_obj.previous_page_number }}">Zurück</a></li>
+                            {% endif %}
+                            <li class="uk-active"><span aria-current="page">Seite {{ page_obj.number }} von {{ page_obj.paginator.num_pages }}</span></li>
+                            {% if page_obj.has_next %}
+                                <li><a href="?wohnung={{ unit.pk }}&amp;page={{ page_obj.next_page_number }}">Weiter</a></li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
+            {% else %}
+                <div class="uk-alert-primary" uk-alert>
+                    <p>Für diese Wohnung liegen noch keine Bewerbungen vor.</p>
+                </div>
+            {% endif %}
+        {% else %}
+            <h1 class="uk-heading-medium">Bewerbungen je Wohnung</h1>
+            <p>Wählen Sie eine Wohnung, um ihre Bewerbungen anzusehen.</p>
+            <div class="uk-grid-small uk-child-width-1-2@s uk-child-width-1-3@l" uk-grid>
+                {% for unit in units %}
+                    <div>
+                        <article class="uk-card uk-card-default uk-card-body">
+                            <h2 class="uk-card-title">{{ unit }}</h2>
+                            <p>{{ unit.application_count }} Bewerbung{{ unit.application_count|pluralize:"en" }}</p>
+                            <a class="uk-button uk-button-primary" href="?wohnung={{ unit.pk }}"
+                               aria-label="Bewerbungen für {{ unit }} ansehen">Bewerbungen ansehen</a>
+                        </article>
+                    </div>
+                {% empty %}
+                    <div><p>Es sind noch keine Wohnungen angelegt.</p></div>
+                {% endfor %}
             </div>
-        {% endfor %}
+        {% endif %}
     </div>
 </section>
 {% endblock %}

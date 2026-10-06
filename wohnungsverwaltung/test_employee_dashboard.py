@@ -1,0 +1,210 @@
+from datetime import timedelta
+from uuid import uuid4
+
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.db import connection
+from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
+from django.utils import timezone
+
+from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
+from .models import (
+    ApplicationProof,
+    ApplicationProofCategory,
+    Bewerbung,
+    BewerbungStatus,
+    Person,
+    Wohnung,
+)
+
+
+class EmployeeDashboardTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.employee = get_user_model().objects.create_user(username="dashboard-employee")
+        cls.employee.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
+        cls.applicant = get_user_model().objects.create_user(username="dashboard-applicant")
+        cls.applicant.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+        cls.unit = Wohnung.objects.create(gebaeudenummer="1", wohnungsnummer="01")
+        cls.empty_unit = Wohnung.objects.create(gebaeudenummer="1", wohnungsnummer="02")
+        cls.application = cls.create_application(cls.unit)
+        cls.list_url = reverse("wohnungsverwaltung:employee_application_list")
+        cls.detail_url = reverse(
+            "wohnungsverwaltung:employee_application_detail", args=[cls.application.pk]
+        )
+
+    @staticmethod
+    def create_application(unit, **kwargs):
+        person = Person.objects.create(
+            vorname="Berta",
+            nachname="Bewerber",
+            email=f"{uuid4()}@example.test",
+            telefonnummer="0123456789",
+            geburtsdatum="2000-01-02",
+        )
+        return Bewerbung.objects.create(
+            person=person,
+            wohnung=unit,
+            personenanzahl=2,
+            haustiere=True,
+            ueber_mich="Ich studiere Informatik.",
+            **kwargs,
+        )
+
+    def setUp(self):
+        self.client.force_login(self.employee)
+
+    def test_dashboard_and_details_require_employee_access(self):
+        for url in (self.list_url, self.detail_url):
+            with self.subTest(url=url):
+                self.client.logout()
+                self.assertEqual(self.client.get(url).status_code, 302)
+                self.client.force_login(self.applicant)
+                self.assertEqual(self.client.get(url).status_code, 403)
+                self.client.force_login(self.employee)
+                self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_entry_shows_all_units_and_counts_without_applicant_data(self):
+        self.create_application(self.unit, status=BewerbungStatus.DECLINED)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, str(self.empty_unit))
+        self.assertNotContains(response, "Berta Bewerber")
+        counts = {unit.pk: unit.application_count for unit in response.context["units"]}
+        self.assertEqual(counts, {self.unit.pk: 2, self.empty_unit.pk: 0})
+        self.assertContains(response, f"?wohnung={self.unit.pk}")
+
+    def test_selected_unit_shows_only_its_applications(self):
+        other = self.create_application(self.empty_unit)
+        response = self.client.get(self.list_url, {"wohnung": self.unit.pk})
+        self.assertEqual(list(response.context["applications"]), [self.application])
+        self.assertNotContains(response, str(other.pk))
+        self.assertContains(response, "Berta Bewerber")
+        self.assertContains(response, "Personenanzahl")
+        self.assertContains(response, "Haustiere")
+        self.assertContains(response, "Pre-Eingang")
+        self.assertNotContains(response, self.application.person.email)
+
+    def test_all_application_statuses_remain_visible(self):
+        for kwargs in (
+            {"status": BewerbungStatus.DECLINED},
+            {"status": BewerbungStatus.BLOCKED},
+            {"interest_withdrawn_at": timezone.now()},
+            {"main_application_unlocked": True},
+            {"submitted_at": timezone.now()},
+        ):
+            self.create_application(self.unit, **kwargs)
+        response = self.client.get(self.list_url, {"wohnung": self.unit.pk})
+        self.assertEqual(response.context["page_obj"].paginator.count, 6)
+        for status in (
+            "In Bearbeitung",
+            "Abgelehnt",
+            "Gesperrt",
+            "Zurückgezogen",
+            "Main-Bewerbung freigeschaltet",
+            "Main-Bewerbung eingereicht",
+        ):
+            self.assertContains(response, status)
+
+    def test_invalid_or_unknown_unit_returns_404(self):
+        for value in ("", "invalid", str(uuid4())):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    self.client.get(self.list_url, {"wohnung": value}).status_code, 404
+                )
+
+    def test_empty_unit_has_clear_empty_state(self):
+        response = self.client.get(self.list_url, {"wohnung": self.empty_unit.pk})
+        self.assertContains(response, "Für diese Wohnung liegen noch keine Bewerbungen vor.")
+
+    def test_pagination_orders_newest_first_and_preserves_unit(self):
+        for _ in range(20):
+            self.create_application(self.unit)
+        Bewerbung.objects.filter(pk=self.application.pk).update(
+            created_at=timezone.now() - timedelta(days=1)
+        )
+        first = self.client.get(self.list_url, {"wohnung": self.unit.pk})
+        second = self.client.get(self.list_url, {"wohnung": self.unit.pk, "page": 2})
+        self.assertEqual(len(first.context["applications"]), 20)
+        self.assertEqual(list(second.context["applications"]), [self.application])
+        self.assertContains(first, f"?wohnung={self.unit.pk}&amp;page=2")
+
+    def test_equal_timestamps_have_stable_order(self):
+        other = self.create_application(self.unit)
+        Bewerbung.objects.all().update(created_at=timezone.now())
+        response = self.client.get(self.list_url, {"wohnung": self.unit.pk})
+        self.assertEqual(
+            [application.pk for application in response.context["applications"]],
+            sorted([self.application.pk, other.pk]),
+        )
+
+    def test_invalid_page_numbers_remain_usable(self):
+        for page in ("invalid", "0", "999"):
+            self.assertContains(
+                self.client.get(self.list_url, {"wohnung": self.unit.pk, "page": page}),
+                "Berta Bewerber",
+            )
+
+    def test_detail_shows_pre_data_and_hides_main_draft_files(self):
+        proof = ApplicationProof.objects.create(
+            application=self.application,
+            category=ApplicationProofCategory.IDENTITY,
+            file="private/draft",
+            original_name="geheimer-entwurf.png",
+        )
+        response = self.client.get(self.detail_url)
+        self.assertContains(response, "Pre-Bewerbung")
+        self.assertContains(response, "Main-Bewerbung")
+        self.assertContains(response, "Noch nicht eingereicht")
+        for value in ("Ich studiere Informatik.", "0123456789", "02.01.2000", "Haustiere"):
+            self.assertContains(response, value)
+        self.assertNotContains(response, proof.original_name)
+        self.assertNotContains(response, "Sicher herunterladen")
+        download_url = reverse(
+            "wohnungsverwaltung:employee_application_proof_download",
+            args=[self.application.pk, proof.pk],
+        )
+        self.assertEqual(self.client.get(download_url).status_code, 404)
+        self.assertContains(response, f"?wohnung={self.unit.pk}")
+
+    def test_submitted_main_shows_proofs_and_submission_date(self):
+        self.application.submitted_at = timezone.now()
+        self.application.save(update_fields=["submitted_at"])
+        ApplicationProof.objects.create(
+            application=self.application,
+            category=ApplicationProofCategory.IDENTITY,
+            file="private/submitted",
+            original_name="eingereicht.png",
+        )
+        response = self.client.get(self.detail_url)
+        self.assertContains(response, "eingereicht.png")
+        self.assertContains(response, "Sicher herunterladen")
+        self.assertNotContains(response, "/media/")
+        self.assertContains(response, "Main-Eingang")
+
+    def test_unknown_application_returns_404(self):
+        self.assertEqual(
+            self.client.get(
+                reverse("wohnungsverwaltung:employee_application_detail", args=[uuid4()])
+            ).status_code,
+            404,
+        )
+
+    def test_dashboard_and_detail_reject_post(self):
+        for url in (self.list_url, self.detail_url):
+            self.assertEqual(self.client.post(url).status_code, 405)
+
+    def test_query_count_does_not_grow_with_units_or_applications(self):
+        def query_count(params):
+            with CaptureQueriesContext(connection) as queries:
+                self.client.get(self.list_url, params)
+            return len(queries)
+
+        overview_before = query_count({})
+        table_before = query_count({"wohnung": self.unit.pk})
+        for number in range(5):
+            self.create_application(self.unit)
+            Wohnung.objects.create(gebaeudenummer="1", wohnungsnummer=f"extra-{number}")
+        self.assertEqual(query_count({}), overview_before)
+        self.assertEqual(query_count({"wohnung": self.unit.pk}), table_before)

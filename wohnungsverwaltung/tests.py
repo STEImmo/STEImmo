@@ -3081,14 +3081,16 @@ class MainApplicationUploadTests(TestCase):
         )
         self.assertTrue(proof.file.storage.exists(proof.file.name))
 
-    def test_employee_cannot_view_or_download_an_unsubmitted_draft(self) -> None:
+    def test_employee_sees_pre_data_but_cannot_view_or_download_main_draft(self) -> None:
         self.applicant_post(
             {"action": "save_draft", "identity_proof": self.png_upload("entwurf.png")}
         )
         proof = ApplicationProof.objects.get(application=self.application)
         self.client.force_login(self.employee_user)
 
-        list_response = self.client.get(reverse("wohnungsverwaltung:employee_application_list"))
+        list_response = self.client.get(
+            reverse("wohnungsverwaltung:employee_application_list"), {"wohnung": self.unit.pk}
+        )
         detail_response = self.client.get(
             reverse("wohnungsverwaltung:employee_application_detail", args=[self.application.pk])
         )
@@ -3099,8 +3101,10 @@ class MainApplicationUploadTests(TestCase):
             )
         )
 
-        self.assertNotContains(list_response, "Berta Bewerber")
-        self.assertEqual(detail_response.status_code, 404)
+        self.assertContains(list_response, "Berta Bewerber")
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertNotContains(detail_response, proof.original_name)
+        self.assertNotContains(detail_response, "Sicher herunterladen")
         self.assertEqual(download_response.status_code, 404)
 
     def test_accepted_pdf_with_trailing_whitespace_can_be_downloaded(self) -> None:
@@ -3499,7 +3503,7 @@ class MainApplicationUploadTests(TestCase):
         self.client.force_login(self.other_user)
         other_applicant_list = self.client.get(list_url)
         self.client.force_login(self.employee_user)
-        employee_list = self.client.get(list_url)
+        employee_list = self.client.get(list_url, {"wohnung": self.unit.pk})
         employee_detail = self.client.get(detail_url)
         employee_download = self.client.get(download_url)
 
@@ -3527,7 +3531,9 @@ class MainApplicationUploadTests(TestCase):
         self.application.save(update_fields=["interest_withdrawn_at"])
         self.client.force_login(self.employee_user)
 
-        list_response = self.client.get(reverse("wohnungsverwaltung:employee_application_list"))
+        list_response = self.client.get(
+            reverse("wohnungsverwaltung:employee_application_list"), {"wohnung": self.unit.pk}
+        )
         download_response = self.client.get(
             reverse(
                 "wohnungsverwaltung:employee_application_proof_download",

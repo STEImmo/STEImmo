@@ -5,7 +5,9 @@ from uuid import UUID
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import Paginator
 from django.db import DatabaseError, IntegrityError, transaction
+from django.db.models import Count
 from django.db.models.deletion import ProtectedError
 from django.http import (
     FileResponse,
@@ -578,15 +580,31 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
 
 @employee_required
 def employee_application_list(request: HttpRequest) -> HttpResponse:
-    applications = (
-        Bewerbung.objects.filter(submitted_at__isnull=False)
-        .select_related("person", "wohnung")
-        .order_by("-submitted_at")
-    )
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    context = {}
+    if "wohnung" in request.GET:
+        unit_id = _valid_wohnung_id(request.GET.get("wohnung"))
+        if unit_id is None:
+            raise Http404("Diese Wohnung existiert nicht.")
+        unit = get_object_or_404(Wohnung, pk=unit_id)
+        applications = (
+            Bewerbung.objects.filter(wohnung=unit)
+            .select_related("person", "wohnung")
+            .order_by("-created_at", "pk")
+        )
+        page = Paginator(applications, 20).get_page(request.GET.get("page"))
+        context.update(unit=unit, applications=page, page_obj=page)
+    else:
+        context["units"] = Wohnung.objects.annotate(
+            application_count=Count("bewerbungen")
+        ).order_by("gebaeudenummer", "wohnungsnummer", "pk")
+
     return render(
         request,
         "wohnungsverwaltung/employee_application_list.html",
-        {"applications": applications},
+        context,
     )
 
 
@@ -595,7 +613,9 @@ def employee_application_detail(request: HttpRequest, application_id: UUID) -> H
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
     application = get_object_or_404(
-        Bewerbung.objects.filter(submitted_at__isnull=False).select_related("person", "wohnung"),
+        Bewerbung.objects.select_related("person", "wohnung").prefetch_related(
+            "bewerbung_stellplaetze__stellplatz"
+        ),
         pk=application_id,
     )
     return render(
@@ -603,7 +623,11 @@ def employee_application_detail(request: HttpRequest, application_id: UUID) -> H
         "wohnungsverwaltung/employee_application_detail.html",
         {
             "application": application,
-            "proof_groups": _application_proof_groups(application, employee=True),
+            "proof_groups": (
+                _application_proof_groups(application, employee=True)
+                if application.submitted_at is not None
+                else []
+            ),
         },
     )
 
