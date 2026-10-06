@@ -20,6 +20,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 from PIL import Image
 
 from .access import (
@@ -578,6 +579,7 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
     )
 
 
+@never_cache
 @employee_required
 def employee_application_list(request: HttpRequest) -> HttpResponse:
     if request.method != "GET":
@@ -608,6 +610,7 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
     )
 
 
+@never_cache
 @employee_required
 def employee_application_detail(request: HttpRequest, application_id: UUID) -> HttpResponse:
     if request.method != "GET":

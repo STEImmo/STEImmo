@@ -167,6 +167,8 @@ Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfigu
 
 ## Bewerbungen im Betreiberbereich
 
+Die Mitarbeiternavigation blendet **Wohnungen finden** und **Bewerbungsvorschau** aus.
+
 Unter **Bewerbungen** sehen berechtigte Mitarbeiter alle Wohnungen mit der Anzahl
 zugeordneter Bewerbungen. Nach Auswahl einer Wohnung erscheint eine Tabelle mit
 Name, Personenanzahl, Haustieren, Bearbeitungsstatus und Pre-Eingangsdatum.
@@ -176,6 +178,8 @@ Die neuesten Pre-Bewerbungen stehen zuerst; pro Seite werden 20 Bewerbungen ange
 Die Detailansicht zeigt Kontaktdaten und Pre-Angaben sowie einen getrennten
 Main-Bereich. Main-Nachweise werden erst nach der Einreichung sichtbar und
 weiterhin ausschließlich über geschützte Downloads bereitgestellt.
+Die Betreiberübersicht und Bewerbungsdetails untersagen Browser- und Proxy-Caching
+über private `no-store`-Antwortheader.
 Kategorienfilter, Priorisierung und Einladungen folgen in Issue #22.
 
 ## Lokale Entwicklung

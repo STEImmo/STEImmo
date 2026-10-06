@@ -2,20 +2,23 @@ from datetime import timedelta
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
-from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
+from .access import ROLE_APPLICANT, ROLE_EMPLOYEE, ROLE_TENANT, ROLE_USER_MANAGEMENT
 from .models import (
     ApplicationProof,
     ApplicationProofCategory,
     Bewerbung,
     BewerbungStatus,
+    BewerbungStellplatz,
     Person,
+    Stellplatz,
+    StellplatzTyp,
     Wohnung,
 )
 
@@ -208,3 +211,95 @@ class EmployeeDashboardTests(TestCase):
             Wohnung.objects.create(gebaeudenummer="1", wohnungsnummer=f"extra-{number}")
         self.assertEqual(query_count({}), overview_before)
         self.assertEqual(query_count({"wohnung": self.unit.pk}), table_before)
+
+    def test_dashboard_pages_disallow_caching_of_applicant_data(self):
+        for url, params in (
+            (self.list_url, {}),
+            (self.list_url, {"wohnung": self.unit.pk}),
+            (self.detail_url, {}),
+        ):
+            with self.subTest(url=url, params=params):
+                response = self.client.get(url, params)
+                directives = response.get("Cache-Control", "").split(", ")
+                self.assertIn("no-store", directives)
+                self.assertIn("private", directives)
+
+    def test_dashboard_access_uses_permissions_and_denies_other_roles(self):
+        manager = get_user_model().objects.create_user(username="dashboard-manager")
+        manager.groups.add(Group.objects.get(name=ROLE_USER_MANAGEMENT))
+        direct_user = get_user_model().objects.create_user(username="dashboard-direct")
+        direct_user.user_permissions.add(Permission.objects.get(codename="access_employee_area"))
+        tenant = get_user_model().objects.create_user(username="dashboard-tenant")
+        tenant.groups.add(Group.objects.get(name=ROLE_TENANT))
+        ordinary_user = get_user_model().objects.create_user(username="dashboard-ordinary")
+        for user, expected_status in (
+            (manager, 200),
+            (direct_user, 200),
+            (tenant, 403),
+            (ordinary_user, 403),
+        ):
+            self.client.force_login(user)
+            for url, params in (
+                (self.list_url, {}),
+                (self.list_url, {"wohnung": self.unit.pk}),
+                (self.detail_url, {}),
+            ):
+                with self.subTest(user=user.username, url=url, params=params):
+                    self.assertEqual(self.client.get(url, params).status_code, expected_status)
+        self.client.logout()
+        self.assertEqual(self.client.get(self.detail_url).status_code, 302)
+
+    def test_detail_displays_all_existing_pre_data_and_escapes_user_text(self):
+        person = self.application.person
+        person.titel = "Dr."
+        person.geschlecht = "divers"
+        person.save(update_fields=["titel", "geschlecht"])
+        self.application.barrierefreiheit_benoetigt = True
+        self.application.alternative_wohnung_akzeptiert = True
+        self.application.ueber_mich = '<script>alert("x")</script>'
+        self.application.save()
+        parking = Stellplatz.objects.create(name="Stellplatz A", stellplatz_typ=StellplatzTyp.CAR)
+        BewerbungStellplatz.objects.create(bewerbung=self.application, stellplatz=parking)
+        response = self.client.get(self.detail_url)
+        for value in (
+            "Dr.",
+            "Divers",
+            "02.01.2000",
+            "0123456789",
+            person.email,
+            "Stellplatz A",
+            "Barrierefreiheit benötigt",
+            "Alternative Wohnung akzeptiert",
+        ):
+            self.assertContains(response, value)
+        self.assertContains(response, "<dd>Ja</dd>", count=3, html=True)
+        self.assertContains(response, "&lt;script&gt;")
+        self.assertNotContains(response, '<script>alert("x")</script>')
+
+    def test_pages_with_equal_timestamps_do_not_skip_or_repeat_applications(self):
+        for _ in range(44):
+            self.create_application(self.unit)
+        Bewerbung.objects.filter(wohnung=self.unit).update(created_at=timezone.now())
+        ids = []
+        for page, expected_length in ((1, 20), (2, 20), (3, 5)):
+            response = self.client.get(self.list_url, {"wohnung": self.unit.pk, "page": page})
+            applications = list(response.context["applications"])
+            self.assertEqual(len(applications), expected_length)
+            ids.extend(application.pk for application in applications)
+        self.assertEqual(len(set(ids)), 45)
+        self.assertEqual(ids, sorted(ids))
+
+    def test_legacy_main_draft_remains_hidden_until_submission(self):
+        self.application.identity_proof = "private/legacy-identity"
+        self.application.identity_proof_original_name = "legacy-identitaet.pdf"
+        self.application.save(update_fields=["identity_proof", "identity_proof_original_name"])
+        response = self.client.get(self.detail_url)
+        self.assertNotContains(response, "legacy-identitaet.pdf")
+        download_url = reverse(
+            "wohnungsverwaltung:employee_application_document",
+            args=[self.application.pk, "identity_proof"],
+        )
+        self.assertEqual(self.client.get(download_url).status_code, 404)
+        self.application.submitted_at = timezone.now()
+        self.application.save(update_fields=["submitted_at"])
+        self.assertContains(self.client.get(self.detail_url), "legacy-identitaet.pdf")
