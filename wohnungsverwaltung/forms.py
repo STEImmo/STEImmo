@@ -8,12 +8,14 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.sessions.models import Session
 from django.core.exceptions import ValidationError
 from django.core.files.storage import Storage
 from django.db import transaction
 from django.db.models import Q
 from django.forms.formsets import BaseFormSet
 from django.forms.models import inlineformset_factory
+from django.utils import timezone
 from PIL import Image, UnidentifiedImageError
 from pypdf import PdfReader
 from pypdf.errors import DependencyError, PyPdfError
@@ -21,6 +23,7 @@ from pypdf.errors import DependencyError, PyPdfError
 from .access import (
     ACCESS_PERMISSION_CODENAMES,
     APP_LABEL,
+    EMPLOYEE_ACCESS_PERMISSION,
     ROLE_NAMES,
     ROLE_USER_MANAGEMENT,
     USER_MANAGEMENT_PERMISSION,
@@ -30,6 +33,7 @@ from .models import (
     ApplicationProof,
     ApplicationProofCategory,
     Bewerbung,
+    EmployeeLoginVerification,
     Merkmal,
     Person,
     Protokoll,
@@ -39,6 +43,7 @@ from .models import (
     RaumMerkmal,
     RaumMerkmalFoto,
     Raumprotokoll,
+    RegistrationVerification,
     Schluessel,
     Stellplatz,
     StellplatzZuordnung,
@@ -374,6 +379,14 @@ class UserAccountForm(forms.Form):
         password2 = cleaned_data.get("password2")
         if self.account is None and not password1:
             self.add_error("password1", "Bitte vergeben Sie ein Passwort für das neue Konto.")
+        if self.account is not None:
+            current_person = getattr(self.account, "person_profile", None)
+            person_changed = selected_person is None or selected_person != current_person
+            if person_changed and (not password1 or self.account.check_password(password1)):
+                self.add_error(
+                    "password1",
+                    "Bei einem Personenwechsel muss ein neues Passwort vergeben werden.",
+                )
         if password1 or password2:
             if password1 != password2:
                 self.add_error("password2", "Die Passwörter stimmen nicht überein.")
@@ -415,7 +428,14 @@ class UserAccountForm(forms.Form):
     def save(self):
         user_model = get_user_model()
         selected_person = self.cleaned_data["person"]
+        privileged_permissions = (EMPLOYEE_ACCESS_PERMISSION, USER_MANAGEMENT_PERMISSION)
         with transaction.atomic():
+            original_account = (
+                user_model.objects.get(pk=self.account.pk) if self.account is not None else None
+            )
+            previously_privileged = original_account is not None and any(
+                original_account.has_perm(permission) for permission in privileged_permissions
+            )
             if selected_person is None:
                 person = Person(
                     vorname=self.cleaned_data["vorname"],
@@ -462,6 +482,23 @@ class UserAccountForm(forms.Form):
             account.user_permissions.set(
                 [*other_permissions, *self.cleaned_data["direct_permissions"]]
             )
+            # Read fresh permissions: the form's account may cache its previous rights.
+            updated_account = user_model.objects.get(pk=account.pk)
+            newly_privileged = not previously_privileged and any(
+                updated_account.has_perm(permission) for permission in privileged_permissions
+            )
+            credentials_changed = bool(self.cleaned_data["password1"]) or (
+                original_account is not None and original_account.email != account.email
+            )
+            if newly_privileged or credentials_changed or not account.is_active:
+                # A pending code was issued for the previous credentials or access state.
+                EmployeeLoginVerification.objects.filter(user=account).delete()
+                RegistrationVerification.objects.filter(user=account).delete()
+                # End only this account's active sessions. A privileged account must
+                # enter the normal password/MFA flow with its current credentials.
+                for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator():
+                    if session.get_decoded().get("_auth_user_id") == str(account.pk):
+                        session.delete()
         return account
 
 

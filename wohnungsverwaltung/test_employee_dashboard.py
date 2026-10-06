@@ -1,13 +1,17 @@
 from datetime import timedelta
+from io import BytesIO
+from tempfile import TemporaryDirectory
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
+from pypdf import PdfWriter
 
 from .access import ROLE_APPLICANT, ROLE_EMPLOYEE, ROLE_TENANT, ROLE_USER_MANAGEMENT
 from .models import (
@@ -303,3 +307,159 @@ class EmployeeDashboardTests(TestCase):
         self.application.submitted_at = timezone.now()
         self.application.save(update_fields=["submitted_at"])
         self.assertContains(self.client.get(self.detail_url), "legacy-identitaet.pdf")
+
+
+class EmployeeDashboardDisclosureTests(TestCase):
+    def setUp(self):
+        media_root = self.enterContext(TemporaryDirectory())
+        self.enterContext(self.settings(MEDIA_ROOT=media_root))
+        self.employee = get_user_model().objects.create_user(username="disclosure-employee")
+        self.employee.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
+        self.unit = Wohnung.objects.create(gebaeudenummer="1", wohnungsnummer="audit")
+        self.submitted = EmployeeDashboardTests.create_application(
+            self.unit, submitted_at=timezone.now()
+        )
+        self.draft = EmployeeDashboardTests.create_application(
+            self.unit, main_application_unlocked=True
+        )
+        self.submitted_proof = self.create_proof(self.submitted, "eingereichte-datei.pdf")
+        self.draft_proof = self.create_proof(self.draft, "privater-main-entwurf.pdf")
+        self.draft.identity_proof.save("legacy-entwurf.pdf", self.pdf_upload(), save=True)
+        self.draft.identity_proof_original_name = "privater-alt-entwurf.pdf"
+        self.draft.save(update_fields=["identity_proof_original_name"])
+        self.client.force_login(self.employee)
+
+    @staticmethod
+    def pdf_upload():
+        writer = PdfWriter()
+        writer.add_blank_page(width=100, height=100)
+        writer.add_metadata({"/Title": "Nur fiktive Audit-Testdaten"})
+        output = BytesIO()
+        writer.write(output)
+        return SimpleUploadedFile("audit.pdf", output.getvalue(), content_type="application/pdf")
+
+    def create_proof(self, application, name):
+        return ApplicationProof.objects.create(
+            application=application,
+            category=ApplicationProofCategory.IDENTITY,
+            original_name=name,
+            file=self.pdf_upload(),
+        )
+
+    def proof_url(self, application, proof):
+        return reverse(
+            "wohnungsverwaltung:employee_application_proof_download",
+            args=[application.pk, proof.pk],
+        )
+
+    def test_employee_cannot_bypass_draft_protection_with_direct_or_mixed_urls(self):
+        urls = (
+            self.proof_url(self.draft, self.draft_proof),
+            self.proof_url(self.submitted, self.draft_proof),
+            self.proof_url(self.draft, self.submitted_proof),
+            reverse(
+                "wohnungsverwaltung:employee_application_document",
+                args=[self.draft.pk, "identity_proof"],
+            ),
+        )
+        for url in urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 404)
+                self.assertNotContains(response, "Nur fiktive Audit-Testdaten", status_code=404)
+
+    def test_employee_cannot_mix_two_submitted_application_and_proof_ids(self):
+        other_unit = Wohnung.objects.create(gebaeudenummer="1", wohnungsnummer="other")
+        other = EmployeeDashboardTests.create_application(other_unit, submitted_at=timezone.now())
+        other_proof = self.create_proof(other, "andere-bewerbung.pdf")
+        self.assertEqual(
+            self.client.get(self.proof_url(self.submitted, other_proof)).status_code, 404
+        )
+        self.assertEqual(
+            self.client.get(self.proof_url(other, self.submitted_proof)).status_code, 404
+        )
+        response = self.client.get(self.proof_url(other, other_proof))
+        self.assertEqual(response.status_code, 200)
+        b"".join(response.streaming_content)
+
+    def test_employee_downloads_submitted_files_in_all_review_statuses(self):
+        for status, withdrawn in (
+            (BewerbungStatus.OPEN, None),
+            (BewerbungStatus.DECLINED, None),
+            (BewerbungStatus.BLOCKED, None),
+            (BewerbungStatus.OPEN, timezone.now()),
+        ):
+            self.submitted.status = status
+            self.submitted.interest_withdrawn_at = withdrawn
+            self.submitted.save(update_fields=["status", "interest_withdrawn_at"])
+            response = self.client.get(self.proof_url(self.submitted, self.submitted_proof))
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(b"".join(response.streaming_content).startswith(b"%PDF-"))
+            self.assertIn("attachment", response["Content-Disposition"])
+            self.assertIn("no-store", response["Cache-Control"])
+            self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+
+    def test_all_draft_states_hide_both_legacy_and_current_filenames(self):
+        for status, withdrawn in (
+            (BewerbungStatus.OPEN, None),
+            (BewerbungStatus.DECLINED, None),
+            (BewerbungStatus.BLOCKED, None),
+            (BewerbungStatus.OPEN, timezone.now()),
+        ):
+            self.draft.status = status
+            self.draft.interest_withdrawn_at = withdrawn
+            self.draft.save(update_fields=["status", "interest_withdrawn_at"])
+            response = self.client.get(
+                reverse("wohnungsverwaltung:employee_application_detail", args=[self.draft.pk])
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertNotContains(response, "privater-main-entwurf.pdf")
+            self.assertNotContains(response, "privater-alt-entwurf.pdf")
+            self.assertNotContains(response, str(self.draft_proof.pk))
+
+    def test_uploaded_files_have_no_direct_media_url_even_for_employees(self):
+        for file in (self.submitted_proof.file, self.draft_proof.file, self.draft.identity_proof):
+            response = self.client.get(file.url)
+            self.assertEqual(response.status_code, 404)
+
+    def test_employee_role_does_not_grant_applicant_or_user_management_access(self):
+        for url in (
+            reverse("wohnungsverwaltung:main_application_status", args=[self.draft.pk]),
+            reverse(
+                "wohnungsverwaltung:applicant_application_proof_download",
+                args=[self.draft.pk, self.draft_proof.pk],
+            ),
+            reverse(
+                "wohnungsverwaltung:applicant_application_document",
+                args=[self.draft.pk, "identity_proof"],
+            ),
+            reverse("verwaltung:user_account_list"),
+        ):
+            self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_staff_flag_alone_does_not_grant_dashboard_or_download_access(self):
+        staff = get_user_model().objects.create_user(username="staff-only", is_staff=True)
+        self.client.force_login(staff)
+        for url in (
+            reverse("wohnungsverwaltung:employee_application_list"),
+            reverse("wohnungsverwaltung:employee_application_detail", args=[self.submitted.pk]),
+            self.proof_url(self.submitted, self.submitted_proof),
+        ):
+            self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_revoked_employee_permission_and_disabled_accounts_lose_access(self):
+        self.employee.groups.clear()
+        url = self.proof_url(self.submitted, self.submitted_proof)
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.employee.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
+        self.employee.is_active = False
+        self.employee.save(update_fields=["is_active"])
+        self.assertEqual(self.client.get(url).status_code, 302)
+
+    def test_legacy_document_type_cannot_select_arbitrary_model_fields(self):
+        for document_type in ("ueber_mich", "identity_proof_original_name", "__dict__"):
+            url = reverse(
+                "wohnungsverwaltung:employee_application_document",
+                args=[self.submitted.pk, document_type],
+            )
+            self.assertEqual(self.client.get(url).status_code, 404)
