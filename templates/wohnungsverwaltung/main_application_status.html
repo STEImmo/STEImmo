@@ -69,7 +69,8 @@
                         {% if document.can_remove %}
                             <form id="remove-proof-{{ forloop.parentloop.counter }}-{{ forloop.counter }}"
                                   method="post"
-                                  onsubmit="return confirm('Diesen Nachweis endgültig entfernen?');">
+                                  data-proof-remove-form
+                                  onsubmit="return confirm('Diesen Nachweis endgültig entfernen? Noch nicht gespeicherte Dateiauswahlen gehen verloren. Speichern Sie zuerst den Entwurf, wenn Sie diese behalten möchten.');">
                                 {% csrf_token %}
                                 <input type="hidden" name="remove_proof" value="{{ document.delete_id }}">
                             </form>
@@ -197,7 +198,7 @@
                         </p>
                     </div>
                 </div>
-                <script src="{% static 'js/main_application_uploads.js' %}?v=7"></script>
+                <script src="{% static 'js/main_application_uploads.js' %}?v=8"></script>
             {% endif %}
         </article>
     </div>

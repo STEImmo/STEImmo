@@ -86,6 +86,9 @@ PDFs werden strukturell geprüft; technisch nicht verarbeitbare oder beschädigt
 Dokumente werden als Formularfehler abgelehnt. Das ersetzt keinen Virenscanner.
 Geschützte Downloads verwenden den bereits geöffneten Dateistream bis zum Ende
 der Antwort; auch PDFs mit zusätzlichen Leerzeichen am Dateiende bleiben abrufbar.
+Wer einen gespeicherten Nachweis entfernt, wird bei einer ungespeicherten
+Dateiauswahl vor deren Verlust gewarnt. Abbrechen erhält die Auswahl; der Entwurf
+kann anschließend zuerst gespeichert werden.
 
 Beim Entfernen eines Nachweises werden Datenbankreferenz und Bereinigungsauftrag
 in derselben Transaktion geändert. Erst nach dem Commit wird die Datei gelöscht.

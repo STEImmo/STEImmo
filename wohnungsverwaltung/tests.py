@@ -2557,7 +2557,7 @@ class MainApplicationUploadTests(TestCase):
         self.assertContains(response, "data-proof-total-size-error")
         self.assertContains(response, "data-proof-upload-modal")
         self.assertEqual(response.content.count(b"data-proof-selection-list"), 3)
-        self.assertContains(response, "main_application_uploads.js?v=7")
+        self.assertContains(response, "main_application_uploads.js?v=8")
         self.assertContains(response, "auch nacheinander auswählen")
         self.assertContains(response, "Entwurf speichern")
         self.assertNotContains(response, "Ergänzende Angaben")
@@ -2576,6 +2576,19 @@ class MainApplicationUploadTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "data-proof-existing-name>personalausweis.png</span>")
         self.assertContains(response, f"({proof.file.size} B)")
+
+    def test_proof_removal_warns_about_unsaved_file_selections(self) -> None:
+        proof = self.application.proof_files.create(
+            category=ApplicationProofCategory.IDENTITY,
+            file=self.png_upload(),
+            original_name="identity.png",
+        )
+        self.client.force_login(self.applicant_user)
+        response = self.client.get(self.main_url)
+        self.assertContains(response, "data-proof-remove-form")
+        self.assertContains(response, "Noch nicht gespeicherte Dateiauswahlen gehen verloren")
+        self.assertContains(response, "Speichern Sie zuerst den Entwurf")
+        self.assertTrue(ApplicationProof.objects.filter(pk=proof.pk).exists())
 
     def test_applicant_can_save_an_incomplete_draft(self) -> None:
         response = self.applicant_post(

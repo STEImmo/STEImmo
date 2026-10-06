@@ -259,6 +259,35 @@
         }
     });
 
+    for (const removeForm of document.querySelectorAll("[data-proof-remove-form]")) {
+        // Override the conservative no-JavaScript fallback with a precise warning.
+        let removalConfirmed = false;
+        removeForm.onsubmit = (event) => {
+            if (removalConfirmed) {
+                removalConfirmed = false;
+                return true;
+            }
+            const hasPendingFiles = fields.some((entry) => entry.input.files.length > 0);
+            const message = hasPendingFiles
+                ? "Diesen Nachweis endgültig entfernen? Noch nicht gespeicherte Dateiauswahlen "
+                    + "gehen verloren. Speichern Sie zuerst den Entwurf, wenn Sie diese behalten "
+                    + "möchten. Wenn Sie die Löschung bestätigen, wird der Nachweis entfernt "
+                    + "und die Auswahl verworfen."
+                : "Diesen Nachweis endgültig entfernen?";
+            if (!window.UIkit?.modal?.confirm) {
+                return window.confirm(message);
+            }
+            event.preventDefault();
+            window.UIkit.modal.confirm(message, {
+                i18n: { ok: "Nachweis entfernen", cancel: "Abbrechen" },
+            }).then(() => {
+                removalConfirmed = true;
+                removeForm.requestSubmit();
+            }, () => {});
+            return false;
+        };
+    }
+
     form.addEventListener("submit", (event) => {
         if (!renderSelections()) {
             return;
