@@ -1,4 +1,4 @@
-"""Retry deletion of proof files that survived a failed upload rollback."""
+"""Retry deletion of proof files queued for deletion."""
 
 import logging
 
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Retry deletion of uploaded proof files left over after a failed save."
+    help = "Retry deletion of proof files queued after removal or a failed save."
 
     def handle(self, *args, **options):
         cleaned = 0

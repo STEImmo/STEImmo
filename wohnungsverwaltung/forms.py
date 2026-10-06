@@ -16,7 +16,7 @@ from django.forms.formsets import BaseFormSet
 from django.forms.models import inlineformset_factory
 from PIL import Image, UnidentifiedImageError
 from pypdf import PdfReader
-from pypdf.errors import PdfReadError
+from pypdf.errors import DependencyError, PyPdfError
 
 from .access import (
     ACCESS_PERMISSION_CODENAMES,
@@ -703,9 +703,18 @@ class MainApplicationForm(forms.Form):
             header = upload.read(1024)
             if header.startswith(b"%PDF-"):
                 upload.seek(0)
-                reader = PdfReader(upload, strict=True)
-                if not reader.pages:
-                    raise forms.ValidationError("Das PDF enthält keine Seiten.")
+                try:
+                    reader = PdfReader(upload, strict=True)
+                    if not reader.pages:
+                        raise forms.ValidationError("Das PDF enthält keine Seiten.")
+                except (
+                    AttributeError,
+                    KeyError,
+                    TypeError,
+                    RecursionError,
+                    OverflowError,
+                ) as error:
+                    raise forms.ValidationError("Das PDF kann nicht verarbeitet werden.") from error
                 return upload
 
             upload.seek(0)
@@ -723,11 +732,16 @@ class MainApplicationForm(forms.Form):
             return upload
         except forms.ValidationError:
             raise
+        except (DependencyError, NotImplementedError) as error:
+            raise forms.ValidationError(
+                "Dieses verschlüsselte PDF kann nicht verarbeitet werden. "
+                "Bitte laden Sie ein unverschlüsseltes PDF hoch."
+            ) from error
         except (
             Image.DecompressionBombError,
             Image.DecompressionBombWarning,
             OSError,
-            PdfReadError,
+            PyPdfError,
             SyntaxError,
             UnidentifiedImageError,
             ValueError,

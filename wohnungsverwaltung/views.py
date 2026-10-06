@@ -370,15 +370,12 @@ def _remove_application_proof(
             )
 
         storage, stored_name = proof_file.storage, proof_file.name
-        if not _delete_application_proof_file(request, storage, stored_name):
-            return redirect(
-                "wohnungsverwaltung:main_application_status", application_id=application_id
-            )
         original_name_field = f"{legacy_field}_original_name"
         with transaction.atomic():
             setattr(application, legacy_field, "")
             setattr(application, original_name_field, "")
             application.save(update_fields=(legacy_field, original_name_field, "updated_at"))
+            _queue_application_proof_deletion(storage, stored_name)
     else:
         try:
             proof_id = UUID(reference)
@@ -411,33 +408,29 @@ def _remove_application_proof(
             )
 
         storage, stored_name = proof.file.storage, proof.file.name
-        if not _delete_application_proof_file(request, storage, stored_name):
-            return redirect(
-                "wohnungsverwaltung:main_application_status", application_id=application_id
-            )
         with transaction.atomic():
             proof.delete()
+            _queue_application_proof_deletion(storage, stored_name)
 
-    messages.success(request, "Der Nachweis wurde entfernt.")
     return redirect("wohnungsverwaltung:main_application_status", application_id=application_id)
 
 
-def _delete_application_proof_file(request: HttpRequest, storage, stored_name: str) -> bool:
-    """Keep the database reference when private storage cannot remove a proof."""
-    try:
-        storage.delete(stored_name)
-    except Exception as error:
-        logger.error(
-            "Could not delete stored application proof %s (%s).",
-            stored_name,
-            type(error).__name__,
-        )
-        messages.error(
-            request,
-            "Der Nachweis konnte nicht entfernt werden. Bitte versuchen Sie es erneut.",
-        )
-        return False
-    return True
+def _queue_application_proof_deletion(storage, stored_name: str) -> None:
+    """Persist deletion intent together with removal of the document reference."""
+    cleanup, _created = ApplicationProofCleanup.objects.get_or_create(storage_name=stored_name)
+
+    def delete_after_commit():
+        try:
+            storage.delete(stored_name)
+            cleanup.delete()
+        except Exception as error:
+            logger.error(
+                "Could not delete stored application proof %s (%s); cleanup remains queued.",
+                stored_name,
+                type(error).__name__,
+            )
+
+    transaction.on_commit(delete_after_commit)
 
 
 @applicant_required
@@ -483,24 +476,41 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
                 if upload_error:
                     return upload_too_large_response(upload_error)
                 if "remove_proof" in post_data:
-                    return _remove_application_proof(request, application, application_id)
+                    removal_response = _remove_application_proof(
+                        request, application, application_id
+                    )
+                else:
+                    form = MainApplicationForm(
+                        post_data,
+                        uploaded_files,
+                        instance=application,
+                    )
+                    form_is_valid = form.is_valid()
+                    if form_is_valid:
+                        action = form.cleaned_data["action"]
+                        form.save_uploaded_proofs()
+                        if action == "submit":
+                            application.submitted_at = timezone.now()
+                            application.save(update_fields=("submitted_at", "updated_at"))
+                        else:
+                            application.save(update_fields=("updated_at",))
+            if "remove_proof" in post_data:
+                messages.success(request, "Der Nachweis wurde aus dem Entwurf entfernt.")
+                return removal_response
 
-                form = MainApplicationForm(
-                    post_data,
-                    uploaded_files,
-                    instance=application,
-                )
-                form_is_valid = form.is_valid()
-                if form_is_valid:
-                    action = form.cleaned_data["action"]
-                    form.save_uploaded_proofs()
-                    if action == "submit":
-                        application.submitted_at = timezone.now()
-                        application.save(update_fields=("submitted_at", "updated_at"))
-                    else:
-                        application.save(update_fields=("updated_at",))
         except (ApplicationProofStorageError, DatabaseError) as error:
             if form is None or application is None:
+                if application is not None and "remove_proof" in post_data:
+                    logger.error(
+                        "Main application proof removal failed (%s).", type(error).__name__
+                    )
+                    messages.error(
+                        request,
+                        "Der Nachweis konnte nicht entfernt werden. Bitte versuchen Sie es erneut.",
+                    )
+                    return redirect(
+                        "wohnungsverwaltung:main_application_status", application_id=application_id
+                    )
                 raise
 
             cleanup_failures = form.cleanup_stored_proof_files()

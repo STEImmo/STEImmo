@@ -16,7 +16,7 @@ from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.db import IntegrityError, close_old_connections, connection, transaction
+from django.db import DatabaseError, IntegrityError, close_old_connections, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.test import Client, TestCase, TransactionTestCase, skipUnlessDBFeature
 from django.urls import reverse
@@ -2659,7 +2659,231 @@ class MainApplicationUploadTests(TestCase):
         self.application.refresh_from_db()
         self.assertIsNone(self.application.submitted_at)
 
-    def test_proof_reference_is_kept_when_storage_delete_fails(self) -> None:
+    def test_removal_database_failure_preserves_file_and_reference(self) -> None:
+        proof = self.application.proof_files.create(
+            category=ApplicationProofCategory.IDENTITY,
+            file=self.png_upload("identity.png"),
+            original_name="identity.png",
+        )
+        self.client.force_login(self.applicant_user)
+        with (
+            mock.patch.object(ApplicationProof, "delete", side_effect=DatabaseError("failed")),
+            self.assertLogs("wohnungsverwaltung.views", level="ERROR"),
+        ):
+            response = self.client.post(self.main_url, {"remove_proof": str(proof.pk)}, follow=True)
+        self.assertContains(response, "Der Nachweis konnte nicht entfernt werden.")
+        self.assertNotContains(response, "Der Nachweis wurde aus dem Entwurf entfernt.")
+        self.assertTrue(ApplicationProof.objects.filter(pk=proof.pk).exists())
+        self.assertTrue(proof.file.storage.exists(proof.file.name))
+        self.assertFalse(ApplicationProofCleanup.objects.exists())
+
+    def test_legacy_removal_database_failure_preserves_file_and_reference(self) -> None:
+        self.application.identity_proof.save("identity.png", self.png_upload(), save=True)
+        name = self.application.identity_proof.name
+        self.client.force_login(self.applicant_user)
+        with (
+            mock.patch.object(Bewerbung, "save", side_effect=DatabaseError("failed")),
+            self.assertLogs("wohnungsverwaltung.views", level="ERROR"),
+        ):
+            response = self.client.post(
+                self.main_url, {"remove_proof": "legacy:identity_proof"}, follow=True
+            )
+        self.assertContains(response, "Der Nachweis konnte nicht entfernt werden.")
+        self.assertNotContains(response, "Der Nachweis wurde aus dem Entwurf entfernt.")
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.identity_proof.name, name)
+        self.assertTrue(self.application.identity_proof.storage.exists(name))
+        self.assertFalse(ApplicationProofCleanup.objects.exists())
+
+    def test_removal_is_not_physical_until_commit_and_can_be_rolled_back(self) -> None:
+        proof = self.application.proof_files.create(
+            category=ApplicationProofCategory.IDENTITY,
+            file=self.png_upload(),
+            original_name="identity.png",
+        )
+        self.client.force_login(self.applicant_user)
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            with transaction.atomic():
+                response = self.client.post(self.main_url, {"remove_proof": str(proof.pk)})
+                self.assertEqual(response.status_code, 302)
+                self.assertFalse(ApplicationProof.objects.filter(pk=proof.pk).exists())
+                self.assertTrue(
+                    ApplicationProofCleanup.objects.filter(storage_name=proof.file.name).exists()
+                )
+                self.assertTrue(proof.file.storage.exists(proof.file.name))
+                transaction.set_rollback(True)
+        self.assertEqual(callbacks, [])
+        self.assertTrue(ApplicationProof.objects.filter(pk=proof.pk).exists())
+        self.assertTrue(proof.file.storage.exists(proof.file.name))
+        self.assertFalse(ApplicationProofCleanup.objects.exists())
+
+    def test_pdf_with_excessive_page_tree_depth_is_rejected(self) -> None:
+        from pypdf import PdfWriter
+        from pypdf.generic import ArrayObject, DictionaryObject, NameObject, NumberObject
+
+        writer = PdfWriter()
+        page = writer.add_blank_page(width=72, height=72)
+        child = page.indirect_reference
+        for _ in range(110):
+            node = DictionaryObject(
+                {
+                    NameObject("/Type"): NameObject("/Pages"),
+                    NameObject("/Kids"): ArrayObject([child]),
+                    NameObject("/Count"): NumberObject(1),
+                }
+            )
+            parent = writer._add_object(node)
+            child.get_object()[NameObject("/Parent")] = parent
+            child = parent
+        writer.root_object[NameObject("/Pages")] = child
+        buffer = BytesIO()
+        writer.write(buffer)
+        response = self.applicant_post(
+            {
+                "action": "save_draft",
+                "identity_proof": SimpleUploadedFile(
+                    "deep.pdf", buffer.getvalue(), content_type="application/pdf"
+                ),
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "gültige PNG- oder PDF-Dateien")
+        self.assertFalse(self.application.proof_files.exists())
+
+    def test_pdf_with_unsupported_encryption_is_rejected(self) -> None:
+        from pypdf import PdfWriter
+
+        writer = PdfWriter()
+        writer.add_blank_page(width=72, height=72)
+        buffer = BytesIO()
+        writer.write(buffer)
+        contents = buffer.getvalue().replace(
+            b"trailer\n<<",
+            b"trailer\n<<\n/Encrypt << /Filter /Unsupported >>",
+            1,
+        )
+        response = self.applicant_post(
+            {
+                "action": "save_draft",
+                "identity_proof": SimpleUploadedFile(
+                    "unsupported.pdf", contents, content_type="application/pdf"
+                ),
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "verschlüsselte PDF")
+        self.assertFalse(self.application.proof_files.exists())
+
+    def test_aes_pdf_without_crypto_support_is_rejected(self) -> None:
+        from pypdf import PdfWriter
+
+        writer = PdfWriter()
+        writer.add_blank_page(width=72, height=72)
+        buffer = BytesIO()
+        writer.write(buffer)
+        encryption = (
+            b"/Encrypt << /Filter /Standard /V 5 /R 6 /Length 256 /P -4 /O <"
+            + b"00" * 48
+            + b"> /U <"
+            + b"00" * 48
+            + b"> /OE <"
+            + b"00" * 32
+            + b"> /UE <"
+            + b"00" * 32
+            + b"> /Perms <"
+            + b"00" * 16
+            + b"> /CF << /StdCF << /CFM /AESV3 >> >> /StmF /StdCF /StrF /StdCF >>"
+        )
+        contents = buffer.getvalue().replace(b"trailer\n<<", b"trailer\n<<\n" + encryption, 1)
+        response = self.applicant_post(
+            {
+                "action": "save_draft",
+                "identity_proof": SimpleUploadedFile(
+                    "aes.pdf", contents, content_type="application/pdf"
+                ),
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "PDF")
+        self.assertFalse(self.application.proof_files.exists())
+
+    def test_pdf_with_incomplete_encryption_metadata_is_rejected(self) -> None:
+        from pypdf import PdfWriter
+
+        writer = PdfWriter()
+        writer.add_blank_page(width=72, height=72)
+        buffer = BytesIO()
+        writer.write(buffer)
+        contents = buffer.getvalue().replace(
+            b"trailer\n<<",
+            b"trailer\n<<\n/Encrypt << /Filter /Standard >>",
+            1,
+        )
+        response = self.applicant_post(
+            {
+                "action": "save_draft",
+                "identity_proof": SimpleUploadedFile(
+                    "incomplete.pdf", contents, content_type="application/pdf"
+                ),
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "PDF kann nicht verarbeitet werden")
+        self.assertFalse(self.application.proof_files.exists())
+
+    def test_cleanup_job_survives_database_failure_after_physical_deletion(self) -> None:
+        proof = self.application.proof_files.create(
+            category=ApplicationProofCategory.IDENTITY,
+            file=self.png_upload(),
+            original_name="identity.png",
+        )
+        with (
+            mock.patch.object(
+                ApplicationProofCleanup, "delete", side_effect=DatabaseError("failed")
+            ),
+            self.assertLogs("wohnungsverwaltung.views", level="ERROR"),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.applicant_post({"remove_proof": str(proof.pk)})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ApplicationProof.objects.filter(pk=proof.pk).exists())
+        self.assertFalse(proof.file.storage.exists(proof.file.name))
+        self.assertTrue(
+            ApplicationProofCleanup.objects.filter(storage_name=proof.file.name).exists()
+        )
+        call_command("retry_application_proof_cleanup", stdout=StringIO())
+        self.assertFalse(ApplicationProofCleanup.objects.exists())
+
+    def test_pdf_processing_errors_are_form_errors(self) -> None:
+        from pypdf.errors import DependencyError, LimitReachedError
+
+        for error_type in (DependencyError, LimitReachedError):
+            with self.subTest(error=error_type.__name__):
+                with mock.patch(
+                    "wohnungsverwaltung.forms.PdfReader", side_effect=error_type("failed")
+                ):
+                    response = self.applicant_post(
+                        {
+                            "action": "save_draft",
+                            "identity_proof": self.pdf_upload(),
+                        }
+                    )
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "PDF")
+                self.assertFalse(self.application.proof_files.exists())
+
+    def test_static_storage_uses_public_permissions(self) -> None:
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import storages
+
+        with TemporaryDirectory() as directory, self.settings(STATIC_ROOT=directory):
+            storage = storages["staticfiles"]
+            name = storage.save("nested/probe.css", ContentFile(b"body {}"))
+            path = Path(storage.path(name))
+            self.assertEqual(path.stat().st_mode & 0o777, 0o644)
+            self.assertEqual(path.parent.stat().st_mode & 0o777, 0o755)
+
+    def test_proof_cleanup_is_queued_when_storage_delete_fails(self) -> None:
         proof = self.application.proof_files.create(
             category=ApplicationProofCategory.IDENTITY,
             file=self.png_upload("identitaet.png"),
@@ -2668,7 +2892,11 @@ class MainApplicationUploadTests(TestCase):
         storage = proof.file.storage
         self.client.force_login(self.applicant_user)
 
-        with mock.patch.object(storage, "delete", side_effect=OSError("storage unavailable")):
+        with (
+            mock.patch.object(storage, "delete", side_effect=OSError("storage unavailable")),
+            self.assertLogs("wohnungsverwaltung.views", level="ERROR"),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             response = self.client.post(
                 self.main_url,
                 {"remove_proof": str(proof.pk)},
@@ -2676,11 +2904,17 @@ class MainApplicationUploadTests(TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Der Nachweis konnte nicht entfernt werden.")
-        self.assertTrue(ApplicationProof.objects.filter(pk=proof.pk).exists())
+        self.assertContains(response, "Der Nachweis wurde aus dem Entwurf entfernt.")
+        self.assertFalse(ApplicationProof.objects.filter(pk=proof.pk).exists())
+        self.assertTrue(
+            ApplicationProofCleanup.objects.filter(storage_name=proof.file.name).exists()
+        )
         self.assertTrue(storage.exists(proof.file.name))
+        call_command("retry_application_proof_cleanup", stdout=StringIO())
+        self.assertFalse(storage.exists(proof.file.name))
+        self.assertFalse(ApplicationProofCleanup.objects.exists())
 
-    def test_legacy_proof_reference_is_kept_when_storage_delete_fails(self) -> None:
+    def test_legacy_proof_cleanup_is_queued_when_storage_delete_fails(self) -> None:
         self.application.identity_proof.save(
             "legacy-identitaet.png",
             self.png_upload("legacy-identitaet.png"),
@@ -2694,7 +2928,11 @@ class MainApplicationUploadTests(TestCase):
         storage = self.application.identity_proof.storage
         self.client.force_login(self.applicant_user)
 
-        with mock.patch.object(storage, "delete", side_effect=OSError("storage unavailable")):
+        with (
+            mock.patch.object(storage, "delete", side_effect=OSError("storage unavailable")),
+            self.assertLogs("wohnungsverwaltung.views", level="ERROR"),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             response = self.client.post(
                 self.main_url,
                 {"remove_proof": "legacy:identity_proof"},
@@ -2702,11 +2940,15 @@ class MainApplicationUploadTests(TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Der Nachweis konnte nicht entfernt werden.")
+        self.assertContains(response, "Der Nachweis wurde aus dem Entwurf entfernt.")
         self.application.refresh_from_db()
-        self.assertEqual(self.application.identity_proof.name, stored_name)
-        self.assertEqual(self.application.identity_proof_original_name, "legacy-identitaet.png")
+        self.assertFalse(self.application.identity_proof.name)
+        self.assertEqual(self.application.identity_proof_original_name, "")
+        self.assertTrue(ApplicationProofCleanup.objects.filter(storage_name=stored_name).exists())
         self.assertTrue(storage.exists(stored_name))
+        call_command("retry_application_proof_cleanup", stdout=StringIO())
+        self.assertFalse(storage.exists(stored_name))
+        self.assertFalse(ApplicationProofCleanup.objects.exists())
 
     def test_storage_failure_cleans_up_files_written_by_the_same_request(self) -> None:
         storage = ApplicationProof._meta.get_field("file").storage
