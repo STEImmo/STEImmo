@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Meine Übergabeprotokolle – STEImmo{% endblock %}
+{% block content %}
+<section class="uk-section"><div class="uk-container">
+    <h1>Meine Übergabeprotokolle</h1>
+    {% for protocol in protocols %}
+        <article class="uk-card uk-card-default uk-card-body uk-margin">
+            <h2 class="uk-card-title">{% if protocol.protokoll_typ == "move_in" %}Einzug{% else %}Auszug{% endif %} – Gebäude {{ protocol.wohnung.gebaeudenummer }}, Wohnung {{ protocol.wohnung.wohnungsnummer }}</h2>
+            <p>{{ protocol.uebergabe_zeitpunkt|date:"d.m.Y H:i" }}</p>
+            {% include "wohnungsverwaltung/_protocol_pdf_action.html" %}
+        </article>
+    {% empty %}<p>Noch keine bestätigten Übergabeprotokolle vorhanden.</p>{% endfor %}
+</div></section>
+{% endblock %}

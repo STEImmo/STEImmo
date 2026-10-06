@@ -38,10 +38,159 @@ from .models import (
     Wohnung,
     WohnungStatus,
 )
+from .test_handover_export import signature_file
+
+
+class ApartmentSearchViewTests(TestCase):
+    def create_unit(self, number: str, **overrides) -> Wohnung:
+        defaults = {
+            "gebaeudenummer": "1",
+            "wohnungsnummer": number,
+            "etage": 1,
+            "groesse_qm": Decimal("55.00"),
+            "zimmeranzahl": Decimal("2.00"),
+            "kaltmiete": Decimal("650.00"),
+            "barrierefrei": True,
+            "status": WohnungStatus.FREE,
+        }
+        return Wohnung.objects.create(**(defaults | overrides))
+
+    def test_search_shows_only_available_units(self) -> None:
+        free_unit = self.create_unit("1.01")
+        taken_unit = self.create_unit("1.02", status=WohnungStatus.TAKEN)
+        blocked_unit = self.create_unit("1.03", status=WohnungStatus.BLOCKED)
+
+        response = self.client.get(reverse("wohnungsverwaltung_public:apartment_search"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertQuerySetEqual(response.context["wohnungen"], [free_unit])
+        self.assertNotContains(response, taken_unit.wohnungsnummer)
+        self.assertNotContains(response, blocked_unit.wohnungsnummer)
+
+    def test_search_result_links_to_apartment_detail_placeholder(self) -> None:
+        unit = self.create_unit("1.01")
+
+        response = self.client.get(reverse("wohnungsverwaltung_public:apartment_search"))
+
+        self.assertContains(
+            response,
+            reverse(
+                "wohnungsverwaltung_public:apartment_detail_placeholder",
+                args=[unit.pk],
+            ),
+        )
+
+    def test_apartment_detail_placeholder_says_details_will_follow(self) -> None:
+        unit = self.create_unit("1.01")
+
+        response = self.client.get(
+            reverse(
+                "wohnungsverwaltung_public:apartment_detail_placeholder",
+                args=[unit.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, unit.wohnungsnummer)
+        self.assertContains(response, "Wohnungsdetails folgen")
+
+    def test_apartment_detail_placeholder_returns_404_for_unavailable_units(self) -> None:
+        unavailable_units = (
+            self.create_unit("1.02", status=WohnungStatus.TAKEN),
+            self.create_unit("1.03", status=WohnungStatus.BLOCKED),
+        )
+
+        for unit in unavailable_units:
+            with self.subTest(status=unit.status):
+                response = self.client.get(
+                    reverse(
+                        "wohnungsverwaltung_public:apartment_detail_placeholder",
+                        args=[unit.pk],
+                    )
+                )
+
+                self.assertEqual(response.status_code, 404)
+
+    def test_search_filters_available_units_by_apartment_attributes(self) -> None:
+        matching_unit = self.create_unit("1.01")
+        self.create_unit("1.02", groesse_qm=Decimal("70.00"))
+        self.create_unit("1.03", kaltmiete=Decimal("900.00"))
+        self.create_unit("1.04", zimmeranzahl=Decimal("3.00"))
+        self.create_unit("2.01", etage=2)
+
+        response = self.client.get(
+            reverse("wohnungsverwaltung_public:apartment_search"),
+            {
+                "groesse_min": "50",
+                "groesse_max": "60",
+                "kaltmiete_max": "700",
+                "zimmer_min": "1",
+                "zimmer_max": "2",
+                "etage": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertQuerySetEqual(response.context["wohnungen"], [matching_unit])
+
+    def test_search_omits_accessibility_filter_and_result_attribute(self) -> None:
+        self.create_unit("1.01")
+        self.create_unit("1.02", barrierefrei=False)
+
+        response = self.client.get(reverse("wohnungsverwaltung_public:apartment_search"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("barrierefrei", response.context["form"].fields)
+        self.assertNotContains(response, "Barrierefrei")
+        self.assertNotContains(response, "barrierefrei")
+
+    def test_search_ignores_legacy_accessibility_query_parameter(self) -> None:
+        first_unit = self.create_unit("1.01")
+        second_unit = self.create_unit("1.02", barrierefrei=False)
+        self.create_unit("1.03", groesse_qm=Decimal("70.00"))
+        self.create_unit("1.04", status=WohnungStatus.BLOCKED)
+
+        for value in ("true", "false", "ungueltig"):
+            with self.subTest(value=value):
+                response = self.client.get(
+                    reverse("wohnungsverwaltung_public:apartment_search"),
+                    {"barrierefrei": value, "groesse_max": "60"},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertNotIn("barrierefrei", response.context["form"].cleaned_data)
+                self.assertQuerySetEqual(response.context["wohnungen"], [first_unit, second_unit])
+
+    def test_empty_search_shows_all_available_units(self) -> None:
+        first_unit = self.create_unit("1.01")
+        second_unit = self.create_unit("1.02")
+
+        response = self.client.get(reverse("wohnungsverwaltung_public:apartment_search"))
+
+        self.assertQuerySetEqual(response.context["wohnungen"], [first_unit, second_unit])
+        self.assertContains(response, "Filter zurücksetzen")
+
+    def test_search_rejects_a_minimum_above_the_maximum(self) -> None:
+        self.create_unit("1.01")
+
+        response = self.client.get(
+            reverse("wohnungsverwaltung_public:apartment_search"),
+            {"groesse_min": "60", "groesse_max": "50"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(
+            response.context["form"],
+            "groesse_max",
+            "Der Höchstwert muss mindestens dem Mindestwert entsprechen.",
+        )
+        self.assertFalse(response.context["wohnungen"].exists())
 
 
 class HandoverProtocolViewsTests(TestCase):
     def setUp(self) -> None:
+        media_root = self.enterContext(TemporaryDirectory())
+        self.enterContext(self.settings(MEDIA_ROOT=media_root))
         self.wohnung = Wohnung.objects.create(
             etage=2,
             wohnungsnummer="2.04",
@@ -289,15 +438,14 @@ class HandoverProtocolViewsTests(TestCase):
         self.assertIn((str(self.employee), str(self.employee)), landlord_choices)
         self.assertNotIn((str(self.person), str(self.person)), landlord_choices)
 
-    def test_create_rejects_a_non_employee_as_landlord_representative(self) -> None:
+    def test_create_uses_logged_in_employee_despite_submitted_representative(self) -> None:
         data = self.valid_form_data()
         data["vermieter_name"] = str(self.person)
 
         response = self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("vermieter_name", response.context["form"].errors)
-        self.assertFalse(Protokoll.objects.exists())
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Protokoll.objects.get().vermieter_name, str(self.employee))
 
     def test_create_page_updates_people_without_a_full_page_reload(self) -> None:
         response = self.client.get(reverse("wohnungsverwaltung:handover_protocol_create"))
@@ -957,6 +1105,19 @@ class HandoverProtocolViewsTests(TestCase):
         )
         self.assertFalse(protocol.protokoll_schluessel.filter(pk=key.pk).exists())
 
+    def signing_data(self, protocol):
+        page = self.client.get(
+            reverse("wohnungsverwaltung:handover_protocol_finalize", args=[protocol.pk])
+        )
+        return {
+            "bestaetigung_erklaert": "on",
+            "schluessel_ueberprueft": "on",
+            "content_token": page.context["form"].initial["content_token"],
+            "tenant_mode": "signed",
+            "mitarbeiter": signature_file(),
+            "mieter": signature_file(),
+        }
+
     def test_confirmation_rejects_incomplete_room_protocols(self) -> None:
         self.client.post(
             reverse("wohnungsverwaltung:handover_protocol_create"), self.valid_form_data()
@@ -969,17 +1130,12 @@ class HandoverProtocolViewsTests(TestCase):
                 "wohnungsverwaltung:handover_protocol_confirm",
                 kwargs={"protocol_id": protocol.pk},
             ),
-            {"bestaetigung_erklaert": "on", "schluessel_ueberprueft": "on"},
+            self.signing_data(protocol),
         )
 
         protocol.refresh_from_db()
-        self.assertRedirects(
-            response,
-            reverse(
-                "wohnungsverwaltung:handover_protocol_detail",
-                kwargs={"protocol_id": protocol.pk},
-            ),
-        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Prüfpunkt", response.json()["error"])
         self.assertEqual(protocol.status, ProtokollStatus.OPEN)
 
     def test_confirmation_signs_complete_protocol_and_locks_edits(self) -> None:
@@ -1007,17 +1163,12 @@ class HandoverProtocolViewsTests(TestCase):
                 "wohnungsverwaltung:handover_protocol_confirm",
                 kwargs={"protocol_id": protocol.pk},
             ),
-            {"bestaetigung_erklaert": "on", "schluessel_ueberprueft": "on"},
+            self.signing_data(protocol),
         )
 
         protocol.refresh_from_db()
-        self.assertRedirects(
-            response,
-            reverse(
-                "wohnungsverwaltung:handover_protocol_detail",
-                kwargs={"protocol_id": protocol.pk},
-            ),
-        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("redirect", response.json())
 
         response = self.client.post(
             reverse(
@@ -1105,16 +1256,11 @@ class HandoverProtocolViewsTests(TestCase):
                 "wohnungsverwaltung:handover_protocol_confirm",
                 kwargs={"protocol_id": protocol.pk},
             ),
-            {"bestaetigung_erklaert": "on", "schluessel_ueberprueft": "on"},
+            self.signing_data(protocol),
         )
 
-        self.assertRedirects(
-            response,
-            reverse(
-                "wohnungsverwaltung:handover_protocol_detail",
-                kwargs={"protocol_id": protocol.pk},
-            ),
-        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Schlüsselposition", response.json()["error"])
         protocol.refresh_from_db()
         self.assertEqual(protocol.status, ProtokollStatus.OPEN)
 
@@ -2388,7 +2534,7 @@ class MainApplicationUploadTests(TestCase):
         response = self.client.get(self.main_url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'data-proof-existing-name>personalausweis.png</span>')
+        self.assertContains(response, "data-proof-existing-name>personalausweis.png</span>")
         self.assertContains(response, f"({proof.file.size} B)")
 
     def test_applicant_can_save_an_incomplete_draft(self) -> None:

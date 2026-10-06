@@ -58,6 +58,7 @@
         const csrfToken = () => protocolForm?.querySelector("[name=csrfmiddlewaretoken]")?.value || "";
 
         const apartmentSelect = document.getElementById("id_wohnung");
+        let loadedApartmentId = apartmentSelect?.value || "";
         const updateApartmentDependentFields = async () => {
             if (!apartmentSelect) {
                 return false;
@@ -79,6 +80,10 @@
                 return false;
             }
             const updatedPage = new DOMParser().parseFromString(await response.text(), "text/html");
+            const apartmentChanged = loadedApartmentId !== apartmentSelect.value;
+            const meterValues = new Map(Array.from(document.querySelectorAll(
+                '#meter-reading-section input[name]:not(:disabled)',
+            )).map((field) => [field.name, field.value]));
             [
                 "id_person",
                 "meter-reading-section",
@@ -87,12 +92,23 @@
                 "room-formset-section",
                 "move-in-reference",
             ].forEach((id) => {
+                if (!apartmentChanged && ["key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
+                    return;
+                }
                 const currentElement = document.getElementById(id);
                 const updatedElement = updatedPage.getElementById(id);
                 if (currentElement && updatedElement) {
                     currentElement.replaceWith(updatedElement);
                 }
             });
+            document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
+                if (meterValues.has(field.name)) {
+                    field.value = meterValues.get(field.name);
+                }
+            });
+            loadedApartmentId = apartmentSelect.value;
+            document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
+            document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
             window.history.replaceState(null, "", url);
             return true;
         };
@@ -121,8 +137,26 @@
             if (!protocolType) {
                 return;
             }
+            // Repeated meter fields must retain their values when switching type.
+            const activeValues = new Map();
+            document.querySelectorAll("[data-protocol-types]").forEach((section) => {
+                if (!section.hidden) {
+                    section.querySelectorAll("input[name], select[name], textarea[name]").forEach((field) => {
+                        if (!field.disabled && field.type !== "checkbox") {
+                            activeValues.set(field.name, field.value);
+                        }
+                    });
+                }
+            });
             document.querySelectorAll("[data-protocol-types]").forEach((section) => {
                 section.hidden = !section.dataset.protocolTypes.split(" ").includes(protocolType.value);
+                section.querySelectorAll("input, select, textarea").forEach((field) => {
+                    if (activeValues.has(field.name)) {
+                        field.value = activeValues.get(field.name);
+                    }
+                    // Hidden required controls must neither block nor duplicate submission.
+                    field.disabled = section.hidden;
+                });
             });
         };
         if (protocolType) {
@@ -168,81 +202,6 @@
         });
         updateMeterDifferences();
 
-        const featureOptions = (container) => {
-            const selectedOption = container?.querySelector("[data-feature-name-select]")?.selectedOptions[0];
-            try {
-                const options = JSON.parse(selectedOption?.dataset.featureOptions || "[]");
-                return Array.from(new Set(options.filter((option) => typeof option === "string" && option.trim())))
-                    .map((option) => option.trim());
-            } catch (error) {
-                return [];
-            }
-        };
-
-        const storedAdditionalDetails = (input) => {
-            try {
-                const details = JSON.parse(input?.value || "{}");
-                return details && typeof details === "object" && !Array.isArray(details) ? details : {};
-            } catch (error) {
-                return {};
-            }
-        };
-
-        const renderAdditionalDetails = (container) => {
-            const detailsInput = container?.querySelector("[data-additional-details-value]");
-            const detailsContainer = container?.querySelector("[data-additional-details]");
-            if (!detailsInput || !detailsContainer) {
-                return;
-            }
-            const options = featureOptions(container);
-            const storedDetails = storedAdditionalDetails(detailsInput);
-            const details = Object.fromEntries(options
-                .filter((label) => typeof storedDetails[label] === "string" && storedDetails[label].trim())
-                .map((label) => [label, storedDetails[label].trim()]));
-            detailsInput.value = JSON.stringify(details);
-            detailsContainer.replaceChildren();
-            detailsContainer.hidden = options.length === 0;
-            if (!options.length) {
-                return;
-            }
-
-            const heading = document.createElement("h5");
-            heading.className = "uk-heading-bullet uk-margin-remove-bottom";
-            heading.textContent = "Zusätzliche Angaben";
-            detailsContainer.append(heading);
-            const hint = document.createElement("p");
-            hint.className = "uk-text-meta uk-margin-small-top";
-            hint.textContent = "Diese Angaben werden zusammen mit dem Prüfpunkt gespeichert.";
-            detailsContainer.append(hint);
-            const grid = document.createElement("div");
-            grid.className = "uk-child-width-1-2@m uk-grid-small";
-            grid.setAttribute("uk-grid", "");
-            options.forEach((label, index) => {
-                const field = document.createElement("div");
-                const inputId = `${detailsInput.id}-detail-${index}`;
-                const labelElement = document.createElement("label");
-                labelElement.className = "uk-form-label";
-                labelElement.htmlFor = inputId;
-                labelElement.textContent = label;
-                const input = document.createElement("input");
-                input.className = "uk-input";
-                input.id = inputId;
-                input.type = "text";
-                input.value = details[label] || "";
-                input.setAttribute("data-additional-detail", label);
-                input.addEventListener("input", () => {
-                    const currentDetails = Object.fromEntries(Array.from(
-                        detailsContainer.querySelectorAll("[data-additional-detail]"),
-                    ).map((fieldInput) => [fieldInput.dataset.additionalDetail, fieldInput.value.trim()])
-                        .filter(([, value]) => value));
-                    detailsInput.value = JSON.stringify(currentDetails);
-                });
-                field.append(labelElement, input);
-                grid.append(field);
-            });
-            detailsContainer.append(grid);
-        };
-
         const filterFeatureNames = (container) => {
             if (!container) {
                 return;
@@ -266,7 +225,6 @@
                 nameSelect.value = "";
             }
             nameSelect.disabled = !selectedArea;
-            renderAdditionalDetails(container);
         };
 
         document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
@@ -290,11 +248,12 @@
         document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
         document.addEventListener("change", (event) => {
             if (event.target.matches("[data-feature-area-select]")) {
+                event.target.closest("[data-room-checklist-form]").querySelector("[data-additional-details-value]").value = "{}";
                 filterFeatureNames(event.target.closest("[data-room-checklist-form]"));
                 saveDraft(true);
             }
             if (event.target.matches("[data-feature-name-select]")) {
-                renderAdditionalDetails(event.target.closest("[data-room-checklist-form]"));
+                event.target.closest("[data-room-checklist-form]").querySelector("[data-additional-details-value]").value = "{}";
                 saveDraft(true);
             }
             if (event.target.matches("[data-room-source]")) {
@@ -420,8 +379,10 @@
             "nachbesserung_bis",
             "nachbesserung_beschreibung",
         ];
-        const checklistFieldNames = ["bereich", "merkmal", "wert", "zusatzangaben"];
+        const checklistFieldNames = ["pruefpunkt", "bereich", "merkmal", "wert", "zusatzangaben", "DELETE"];
         const keyFieldNames = [
+            "schluessel",
+            "DELETE",
             "anzahl",
             "raum_bezeichnung",
             "aufschrift",
@@ -432,13 +393,15 @@
         ];
 
         const fieldForName = (container, fieldName) => (
-            container?.querySelector(`[name="${fieldName}"]`)
+            container?.querySelector(`[name="${fieldName}"]:not(:disabled)`)
+            || container?.querySelector(`[name$="-${fieldName}"]:not(:disabled)`)
+            || container?.querySelector(`[name="${fieldName}"]`)
             || container?.querySelector(`[name$="-${fieldName}"]`)
         );
         const serializeFields = (container, fieldNames) => Object.fromEntries(
             fieldNames.flatMap((fieldName) => {
                 const field = fieldForName(container, fieldName);
-                if (!field) {
+                if (!field || (field.name === "vermieter_name" && field.disabled)) {
                     return [];
                 }
                 return [[fieldName, {
@@ -450,7 +413,7 @@
         const restoreFields = (container, values) => {
             Object.entries(values || {}).forEach(([fieldName, state]) => {
                 const field = fieldForName(container, fieldName);
-                if (!field) {
+                if (!field || (field.name === "vermieter_name" && field.disabled)) {
                     return;
                 }
                 if (field.type === "checkbox") {
@@ -465,15 +428,12 @@
             savedAt: Date.now(),
             fields: serializeFields(protocolForm, protocolFieldNames),
             rooms: Array.from(document.querySelectorAll("[data-room-card]"))
-                .filter((card) => !card.hidden)
                 .map((card) => ({
                     raum: card.querySelector("[data-room-source]")?.value || "",
                     items: Array.from(card.querySelectorAll("[data-room-checklist-form]"))
-                        .filter((item) => !item.hidden)
                         .map((item) => serializeFields(item, checklistFieldNames)),
                 })),
             keys: Array.from(document.querySelectorAll("[data-key-formset-row]"))
-                .filter((card) => !card.hidden)
                 .map((card) => serializeFields(card, keyFieldNames)),
         });
         const showDraftStatus = (message) => {
@@ -555,23 +515,55 @@
             if (!totalForms || !target) {
                 return;
             }
-            target.innerHTML = "";
-            totalForms.value = "0";
             (rooms || []).forEach((savedRoom) => {
-                addRoom();
-                const card = target.lastElementChild;
+                let card = Array.from(target.querySelectorAll("[data-room-card]")).find((existing) => (
+                    existing.querySelector("[data-room-source]")?.value === savedRoom.raum
+                ));
+                if (!card) {
+                    card = Array.from(target.querySelectorAll("[data-room-card]")).find((existing) => (
+                        !existing.querySelector("[data-room-source]")?.value
+                    ));
+                }
+                if (!card) {
+                    addRoom();
+                    card = target.lastElementChild;
+                }
                 const roomInput = card?.querySelector("[data-room-source]");
                 if (roomInput) {
                     roomInput.value = savedRoom.raum || "";
                 }
                 const savedItems = savedRoom.items?.length ? savedRoom.items : [{}];
-                while (card?.querySelectorAll("[data-room-checklist-form]").length < savedItems.length) {
-                    addRoomChecklistItem(card);
-                }
-                card?.querySelectorAll("[data-room-checklist-form]").forEach((item, index) => {
-                    restoreFields(item, savedItems[index]);
+                const restored = new Set();
+                savedItems.forEach((savedItem) => {
+                    const id = savedItem.pruefpunkt?.value;
+                    const feature = savedItem.merkmal?.value;
+                    let item = Array.from(target.querySelectorAll("[data-room-checklist-form]")).find((existing) => (
+                        id && fieldForName(existing, "pruefpunkt")?.value === id
+                    ));
+                    if (!item) {
+                        item = Array.from(card.querySelectorAll("[data-room-checklist-form]")).find((existing) => (
+                            !restored.has(existing) && fieldForName(existing, "merkmal")?.value === feature
+                        ));
+                    }
+                    if (!item) {
+                        item = Array.from(card.querySelectorAll("[data-room-checklist-form]")).find((existing) => (
+                            !restored.has(existing) && !fieldForName(existing, "merkmal")?.value
+                            && !fieldForName(existing, "pruefpunkt")?.value
+                        ));
+                    }
+                    if (!item) {
+                        addRoomChecklistItem(card);
+                        item = card.querySelector("[data-room-checklist-items]").lastElementChild;
+                    }
+                    if (!card.contains(item)) {
+                        card.querySelector("[data-room-checklist-items]").append(item);
+                    }
+                    restored.add(item);
+                    restoreFields(item, savedItem);
+                    item.hidden = Boolean(savedItem.DELETE?.checked);
                     filterFeatureNames(item);
                 });
+                card.hidden = Array.from(card.querySelectorAll("[data-room-checklist-form]")).every((item) => item.hidden);
                 synchronizeRoomCard(card);
             });
         };
@@ -581,10 +573,26 @@
             if (!totalForms || !target) {
                 return;
             }
-            target.innerHTML = "";
-            totalForms.value = "0";
+            const restored = new Set();
             (keys || []).forEach((savedKey) => {
-                restoreFields(addKeyForm(), savedKey);
+                let card = Array.from(target.children).find((existing) => (
+                    savedKey.schluessel?.value && fieldForName(existing, "schluessel")?.value === savedKey.schluessel.value
+                ));
+                if (!card) {
+                    card = Array.from(target.children).find((existing) => (
+                        !restored.has(existing) && fieldForName(existing, "raum_bezeichnung")?.value === savedKey.raum_bezeichnung?.value
+                        && fieldForName(existing, "schluesselnummer")?.value === savedKey.schluesselnummer?.value
+                    ));
+                }
+                if (!card) {
+                    card = Array.from(target.children).find((existing) => (
+                        !restored.has(existing) && !fieldForName(existing, "raum_bezeichnung")?.value
+                    ));
+                }
+                card = card || addKeyForm();
+                restored.add(card);
+                restoreFields(card, savedKey);
+                card.hidden = Boolean(savedKey.DELETE?.checked);
             });
         };
         const restoreDraft = async (draft) => {
@@ -638,7 +646,7 @@
             showDraftStatus("Entwurf verworfen");
         };
 
-        protocolForm?.addEventListener("input", saveDraft);
+        protocolForm?.addEventListener("input", () => saveDraft());
         protocolForm?.addEventListener("change", () => saveDraft(true));
         protocolForm?.querySelectorAll("a[href]").forEach((link) => {
             link.addEventListener("click", () => saveDraft(true));

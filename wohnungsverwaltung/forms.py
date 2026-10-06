@@ -573,8 +573,7 @@ class MainApplicationForm(forms.Form):
             self.fields[field_name].widget.attrs["data-max-total-size"] = str(
                 max(
                     0,
-                    settings.MAIN_APPLICATION_MAX_REQUEST_SIZE
-                    - self.MULTIPART_OVERHEAD_RESERVE,
+                    settings.MAIN_APPLICATION_MAX_REQUEST_SIZE - self.MULTIPART_OVERHEAD_RESERVE,
                 )
             )
             self.fields[field_name].help_text = (
@@ -706,6 +705,81 @@ class MainApplicationForm(forms.Form):
         return self._clean_proof_files("credit_report_proof")
 
 
+class ApartmentSearchForm(forms.Form):
+    groesse_min = forms.DecimalField(
+        label="Wohnfläche ab (m²)",
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "uk-input", "min": "0", "step": "1"}),
+    )
+    groesse_max = forms.DecimalField(
+        label="Wohnfläche bis (m²)",
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "uk-input", "min": "0", "step": "1"}),
+    )
+    kaltmiete_min = forms.DecimalField(
+        label="Kaltmiete ab (€)",
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "uk-input", "min": "0", "step": "10"}),
+    )
+    kaltmiete_max = forms.DecimalField(
+        label="Kaltmiete bis (€)",
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "uk-input", "min": "0", "step": "10"}),
+    )
+    zimmer_min = forms.DecimalField(
+        label="Zimmer ab",
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "uk-input", "min": "0", "step": "0.5"}),
+    )
+    zimmer_max = forms.DecimalField(
+        label="Zimmer bis",
+        required=False,
+        min_value=0,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "uk-input", "min": "0", "step": "0.5"}),
+    )
+    etage = forms.ChoiceField(
+        label="Etage",
+        required=False,
+        choices=(("", "Alle Etagen"),),
+        widget=forms.Select(attrs={"class": "uk-select"}),
+    )
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        floors = Wohnung.objects.order_by("etage").values_list("etage", flat=True).distinct()
+        self.fields["etage"].choices = (("", "Alle Etagen"),) + tuple(
+            (str(floor), "Erdgeschoss" if floor == 0 else f"Etage {floor}") for floor in floors
+        )
+
+    def clean(self) -> dict[str, object]:
+        cleaned_data = super().clean()
+        ranges = (
+            ("groesse_min", "groesse_max"),
+            ("kaltmiete_min", "kaltmiete_max"),
+            ("zimmer_min", "zimmer_max"),
+        )
+        for minimum_field, maximum_field in ranges:
+            minimum = cleaned_data.get(minimum_field)
+            maximum = cleaned_data.get(maximum_field)
+            if minimum is not None and maximum is not None and minimum > maximum:
+                self.add_error(
+                    maximum_field,
+                    "Der Höchstwert muss mindestens dem Mindestwert entsprechen.",
+                )
+        return cleaned_data
+
+
 class HandoverProtocolForm(forms.ModelForm):
     vermieter_name = forms.ChoiceField(
         label="Anwesend für den Vermieter",
@@ -779,11 +853,13 @@ class HandoverProtocolForm(forms.ModelForm):
             ),
             "kaution_nachweis_vorhanden": forms.CheckboxInput(attrs={"class": "uk-checkbox"}),
             "erste_miete_nachweis_vorhanden": forms.CheckboxInput(attrs={"class": "uk-checkbox"}),
-            "nachbesserung_bis": forms.DateInput(attrs={"class": "uk-input", "type": "date"}),
+            "nachbesserung_bis": forms.DateInput(
+                attrs={"class": "uk-input", "type": "date"}, format="%Y-%m-%d"
+            ),
             "nachbesserung_beschreibung": forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
         }
 
-    def __init__(self, *args, wohnung_id: str | None = None, **kwargs) -> None:
+    def __init__(self, *args, wohnung_id: str | None = None, employee=None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.fields["wohnung"].queryset = Wohnung.objects.order_by(
             "gebaeudenummer", "wohnungsnummer"
@@ -809,6 +885,15 @@ class HandoverProtocolForm(forms.ModelForm):
                 )
             ],
         ]
+        if employee is not None:
+            from .handover_export import employee_name
+
+            name = employee_name(employee)
+            self.fields["vermieter_name"].choices = [(name, name)] if name else [("", "Name fehlt")]
+            self.fields["vermieter_name"].disabled = True
+            self.fields["vermieter_name"].label = "Vertretung des Unternehmens"
+            self.initial["vermieter_name"] = name
+            self.fields["vermieter_name"].help_text = "Diese Person unterschreibt das Protokoll."
         self.fields["mieter_zukuenftige_anschrift"].required = False
         self.fields["protokoll_typ"].choices = HANDOVER_TYPE_LABELS.items()
         self.fields["uebergabe_status"].choices = HANDOVER_STATUS_LABELS.items()
@@ -1144,6 +1229,23 @@ class RoomChecklistPhotoUploadForm(forms.Form):
 
 
 class HandoverKeyForm(forms.ModelForm):
+    schluessel = forms.ModelChoiceField(
+        queryset=ProtokollSchluessel.objects.none(), required=False, widget=forms.HiddenInput
+    )
+
+    def __init__(self, *args, protocol=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if protocol is not None:
+            self.fields["schluessel"].queryset = protocol.protokoll_schluessel.all()
+            try:
+                existing = (
+                    self.fields["schluessel"].queryset.filter(pk=self["schluessel"].value()).first()
+                )
+            except (ValueError, ValidationError):
+                existing = None
+            if existing is not None:
+                self.instance = existing
+
     class Meta:
         model = ProtokollSchluessel
         fields = [
@@ -1171,7 +1273,9 @@ class HandoverKeyForm(forms.ModelForm):
             "schluesselnummer": forms.TextInput(attrs={"class": "uk-input"}),
             "fehlt": forms.CheckboxInput(attrs={"class": "uk-checkbox"}),
             "fehlgrund": forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
-            "nachlieferung_am": forms.DateInput(attrs={"class": "uk-input", "type": "date"}),
+            "nachlieferung_am": forms.DateInput(
+                attrs={"class": "uk-input", "type": "date"}, format="%Y-%m-%d"
+            ),
         }
 
     def clean(self) -> dict:
@@ -1197,6 +1301,9 @@ class ProtocolConfirmationForm(forms.Form):
 
 
 class InlineRoomChecklistForm(forms.Form):
+    pruefpunkt = forms.ModelChoiceField(
+        queryset=RaumMerkmal.objects.none(), required=False, widget=forms.HiddenInput
+    )
     raum = forms.ModelChoiceField(
         queryset=Raum.objects.none(),
         label="Raum",
@@ -1241,10 +1348,23 @@ class InlineRoomChecklistForm(forms.Form):
         *args,
         wohnung_id: UUID | None = None,
         allow_photo_upload: bool = False,
+        protocol=None,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.allow_photo_upload = allow_photo_upload
+        self.protocol = protocol
+        self.existing_item = None
+        if protocol is not None:
+            self.fields["pruefpunkt"].queryset = RaumMerkmal.objects.filter(
+                raumprotokoll__protokoll=protocol
+            ).prefetch_related("fotos")
+            try:
+                self.existing_item = (
+                    self.fields["pruefpunkt"].queryset.filter(pk=self["pruefpunkt"].value()).first()
+                )
+            except (ValueError, ValidationError):
+                pass
         if wohnung_id is not None:
             self.fields["raum"].queryset = Raum.objects.filter(wohnung_id=wohnung_id).order_by(
                 "name"
@@ -1262,6 +1382,8 @@ class InlineRoomChecklistForm(forms.Form):
             "wert": cleaned_data.get("wert", "").strip(),
         }
         if not any((values["bereich"], values["merkmal"], values["wert"])):
+            if cleaned_data.get("pruefpunkt"):
+                self.add_error("wert", "Bitte vervollständigen Sie den vorhandenen Prüfpunkt.")
             if photos:
                 self.add_error("fotos", "Bitte erfassen Sie den zugehörigen Prüfpunkt vollständig.")
             return cleaned_data
@@ -1280,7 +1402,25 @@ class InlineRoomChecklistForm(forms.Form):
             self.add_error("zusatzangaben", error)
         if photos and not self.allow_photo_upload:
             self.add_error("fotos", "Nur die Verwaltung darf Fotos hochladen.")
-        if len(photos) > settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM:
+        existing = cleaned_data.get("pruefpunkt")
+        if existing is None and self.protocol and values["raum"] and feature:
+            existing = (
+                self.fields["pruefpunkt"]
+                .queryset.filter(raumprotokoll__raum=values["raum"], merkmal=feature)
+                .first()
+            )
+        if existing and not cleaned_data.get("DELETE") and not values["wert"]:
+            self.add_error("wert", "Ein vorhandener Prüfpunkt darf nicht leer gespeichert werden.")
+        if existing and values["raum"] and feature:
+            collision = (
+                self.fields["pruefpunkt"]
+                .queryset.filter(raumprotokoll__raum=values["raum"], merkmal=feature)
+                .exclude(pk=existing.pk)
+            )
+            if collision.exists():
+                self.add_error("merkmal", "Dieser Prüfpunkt ist in diesem Raum bereits erfasst.")
+        existing_count = existing.fotos.count() if existing else 0
+        if existing_count + len(photos) > settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM:
             maximum = settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM
             self.add_error("fotos", f"Für einen Prüfpunkt sind höchstens {maximum} Fotos erlaubt.")
         return cleaned_data
@@ -1295,18 +1435,29 @@ class InlineRoomChecklistForm(forms.Form):
             raum=raum,
             defaults={"name": raum.name},
         )
-        checklist_item = RaumMerkmal.objects.create(
-            raumprotokoll=room,
-            merkmal=self.cleaned_data["merkmal"],
-            wert=_finding_value(self.cleaned_data["wert"], self.cleaned_data["zusatzangaben"]),
-        )
+        values = {
+            "wert": _finding_value(self.cleaned_data["wert"], self.cleaned_data["zusatzangaben"])
+        }
+        checklist_item = self.cleaned_data.get("pruefpunkt")
+        if checklist_item is not None:
+            checklist_item.raumprotokoll = room
+            checklist_item.merkmal = self.cleaned_data["merkmal"]
+            checklist_item.wert = values["wert"]
+            checklist_item.save()
+        else:
+            checklist_item, _ = RaumMerkmal.objects.update_or_create(
+                raumprotokoll=room, merkmal=self.cleaned_data["merkmal"], defaults=values
+            )
         for photo in self.cleaned_data["fotos"]:
+            checksum = calculate_photo_checksum(photo)
+            if checklist_item.fotos.filter(inhalt_hash_sha256=checksum).exists():
+                continue
             RaumMerkmalFoto.objects.create(
                 raum_merkmal=checklist_item,
                 datei=photo,
                 content_type=verified_photo_content_type(photo),
                 dateigroesse=photo.size,
-                inhalt_hash_sha256=calculate_photo_checksum(photo),
+                inhalt_hash_sha256=checksum,
             )
         return checklist_item
 
@@ -1334,7 +1485,13 @@ class RoomChecklistFormSet(BaseFormSet):
             checklist_entries.append(room_form)
 
         seen_checkpoints = set()
+        seen_items = set()
         for room_form in checklist_entries:
+            existing = room_form.cleaned_data.get("pruefpunkt")
+            if existing is not None:
+                if existing.pk in seen_items:
+                    room_form.add_error("pruefpunkt", "Der Prüfpunkt wurde mehrfach übertragen.")
+                seen_items.add(existing.pk)
             checkpoint = (
                 room_form.cleaned_data["raum"].pk,
                 room_form.cleaned_data["merkmal"].pk,
@@ -1392,7 +1549,6 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "kaltmiete",
             "warmmiete",
             "kaution",
-            "barrierefrei",
             "status",
             "zaehlernummer_wasser_kalt",
             "zaehlernummer_wasser_warm",
@@ -1408,7 +1564,6 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "kaltmiete": "Kaltmiete (€)",
             "warmmiete": "Warmmiete (€)",
             "kaution": "Kaution (€)",
-            "barrierefrei": "Barrierefrei",
             "zaehlernummer_wasser_kalt": "Zählernummer Kaltwasser",
             "zaehlernummer_wasser_warm": "Zählernummer Warmwasser",
             "zaehlernummer_heizung": "Zählernummer Heizung",
