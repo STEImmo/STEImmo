@@ -1,4 +1,5 @@
 import json
+import unicodedata
 import warnings
 from uuid import UUID
 
@@ -573,10 +574,36 @@ class MainApplicationForm(forms.Form):
             raise forms.ValidationError("Bitte wählen Sie eine gültige Aktion.")
         cleaned_data["action"] = action
 
+        existing_names = {
+            self._normalized_file_name(name)
+            for name in self.instance.proof_files.values_list("original_name", flat=True)
+        }
+        for _category, field_name, _label in self.PROOF_FIELDS:
+            if getattr(self.instance, field_name):
+                legacy_name = getattr(self.instance, f"{field_name}_original_name", "")
+                if legacy_name:
+                    existing_names.add(self._normalized_file_name(legacy_name))
+
+        submitted_names = set()
         for category, field_name, _label in self.PROOF_FIELDS:
             existing_count = int(bool(getattr(self.instance, field_name)))
             existing_count += self.instance.proof_files.filter(category=category).count()
-            uploaded_count = len(cleaned_data.get(field_name) or [])
+            uploads = cleaned_data.get(field_name) or []
+            uploaded_count = len(uploads)
+
+            has_duplicate_name = False
+            for upload in uploads:
+                normalized_name = self._normalized_file_name(upload.name)
+                if normalized_name in existing_names or normalized_name in submitted_names:
+                    has_duplicate_name = True
+                submitted_names.add(normalized_name)
+
+            if has_duplicate_name:
+                self.add_error(
+                    field_name,
+                    "Eine Datei mit dieser Bezeichnung wird bereits in dieser Main-Bewerbung "
+                    "verwendet. Bitte benennen Sie sie um.",
+                )
 
             if existing_count + uploaded_count > self.MAX_FILES_PER_CATEGORY:
                 self.add_error(
@@ -606,6 +633,10 @@ class MainApplicationForm(forms.Form):
         display_name = filename.replace("\\", "/").rsplit("/", 1)[-1]
         display_name = "".join(character for character in display_name if character.isprintable())
         return display_name.strip()[:255] or "Datei"
+
+    @classmethod
+    def _normalized_file_name(cls, filename: str) -> str:
+        return unicodedata.normalize("NFKC", cls._display_filename(filename)).casefold()
 
     def _clean_proof(self, upload):
         if upload.size > settings.MAIN_APPLICATION_PROOF_MAX_SIZE:

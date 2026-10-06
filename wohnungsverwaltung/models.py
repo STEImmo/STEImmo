@@ -445,7 +445,7 @@ class Bewerbung(models.Model):
         if self.status == BewerbungStatus.BLOCKED:
             return "Die Bewerbung ist derzeit gesperrt."
         if self.submitted_at is not None:
-            return "Sie können Ihre Nachweise bis zum Ende der Freigabe korrigieren."
+            return "Bitte warten Sie auf die Rückmeldung des Mitarbeiters."
         if self.main_application_unlocked:
             return "Bitte reichen Sie die Main-Bewerbung mit allen drei Nachweisen ein."
         return "Warten Sie auf die nächste Rückmeldung zu Ihrer Bewerbung."

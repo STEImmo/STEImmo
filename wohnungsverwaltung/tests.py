@@ -2466,6 +2466,8 @@ class MainApplicationUploadTests(TestCase):
         self.assertEqual(page_response.status_code, 200)
         self.assertNotContains(page_response, 'type="file"')
         self.assertContains(page_response, "nicht mehr geändert werden")
+        self.assertContains(page_response, "Bitte warten Sie auf die Rückmeldung des Mitarbeiters.")
+        self.assertNotContains(page_response, "Nachweise bis zum Ende der Freigabe korrigieren")
         self.assertEqual(upload_response.status_code, 403)
         self.assertEqual(remove_response.status_code, 403)
         self.assertEqual(
@@ -2519,6 +2521,50 @@ class MainApplicationUploadTests(TestCase):
             set(income_proofs.values_list("original_name", flat=True)),
             {"gehalt-januar.pdf", "gehalt-februar.pdf"},
         )
+
+    def test_applicant_cannot_upload_a_filename_already_used_on_the_application(self) -> None:
+        first_response = self.applicant_post(
+            {"action": "save_draft", "identity_proof": self.png_upload("Ausweis.png")}
+        )
+        self.assertRedirects(first_response, self.main_url)
+
+        duplicate_response = self.applicant_post(
+            {"action": "save_draft", "identity_proof": self.png_upload("ausweis.PNG")}
+        )
+
+        self.assertEqual(duplicate_response.status_code, 200)
+        self.assertIn("identity_proof", duplicate_response.context["form"].errors)
+        self.assertContains(duplicate_response, "bereits in dieser Main-Bewerbung verwendet")
+        self.assertContains(duplicate_response, "wird dabei nicht unterschieden.")
+        self.assertEqual(ApplicationProof.objects.filter(application=self.application).count(), 1)
+
+    def test_applicant_cannot_upload_duplicate_filenames_in_one_submission(self) -> None:
+        response = self.applicant_post(
+            {
+                "action": "save_draft",
+                "income_proof": [
+                    self.pdf_upload("gehalt.pdf"),
+                    self.pdf_upload("GEHALT.PDF"),
+                ],
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("income_proof", response.context["form"].errors)
+        self.assertEqual(ApplicationProof.objects.filter(application=self.application).count(), 0)
+
+    def test_applicant_cannot_reuse_a_filename_in_another_proof_category(self) -> None:
+        response = self.applicant_post(
+            {
+                "action": "save_draft",
+                "identity_proof": self.pdf_upload("scan.pdf"),
+                "credit_report_proof": self.pdf_upload("SCAN.PDF"),
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("credit_report_proof", response.context["form"].errors)
+        self.assertEqual(ApplicationProof.objects.filter(application=self.application).count(), 0)
 
     def test_invalid_or_tampered_file_contents_are_rejected(self) -> None:
         data = self.complete_upload_data()
