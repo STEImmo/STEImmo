@@ -74,6 +74,9 @@ class MainApplicationProofUploadHandler(FileUploadHandler):
 
         return raw_data
 
+    def file_complete(self, file_size: int):
+        return None
+
 
 class MainApplicationUploadLimitMiddleware:
     """Reject declared oversized requests before CSRF or form parsing starts."""

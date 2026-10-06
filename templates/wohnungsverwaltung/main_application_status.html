@@ -18,7 +18,7 @@
             {% if application.submitted_at %}
                 <p class="uk-text-meta">
                     Eingereicht am {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr.
-                    Sie können Ihre Nachweise ändern, solange die Bewerbung freigeschaltet ist.
+                    Die Einreichung ist abgeschlossen und kann nicht mehr geändert werden.
                 </p>
             {% endif %}
             <a class="uk-button uk-button-danger uk-margin-small-top"
@@ -35,28 +35,42 @@
                 gilt ein Gesamtlimit von 25 MiB.
             </p>
             {% if application.submitted_at %}
-                <p class="uk-text-meta">
-                    Nach der Einreichung muss pro Kategorie mindestens eine Datei vorhanden sein.
-                    Fügen Sie zum Ersetzen erst eine neue Datei hinzu.
-                </p>
+                <p class="uk-text-meta">Ihre eingereichten Nachweise können Sie hier ansehen.</p>
+                {% for group in proof_groups %}
+                    <h3 class="uk-h4">{{ group.label }}</h3>
+                    {% if group.documents %}
+                        <ul class="uk-list uk-list-divider">
+                            {% for document in group.documents %}
+                                <li class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
+                                    <span>{{ document.name }}</span>
+                                    <a class="uk-button uk-button-default uk-button-small"
+                                       href="{{ document.download_url }}">
+                                        Herunterladen / ansehen
+                                    </a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="uk-text-danger">Kein Nachweis vorhanden</p>
+                    {% endif %}
+                {% endfor %}
             {% else %}
                 <p class="uk-text-meta">
                     Bereits gespeicherte Dateien stehen direkt unter dem jeweiligen Uploadfeld.
                 </p>
-            {% endif %}
-            {% for group in proof_groups %}
-                {% for document in group.documents %}
-                    {% if document.can_remove %}
-                        <form id="remove-proof-{{ forloop.parentloop.counter }}-{{ forloop.counter }}"
-                              method="post"
-                              onsubmit="return confirm('Diesen Nachweis endgültig entfernen?');">
-                            {% csrf_token %}
-                            <input type="hidden" name="remove_proof" value="{{ document.delete_id }}">
-                        </form>
-                    {% endif %}
+                {% for group in proof_groups %}
+                    {% for document in group.documents %}
+                        {% if document.can_remove %}
+                            <form id="remove-proof-{{ forloop.parentloop.counter }}-{{ forloop.counter }}"
+                                  method="post"
+                                  onsubmit="return confirm('Diesen Nachweis endgültig entfernen?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="remove_proof" value="{{ document.delete_id }}">
+                            </form>
+                        {% endif %}
+                    {% endfor %}
                 {% endfor %}
-            {% endfor %}
-            <form method="post" enctype="multipart/form-data" novalidate>
+                <form method="post" enctype="multipart/form-data" novalidate>
                 {% csrf_token %}
                 {{ form.action }}
                 {% if form.non_field_errors %}
@@ -143,7 +157,8 @@
                         </button>
                     </div>
                 </div>
-            </form>
+                </form>
+            {% endif %}
         </article>
     </div>
 </section>

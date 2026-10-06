@@ -253,10 +253,6 @@ def _application_proof_groups(
                 }
             )
 
-        can_remove_submitted_files = application.submitted_at is not None and len(documents) > 1
-        if can_remove_submitted_files:
-            for document in documents:
-                document["can_remove"] = True
         groups.append(
             {
                 "field_name": legacy_field,
@@ -371,6 +367,9 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
         ),
         pk=application_id,
     )
+
+    if request.method == "POST" and application.submitted_at is not None:
+        raise PermissionDenied("Eine eingereichte Main-Bewerbung kann nicht mehr geändert werden.")
 
     proof_groups = _application_proof_groups(application)
     if request.method == "POST":
