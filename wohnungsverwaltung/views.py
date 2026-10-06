@@ -1,10 +1,11 @@
 import json
+import logging
 from uuid import UUID
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import IntegrityError, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from django.http import (
     FileResponse,
@@ -32,6 +33,7 @@ from .forms import (
     HANDOVER_TYPE_LABELS,
     METER_READING_FIELDS,
     ApartmentSearchForm,
+    ApplicationProofStorageError,
     BewerbungForm,
     HandoverKeyForm,
     HandoverKeyFormSet,
@@ -81,6 +83,7 @@ PROTOCOL_STATUS_LABELS = {
     ProtokollStatus.SIGNED: "Bestätigt",
     ProtokollStatus.BLOCKED: "Gesperrt",
 }
+logger = logging.getLogger(__name__)
 
 DRAFT_MAXIMUM_SIZE = 512_000
 APPLICATION_PROOF_GROUPS = (
@@ -418,55 +421,110 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
         return HttpResponseNotAllowed(["GET", "POST"])
 
     applicant = _applicant_for_user(request)
-    application = get_object_or_404(
-        Bewerbung.objects.select_related("wohnung").filter(
-            person=applicant,
-            status=BewerbungStatus.OPEN,
-            interest_withdrawn_at__isnull=True,
-            main_application_unlocked=True,
-        ),
-        pk=application_id,
+    eligible_applications = Bewerbung.objects.filter(
+        person=applicant,
+        status=BewerbungStatus.OPEN,
+        interest_withdrawn_at__isnull=True,
+        main_application_unlocked=True,
     )
 
-    if request.method == "POST" and application.submitted_at is not None:
-        raise PermissionDenied("Eine eingereichte Main-Bewerbung kann nicht mehr geändert werden.")
-
-    proof_groups = _application_proof_groups(application)
-    if request.method == "POST":
+    if request.method == "GET":
+        application = get_object_or_404(
+            eligible_applications.select_related("wohnung"),
+            pk=application_id,
+        )
+        form = MainApplicationForm(instance=application)
+    else:
         post_data = request.POST
         uploaded_files = request.FILES
         upload_error = getattr(request, "_main_application_upload_error", None)
-        if upload_error:
-            return upload_too_large_response(upload_error)
+        form = None
+        application = None
+        action = None
+        form_is_valid = False
 
-        if "remove_proof" in post_data:
-            return _remove_application_proof(request, application, application_id)
-
-        form = MainApplicationForm(
-            post_data,
-            uploaded_files,
-            instance=application,
-        )
-        if form.is_valid():
-            action = form.cleaned_data["action"]
+        try:
             with transaction.atomic():
-                form.save_uploaded_proofs()
-                if action == "submit" and application.submitted_at is None:
-                    application.submitted_at = timezone.now()
-                    application.save(update_fields=("submitted_at", "updated_at"))
-                else:
-                    application.save(update_fields=("updated_at",))
+                # All mutations of this application serialize on the same row. Recheck
+                # access and submission state only after acquiring the lock.
+                application = get_object_or_404(
+                    eligible_applications.select_for_update(),
+                    pk=application_id,
+                )
+                if application.submitted_at is not None:
+                    raise PermissionDenied(
+                        "Eine eingereichte Main-Bewerbung kann nicht mehr geändert werden."
+                    )
+                if upload_error:
+                    return upload_too_large_response(upload_error)
+                if "remove_proof" in post_data:
+                    return _remove_application_proof(request, application, application_id)
 
-            if action == "submit":
-                messages.success(request, "Ihre Main-Bewerbung wurde erfolgreich eingereicht.")
-            else:
-                messages.success(request, "Ihr Entwurf wurde gespeichert.")
-            return redirect(
-                "wohnungsverwaltung:main_application_status",
-                application_id=application.pk,
+                form = MainApplicationForm(
+                    post_data,
+                    uploaded_files,
+                    instance=application,
+                )
+                form_is_valid = form.is_valid()
+                if form_is_valid:
+                    action = form.cleaned_data["action"]
+                    form.save_uploaded_proofs()
+                    if action == "submit":
+                        application.submitted_at = timezone.now()
+                        application.save(update_fields=("submitted_at", "updated_at"))
+                    else:
+                        application.save(update_fields=("updated_at",))
+        except (ApplicationProofStorageError, DatabaseError) as error:
+            if form is None or application is None:
+                raise
+
+            cleanup_failures = form.cleanup_stored_proof_files()
+            if cleanup_failures:
+                logger.error(
+                    "Cleanup failed for %d main application proof file(s).",
+                    len(cleanup_failures),
+                )
+            logger.error(
+                "Main application proof persistence failed (%s).",
+                type(error).__name__,
             )
-    else:
-        form = MainApplicationForm(instance=application)
+            application.refresh_from_db()
+            form.instance = application
+            form.add_error(
+                None,
+                "Dateien konnten nicht sicher gespeichert werden. Bitte versuchen Sie es erneut.",
+            )
+            return render(
+                request,
+                "wohnungsverwaltung/main_application_status.html",
+                {
+                    "application": application,
+                    "form": form,
+                    "proof_groups": _application_proof_groups(application),
+                },
+            )
+
+        if not form_is_valid:
+            return render(
+                request,
+                "wohnungsverwaltung/main_application_status.html",
+                {
+                    "application": application,
+                    "form": form,
+                    "proof_groups": _application_proof_groups(application),
+                },
+            )
+
+        if action == "submit":
+            messages.success(request, "Ihre Main-Bewerbung wurde erfolgreich eingereicht.")
+        else:
+            messages.success(request, "Ihr Entwurf wurde gespeichert.")
+        return redirect(
+            "wohnungsverwaltung:main_application_status",
+            application_id=application.pk,
+        )
+
+    proof_groups = _application_proof_groups(application)
 
     return render(
         request,

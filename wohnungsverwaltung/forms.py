@@ -527,6 +527,10 @@ class MultipleFileField(forms.FileField):
         return cleaned_uploads
 
 
+class ApplicationProofStorageError(Exception):
+    """Raised when an uploaded proof cannot be written to private storage."""
+
+
 class MainApplicationForm(forms.Form):
     MAX_FILES_PER_CATEGORY = 10
     MULTIPART_OVERHEAD_RESERVE = 64 * 1024
@@ -561,6 +565,7 @@ class MainApplicationForm(forms.Form):
 
     def __init__(self, *args, instance: Bewerbung, **kwargs):
         self.instance = instance
+        self.stored_proof_files = []
         super().__init__(*args, **kwargs)
         for _category, field_name, label in self.PROOF_FIELDS:
             self.fields[field_name].widget.attrs["data-proof-upload-input"] = ""
@@ -636,12 +641,43 @@ class MainApplicationForm(forms.Form):
     def save_uploaded_proofs(self) -> None:
         for category, field_name, _label in self.PROOF_FIELDS:
             for upload in self.cleaned_data.get(field_name, []):
-                ApplicationProof.objects.create(
+                proof = ApplicationProof(
                     application=self.instance,
                     category=category,
-                    file=upload,
                     original_name=self._display_filename(upload.name),
                 )
+                file_field = proof._meta.get_field("file")
+                storage = proof.file.storage
+                try:
+                    stored_name = file_field.generate_filename(proof, upload.name)
+                    while storage.exists(stored_name):
+                        stored_name = file_field.generate_filename(proof, upload.name)
+
+                    # Track the unique candidate before writing: storage backends can raise
+                    # after creating the object, in which case no name is returned.
+                    self.stored_proof_files.append((storage, stored_name))
+                    saved_name = storage.save(
+                        stored_name,
+                        upload,
+                        max_length=file_field.max_length,
+                    )
+                except Exception as error:
+                    raise ApplicationProofStorageError from error
+
+                if saved_name != stored_name:
+                    self.stored_proof_files.append((storage, saved_name))
+                proof.file.name = saved_name
+                proof.save()
+
+    def cleanup_stored_proof_files(self) -> list[str]:
+        failures = []
+        for storage, stored_name in reversed(self.stored_proof_files):
+            try:
+                storage.delete(stored_name)
+            except Exception as error:
+                failures.append(type(error).__name__)
+        self.stored_proof_files.clear()
+        return failures
 
     @staticmethod
     def _display_filename(filename: str) -> str:

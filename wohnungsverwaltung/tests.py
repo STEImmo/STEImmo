@@ -1,22 +1,32 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from decimal import Decimal
 from io import BytesIO, StringIO
+from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Event
+from unittest import mock
 
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.db import IntegrityError, connection, transaction
+from django.db import IntegrityError, close_old_connections, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
-from django.test import Client, TestCase, TransactionTestCase
+from django.test import Client, TestCase, TransactionTestCase, skipUnlessDBFeature
 from django.urls import reverse
 from PIL import Image
 
+from . import views as application_views
 from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
-from .forms import BewerbungForm, InlineRoomChecklistFormSet, RoomChecklistItemForm
+from .forms import (
+    BewerbungForm,
+    InlineRoomChecklistFormSet,
+    MainApplicationForm,
+    RoomChecklistItemForm,
+)
 from .models import (
     AbnahmeStatus,
     ApplicationProof,
@@ -2618,6 +2628,38 @@ class MainApplicationUploadTests(TestCase):
         self.application.refresh_from_db()
         self.assertIsNone(self.application.submitted_at)
 
+    def test_storage_failure_cleans_up_files_written_by_the_same_request(self) -> None:
+        storage = ApplicationProof._meta.get_field("file").storage
+        original_save = storage.save
+        save_count = 0
+
+        def save_then_fail_on_second_file(name, content, max_length=None):
+            nonlocal save_count
+            save_count += 1
+            stored_name = original_save(name, content, max_length=max_length)
+            if save_count == 2:
+                raise OSError("simulated storage failure")
+            return stored_name
+
+        with mock.patch.object(storage, "save", side_effect=save_then_fail_on_second_file):
+            response = self.applicant_post(
+                {
+                    "action": "save_draft",
+                    "identity_proof": [
+                        self.png_upload("erster-nachweis.png"),
+                        self.pdf_upload("zweiter-nachweis.pdf"),
+                    ],
+                }
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dateien konnten nicht sicher gespeichert werden.")
+        self.assertEqual(ApplicationProof.objects.filter(application=self.application).count(), 0)
+        stored_files = [
+            path for path in Path(self.media_directory.name).rglob("*") if path.is_file()
+        ]
+        self.assertEqual(stored_files, [])
+
     def test_submitted_main_application_is_read_only_for_applicant(self) -> None:
         self.applicant_post(self.complete_upload_data())
         proof = ApplicationProof.objects.get(
@@ -2944,6 +2986,169 @@ class MainApplicationUploadTests(TestCase):
 
         self.assertContains(list_response, "Zurückgezogen")
         self.assertEqual(download_response.status_code, 200)
+
+
+class MainApplicationMutationLockTests(TransactionTestCase):
+    def setUp(self) -> None:
+        self.media_directory = TemporaryDirectory()
+        self.addCleanup(self.media_directory.cleanup)
+        media_settings = self.settings(MEDIA_ROOT=self.media_directory.name)
+        media_settings.enable()
+        self.addCleanup(media_settings.disable)
+
+        self.applicant_user = get_user_model().objects.create_user(
+            username="lock-test@example.test",
+            email="lock-test@example.test",
+            password="FjordTanne!4826",
+        )
+        self.applicant_user.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+        self.applicant = Person.objects.create(
+            user=self.applicant_user,
+            vorname="Lock",
+            nachname="Test",
+            email="lock-test@example.test",
+        )
+        unit = Wohnung.objects.create(
+            etage=5,
+            wohnungsnummer="5.01",
+            gebaeudenummer="1",
+            status=WohnungStatus.FREE,
+        )
+        self.application = Bewerbung.objects.create(
+            person=self.applicant,
+            wohnung=unit,
+            personenanzahl=1,
+            ueber_mich="Parallelzugriff testen.",
+            main_application_unlocked=True,
+        )
+        self.main_url = reverse(
+            "wohnungsverwaltung:main_application_status", args=[self.application.pk]
+        )
+        self.identity_proof = ApplicationProof.objects.create(
+            application=self.application,
+            category=ApplicationProofCategory.IDENTITY,
+            file=MainApplicationUploadTests.png_upload("identitaet.png"),
+            original_name="identitaet.png",
+        )
+        ApplicationProof.objects.create(
+            application=self.application,
+            category=ApplicationProofCategory.INCOME,
+            file=MainApplicationUploadTests.pdf_upload("gehalt.pdf"),
+            original_name="gehalt.pdf",
+        )
+        ApplicationProof.objects.create(
+            application=self.application,
+            category=ApplicationProofCategory.CREDIT_REPORT,
+            file=MainApplicationUploadTests.pdf_upload("schufa.pdf"),
+            original_name="schufa.pdf",
+        )
+
+    def post_in_thread(self, data, lock_requested=None):
+        close_old_connections()
+        client = Client()
+        client.force_login(self.applicant_user)
+
+        def observe_lock(execute, sql, params, many, context):
+            if "FOR UPDATE" in sql.upper() and lock_requested is not None:
+                lock_requested.set()
+            return execute(sql, params, many, context)
+
+        try:
+            with connection.execute_wrapper(observe_lock):
+                return client.post(self.main_url, data)
+        finally:
+            close_old_connections()
+
+    @skipUnlessDBFeature("has_select_for_update")
+    def test_upload_and_removal_wait_until_submission_commits(self) -> None:
+        submission_is_saving = Event()
+        allow_submission_to_finish = Event()
+        upload_lock_requested = Event()
+        removal_lock_requested = Event()
+        original_save = MainApplicationForm.save_uploaded_proofs
+
+        def pause_submission(form):
+            submission_is_saving.set()
+            if not allow_submission_to_finish.wait(timeout=10):
+                raise TimeoutError("submission test synchronization timed out")
+            return original_save(form)
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            with mock.patch(
+                "wohnungsverwaltung.views.MainApplicationForm.save_uploaded_proofs",
+                new=pause_submission,
+            ):
+                try:
+                    submission = executor.submit(self.post_in_thread, {"action": "submit"})
+                    self.assertTrue(submission_is_saving.wait(timeout=5))
+                    upload = executor.submit(
+                        self.post_in_thread,
+                        {
+                            "action": "save_draft",
+                            "identity_proof": MainApplicationUploadTests.png_upload("nachtrag.png"),
+                        },
+                        upload_lock_requested,
+                    )
+                    removal = executor.submit(
+                        self.post_in_thread,
+                        {"remove_proof": str(self.identity_proof.pk)},
+                        removal_lock_requested,
+                    )
+                    self.assertTrue(upload_lock_requested.wait(timeout=5))
+                    self.assertTrue(removal_lock_requested.wait(timeout=5))
+                finally:
+                    allow_submission_to_finish.set()
+
+                self.assertEqual(submission.result(timeout=10).status_code, 302)
+                self.assertEqual(upload.result(timeout=10).status_code, 403)
+                self.assertEqual(removal.result(timeout=10).status_code, 403)
+
+        self.application.refresh_from_db()
+        self.assertIsNotNone(self.application.submitted_at)
+        self.assertTrue(ApplicationProof.objects.filter(pk=self.identity_proof.pk).exists())
+        self.assertEqual(ApplicationProof.objects.filter(application=self.application).count(), 3)
+
+    @skipUnlessDBFeature("has_select_for_update")
+    def test_submission_checks_required_proofs_after_concurrent_removal(self) -> None:
+        removal_is_saving = Event()
+        allow_removal_to_finish = Event()
+        submission_lock_requested = Event()
+        original_remove = application_views._remove_application_proof
+
+        def pause_removal(request, application, application_id):
+            removal_is_saving.set()
+            if not allow_removal_to_finish.wait(timeout=10):
+                raise TimeoutError("removal test synchronization timed out")
+            return original_remove(request, application, application_id)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            with mock.patch(
+                "wohnungsverwaltung.views._remove_application_proof",
+                new=pause_removal,
+            ):
+                try:
+                    removal = executor.submit(
+                        self.post_in_thread,
+                        {"remove_proof": str(self.identity_proof.pk)},
+                    )
+                    self.assertTrue(removal_is_saving.wait(timeout=5))
+                    submission = executor.submit(
+                        self.post_in_thread,
+                        {"action": "submit"},
+                        submission_lock_requested,
+                    )
+                    self.assertTrue(submission_lock_requested.wait(timeout=5))
+                finally:
+                    allow_removal_to_finish.set()
+
+                self.assertEqual(removal.result(timeout=10).status_code, 302)
+                submission_response = submission.result(timeout=10)
+                self.assertEqual(submission_response.status_code, 200)
+                self.assertIn("identity_proof", submission_response.context["form"].errors)
+
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.submitted_at)
+        self.assertFalse(ApplicationProof.objects.filter(pk=self.identity_proof.pk).exists())
 
 
 class CreateTestApplicantCommandTests(TestCase):
