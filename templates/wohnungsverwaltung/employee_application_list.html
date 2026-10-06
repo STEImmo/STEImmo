@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Eingereichte Bewerbungen – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container">
+        <h1 class="uk-heading-medium">Eingereichte Main-Bewerbungen</h1>
+        {% for application in applications %}
+            <article class="uk-card uk-card-default uk-card-body uk-margin-top">
+                <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
+                    <div>
+                        <span class="uk-label">{{ application.get_applicant_status_display }}</span>
+                        <h2 class="uk-card-title uk-margin-small-top">
+                            {{ application.person }} – {{ application.wohnung }}
+                        </h2>
+                        <p class="uk-margin-remove">
+                            Eingereicht am {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr
+                        </p>
+                    </div>
+                    <a class="uk-button uk-button-primary"
+                       href="{% url 'wohnungsverwaltung:employee_application_detail' application.pk %}">
+                        Bewerbung ansehen
+                    </a>
+                </div>
+            </article>
+        {% empty %}
+            <div class="uk-alert-primary uk-margin-top" uk-alert>
+                <p>Es wurden noch keine Main-Bewerbungen eingereicht.</p>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

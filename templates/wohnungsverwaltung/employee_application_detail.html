@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Main-Bewerbung prüfen – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <p>
+            <a class="uk-button uk-button-text"
+               href="{% url 'wohnungsverwaltung:employee_application_list' %}">
+                Zurück zu den Bewerbungen
+            </a>
+        </p>
+        <article class="uk-card uk-card-default uk-card-body">
+            <span class="uk-label">{{ application.get_applicant_status_display }}</span>
+            <h1 class="uk-card-title">{{ application.person }} – {{ application.wohnung }}</h1>
+            <p>Eingereicht am {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr</p>
+            <dl class="uk-description-list">
+                <dt>E-Mail</dt>
+                <dd>{{ application.person.email }}</dd>
+                <dt>Telefon</dt>
+                <dd>{{ application.person.telefonnummer|default:"Keine Telefonnummer hinterlegt" }}</dd>
+                <dt>Personen im Haushalt</dt>
+                <dd>{{ application.personenanzahl }}</dd>
+                <dt>Über mich</dt>
+                <dd>{{ application.ueber_mich|linebreaksbr }}</dd>
+            </dl>
+        </article>
+
+        <article class="uk-card uk-card-default uk-card-body uk-margin-top">
+            <h2 class="uk-card-title">Nachweise</h2>
+            {% for group in proof_groups %}
+                <h3 class="uk-h4">{{ group.label }}</h3>
+                {% if group.documents %}
+                    <ul class="uk-list uk-list-divider">
+                        {% for document in group.documents %}
+                            <li class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
+                                <span>
+                                    <span>{{ document.name }}</span>
+                                    <span class="uk-text-meta">({{ document.size_display }})</span>
+                                </span>
+                                <a class="uk-button uk-button-default uk-button-small"
+                                   href="{{ document.download_url }}">
+                                    Sicher herunterladen
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="uk-text-danger">Nicht vorhanden</p>
+                {% endif %}
+            {% endfor %}
+        </article>
+    </div>
+</section>
+{% endblock %}

@@ -78,6 +78,39 @@ flowchart TD
     D --> M["Media-Volume"]
 ~~~
 
+## Nachweise und Dateibereinigung
+
+Bewerber bearbeiten ihre Nachweise im eigenen freigeschalteten Entwurf. Nach der
+Einreichung ist die Bewerbung unveränderbar und für Mitarbeiter einsehbar.
+PDFs werden strukturell geprüft; technisch nicht verarbeitbare oder beschädigte
+Dokumente werden als Formularfehler abgelehnt. Das ersetzt keinen Virenscanner.
+Geschützte Downloads verwenden den bereits geöffneten Dateistream bis zum Ende
+der Antwort; auch PDFs mit zusätzlichen Leerzeichen am Dateiende bleiben abrufbar.
+Wer einen gespeicherten Nachweis entfernt, wird bei einer ungespeicherten
+Dateiauswahl vor deren Verlust gewarnt. Abbrechen erhält die Auswahl; der Entwurf
+kann anschließend zuerst gespeichert werden.
+
+Beim Entfernen eines Nachweises werden Datenbankreferenz und Bereinigungsauftrag
+in derselben Transaktion geändert. Erst nach dem Commit wird die Datei gelöscht.
+Scheitert die Löschung oder endet der Prozess vorher, bleibt der Auftrag erhalten.
+Offene Aufträge müssen betrieblich regelmäßig mit
+`python manage.py retry_application_proof_cleanup` wiederholt werden; der Befehl
+liefert bei fehlgeschlagenen Löschungen einen Fehlerstatus.
+
+Private Uploads verwenden Dateirechte `0600` und Verzeichnisrechte `0700`.
+Öffentliche statische Dateien verwenden separat `0644` und `0755`, damit ein
+Reverse-Proxy sie lesen kann. Bei bereits mit privaten Rechten erzeugten
+statischen Dateien müssen einmalig die Rechte in `STATIC_ROOT` korrigiert
+werden (bei der Standardkonfiguration mit den folgenden Befehlen). Ein erneutes
+`collectstatic` allein korrigiert vorhandene Verzeichnisse nicht. Diese Befehle
+dürfen ausschließlich auf das öffentliche Static-Verzeichnis angewendet werden,
+niemals auf `MEDIA_ROOT`:
+
+```bash
+find staticfiles -type d -exec chmod 755 {} +
+find staticfiles -type f -exec chmod 644 {} +
+```
+
 ## Technische Roadmap
 
 | Phase | Technische Lieferobjekte | Fertigkriterium | Status |

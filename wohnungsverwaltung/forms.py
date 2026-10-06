@@ -1,4 +1,6 @@
 import json
+import unicodedata
+import warnings
 from uuid import UUID
 
 from django import forms
@@ -7,10 +9,14 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.core.files.storage import Storage
 from django.db import transaction
 from django.db.models import Q
 from django.forms.formsets import BaseFormSet
 from django.forms.models import inlineformset_factory
+from PIL import Image, UnidentifiedImageError
+from pypdf import PdfReader
+from pypdf.errors import DependencyError, PyPdfError
 
 from .access import (
     ACCESS_PERMISSION_CODENAMES,
@@ -21,6 +27,8 @@ from .access import (
 )
 from .models import (
     AbnahmeStatus,
+    ApplicationProof,
+    ApplicationProofCategory,
     Bewerbung,
     Merkmal,
     Person,
@@ -502,6 +510,259 @@ class BewerbungForm(forms.ModelForm):
         if commit:
             application.save()
         return application
+
+
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    widget = MultipleFileInput
+
+    def clean(self, data, initial=None):
+        if not data:
+            return []
+        uploads = data if isinstance(data, (list, tuple)) else [data]
+        cleaned_uploads = []
+        for upload in uploads:
+            if upload not in (None, ""):
+                cleaned_uploads.append(super().clean(upload, initial))
+        return cleaned_uploads
+
+
+class ApplicationProofStorageError(Exception):
+    """Raised when an uploaded proof cannot be written to private storage."""
+
+
+class MainApplicationForm(forms.Form):
+    MAX_FILES_PER_CATEGORY = 10
+    MULTIPART_OVERHEAD_RESERVE = 64 * 1024
+    PROOF_FIELDS = (
+        (ApplicationProofCategory.INCOME, "income_proof", "Gehaltsnachweise"),
+        (ApplicationProofCategory.IDENTITY, "identity_proof", "Identitätsnachweis"),
+        (ApplicationProofCategory.CREDIT_REPORT, "credit_report_proof", "SCHUFA-Unterlage"),
+    )
+
+    action = forms.CharField(required=False, widget=forms.HiddenInput)
+    income_proof = MultipleFileField(
+        label="Gehaltsabrechnungen",
+        required=False,
+        widget=MultipleFileInput(
+            attrs={"class": "uk-input", "accept": ".png,.pdf,image/png,application/pdf"}
+        ),
+    )
+    identity_proof = MultipleFileField(
+        label="Identitätsnachweis",
+        required=False,
+        widget=MultipleFileInput(
+            attrs={"class": "uk-input", "accept": ".png,.pdf,image/png,application/pdf"}
+        ),
+    )
+    credit_report_proof = MultipleFileField(
+        label="SCHUFA-Unterlage",
+        required=False,
+        widget=MultipleFileInput(
+            attrs={"class": "uk-input", "accept": ".png,.pdf,image/png,application/pdf"}
+        ),
+    )
+
+    def __init__(self, *args, instance: Bewerbung, **kwargs):
+        self.instance = instance
+        self.stored_proof_files: list[tuple[Storage, str]] = []
+        super().__init__(*args, **kwargs)
+        for _category, field_name, label in self.PROOF_FIELDS:
+            self.fields[field_name].widget.attrs["data-proof-upload-input"] = ""
+            self.fields[field_name].widget.attrs["data-max-files"] = str(
+                self.MAX_FILES_PER_CATEGORY
+            )
+            self.fields[field_name].widget.attrs["data-max-file-size"] = str(
+                settings.MAIN_APPLICATION_PROOF_MAX_SIZE
+            )
+            self.fields[field_name].widget.attrs["data-max-total-size"] = str(
+                max(
+                    0,
+                    settings.MAIN_APPLICATION_MAX_REQUEST_SIZE - self.MULTIPART_OVERHEAD_RESERVE,
+                )
+            )
+            self.fields[field_name].help_text = (
+                f"Sie können Dateien für {label} auch nacheinander auswählen; "
+                f"die bisherige Auswahl bleibt erhalten. Maximal "
+                f"{self.MAX_FILES_PER_CATEGORY} Dateien pro Nachweiskategorie."
+            )
+
+    def clean(self) -> dict:
+        cleaned_data = super().clean()
+        action = self.data.get("action") or "save_draft"
+        if action not in {"save_draft", "submit"}:
+            raise forms.ValidationError("Bitte wählen Sie eine gültige Aktion.")
+        cleaned_data["action"] = action
+
+        existing_names = {
+            self._normalized_file_name(name)
+            for name in self.instance.proof_files.values_list("original_name", flat=True)
+        }
+        for _category, field_name, _label in self.PROOF_FIELDS:
+            if getattr(self.instance, field_name):
+                legacy_name = getattr(self.instance, f"{field_name}_original_name", "")
+                if legacy_name:
+                    existing_names.add(self._normalized_file_name(legacy_name))
+
+        submitted_names = set()
+        for category, field_name, _label in self.PROOF_FIELDS:
+            existing_count = int(bool(getattr(self.instance, field_name)))
+            existing_count += self.instance.proof_files.filter(category=category).count()
+            uploads = cleaned_data.get(field_name) or []
+            uploaded_count = len(uploads)
+
+            has_duplicate_name = False
+            for upload in uploads:
+                normalized_name = self._normalized_file_name(upload.name)
+                if normalized_name in existing_names or normalized_name in submitted_names:
+                    has_duplicate_name = True
+                submitted_names.add(normalized_name)
+
+            if has_duplicate_name:
+                self.add_error(
+                    field_name,
+                    "Eine Datei mit dieser Bezeichnung wird bereits in dieser Main-Bewerbung "
+                    "verwendet. Bitte benennen Sie sie um.",
+                )
+
+            if existing_count + uploaded_count > self.MAX_FILES_PER_CATEGORY:
+                self.add_error(
+                    field_name,
+                    f"Pro Nachweiskategorie sind höchstens {self.MAX_FILES_PER_CATEGORY} "
+                    "Dateien erlaubt.",
+                )
+            if action == "submit" and existing_count + uploaded_count == 0:
+                self.add_error(
+                    field_name,
+                    "Mindestens eine Datei dieses Nachweises ist für die Einreichung erforderlich.",
+                )
+        return cleaned_data
+
+    def save_uploaded_proofs(self) -> None:
+        for category, field_name, _label in self.PROOF_FIELDS:
+            for upload in self.cleaned_data.get(field_name, []):
+                proof = ApplicationProof(
+                    application=self.instance,
+                    category=category,
+                    original_name=self._display_filename(upload.name),
+                )
+                file_field = proof._meta.get_field("file")
+                storage = proof.file.storage
+                try:
+                    stored_name = file_field.generate_filename(proof, upload.name)
+                    while storage.exists(stored_name):
+                        stored_name = file_field.generate_filename(proof, upload.name)
+
+                    # Track the unique candidate before writing: storage backends can raise
+                    # after creating the object, in which case no name is returned.
+                    self.stored_proof_files.append((storage, stored_name))
+                    saved_name = storage.save(
+                        stored_name,
+                        upload,
+                        max_length=file_field.max_length,
+                    )
+                except Exception as error:
+                    raise ApplicationProofStorageError from error
+
+                if saved_name != stored_name:
+                    self.stored_proof_files.append((storage, saved_name))
+                proof.file.name = saved_name
+                proof.save()
+
+    def cleanup_stored_proof_files(self) -> list[tuple[Storage, str]]:
+        failures: list[tuple[Storage, str]] = []
+        for storage, stored_name in reversed(self.stored_proof_files):
+            try:
+                storage.delete(stored_name)
+            except Exception:
+                failures.append((storage, stored_name))
+        self.stored_proof_files = failures
+        return failures
+
+    @staticmethod
+    def _display_filename(filename: str) -> str:
+        display_name = filename.replace("\\", "/").rsplit("/", 1)[-1]
+        display_name = "".join(character for character in display_name if character.isprintable())
+        return display_name.strip()[:255] or "Datei"
+
+    @classmethod
+    def _normalized_file_name(cls, filename: str) -> str:
+        return unicodedata.normalize("NFKC", cls._display_filename(filename)).casefold()
+
+    def _clean_proof(self, upload):
+        if upload.size > settings.MAIN_APPLICATION_PROOF_MAX_SIZE:
+            maximum_mib = settings.MAIN_APPLICATION_PROOF_MAX_SIZE / (1024 * 1024)
+            raise forms.ValidationError(f"Die Datei darf höchstens {maximum_mib:g} MiB groß sein.")
+
+        original_position = upload.tell()
+        try:
+            upload.seek(0)
+            header = upload.read(1024)
+            if header.startswith(b"%PDF-"):
+                upload.seek(0)
+                try:
+                    reader = PdfReader(upload, strict=True)
+                    if not reader.pages:
+                        raise forms.ValidationError("Das PDF enthält keine Seiten.")
+                except (
+                    AttributeError,
+                    KeyError,
+                    TypeError,
+                    RecursionError,
+                    OverflowError,
+                ) as error:
+                    raise forms.ValidationError("Das PDF kann nicht verarbeitet werden.") from error
+                return upload
+
+            upload.seek(0)
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", Image.DecompressionBombWarning)
+                with Image.open(upload) as image:
+                    if image.format != "PNG":
+                        raise forms.ValidationError("Erlaubt sind nur PNG- oder PDF-Dateien.")
+                    image.verify()
+                upload.seek(0)
+                with Image.open(upload) as image:
+                    if image.format != "PNG":
+                        raise forms.ValidationError("Erlaubt sind nur PNG- oder PDF-Dateien.")
+                    image.load()
+            return upload
+        except forms.ValidationError:
+            raise
+        except (DependencyError, NotImplementedError) as error:
+            raise forms.ValidationError(
+                "Dieses verschlüsselte PDF kann nicht verarbeitet werden. "
+                "Bitte laden Sie ein unverschlüsseltes PDF hoch."
+            ) from error
+        except (
+            Image.DecompressionBombError,
+            Image.DecompressionBombWarning,
+            OSError,
+            PyPdfError,
+            SyntaxError,
+            UnidentifiedImageError,
+            ValueError,
+        ) as error:
+            raise forms.ValidationError(
+                "Erlaubt sind nur gültige PNG- oder PDF-Dateien."
+            ) from error
+        finally:
+            upload.seek(original_position)
+
+    def _clean_proof_files(self, field_name: str):
+        return [self._clean_proof(upload) for upload in self.cleaned_data.get(field_name, [])]
+
+    def clean_income_proof(self):
+        return self._clean_proof_files("income_proof")
+
+    def clean_identity_proof(self):
+        return self._clean_proof_files("identity_proof")
+
+    def clean_credit_report_proof(self):
+        return self._clean_proof_files("credit_report_proof")
 
 
 class ApartmentSearchForm(forms.Form):

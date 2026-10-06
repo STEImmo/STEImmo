@@ -35,6 +35,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "wohnungsverwaltung.upload_limits.MainApplicationUploadLimitMiddleware",
     "wohnungsverwaltung.export_limits.SignatureRequestLimitMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -99,9 +100,24 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        "OPTIONS": {"file_permissions_mode": 0o644, "directory_permissions_mode": 0o755},
+    },
+}
+FILE_UPLOAD_PERMISSIONS = 0o600
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o700
 HANDOVER_PHOTO_MAX_SIZE = int(os.environ.get("HANDOVER_PHOTO_MAX_SIZE", 8 * 1024 * 1024))
 HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM = int(
     os.environ.get("HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM", 10)
+)
+MAIN_APPLICATION_PROOF_MAX_SIZE = int(
+    os.environ.get("MAIN_APPLICATION_PROOF_MAX_SIZE", 8 * 1024 * 1024)
+)
+MAIN_APPLICATION_MAX_REQUEST_SIZE = int(
+    os.environ.get("MAIN_APPLICATION_MAX_REQUEST_SIZE", 25 * 1024 * 1024)
 )
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Main-Bewerbung – STEImmo{% endblock %}
 
@@ -15,6 +16,12 @@
             <h1 class="uk-card-title">Main-Bewerbung für {{ application.wohnung }}</h1>
             <p>Die Main-Bewerbung ist freigeschaltet.</p>
             <p>{{ application.get_applicant_next_step }}</p>
+            {% if application.submitted_at %}
+                <p class="uk-text-meta">
+                    Eingereicht am {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr.
+                    Die Einreichung ist abgeschlossen und kann nicht mehr geändert werden.
+                </p>
+            {% endif %}
             <a class="uk-button uk-button-danger uk-margin-small-top"
                href="{% url 'wohnungsverwaltung:application_withdraw' application.pk %}">
                 Interesse zurückziehen
@@ -22,52 +29,177 @@
         </article>
 
         <article class="uk-card uk-card-default uk-card-body uk-margin-top">
-            <h2 class="uk-card-title">Vorschau: weitere Angaben und Nachweise</h2>
+            <h2 class="uk-card-title">Erforderliche Nachweise</h2>
             <p>
-                Dies ist eine erste Formularvorschau. Angaben werden noch nicht gespeichert und
-                Dateien noch nicht hochgeladen. Die sichere Verarbeitung folgt mit Issue #20.
+                Reichen Sie alle drei Nachweise ein. Erlaubt sind PNG- und PDF-Dateien mit
+                höchstens 8 MiB je Datei und maximal 10 Dateien pro Kategorie. Pro Speichervorgang
+                gilt ein Gesamtlimit von 25 MiB.
+                Dateinamen müssen innerhalb der Bewerbung eindeutig sein; Groß- und Kleinschreibung
+                wird dabei nicht unterschieden.
             </p>
+            {% if application.submitted_at %}
+                <p class="uk-text-meta">Ihre eingereichten Nachweise können Sie hier ansehen.</p>
+                {% for group in proof_groups %}
+                    <h3 class="uk-h4">{{ group.label }}</h3>
+                    {% if group.documents %}
+                        <ul class="uk-list uk-list-divider">
+                            {% for document in group.documents %}
+                                <li class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
+                                    <span>
+                                        <span>{{ document.name }}</span>
+                                        <span class="uk-text-meta">({{ document.size_display }})</span>
+                                    </span>
+                                    <a class="uk-button uk-button-default uk-button-small"
+                                       href="{{ document.download_url }}">
+                                        Herunterladen / ansehen
+                                    </a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="uk-text-danger">Kein Nachweis vorhanden</p>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <p class="uk-text-meta">
+                    Bereits gespeicherte Dateien stehen direkt unter dem jeweiligen Uploadfeld.
+                </p>
+                {% for group in proof_groups %}
+                    {% for document in group.documents %}
+                        {% if document.can_remove %}
+                            <form id="remove-proof-{{ forloop.parentloop.counter }}-{{ forloop.counter }}"
+                                  method="post"
+                                  data-proof-remove-form
+                                  onsubmit="return confirm('Diesen Nachweis endgültig entfernen? Noch nicht gespeicherte Dateiauswahlen gehen verloren. Speichern Sie zuerst den Entwurf, wenn Sie diese behalten möchten.');">
+                                {% csrf_token %}
+                                <input type="hidden" name="remove_proof" value="{{ document.delete_id }}">
+                            </form>
+                        {% endif %}
+                    {% endfor %}
+                {% endfor %}
+                <form method="post" enctype="multipart/form-data" novalidate data-proof-upload-form>
+                {% csrf_token %}
+                {{ form.action }}
+                {% if form.non_field_errors %}
+                    <div class="uk-alert-danger" uk-alert>
+                        {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+                    </div>
+                {% endif %}
+                <p class="uk-text-danger uk-text-small"
+                   data-proof-total-size-error
+                   role="alert"
+                   aria-live="polite"
+                   hidden></p>
 
-            <fieldset class="uk-fieldset" disabled>
-                <div class="uk-margin">
-                    <label class="uk-form-label" for="main-additional-information">
-                        Ergänzende Angaben
-                    </label>
-                    <div class="uk-form-controls">
-                        <textarea class="uk-textarea"
-                                  id="main-additional-information"
-                                  rows="4"
-                                  placeholder="Weitere Informationen zu Ihrer Bewerbung"></textarea>
-                    </div>
-                </div>
+                {% for field in form %}
+                    {% if field.name != "action" %}
+                        <div class="uk-margin">
+                            <label class="uk-form-label" for="{{ field.id_for_label }}">
+                                {{ field.label }} <span class="uk-text-danger">*</span>
+                            </label>
+                            <div class="uk-form-controls" data-proof-upload-field>
+                                {{ field }}
+                                <div class="uk-margin-small-top">
+                                    <p class="uk-text-meta uk-margin-small-bottom"
+                                       data-proof-selection-label hidden>
+                                        Ausgewählt – noch nicht gespeichert
+                                    </p>
+                                    <ul class="uk-list uk-list-divider uk-margin-small-top"
+                                        data-proof-selection-list
+                                        aria-live="polite"></ul>
+                                    <p class="uk-text-danger uk-text-small"
+                                       data-proof-selection-error
+                                       role="alert"
+                                       aria-live="polite"
+                                       hidden></p>
+                                </div>
+                                {% for group in proof_groups %}
+                                    {% if group.field_name == field.name %}
+                                        <div class="uk-margin-small-top">
+                                            <p class="uk-text-meta uk-margin-small-bottom">
+                                                Bereits hochgeladen ({{ group.label }})
+                                            </p>
+                                            {% if group.documents %}
+                                                <ul class="uk-list uk-list-divider uk-margin-small-top">
+                                                    {% for document in group.documents %}
+                                                        <li class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
+                                                            <span>
+                                                                <span data-proof-existing-name>{{ document.name }}</span>
+                                                                <span class="uk-text-meta">({{ document.size_display }})</span>
+                                                            </span>
+                                                            <div class="uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
+                                                                <div>
+                                                                    <a class="uk-button uk-button-default uk-button-small"
+                                                                       href="{{ document.download_url }}">
+                                                                        Herunterladen / ansehen
+                                                                    </a>
+                                                                </div>
+                                                                {% if document.can_remove %}
+                                                                    <div>
+                                                                        <button class="uk-button uk-button-danger uk-button-small"
+                                                                                type="submit"
+                                                                                form="remove-proof-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                                                            Entfernen
+                                                                        </button>
+                                                                    </div>
+                                                                {% endif %}
+                                                            </div>
+                                                        </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            {% else %}
+                                                <p class="uk-text-meta uk-margin-small-top">
+                                                    Noch keine Datei gespeichert.
+                                                </p>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                                {% if field.help_text %}
+                                    <p class="uk-text-meta uk-text-small">{{ field.help_text }}</p>
+                                {% endif %}
+                                {% if field.errors %}
+                                    <ul class="uk-text-danger uk-text-small">
+                                        {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+                                    </ul>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
 
-                <h3>Nachweise</h3>
-                <p>Vorgesehen sind PNG- oder PDF-Dateien mit maximal 8 MiB je Datei.</p>
-                <div class="uk-margin">
-                    <label class="uk-form-label" for="identity-proof">Identitätsnachweis</label>
-                    <div class="uk-form-controls">
-                        <input class="uk-input" id="identity-proof" type="file"
-                               accept=".png,.pdf,image/png,application/pdf">
+                <p class="uk-text-meta">
+                    Ein Entwurf kann unvollständig gespeichert werden. Erst mit der endgültigen
+                    Einreichung müssen alle drei Nachweise vorliegen.
+                </p>
+                <div class="uk-flex uk-flex-wrap uk-grid-small" uk-grid>
+                    <div>
+                        <button class="uk-button uk-button-default" type="submit"
+                                name="action" value="save_draft">
+                            Entwurf speichern
+                        </button>
+                    </div>
+                    <div>
+                        <button class="uk-button uk-button-primary" type="submit"
+                                name="action" value="submit">
+                            Main-Bewerbung einreichen
+                        </button>
                     </div>
                 </div>
-                <div class="uk-margin">
-                    <label class="uk-form-label" for="payment-proof">Zahlungsnachweis</label>
-                    <div class="uk-form-controls">
-                        <input class="uk-input" id="payment-proof" type="file"
-                               accept=".png,.pdf,image/png,application/pdf">
+                </form>
+                <div class="uk-flex-top" uk-modal data-proof-upload-modal>
+                    <div class="uk-modal-dialog uk-modal-body uk-margin-auto-vertical">
+                        <h2 class="uk-modal-title">Dateien wurden nicht gespeichert</h2>
+                        <p data-proof-upload-modal-message></p>
+                        <p class="uk-text-right uk-margin-remove-bottom">
+                            <button class="uk-button uk-button-primary uk-modal-close" type="button">
+                                Schließen
+                            </button>
+                        </p>
                     </div>
                 </div>
-                <div class="uk-margin">
-                    <label class="uk-form-label" for="schufa-proof">SCHUFA-Unterlage</label>
-                    <div class="uk-form-controls">
-                        <input class="uk-input" id="schufa-proof" type="file"
-                               accept=".png,.pdf,image/png,application/pdf">
-                    </div>
-                </div>
-                <button class="uk-button uk-button-primary" type="button">
-                    Angaben einreichen
-                </button>
-            </fieldset>
+                <script src="{% static 'js/main_application_uploads.js' %}?v=8"></script>
+            {% endif %}
         </article>
     </div>
 </section>
