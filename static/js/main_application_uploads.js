@@ -14,6 +14,8 @@
                 label: field.querySelector("[data-proof-selection-label]"),
                 error: field.querySelector("[data-proof-selection-error]"),
                 maxFiles: Number(input?.dataset.maxFiles || 10),
+                maxFileBytes: Number(input?.dataset.maxFileSize ?? 8 * 1024 * 1024),
+                maxTotalBytes: Number(input?.dataset.maxTotalSize ?? 25 * 1024 * 1024),
                 existingCount: field.querySelectorAll("[data-proof-existing-name]").length,
                 selectedFiles: [],
                 selectionError: "",
@@ -38,14 +40,20 @@
         files.forEach((file) => transfer.items.add(file));
         input.files = transfer.files;
     };
+    const totalError = form.querySelector("[data-proof-total-size-error]");
+    const validationModal = document.querySelector("[data-proof-upload-modal]");
+    const validationModalMessage = document.querySelector("[data-proof-upload-modal-message]");
 
     const renderSelections = () => {
         const usedNames = new Set(existingNames);
         const duplicatesByField = new Map(fields.map((entry) => [entry, []]));
         const fileEntries = new Map();
+        let totalSelectedBytes = 0;
 
         for (const entry of fields) {
             const files = Array.from(entry.input.files || []);
+            totalSelectedBytes += files.reduce((total, file) => total + file.size, 0);
+            const oversizedFiles = files.filter((file) => file.size > entry.maxFileBytes);
             const duplicateFlags = files.map((file) => {
                 const name = normalizeFileName(file.name);
                 const duplicate = usedNames.has(name);
@@ -56,18 +64,23 @@
                 }
                 return duplicate;
             });
-            fileEntries.set(entry, { files, duplicateFlags });
+            fileEntries.set(entry, { files, duplicateFlags, oversizedFiles });
         }
 
         let hasErrors = false;
+        const totalSizeLimit = fields[0]?.maxTotalBytes ?? 0;
+        const overTotalSizeLimit = totalSelectedBytes > totalSizeLimit;
         for (const entry of fields) {
-            const { files, duplicateFlags } = fileEntries.get(entry);
+            const { files, duplicateFlags, oversizedFiles } = fileEntries.get(entry);
             const duplicateNames = duplicatesByField.get(entry);
             const totalFiles = entry.existingCount + files.length;
             const overFileLimit = totalFiles > entry.maxFiles;
             const atFileLimit = totalFiles === entry.maxFiles;
             const fieldHasErrors =
-                duplicateNames.length > 0 || overFileLimit || Boolean(entry.selectionError);
+                duplicateNames.length > 0 ||
+                oversizedFiles.length > 0 ||
+                overFileLimit ||
+                Boolean(entry.selectionError);
             const errorMessages = [];
             hasErrors ||= fieldHasErrors;
             entry.list.replaceChildren();
@@ -107,6 +120,13 @@
                     + "verwendet. Entfernen Sie die Datei aus der Auswahl oder benennen Sie sie um.",
                 );
             }
+            if (oversizedFiles.length) {
+                const fileNames = oversizedFiles.map((file) => `„${file.name}“`).join(", ");
+                errorMessages.push(
+                    `${fileNames} ${oversizedFiles.length === 1 ? "überschreitet" : "überschreiten"} `
+                    + `das Dateilimit von ${formatMiB(entry.maxFileBytes)}.`,
+                );
+            }
             if (overFileLimit) {
                 errorMessages.push(
                     `Pro Nachweiskategorie sind höchstens ${entry.maxFiles} Dateien erlaubt. `
@@ -135,7 +155,39 @@
             }
         }
 
+        if (totalError) {
+            totalError.hidden = !overTotalSizeLimit;
+            totalError.textContent = overTotalSizeLimit
+                ? `Die ausgewählten Dateien überschreiten zusammen das Gesamtlimit von `
+                    + `${formatMiB(totalSizeLimit)}. Entfernen Sie Dateien aus der Auswahl.`
+                : "";
+        }
+        hasErrors ||= overTotalSizeLimit;
+
         return hasErrors;
+    };
+
+    const formatMiB = (bytes) => {
+        const formatted = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 })
+            .format(bytes / (1024 * 1024));
+        return `${formatted} MiB`;
+    };
+
+    const showValidationPopup = () => {
+        const messages = fields
+            .filter((entry) => !entry.error.hidden)
+            .map((entry) => entry.error.textContent);
+        if (totalError && !totalError.hidden) {
+            messages.push(totalError.textContent);
+        }
+        const message = `Die Dateien wurden nicht gespeichert. ${messages.join(" ")}`;
+
+        if (validationModal && validationModalMessage && window.UIkit?.modal) {
+            validationModalMessage.textContent = message;
+            window.UIkit.modal(validationModal).show();
+        } else {
+            window.alert(message);
+        }
     };
 
     for (const entry of fields) {
@@ -194,12 +246,9 @@
         }
 
         event.preventDefault();
-        fields.find((entry) => duplicatesByFieldHasFiles(entry))?.input.focus();
+        fields.find((entry) => entry.input.getAttribute("aria-invalid") === "true")?.input.focus();
+        showValidationPopup();
     });
-
-    function duplicatesByFieldHasFiles(entry) {
-        return entry.error && !entry.error.hidden;
-    }
 
     renderSelections();
 })();

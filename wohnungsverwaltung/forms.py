@@ -529,6 +529,7 @@ class MultipleFileField(forms.FileField):
 
 class MainApplicationForm(forms.Form):
     MAX_FILES_PER_CATEGORY = 10
+    MULTIPART_OVERHEAD_RESERVE = 64 * 1024
     PROOF_FIELDS = (
         (ApplicationProofCategory.INCOME, "income_proof", "Gehaltsnachweise"),
         (ApplicationProofCategory.IDENTITY, "identity_proof", "Identitätsnachweis"),
@@ -565,6 +566,16 @@ class MainApplicationForm(forms.Form):
             self.fields[field_name].widget.attrs["data-proof-upload-input"] = ""
             self.fields[field_name].widget.attrs["data-max-files"] = str(
                 self.MAX_FILES_PER_CATEGORY
+            )
+            self.fields[field_name].widget.attrs["data-max-file-size"] = str(
+                settings.MAIN_APPLICATION_PROOF_MAX_SIZE
+            )
+            self.fields[field_name].widget.attrs["data-max-total-size"] = str(
+                max(
+                    0,
+                    settings.MAIN_APPLICATION_MAX_REQUEST_SIZE
+                    - self.MULTIPART_OVERHEAD_RESERVE,
+                )
             )
             self.fields[field_name].help_text = (
                 f"Sie können Dateien für {label} auch nacheinander auswählen; "

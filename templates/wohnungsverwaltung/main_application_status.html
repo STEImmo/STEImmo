@@ -81,6 +81,11 @@
                         {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
                     </div>
                 {% endif %}
+                <p class="uk-text-danger uk-text-small"
+                   data-proof-total-size-error
+                   role="alert"
+                   aria-live="polite"
+                   hidden></p>
 
                 {% for field in form %}
                     {% if field.name != "action" %}
@@ -175,7 +180,18 @@
                     </div>
                 </div>
                 </form>
-                <script src="{% static 'js/main_application_uploads.js' %}?v=4"></script>
+                <div class="uk-flex-top" uk-modal data-proof-upload-modal>
+                    <div class="uk-modal-dialog uk-modal-body uk-margin-auto-vertical">
+                        <h2 class="uk-modal-title">Dateien wurden nicht gespeichert</h2>
+                        <p data-proof-upload-modal-message></p>
+                        <p class="uk-text-right uk-margin-remove-bottom">
+                            <button class="uk-button uk-button-primary uk-modal-close" type="button">
+                                Schließen
+                            </button>
+                        </p>
+                    </div>
+                </div>
+                <script src="{% static 'js/main_application_uploads.js' %}?v=5"></script>
             {% endif %}
         </article>
     </div>
