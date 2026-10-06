@@ -1,4 +1,6 @@
 import json
+import struct
+import zlib
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -13,11 +15,13 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.db import IntegrityError, close_old_connections, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.test import Client, TestCase, TransactionTestCase, skipUnlessDBFeature
 from django.urls import reverse
 from PIL import Image
+from reportlab.pdfgen import canvas
 
 from . import views as application_views
 from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
@@ -31,6 +35,7 @@ from .models import (
     AbnahmeStatus,
     ApplicationProof,
     ApplicationProofCategory,
+    ApplicationProofCleanup,
     Bewerbung,
     BewerbungStatus,
     Merkmal,
@@ -2494,8 +2499,32 @@ class MainApplicationUploadTests(TestCase):
 
     @staticmethod
     def pdf_upload(name: str = "nachweis.pdf", size: int = 36) -> SimpleUploadedFile:
-        content = b"%PDF-1.4\n" + b"x" * max(0, size - 15) + b"\n%%EOF"
+        pdf_buffer = BytesIO()
+        document = canvas.Canvas(pdf_buffer)
+        document.drawString(72, 720, "Gültiger Testnachweis")
+        document.save()
+        content = pdf_buffer.getvalue()
+        if len(content) < size:
+            content += b" " * (size - len(content))
         return SimpleUploadedFile(name, content, content_type="application/pdf")
+
+    @staticmethod
+    def broken_png_upload(name: str = "broken.png") -> SimpleUploadedFile:
+        def chunk(chunk_type: bytes, data: bytes) -> bytes:
+            chunk_data = chunk_type + data
+            return (
+                struct.pack(">I", len(data))
+                + chunk_data
+                + struct.pack(">I", zlib.crc32(chunk_data) & 0xFFFFFFFF)
+            )
+
+        content = (
+            b"\x89PNG\r\n\x1a\n"
+            + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", b"not a zlib image stream")
+            + chunk(b"IEND", b"")
+        )
+        return SimpleUploadedFile(name, content, content_type="image/png")
 
     def complete_upload_data(self) -> dict[str, object]:
         return {
@@ -2579,6 +2608,8 @@ class MainApplicationUploadTests(TestCase):
             self.assertEqual(proof.original_name, original_name)
             self.assertTrue(proof.file.storage.exists(proof.file.name))
             self.assertNotIn(original_name, proof.file.name)
+            self.assertEqual(Path(proof.file.path).stat().st_mode & 0o777, 0o600)
+            self.assertEqual(Path(proof.file.path).parent.stat().st_mode & 0o777, 0o700)
         self.assertContains(self.client.get(self.main_url), "Main-Bewerbung eingereicht")
 
     def test_final_submission_requires_every_proof(self) -> None:
@@ -2628,6 +2659,55 @@ class MainApplicationUploadTests(TestCase):
         self.application.refresh_from_db()
         self.assertIsNone(self.application.submitted_at)
 
+    def test_proof_reference_is_kept_when_storage_delete_fails(self) -> None:
+        proof = self.application.proof_files.create(
+            category=ApplicationProofCategory.IDENTITY,
+            file=self.png_upload("identitaet.png"),
+            original_name="identitaet.png",
+        )
+        storage = proof.file.storage
+        self.client.force_login(self.applicant_user)
+
+        with mock.patch.object(storage, "delete", side_effect=OSError("storage unavailable")):
+            response = self.client.post(
+                self.main_url,
+                {"remove_proof": str(proof.pk)},
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Der Nachweis konnte nicht entfernt werden.")
+        self.assertTrue(ApplicationProof.objects.filter(pk=proof.pk).exists())
+        self.assertTrue(storage.exists(proof.file.name))
+
+    def test_legacy_proof_reference_is_kept_when_storage_delete_fails(self) -> None:
+        self.application.identity_proof.save(
+            "legacy-identitaet.png",
+            self.png_upload("legacy-identitaet.png"),
+            save=False,
+        )
+        self.application.identity_proof_original_name = "legacy-identitaet.png"
+        self.application.save(
+            update_fields=("identity_proof", "identity_proof_original_name", "updated_at")
+        )
+        stored_name = self.application.identity_proof.name
+        storage = self.application.identity_proof.storage
+        self.client.force_login(self.applicant_user)
+
+        with mock.patch.object(storage, "delete", side_effect=OSError("storage unavailable")):
+            response = self.client.post(
+                self.main_url,
+                {"remove_proof": "legacy:identity_proof"},
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Der Nachweis konnte nicht entfernt werden.")
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.identity_proof.name, stored_name)
+        self.assertEqual(self.application.identity_proof_original_name, "legacy-identitaet.png")
+        self.assertTrue(storage.exists(stored_name))
+
     def test_storage_failure_cleans_up_files_written_by_the_same_request(self) -> None:
         storage = ApplicationProof._meta.get_field("file").storage
         original_save = storage.save
@@ -2659,6 +2739,63 @@ class MainApplicationUploadTests(TestCase):
             path for path in Path(self.media_directory.name).rglob("*") if path.is_file()
         ]
         self.assertEqual(stored_files, [])
+
+    def test_failed_upload_cleanup_is_persisted_and_can_be_retried(self) -> None:
+        storage = ApplicationProof._meta.get_field("file").storage
+        original_save = storage.save
+        save_count = 0
+
+        def save_then_fail_on_second_file(name, content, max_length=None):
+            nonlocal save_count
+            save_count += 1
+            stored_name = original_save(name, content, max_length=max_length)
+            if save_count == 2:
+                raise OSError("simulated storage failure")
+            return stored_name
+
+        with (
+            mock.patch.object(storage, "save", side_effect=save_then_fail_on_second_file),
+            mock.patch.object(storage, "delete", side_effect=OSError("storage unavailable")),
+        ):
+            response = self.applicant_post(
+                {
+                    "action": "save_draft",
+                    "identity_proof": [
+                        self.png_upload("erster-nachweis.png"),
+                        self.pdf_upload("zweiter-nachweis.pdf"),
+                    ],
+                }
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dateien konnten nicht sicher gespeichert werden.")
+        self.assertEqual(ApplicationProof.objects.filter(application=self.application).count(), 0)
+        cleanup_names = set(ApplicationProofCleanup.objects.values_list("storage_name", flat=True))
+        self.assertEqual(len(cleanup_names), 2)
+        self.assertTrue(all(storage.exists(name) for name in cleanup_names))
+
+        call_command("retry_application_proof_cleanup", stdout=StringIO())
+
+        self.assertFalse(ApplicationProofCleanup.objects.exists())
+        self.assertTrue(all(not storage.exists(name) for name in cleanup_names))
+
+    def test_cleanup_retry_failure_keeps_job_and_returns_nonzero_status(self) -> None:
+        cleanup = ApplicationProofCleanup.objects.create(storage_name="orphaned/opaque-file")
+
+        with (
+            mock.patch(
+                "wohnungsverwaltung.management.commands.retry_application_proof_cleanup.default_storage.delete",
+                side_effect=OSError("storage unavailable"),
+            ),
+            self.assertLogs(
+                "wohnungsverwaltung.management.commands.retry_application_proof_cleanup",
+                level="ERROR",
+            ),
+        ):
+            with self.assertRaises(CommandError):
+                call_command("retry_application_proof_cleanup", stdout=StringIO())
+
+        self.assertTrue(ApplicationProofCleanup.objects.filter(pk=cleanup.pk).exists())
 
     def test_submitted_main_application_is_read_only_for_applicant(self) -> None:
         self.applicant_post(self.complete_upload_data())
@@ -2805,6 +2942,34 @@ class MainApplicationUploadTests(TestCase):
         self.assertIn("credit_report_proof", response.context["form"].errors)
         self.application.refresh_from_db()
         self.assertIsNone(self.application.submitted_at)
+
+    def test_png_with_valid_chunk_checksums_but_invalid_image_data_is_rejected(self) -> None:
+        response = self.applicant_post(
+            {
+                "action": "save_draft",
+                "identity_proof": self.broken_png_upload(),
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("identity_proof", response.context["form"].errors)
+        self.assertFalse(self.application.proof_files.exists())
+
+    def test_pdf_with_header_and_eof_markers_but_invalid_structure_is_rejected(self) -> None:
+        response = self.applicant_post(
+            {
+                "action": "save_draft",
+                "credit_report_proof": SimpleUploadedFile(
+                    "kein-pdf.pdf",
+                    b"%PDF-1.4\nwillkuerliche datei-inhalte\n%%EOF",
+                    content_type="application/pdf",
+                ),
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("credit_report_proof", response.context["form"].errors)
+        self.assertFalse(self.application.proof_files.exists())
 
     def test_proof_larger_than_eight_mib_is_rejected(self) -> None:
         data = self.complete_upload_data()

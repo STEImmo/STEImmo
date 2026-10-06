@@ -58,6 +58,7 @@ from .handover_lock import protocol_mutation
 from .models import (
     ApplicationProof,
     ApplicationProofCategory,
+    ApplicationProofCleanup,
     Bewerbung,
     BewerbungStatus,
     Merkmal,
@@ -369,12 +370,15 @@ def _remove_application_proof(
             )
 
         storage, stored_name = proof_file.storage, proof_file.name
+        if not _delete_application_proof_file(request, storage, stored_name):
+            return redirect(
+                "wohnungsverwaltung:main_application_status", application_id=application_id
+            )
         original_name_field = f"{legacy_field}_original_name"
         with transaction.atomic():
             setattr(application, legacy_field, "")
             setattr(application, original_name_field, "")
             application.save(update_fields=(legacy_field, original_name_field, "updated_at"))
-            transaction.on_commit(lambda: storage.delete(stored_name))
     else:
         try:
             proof_id = UUID(reference)
@@ -407,12 +411,33 @@ def _remove_application_proof(
             )
 
         storage, stored_name = proof.file.storage, proof.file.name
+        if not _delete_application_proof_file(request, storage, stored_name):
+            return redirect(
+                "wohnungsverwaltung:main_application_status", application_id=application_id
+            )
         with transaction.atomic():
             proof.delete()
-            transaction.on_commit(lambda: storage.delete(stored_name))
 
     messages.success(request, "Der Nachweis wurde entfernt.")
     return redirect("wohnungsverwaltung:main_application_status", application_id=application_id)
+
+
+def _delete_application_proof_file(request: HttpRequest, storage, stored_name: str) -> bool:
+    """Keep the database reference when private storage cannot remove a proof."""
+    try:
+        storage.delete(stored_name)
+    except Exception as error:
+        logger.error(
+            "Could not delete stored application proof %s (%s).",
+            stored_name,
+            type(error).__name__,
+        )
+        messages.error(
+            request,
+            "Der Nachweis konnte nicht entfernt werden. Bitte versuchen Sie es erneut.",
+        )
+        return False
+    return True
 
 
 @applicant_required
@@ -479,11 +504,15 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
                 raise
 
             cleanup_failures = form.cleanup_stored_proof_files()
-            if cleanup_failures:
-                logger.error(
-                    "Cleanup failed for %d main application proof file(s).",
-                    len(cleanup_failures),
-                )
+            for storage, stored_name in cleanup_failures:
+                try:
+                    ApplicationProofCleanup.objects.get_or_create(storage_name=stored_name)
+                except DatabaseError as cleanup_error:
+                    logger.error(
+                        "Could not persist cleanup job for application proof %s (%s).",
+                        stored_name,
+                        type(cleanup_error).__name__,
+                    )
             logger.error(
                 "Main application proof persistence failed (%s).",
                 type(error).__name__,

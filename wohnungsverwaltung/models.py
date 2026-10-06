@@ -471,6 +471,16 @@ class ApplicationProof(models.Model):
         ]
 
 
+class ApplicationProofCleanup(models.Model):
+    cleanup_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    storage_name = models.CharField(max_length=512, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "application_proof_cleanup"
+        ordering = ("created_at", "cleanup_id")
+
+
 class Stellplatz(models.Model):
     stellplatz_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)

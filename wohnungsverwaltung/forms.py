@@ -9,11 +9,14 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.core.files.storage import Storage
 from django.db import transaction
 from django.db.models import Q
 from django.forms.formsets import BaseFormSet
 from django.forms.models import inlineformset_factory
 from PIL import Image, UnidentifiedImageError
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 from .access import (
     ACCESS_PERMISSION_CODENAMES,
@@ -565,7 +568,7 @@ class MainApplicationForm(forms.Form):
 
     def __init__(self, *args, instance: Bewerbung, **kwargs):
         self.instance = instance
-        self.stored_proof_files = []
+        self.stored_proof_files: list[tuple[Storage, str]] = []
         super().__init__(*args, **kwargs)
         for _category, field_name, label in self.PROOF_FIELDS:
             self.fields[field_name].widget.attrs["data-proof-upload-input"] = ""
@@ -669,14 +672,14 @@ class MainApplicationForm(forms.Form):
                 proof.file.name = saved_name
                 proof.save()
 
-    def cleanup_stored_proof_files(self) -> list[str]:
-        failures = []
+    def cleanup_stored_proof_files(self) -> list[tuple[Storage, str]]:
+        failures: list[tuple[Storage, str]] = []
         for storage, stored_name in reversed(self.stored_proof_files):
             try:
                 storage.delete(stored_name)
-            except Exception as error:
-                failures.append(type(error).__name__)
-        self.stored_proof_files.clear()
+            except Exception:
+                failures.append((storage, stored_name))
+        self.stored_proof_files = failures
         return failures
 
     @staticmethod
@@ -699,9 +702,10 @@ class MainApplicationForm(forms.Form):
             upload.seek(0)
             header = upload.read(1024)
             if header.startswith(b"%PDF-"):
-                upload.seek(max(0, upload.size - 1024))
-                if b"%%EOF" not in upload.read():
-                    raise forms.ValidationError("Die PDF-Datei ist beschädigt oder ungültig.")
+                upload.seek(0)
+                reader = PdfReader(upload, strict=True)
+                if not reader.pages:
+                    raise forms.ValidationError("Das PDF enthält keine Seiten.")
                 return upload
 
             upload.seek(0)
@@ -711,6 +715,11 @@ class MainApplicationForm(forms.Form):
                     if image.format != "PNG":
                         raise forms.ValidationError("Erlaubt sind nur PNG- oder PDF-Dateien.")
                     image.verify()
+                upload.seek(0)
+                with Image.open(upload) as image:
+                    if image.format != "PNG":
+                        raise forms.ValidationError("Erlaubt sind nur PNG- oder PDF-Dateien.")
+                    image.load()
             return upload
         except forms.ValidationError:
             raise
@@ -718,6 +727,7 @@ class MainApplicationForm(forms.Form):
             Image.DecompressionBombError,
             Image.DecompressionBombWarning,
             OSError,
+            PdfReadError,
             SyntaxError,
             UnidentifiedImageError,
             ValueError,
