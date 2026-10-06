@@ -2366,10 +2366,24 @@ class MainApplicationUploadTests(TestCase):
         self.assertContains(response, "data-proof-upload-form")
         self.assertContains(response, "data-proof-upload-input")
         self.assertEqual(response.content.count(b"data-proof-selection-list"), 3)
-        self.assertContains(response, "main_application_uploads.js")
+        self.assertContains(response, "main_application_uploads.js?v=3")
+        self.assertContains(response, "auch nacheinander auswählen")
         self.assertContains(response, "Entwurf speichern")
         self.assertNotContains(response, "Ergänzende Angaben")
         self.assertNotContains(response, "/media/")
+
+    def test_saved_proof_filename_is_available_for_immediate_duplicate_check(self) -> None:
+        self.application.proof_files.create(
+            category=ApplicationProofCategory.IDENTITY,
+            file=self.png_upload("original-file.png"),
+            original_name="personalausweis.png",
+        )
+        self.client.force_login(self.applicant_user)
+
+        response = self.client.get(self.main_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-proof-existing-name>personalausweis.png</span>')
 
     def test_applicant_can_save_an_incomplete_draft(self) -> None:
         response = self.applicant_post(

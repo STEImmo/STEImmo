@@ -564,7 +564,8 @@ class MainApplicationForm(forms.Form):
         for _category, field_name, label in self.PROOF_FIELDS:
             self.fields[field_name].widget.attrs["data-proof-upload-input"] = ""
             self.fields[field_name].help_text = (
-                f"Wählen Sie mehrere Dateien für {label} aus. Maximal "
+                f"Sie können Dateien für {label} auch nacheinander auswählen; "
+                f"die bisherige Auswahl bleibt erhalten. Maximal "
                 f"{self.MAX_FILES_PER_CATEGORY} Dateien pro Nachweiskategorie."
             )
 

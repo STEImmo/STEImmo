@@ -11,6 +11,8 @@
             list: field.querySelector("[data-proof-selection-list]"),
             label: field.querySelector("[data-proof-selection-label]"),
             error: field.querySelector("[data-proof-selection-error]"),
+            selectedFiles: [],
+            selectionError: "",
         }))
         .filter((entry) => entry.input && entry.list && entry.error);
 
@@ -21,10 +23,16 @@
     const normalizeFileName = (filename) =>
         filename.normalize("NFKC").trim().toUpperCase().toLowerCase();
     const existingNames = new Set(
-        Array.from(form.querySelectorAll("[data-proof-existing-name]"))
+        Array.from(document.querySelectorAll("[data-proof-existing-name]"))
             .map((element) => normalizeFileName(element.textContent || ""))
             .filter(Boolean),
     );
+
+    const assignFiles = (input, files) => {
+        const transfer = new DataTransfer();
+        files.forEach((file) => transfer.items.add(file));
+        input.files = transfer.files;
+    };
 
     const renderSelections = () => {
         const usedNames = new Set(existingNames);
@@ -46,11 +54,11 @@
             fileEntries.set(entry, { files, duplicateFlags });
         }
 
-        let hasDuplicates = false;
+        let hasErrors = false;
         for (const entry of fields) {
             const { files, duplicateFlags } = fileEntries.get(entry);
             const duplicateNames = duplicatesByField.get(entry);
-            hasDuplicates ||= duplicateNames.length > 0;
+            hasErrors ||= duplicateNames.length > 0 || Boolean(entry.selectionError);
             entry.list.replaceChildren();
             entry.label.hidden = files.length === 0;
 
@@ -88,6 +96,10 @@
                     + "verwendet. Entfernen Sie die Datei aus der Auswahl oder benennen Sie sie um.";
                 entry.error.hidden = false;
                 entry.input.setAttribute("aria-invalid", "true");
+            } else if (entry.selectionError) {
+                entry.error.textContent = entry.selectionError;
+                entry.error.hidden = false;
+                entry.input.setAttribute("aria-invalid", "true");
             } else {
                 entry.error.textContent = "";
                 entry.error.hidden = true;
@@ -95,11 +107,27 @@
             }
         }
 
-        return hasDuplicates;
+        return hasErrors;
     };
 
     for (const entry of fields) {
-        entry.input.addEventListener("change", renderSelections);
+        entry.input.addEventListener("change", () => {
+            const newlySelectedFiles = Array.from(entry.input.files || []);
+            const combinedFiles = [...entry.selectedFiles, ...newlySelectedFiles];
+
+            try {
+                assignFiles(entry.input, combinedFiles);
+                entry.selectedFiles = combinedFiles;
+                entry.selectionError = "";
+                renderSelections();
+            } catch {
+                entry.selectedFiles = newlySelectedFiles;
+                entry.selectionError =
+                    "Dateien konnten nicht angehängt werden. Bitte wählen Sie alle Dateien "
+                    + "gemeinsam aus oder verwenden Sie einen aktuellen Browser.";
+                renderSelections();
+            }
+        });
     }
 
     form.addEventListener("click", (event) => {
@@ -115,21 +143,20 @@
 
         const removeIndex = Number(button.dataset.proofRemoveSelection);
         try {
-            const remainingFiles = new DataTransfer();
-            Array.from(entry.input.files || []).forEach((file, index) => {
-                if (index !== removeIndex) {
-                    remainingFiles.items.add(file);
-                }
-            });
-            entry.input.files = remainingFiles.files;
+            const remainingFiles = Array.from(entry.input.files || []).filter(
+                (_file, index) => index !== removeIndex,
+            );
+            assignFiles(entry.input, remainingFiles);
+            entry.selectedFiles = remainingFiles;
+            entry.selectionError = "";
             renderSelections();
             entry.input.focus();
         } catch {
             entry.input.value = "";
-            renderSelections();
-            entry.error.textContent =
+            entry.selectedFiles = [];
+            entry.selectionError =
                 "Die Auswahl wurde geleert. Wählen Sie die gewünschten Dateien bitte erneut aus.";
-            entry.error.hidden = false;
+            renderSelections();
         }
     });
 
