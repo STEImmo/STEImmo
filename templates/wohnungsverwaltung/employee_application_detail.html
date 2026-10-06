@@ -35,7 +35,10 @@
                     <ul class="uk-list uk-list-divider">
                         {% for document in group.documents %}
                             <li class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
-                                <span>{{ document.name }}</span>
+                                <span>
+                                    <span>{{ document.name }}</span>
+                                    <span class="uk-text-meta">({{ document.size_display }})</span>
+                                </span>
                                 <a class="uk-button uk-button-default uk-button-small"
                                    href="{{ document.download_url }}">
                                     Sicher herunterladen

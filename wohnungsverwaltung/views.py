@@ -201,6 +201,19 @@ def pre_application_list(request: HttpRequest) -> HttpResponse:
     )
 
 
+def _stored_file_size_display(file_field) -> str:
+    try:
+        size = file_field.size
+    except (NotImplementedError, OSError):
+        return "Größe nicht verfügbar"
+
+    if size < 1024:
+        return f"{size} B"
+    if size < 1024 * 1024:
+        return f"{size / 1024:.1f} KiB"
+    return f"{size / (1024 * 1024):.1f} MiB"
+
+
 def _application_proof_groups(
     application: Bewerbung,
     *,
@@ -231,6 +244,7 @@ def _application_proof_groups(
             documents.append(
                 {
                     "name": original_name or "Dateiname dieses älteren Uploads nicht erfasst",
+                    "size_display": _stored_file_size_display(legacy_file),
                     "delete_id": f"legacy:{legacy_field}",
                     "download_url": reverse(
                         legacy_download_view,
@@ -244,6 +258,7 @@ def _application_proof_groups(
             documents.append(
                 {
                     "name": proof.original_name,
+                    "size_display": _stored_file_size_display(proof.file),
                     "delete_id": str(proof.pk),
                     "download_url": reverse(
                         proof_download_view,

@@ -45,7 +45,10 @@
                         <ul class="uk-list uk-list-divider">
                             {% for document in group.documents %}
                                 <li class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
-                                    <span>{{ document.name }}</span>
+                                    <span>
+                                        <span>{{ document.name }}</span>
+                                        <span class="uk-text-meta">({{ document.size_display }})</span>
+                                    </span>
                                     <a class="uk-button uk-button-default uk-button-small"
                                        href="{{ document.download_url }}">
                                         Herunterladen / ansehen
@@ -119,7 +122,10 @@
                                                 <ul class="uk-list uk-list-divider uk-margin-small-top">
                                                     {% for document in group.documents %}
                                                         <li class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
-                                                            <span data-proof-existing-name>{{ document.name }}</span>
+                                                            <span>
+                                                                <span data-proof-existing-name>{{ document.name }}</span>
+                                                                <span class="uk-text-meta">({{ document.size_display }})</span>
+                                                            </span>
                                                             <div class="uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
                                                                 <div>
                                                                     <a class="uk-button uk-button-default uk-button-small"
@@ -191,7 +197,7 @@
                         </p>
                     </div>
                 </div>
-                <script src="{% static 'js/main_application_uploads.js' %}?v=5"></script>
+                <script src="{% static 'js/main_application_uploads.js' %}?v=7"></script>
             {% endif %}
         </article>
     </div>

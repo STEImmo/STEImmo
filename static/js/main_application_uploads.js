@@ -92,14 +92,22 @@
 
                 const name = document.createElement("span");
                 name.textContent = file.name;
-                item.append(name);
+                const fileInfo = document.createElement("span");
+                fileInfo.className = "uk-flex uk-flex-middle uk-flex-wrap";
+                fileInfo.append(name);
+
+                const fileSize = document.createElement("span");
+                fileSize.className = "uk-text-meta uk-margin-small-left";
+                fileSize.textContent = formatFileSize(file.size);
+                fileInfo.append(fileSize);
 
                 if (duplicateFlags[index]) {
                     const warning = document.createElement("span");
                     warning.className = "uk-text-danger uk-text-small uk-margin-small-left";
                     warning.textContent = "Dateiname bereits verwendet";
-                    item.append(warning);
+                    fileInfo.append(warning);
                 }
+                item.append(fileInfo);
 
                 const removeButton = document.createElement("button");
                 removeButton.type = "button";
@@ -158,8 +166,9 @@
         if (totalError) {
             totalError.hidden = !overTotalSizeLimit;
             totalError.textContent = overTotalSizeLimit
-                ? `Die ausgewählten Dateien überschreiten zusammen das Gesamtlimit von `
-                    + `${formatMiB(totalSizeLimit)}. Entfernen Sie Dateien aus der Auswahl.`
+                ? `Die ausgewählten Dateien sind zusammen ${formatFileSize(totalSelectedBytes)} groß `
+                    + "und überschreiten das Gesamtlimit für einen Speichervorgang. "
+                    + "Entfernen Sie Dateien aus der Auswahl."
                 : "";
         }
         hasErrors ||= overTotalSizeLimit;
@@ -171,6 +180,16 @@
         const formatted = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 })
             .format(bytes / (1024 * 1024));
         return `${formatted} MiB`;
+    };
+    const formatFileSize = (bytes) => {
+        if (bytes < 1024) {
+            return `${bytes} B`;
+        }
+        const unit = bytes < 1024 * 1024 ? "KiB" : "MiB";
+        const divisor = unit === "KiB" ? 1024 : 1024 * 1024;
+        const formatted = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 })
+            .format(bytes / divisor);
+        return `${formatted} ${unit}`;
     };
 
     const showValidationPopup = () => {

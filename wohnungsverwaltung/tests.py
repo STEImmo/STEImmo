@@ -2371,14 +2371,14 @@ class MainApplicationUploadTests(TestCase):
         self.assertContains(response, "data-proof-total-size-error")
         self.assertContains(response, "data-proof-upload-modal")
         self.assertEqual(response.content.count(b"data-proof-selection-list"), 3)
-        self.assertContains(response, "main_application_uploads.js?v=5")
+        self.assertContains(response, "main_application_uploads.js?v=7")
         self.assertContains(response, "auch nacheinander auswählen")
         self.assertContains(response, "Entwurf speichern")
         self.assertNotContains(response, "Ergänzende Angaben")
         self.assertNotContains(response, "/media/")
 
     def test_saved_proof_filename_is_available_for_immediate_duplicate_check(self) -> None:
-        self.application.proof_files.create(
+        proof = self.application.proof_files.create(
             category=ApplicationProofCategory.IDENTITY,
             file=self.png_upload("original-file.png"),
             original_name="personalausweis.png",
@@ -2389,6 +2389,7 @@ class MainApplicationUploadTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'data-proof-existing-name>personalausweis.png</span>')
+        self.assertContains(response, f"({proof.file.size} B)")
 
     def test_applicant_can_save_an_incomplete_draft(self) -> None:
         response = self.applicant_post(
@@ -2769,6 +2770,7 @@ class MainApplicationUploadTests(TestCase):
         self.assertContains(employee_list, "Berta Bewerber")
         self.assertEqual(employee_detail.status_code, 200)
         self.assertContains(employee_detail, "Gehaltsnachweise")
+        self.assertContains(employee_detail, f"({proof.file.size} B)")
         self.assertNotContains(employee_detail, "/media/")
         self.assertEqual(employee_download.status_code, 200)
         self.assertEqual(employee_download["X-Content-Type-Options"], "nosniff")
