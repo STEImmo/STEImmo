@@ -19,6 +19,8 @@ from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
 from .forms import BewerbungForm, InlineRoomChecklistFormSet, RoomChecklistItemForm
 from .models import (
     AbnahmeStatus,
+    ApplicationProof,
+    ApplicationProofCategory,
     Bewerbung,
     BewerbungStatus,
     Merkmal,
@@ -2373,9 +2375,13 @@ class MainApplicationUploadTests(TestCase):
         self.assertRedirects(response, self.main_url, fetch_redirect_response=False)
         self.application.refresh_from_db()
         self.assertIsNone(self.application.submitted_at)
-        self.assertTrue(self.application.identity_proof)
+        proof = ApplicationProof.objects.get(
+            application=self.application,
+            category=ApplicationProofCategory.IDENTITY,
+        )
+        self.assertEqual(proof.original_name, "ausweis.png")
         self.assertTrue(
-            self.application.identity_proof.storage.exists(self.application.identity_proof.name)
+            proof.file.storage.exists(proof.file.name)
         )
         self.assertContains(self.client.get(self.main_url), "Ihr Entwurf wurde gespeichert.")
 
@@ -2385,13 +2391,16 @@ class MainApplicationUploadTests(TestCase):
         self.assertRedirects(response, self.main_url)
         self.application.refresh_from_db()
         self.assertIsNotNone(self.application.submitted_at)
-        for field_name in ("income_proof", "identity_proof", "credit_report_proof"):
-            stored_file = getattr(self.application, field_name)
-            self.assertTrue(stored_file)
-            self.assertTrue(stored_file.storage.exists(stored_file.name))
-            self.assertNotIn("gehaltsabrechnungen", stored_file.name)
-            self.assertNotIn("personalausweis", stored_file.name)
-            self.assertNotIn("schufa.pdf", stored_file.name)
+        expected_proofs = (
+            (ApplicationProofCategory.INCOME, "gehaltsabrechnungen.pdf"),
+            (ApplicationProofCategory.IDENTITY, "personalausweis.png"),
+            (ApplicationProofCategory.CREDIT_REPORT, "schufa.pdf"),
+        )
+        for category, original_name in expected_proofs:
+            proof = ApplicationProof.objects.get(application=self.application, category=category)
+            self.assertEqual(proof.original_name, original_name)
+            self.assertTrue(proof.file.storage.exists(proof.file.name))
+            self.assertNotIn(original_name, proof.file.name)
         self.assertContains(self.client.get(self.main_url), "Main-Bewerbung eingereicht")
 
     def test_final_submission_requires_every_proof(self) -> None:
@@ -2405,23 +2414,72 @@ class MainApplicationUploadTests(TestCase):
         self.application.refresh_from_db()
         self.assertIsNone(self.application.submitted_at)
 
-    def test_applicant_can_replace_a_proof_while_application_is_unlocked(self) -> None:
+    def test_applicant_can_add_and_remove_proof_files_while_application_is_unlocked(self) -> None:
         self.applicant_post(self.complete_upload_data())
-        self.application.refresh_from_db()
-        previous_identity_name = self.application.identity_proof.name
-        previous_income_name = self.application.income_proof.name
+        previous_identity = ApplicationProof.objects.get(
+            application=self.application,
+            category=ApplicationProofCategory.IDENTITY,
+        )
+        previous_identity_name = previous_identity.file.name
+        income_proof = ApplicationProof.objects.get(
+            application=self.application,
+            category=ApplicationProofCategory.INCOME,
+        )
+        previous_income_name = income_proof.file.name
 
-        with self.captureOnCommitCallbacks(execute=True):
-            response = self.applicant_post(
-                {"action": "submit", "identity_proof": self.pdf_upload("neue-datei.pdf")}
-            )
+        response = self.applicant_post(
+            {"action": "submit", "identity_proof": self.pdf_upload("neue-datei.pdf")}
+        )
 
         self.assertRedirects(response, self.main_url)
-        self.application.refresh_from_db()
-        self.assertNotEqual(self.application.identity_proof.name, previous_identity_name)
-        self.assertFalse(self.application.identity_proof.storage.exists(previous_identity_name))
-        self.assertEqual(self.application.income_proof.name, previous_income_name)
-        self.assertTrue(self.application.income_proof.storage.exists(previous_income_name))
+        self.assertEqual(
+            ApplicationProof.objects.filter(
+                application=self.application,
+                category=ApplicationProofCategory.IDENTITY,
+            ).count(),
+            2,
+        )
+        replacement = ApplicationProof.objects.get(
+            application=self.application,
+            category=ApplicationProofCategory.IDENTITY,
+            original_name="neue-datei.pdf",
+        )
+        self.assertTrue(previous_identity.file.storage.exists(previous_identity_name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            removal_response = self.applicant_post(
+                {"remove_proof": str(previous_identity.pk)}
+            )
+
+        self.assertRedirects(removal_response, self.main_url)
+        self.assertFalse(replacement.file.storage.exists(previous_identity_name))
+        self.assertTrue(replacement.file.storage.exists(replacement.file.name))
+        self.assertEqual(income_proof.file.name, previous_income_name)
+        self.assertTrue(income_proof.file.storage.exists(previous_income_name))
+
+    def test_applicant_can_upload_multiple_files_for_one_category(self) -> None:
+        response = self.applicant_post(
+            {
+                "action": "submit",
+                "income_proof": [
+                    self.pdf_upload("gehalt-januar.pdf"),
+                    self.pdf_upload("gehalt-februar.pdf"),
+                ],
+                "identity_proof": self.png_upload("personalausweis.png"),
+                "credit_report_proof": self.pdf_upload("schufa.pdf"),
+            }
+        )
+
+        self.assertRedirects(response, self.main_url)
+        income_proofs = ApplicationProof.objects.filter(
+            application=self.application,
+            category=ApplicationProofCategory.INCOME,
+        )
+        self.assertEqual(income_proofs.count(), 2)
+        self.assertSetEqual(
+            set(income_proofs.values_list("original_name", flat=True)),
+            {"gehalt-januar.pdf", "gehalt-februar.pdf"},
+        )
 
     def test_invalid_or_tampered_file_contents_are_rejected(self) -> None:
         data = self.complete_upload_data()
@@ -2457,10 +2515,11 @@ class MainApplicationUploadTests(TestCase):
 
         response = self.applicant_post(data)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("income_proof", response.context["form"].errors)
+        self.assertEqual(response.status_code, 413)
+        self.assertContains(response, "8 MiB", status_code=413)
         self.application.refresh_from_db()
         self.assertIsNone(self.application.submitted_at)
+        self.assertFalse(self.application.proof_files.exists())
 
     def test_total_request_size_is_limited_before_multipart_fields_are_read(self) -> None:
         with self.settings(MAIN_APPLICATION_MAX_REQUEST_SIZE=1024):
@@ -2475,13 +2534,26 @@ class MainApplicationUploadTests(TestCase):
         self.assertContains(response, "Gesamtgröße des Uploads", status_code=413)
 
     def test_locked_application_cannot_be_edited_or_have_documents_downloaded(self) -> None:
+        proof = ApplicationProof.objects.create(
+            application=self.application,
+            category=ApplicationProofCategory.IDENTITY,
+            file=self.png_upload("personalausweis.png"),
+            original_name="personalausweis.png",
+        )
         self.application.main_application_unlocked = False
         self.application.save(update_fields=["main_application_unlocked"])
         self.client.force_login(self.applicant_user)
 
         response = self.client.get(self.main_url)
+        download_response = self.client.get(
+            reverse(
+                "wohnungsverwaltung:applicant_application_proof_download",
+                args=[self.application.pk, proof.pk],
+            )
+        )
 
         self.assertEqual(response.status_code, 404)
+        self.assertEqual(download_response.status_code, 404)
 
     def test_applicant_cannot_access_another_applicants_form_or_files(self) -> None:
         other_application = Bewerbung.objects.create(
@@ -2490,6 +2562,12 @@ class MainApplicationUploadTests(TestCase):
             personenanzahl=1,
             ueber_mich="Private Angaben.",
             main_application_unlocked=True,
+        )
+        foreign_proof = ApplicationProof.objects.create(
+            application=other_application,
+            category=ApplicationProofCategory.INCOME,
+            file=self.pdf_upload("gehalt.pdf"),
+            original_name="gehalt.pdf",
         )
         self.applicant_post(self.complete_upload_data())
         self.client.force_login(self.applicant_user)
@@ -2503,19 +2581,69 @@ class MainApplicationUploadTests(TestCase):
                 args=[other_application.pk, "income_proof"],
             )
         )
+        foreign_proof_download = self.client.get(
+            reverse(
+                "wohnungsverwaltung:applicant_application_proof_download",
+                args=[other_application.pk, foreign_proof.pk],
+            )
+        )
 
         self.assertEqual(foreign_form.status_code, 404)
         self.assertEqual(foreign_document.status_code, 403)
+        self.assertEqual(foreign_proof_download.status_code, 404)
+
+    def test_applicant_can_download_their_own_saved_proof(self) -> None:
+        self.applicant_post({"action": "save_draft", "identity_proof": self.png_upload()})
+        proof = ApplicationProof.objects.get(
+            application=self.application,
+            category=ApplicationProofCategory.IDENTITY,
+        )
+        self.client.force_login(self.applicant_user)
+
+        response = self.client.get(
+            reverse(
+                "wohnungsverwaltung:applicant_application_proof_download",
+                args=[self.application.pk, proof.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+        self.assertIn("attachment", response["Content-Disposition"])
+        self.assertEqual(response["Cache-Control"], "private, no-store")
+
+    def test_applicant_cannot_download_proofs_after_withdrawal(self) -> None:
+        self.applicant_post({"action": "save_draft", "identity_proof": self.png_upload()})
+        proof = ApplicationProof.objects.get(
+            application=self.application,
+            category=ApplicationProofCategory.IDENTITY,
+        )
+        self.application.interest_withdrawn_at = datetime.now(UTC)
+        self.application.save(update_fields=["interest_withdrawn_at"])
+        self.client.force_login(self.applicant_user)
+
+        response = self.client.get(
+            reverse(
+                "wohnungsverwaltung:applicant_application_proof_download",
+                args=[self.application.pk, proof.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
 
     def test_only_employees_can_list_review_and_download_submitted_proofs(self) -> None:
         self.applicant_post(self.complete_upload_data())
+        proof = ApplicationProof.objects.get(
+            application=self.application,
+            category=ApplicationProofCategory.IDENTITY,
+        )
         list_url = reverse("wohnungsverwaltung:employee_application_list")
         detail_url = reverse(
             "wohnungsverwaltung:employee_application_detail", args=[self.application.pk]
         )
         download_url = reverse(
-            "wohnungsverwaltung:employee_application_document",
-            args=[self.application.pk, "identity_proof"],
+            "wohnungsverwaltung:employee_application_proof_download",
+            args=[self.application.pk, proof.pk],
         )
 
         applicant_list = self.client.get(list_url)
@@ -2541,6 +2669,10 @@ class MainApplicationUploadTests(TestCase):
 
     def test_employee_can_still_view_and_download_proofs_after_withdrawal(self) -> None:
         self.applicant_post(self.complete_upload_data())
+        proof = ApplicationProof.objects.get(
+            application=self.application,
+            category=ApplicationProofCategory.CREDIT_REPORT,
+        )
         self.application.refresh_from_db()
         self.application.interest_withdrawn_at = datetime.now(UTC)
         self.application.save(update_fields=["interest_withdrawn_at"])
@@ -2549,8 +2681,8 @@ class MainApplicationUploadTests(TestCase):
         list_response = self.client.get(reverse("wohnungsverwaltung:employee_application_list"))
         download_response = self.client.get(
             reverse(
-                "wohnungsverwaltung:employee_application_document",
-                args=[self.application.pk, "credit_report_proof"],
+                "wohnungsverwaltung:employee_application_proof_download",
+                args=[self.application.pk, proof.pk],
             )
         )
 

@@ -1,7 +1,6 @@
 import json
 from uuid import UUID
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -74,6 +73,7 @@ from .models import (
     Wohnung,
     calculate_photo_checksum,
 )
+from .upload_limits import upload_too_large_response
 
 PROTOCOL_STATUS_LABELS = {
     ProtokollStatus.OPEN: "In Bearbeitung",
@@ -374,33 +374,18 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
 
     proof_groups = _application_proof_groups(application)
     if request.method == "POST":
-        try:
-            content_length = int(request.META.get("CONTENT_LENGTH") or 0)
-        except (TypeError, ValueError):
-            content_length = 0
-        if content_length > settings.MAIN_APPLICATION_MAX_REQUEST_SIZE:
-            form = MainApplicationForm(instance=application)
-            form.add_error(
-                None,
-                "Die Gesamtgröße des Uploads ist zu groß. Bitte laden Sie kleinere Dateien hoch.",
-            )
-            return render(
-                request,
-                "wohnungsverwaltung/main_application_status.html",
-                {
-                    "application": application,
-                    "form": form,
-                    "proof_groups": proof_groups,
-                },
-                status=413,
-            )
+        post_data = request.POST
+        uploaded_files = request.FILES
+        upload_error = getattr(request, "_main_application_upload_error", None)
+        if upload_error:
+            return upload_too_large_response(upload_error)
 
-        if "remove_proof" in request.POST:
+        if "remove_proof" in post_data:
             return _remove_application_proof(request, application, application_id)
 
         form = MainApplicationForm(
-            request.POST,
-            request.FILES,
+            post_data,
+            uploaded_files,
             instance=application,
         )
         if form.is_valid():
