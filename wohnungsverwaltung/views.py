@@ -610,29 +610,32 @@ def employee_application_detail(request: HttpRequest, application_id: UUID) -> H
 
 def _application_document_response(proof_file, download_label: str) -> FileResponse:
     try:
-        proof_file.open("rb")
-        header = proof_file.read(1024)
-        proof_file.seek(max(0, proof_file.size - 1024))
-        footer = proof_file.read()
-    except OSError as error:
+        stream = proof_file.open("rb")
+        header = stream.read(8)
+        # Upload validation already checks the full file. Here the signature only
+        # selects the download extension, including for older private proofs.
+        if header.startswith(b"%PDF-"):
+            extension = "pdf"
+        elif header.startswith(b"\x89PNG\r\n\x1a\n"):
+            extension = "png"
+        else:
+            raise Http404("Der gespeicherte Nachweis hat ein ungültiges Dateiformat.")
+        stream.seek(0)
+        # Keep this descriptor open: removing the path concurrently must not
+        # force a second open between checking and streaming the document.
+        response = FileResponse(
+            stream,
+            as_attachment=True,
+            filename=f"{download_label}.{extension}",
+            content_type="application/octet-stream",
+        )
+    except (OSError, ValueError) as error:
         proof_file.close()
         raise Http404("Der gespeicherte Nachweis kann nicht geöffnet werden.") from error
-    finally:
+    except Exception:
         proof_file.close()
+        raise
 
-    if header.startswith(b"%PDF-") and b"%%EOF" in footer:
-        extension = "pdf"
-    elif header.startswith(b"\x89PNG\r\n\x1a\n"):
-        extension = "png"
-    else:
-        raise Http404("Der gespeicherte Nachweis hat ein ungültiges Dateiformat.")
-
-    response = FileResponse(
-        proof_file.open("rb"),
-        as_attachment=True,
-        filename=f"{download_label}.{extension}",
-        content_type="application/octet-stream",
-    )
     response["X-Content-Type-Options"] = "nosniff"
     response["Cache-Control"] = "private, no-store"
     return response

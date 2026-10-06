@@ -84,6 +84,8 @@ Bewerber bearbeiten ihre Nachweise im eigenen freigeschalteten Entwurf. Nach der
 Einreichung ist die Bewerbung unveränderbar und für Mitarbeiter einsehbar.
 PDFs werden strukturell geprüft; technisch nicht verarbeitbare oder beschädigte
 Dokumente werden als Formularfehler abgelehnt. Das ersetzt keinen Virenscanner.
+Geschützte Downloads verwenden den bereits geöffneten Dateistream bis zum Ende
+der Antwort; auch PDFs mit zusätzlichen Leerzeichen am Dateiende bleiben abrufbar.
 
 Beim Entfernen eines Nachweises werden Datenbankreferenz und Bereinigungsauftrag
 in derselben Transaktion geändert. Erst nach dem Commit wird die Datei gelöscht.

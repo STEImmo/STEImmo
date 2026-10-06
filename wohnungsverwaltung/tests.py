@@ -18,6 +18,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import DatabaseError, IntegrityError, close_old_connections, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
+from django.db.models.fields.files import FieldFile
 from django.test import Client, TestCase, TransactionTestCase, skipUnlessDBFeature
 from django.urls import reverse
 from PIL import Image
@@ -3088,6 +3089,136 @@ class MainApplicationUploadTests(TestCase):
         self.assertNotContains(list_response, "Berta Bewerber")
         self.assertEqual(detail_response.status_code, 404)
         self.assertEqual(download_response.status_code, 404)
+
+    def test_accepted_pdf_with_trailing_whitespace_can_be_downloaded(self) -> None:
+        upload = self.pdf_upload("gehalt.pdf")
+        contents = upload.read() + b"\n" * 2048
+        data = self.complete_upload_data()
+        data["income_proof"] = SimpleUploadedFile(
+            "gehalt.pdf", contents, content_type="application/pdf"
+        )
+        self.assertRedirects(self.applicant_post(data), self.main_url)
+        proof = self.application.proof_files.get(category=ApplicationProofCategory.INCOME)
+        for user, view in (
+            (self.applicant_user, "applicant_application_proof_download"),
+            (self.employee_user, "employee_application_proof_download"),
+        ):
+            with self.subTest(view=view):
+                self.client.force_login(user)
+                response = self.client.get(
+                    reverse(f"wohnungsverwaltung:{view}", args=[self.application.pk, proof.pk])
+                )
+                try:
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(b"".join(response.streaming_content), contents)
+                    self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+                    self.assertEqual(response["Cache-Control"], "private, no-store")
+                    self.assertIn("attachment", response["Content-Disposition"])
+                finally:
+                    if getattr(response, "file_to_stream", None) is not None:
+                        response.file_to_stream.close()
+
+    def test_legacy_pdf_with_trailing_whitespace_can_be_downloaded(self) -> None:
+        contents = self.pdf_upload().read() + b"\n" * 2048
+        self.application.income_proof.save(
+            "legacy.pdf", SimpleUploadedFile("legacy.pdf", contents), save=True
+        )
+        data = self.complete_upload_data()
+        del data["income_proof"]
+        self.assertRedirects(self.applicant_post(data), self.main_url)
+        for user, view in (
+            (self.applicant_user, "applicant_application_document"),
+            (self.employee_user, "employee_application_document"),
+        ):
+            with self.subTest(view=view):
+                self.client.force_login(user)
+                response = self.client.get(
+                    reverse(
+                        f"wohnungsverwaltung:{view}", args=[self.application.pk, "income_proof"]
+                    )
+                )
+                try:
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(b"".join(response.streaming_content), contents)
+                finally:
+                    if getattr(response, "file_to_stream", None) is not None:
+                        response.file_to_stream.close()
+
+    def test_download_uses_open_stream_when_file_is_removed_on_close(self) -> None:
+        self.assertRedirects(self.applicant_post(self.complete_upload_data()), self.main_url)
+        proof = self.application.proof_files.get(category=ApplicationProofCategory.INCOME)
+        storage = proof.file.storage
+        with storage.open(proof.file.name, "rb") as stream:
+            contents = stream.read()
+        real_close = FieldFile.close
+
+        def remove_after_close(field_file):
+            real_close(field_file)
+            if field_file.name == proof.file.name:
+                storage.delete(field_file.name)
+
+        self.client.force_login(self.employee_user)
+        with mock.patch.object(FieldFile, "close", autospec=True, side_effect=remove_after_close):
+            response = self.client.get(
+                reverse(
+                    "wohnungsverwaltung:employee_application_proof_download",
+                    args=[self.application.pk, proof.pk],
+                )
+            )
+            try:
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(storage.exists(proof.file.name))
+                self.assertEqual(b"".join(response.streaming_content), contents)
+            finally:
+                if getattr(response, "file_to_stream", None) is not None:
+                    response.file_to_stream.close()
+        self.assertFalse(storage.exists(proof.file.name))
+
+    def test_download_continues_after_file_path_is_removed(self) -> None:
+        self.assertRedirects(self.applicant_post(self.complete_upload_data()), self.main_url)
+        proof = self.application.proof_files.get(category=ApplicationProofCategory.INCOME)
+        storage = proof.file.storage
+        with storage.open(proof.file.name, "rb") as stream:
+            contents = stream.read()
+        real_open = FieldFile.open
+        removed = False
+
+        def remove_after_open(field_file, *args, **kwargs):
+            nonlocal removed
+            stream = real_open(field_file, *args, **kwargs)
+            if field_file.name == proof.file.name and not removed:
+                storage.delete(field_file.name)
+                removed = True
+            return stream
+
+        self.client.force_login(self.applicant_user)
+        with mock.patch.object(FieldFile, "open", autospec=True, side_effect=remove_after_open):
+            response = self.client.get(
+                reverse(
+                    "wohnungsverwaltung:applicant_application_proof_download",
+                    args=[self.application.pk, proof.pk],
+                )
+            )
+            try:
+                self.assertEqual(response.status_code, 200)
+                self.assertFalse(storage.exists(proof.file.name))
+                self.assertEqual(b"".join(response.streaming_content), contents)
+            finally:
+                if getattr(response, "file_to_stream", None) is not None:
+                    response.file_to_stream.close()
+
+    def test_missing_stored_proof_returns_not_found(self) -> None:
+        self.assertRedirects(self.applicant_post(self.complete_upload_data()), self.main_url)
+        proof = self.application.proof_files.get(category=ApplicationProofCategory.INCOME)
+        proof.file.storage.delete(proof.file.name)
+        self.client.force_login(self.applicant_user)
+        response = self.client.get(
+            reverse(
+                "wohnungsverwaltung:applicant_application_proof_download",
+                args=[self.application.pk, proof.pk],
+            )
+        )
+        self.assertEqual(response.status_code, 404)
 
     def test_applicant_can_upload_multiple_files_for_one_category(self) -> None:
         response = self.applicant_post(
