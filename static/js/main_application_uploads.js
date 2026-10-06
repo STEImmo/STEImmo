@@ -5,15 +5,20 @@
     }
 
     const fields = Array.from(form.querySelectorAll("[data-proof-upload-field]"))
-        .map((field) => ({
-            field,
-            input: field.querySelector("[data-proof-upload-input]"),
-            list: field.querySelector("[data-proof-selection-list]"),
-            label: field.querySelector("[data-proof-selection-label]"),
-            error: field.querySelector("[data-proof-selection-error]"),
-            selectedFiles: [],
-            selectionError: "",
-        }))
+        .map((field) => {
+            const input = field.querySelector("[data-proof-upload-input]");
+            return {
+                field,
+                input,
+                list: field.querySelector("[data-proof-selection-list]"),
+                label: field.querySelector("[data-proof-selection-label]"),
+                error: field.querySelector("[data-proof-selection-error]"),
+                maxFiles: Number(input?.dataset.maxFiles || 10),
+                existingCount: field.querySelectorAll("[data-proof-existing-name]").length,
+                selectedFiles: [],
+                selectionError: "",
+            };
+        })
         .filter((entry) => entry.input && entry.list && entry.error);
 
     if (!fields.length) {
@@ -58,7 +63,13 @@
         for (const entry of fields) {
             const { files, duplicateFlags } = fileEntries.get(entry);
             const duplicateNames = duplicatesByField.get(entry);
-            hasErrors ||= duplicateNames.length > 0 || Boolean(entry.selectionError);
+            const totalFiles = entry.existingCount + files.length;
+            const overFileLimit = totalFiles > entry.maxFiles;
+            const atFileLimit = totalFiles === entry.maxFiles;
+            const fieldHasErrors =
+                duplicateNames.length > 0 || overFileLimit || Boolean(entry.selectionError);
+            const errorMessages = [];
+            hasErrors ||= fieldHasErrors;
             entry.list.replaceChildren();
             entry.label.hidden = files.length === 0;
 
@@ -91,18 +102,35 @@
             });
 
             if (duplicateNames.length) {
-                entry.error.textContent =
+                errorMessages.push(
                     `Datei „${duplicateNames[0]}“ wird bereits in dieser Main-Bewerbung `
-                    + "verwendet. Entfernen Sie die Datei aus der Auswahl oder benennen Sie sie um.";
-                entry.error.hidden = false;
-                entry.input.setAttribute("aria-invalid", "true");
-            } else if (entry.selectionError) {
-                entry.error.textContent = entry.selectionError;
-                entry.error.hidden = false;
+                    + "verwendet. Entfernen Sie die Datei aus der Auswahl oder benennen Sie sie um.",
+                );
+            }
+            if (overFileLimit) {
+                errorMessages.push(
+                    `Pro Nachweiskategorie sind höchstens ${entry.maxFiles} Dateien erlaubt. `
+                    + "Entfernen Sie eine Datei aus der Auswahl.",
+                );
+            } else if (atFileLimit) {
+                errorMessages.push(
+                    `Das Maximum von ${entry.maxFiles} Dateien für diese Kategorie ist erreicht. `
+                    + "Weitere Dateien können Sie erst nach dem Entfernen einer Datei hinzufügen.",
+                );
+            }
+            if (entry.selectionError) {
+                errorMessages.push(entry.selectionError);
+            }
+
+            entry.error.textContent = errorMessages.join(" ");
+            entry.error.hidden = errorMessages.length === 0;
+            const informationalLimitNotice =
+                atFileLimit && !overFileLimit && !duplicateNames.length && !entry.selectionError;
+            entry.error.classList.toggle("uk-text-warning", informationalLimitNotice);
+            entry.error.classList.toggle("uk-text-danger", !informationalLimitNotice);
+            if (fieldHasErrors) {
                 entry.input.setAttribute("aria-invalid", "true");
             } else {
-                entry.error.textContent = "";
-                entry.error.hidden = true;
                 entry.input.removeAttribute("aria-invalid");
             }
         }

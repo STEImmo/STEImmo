@@ -563,6 +563,9 @@ class MainApplicationForm(forms.Form):
         super().__init__(*args, **kwargs)
         for _category, field_name, label in self.PROOF_FIELDS:
             self.fields[field_name].widget.attrs["data-proof-upload-input"] = ""
+            self.fields[field_name].widget.attrs["data-max-files"] = str(
+                self.MAX_FILES_PER_CATEGORY
+            )
             self.fields[field_name].help_text = (
                 f"Sie können Dateien für {label} auch nacheinander auswählen; "
                 f"die bisherige Auswahl bleibt erhalten. Maximal "
