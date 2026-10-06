@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Main-Bewerbung – STEImmo{% endblock %}
 
@@ -72,7 +73,7 @@
                         {% endif %}
                     {% endfor %}
                 {% endfor %}
-                <form method="post" enctype="multipart/form-data" novalidate>
+                <form method="post" enctype="multipart/form-data" novalidate data-proof-upload-form>
                 {% csrf_token %}
                 {{ form.action }}
                 {% if form.non_field_errors %}
@@ -87,8 +88,22 @@
                             <label class="uk-form-label" for="{{ field.id_for_label }}">
                                 {{ field.label }} <span class="uk-text-danger">*</span>
                             </label>
-                            <div class="uk-form-controls">
+                            <div class="uk-form-controls" data-proof-upload-field>
                                 {{ field }}
+                                <div class="uk-margin-small-top">
+                                    <p class="uk-text-meta uk-margin-small-bottom"
+                                       data-proof-selection-label hidden>
+                                        Ausgewählt – noch nicht gespeichert
+                                    </p>
+                                    <ul class="uk-list uk-list-divider uk-margin-small-top"
+                                        data-proof-selection-list
+                                        aria-live="polite"></ul>
+                                    <p class="uk-text-danger uk-text-small"
+                                       data-proof-selection-error
+                                       role="alert"
+                                       aria-live="polite"
+                                       hidden></p>
+                                </div>
                                 {% for group in proof_groups %}
                                     {% if group.field_name == field.name %}
                                         <div class="uk-margin-small-top">
@@ -99,7 +114,7 @@
                                                 <ul class="uk-list uk-list-divider uk-margin-small-top">
                                                     {% for document in group.documents %}
                                                         <li class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
-                                                            <span>{{ document.name }}</span>
+                                                            <span data-proof-existing-name>{{ document.name }}</span>
                                                             <div class="uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
                                                                 <div>
                                                                     <a class="uk-button uk-button-default uk-button-small"
@@ -160,6 +175,7 @@
                     </div>
                 </div>
                 </form>
+                <script src="{% static 'js/main_application_uploads.js' %}?v=1"></script>
             {% endif %}
         </article>
     </div>
