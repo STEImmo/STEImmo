@@ -85,6 +85,11 @@
                     {{ invitation_form.as_p }}
                     <button class="uk-button uk-button-primary" type="submit">Main-Bewerbung freischalten und einladen</button>
                 </form>
+            {% else %}
+                <p class="uk-alert-warning" uk-alert>
+                    Eine Main-Bewerbung kann nur für eine aktive, offene Pre-Bewerbung freigeschaltet werden.
+                    Aktueller Status: {{ application.get_applicant_status_display }}.
+                </p>
             {% endif %}
 
             <h3 class="uk-h4">Änderungsverlauf</h3>

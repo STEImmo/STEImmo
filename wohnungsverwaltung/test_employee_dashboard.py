@@ -503,6 +503,24 @@ class EmployeeApplicationSelectionTests(TestCase):
         )
         self.assertContains(response, "Anforderungen offen")
 
+    def test_main_invitation_is_shown_for_open_applications_and_explained_for_declined(self):
+        open_detail_url = reverse(
+            "wohnungsverwaltung:employee_application_detail", args=[self.match.pk]
+        )
+        response = self.client.get(open_detail_url)
+        self.assertContains(response, "Main-Bewerbung freischalten und einladen")
+        self.assertContains(response, "Ich bestätige die positive Entscheidung")
+
+        declined = EmployeeDashboardTests.create_application(
+            self.unit, status=BewerbungStatus.DECLINED
+        )
+        declined_detail_url = reverse(
+            "wohnungsverwaltung:employee_application_detail", args=[declined.pk]
+        )
+        response = self.client.get(declined_detail_url)
+        self.assertContains(response, "Aktueller Status: Abgelehnt")
+        self.assertNotContains(response, "Main-Bewerbung freischalten und einladen")
+
     def test_default_view_shows_only_matching_applications_and_review_tab_keeps_exceptions(self):
         self.configure_requirements()
         matching = self.client.get(self.list_url, {"wohnung": self.unit.pk})
