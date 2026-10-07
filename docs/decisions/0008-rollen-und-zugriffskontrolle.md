@@ -28,11 +28,11 @@ Bei der Selbstregistrierung werden `User` und `Person` atomar, aber zunächst mi
 
 Der Development-Override startet zusätzlich einen explizit fiktiven Mitarbeiter über `create_development_employee`. Die Compose-Variablen sind auf `mitarbeiter@example.test` und ein dokumentiertes lokales Passwort festgelegt. Der Command darf ausschließlich mit `DEBUG=True` laufen, erstellt die verknüpfte Person, aktiviert das Konto und vergibt die Gruppe `Mitarbeiter`. Bei jedem Entwicklungsstart stellt er diesen Zustand wieder her. Eine Datenmigration oder die Produktions-Compose-Konfiguration erzeugt kein solches Konto.
 
-Jede Anmeldung eines Kontos mit `access_employee_area` oder `manage_user_accounts` erfordert Passwort und einen zusätzlichen E-Mail-Einmalcode. Das gilt auch für direkt zugewiesene Einzelrechte. Der Code wird ausschließlich als Passwort-Hash gespeichert, ist 15 Minuten gültig und hat höchstens fünf Versuche. Erst nach korrekter Eingabe legt die Anwendung die authentifizierte Session an; es gibt keine dauerhafte Gerätefreigabe. Eine neue Passwortanmeldung erstellt stets einen neuen Code. Erhält ein bisher nicht privilegiertes Konto über die Benutzerverwaltung erstmals Mitarbeiter- oder Benutzerverwaltungsrechte, werden seine bestehenden aktiven Datenbanksitzungen innerhalb derselben Transaktion beendet. Damit kann eine vorherige Bewerberanmeldung die Mitarbeiter-MFA nicht umgehen; auch direkt vergebene Einzelrechte lösen diese Neuanmeldung aus. Erhält ein Konto bereits vor Abschluss der Selbstregistrierung solche Rechte, bestätigt der Registrierungscode nur das Konto; die automatische Anmeldung entfällt. Der Mitarbeiter muss anschließend die reguläre Passwort- und MFA-Anmeldung durchlaufen.
+Jede Anmeldung eines Kontos mit `access_employee_area` oder `manage_user_accounts` erfordert Passwort und einen zusätzlichen E-Mail-Einmalcode. Das gilt auch für direkt zugewiesene Einzelrechte. Der Code wird ausschließlich als Passwort-Hash gespeichert, ist 15 Minuten gültig und hat höchstens fünf Versuche. Erst nach korrekter Eingabe legt die Anwendung die authentifizierte Session an; es gibt keine dauerhafte Gerätefreigabe. Eine neue Passwortanmeldung erstellt stets einen neuen Code. Änderungen an Rollen oder direkten Seitenrechten beenden die aktiven Datenbanksitzungen des betroffenen Kontos innerhalb derselben Transaktion. Damit kann eine vorherige Bewerberanmeldung die Mitarbeiter-MFA nicht umgehen. Erhält ein Konto bereits vor Abschluss der Selbstregistrierung solche Rechte, bestätigt ein weiterhin gültiger Registrierungscode nur das Konto; die automatische Anmeldung entfällt. Der Mitarbeiter muss anschließend die reguläre Passwort- und MFA-Anmeldung durchlaufen.
 
 Die reguläre Anmeldung unter `/accounts/login/` begrenzt Passwortversuche für alle Kontoarten: Drei aufeinanderfolgende falsche Passwörter sperren das betroffene Konto für 15 Minuten. Zusätzlich begrenzen zehn Fehlversuche aus derselben IP-Adresse innerhalb von 15 Minuten weitere Anmeldungen dieser Quelle. Der Kontostatus und ein ausschließlich mit `SECRET_KEY` abgeleiteter IP-Fingerprint liegen transaktionssicher in PostgreSQL; Roh-IP-Adressen und Anmeldeprotokolle werden nicht gespeichert. Erfolgreiche Passwortanmeldungen löschen den Kontofehlerstatus, während die IP-Grenze als rollierendes Fehlversuchsfenster weiterläuft. Abgelaufene Zustände werden beim nächsten Anmeldeversuch gelöscht. Sperren verlängern sich durch weitere Anfragen nicht. Alle Fehlfälle liefern dieselbe neutrale Meldung. Standardmäßig wird `REMOTE_ADDR` verwendet; `X-Forwarded-For` gilt nur, wenn `REMOTE_ADDR` in `DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS` konfiguriert ist. Django-Admin bleibt außerhalb des Geltungsbereichs.
 
-Bei Passwortänderungen, geänderter Konto-E-Mail, erstmaliger Rechteerhöhung oder
+Bei Passwortänderungen, geänderter Konto-E-Mail, geänderten Rollen oder Seitenrechten und
 administrativer Deaktivierung verwirft die Benutzerverwaltung zusätzlich ausstehende
 Registrierungs- und Mitarbeitercodes. Betroffene aktive Sitzungen werden beendet.
 Ein bereits versendeter Code kann dadurch weder einen Passwortreset umgehen noch ein
@@ -40,6 +40,47 @@ administrativ deaktiviertes Konto reaktivieren. Beim Zuordnen eines bestehenden
 Kontos zu einer anderen Person ist ein vom bisherigen Passwort abweichendes neues
 Passwort erforderlich; die bisherigen Zugangsdaten dürfen nicht auf die neue Person
 übergehen.
+
+### Parallele Anmeldung und Kontowiderruf (Issue #63)
+
+Der Abschluss einer Passwortanmeldung, die Ausstellung und Bestätigung eines
+Mitarbeitercodes, Registrierungsbestätigung und erneuter Codeversand sowie die
+Benutzerverwaltung sperren zuerst dieselbe `User`-Zeile mit `select_for_update()`.
+Danach werden bei Bedarf Person und Verifikationsdatensatz gesperrt. Die Anmeldung
+vergleicht die aktuell gesperrten Zugangsdaten mit dem tatsächlich geprüften
+Passwortstand (`password`, `username`, `email`) und verlangt ein weiterhin aktives
+Konto. Ein inzwischen geänderter Stand wird mit der neutralen Anmeldefehlermeldung
+abgewiesen; Berechtigungen werden am frisch geladenen Konto geprüft. Auch die
+Benutzerverwaltung verwendet den gesperrten aktuellen Kontostand statt eines
+älteren Formularobjekts und prüft das neue Passwort bei Personenwechsel erneut.
+
+Eine erfolgreiche Anmeldung speichert die authentifizierte Datenbanksitzung noch
+innerhalb der Transaktion und unter der Kontosperre. Gewinnt die Anmeldung zuerst,
+kann die anschließende Kontoänderung diese Sitzung bereits widerrufen. Gewinnt die
+Kontoänderung zuerst, kann die Anmeldung keine Sitzung auf Grundlage veralteter
+Zugangsdaten oder Rechte erzeugen. Ein späteres Speichern durch Djangos
+`SessionMiddleware` aktualisiert ausschließlich die bestehende Sitzung; wurde sie
+inzwischen gelöscht, bricht Django mit `SessionInterrupted` ab, statt sie neu
+anzulegen. Ein bloßes erneutes Lesen des Kontos oder das bisherige einmalige Löschen
+bereits gespeicherter Sitzungen würde diese Lücke nicht schließen. Eine zusätzliche
+Kontoversion und ein eigenes Session-Middleware-Verfahren sind bei dieser
+Synchronisierung mit dem bestehenden Django-Datenbank-Sessionbackend nicht nötig.
+
+Die ausstehende MFA-Browsersitzung ist zusätzlich an den Hash des konkret
+ausgestellten Codes gebunden. Eine ältere Passwortanmeldung kann dadurch keinen
+Code einer späteren Anmeldung verwenden, auch wenn beide dasselbe Konto betreffen.
+Ein veralteter Browser verwirft nur seinen eigenen ausstehenden Anmeldezustand und
+verbraucht keine Versuche des neu ausgestellten Codes. Bereits vor dieser Änderung
+begonnene MFA-Anmeldungen ohne diese Bindung müssen erneut gestartet werden.
+
+Eine inaktive Selbstregistrierung mit vorhandenem `RegistrationVerification` ist
+noch offen. Unverändertes Speichern erhält Hash, Ablaufzeit, Versuchszähler und
+Versandsperre. Die Benutzerverwaltung bietet für diese Konten ausdrücklich
+„Offene Registrierung widerrufen“ an; dieser Widerruf entfernt die Verifikation
+und verhindert sowohl Bestätigung als auch erneuten Versand. Der Wechsel von
+aktiv zu inaktiv sowie Änderungen an Zugangsdaten, Person oder Zugriffsrechten
+verwerfen Codes weiterhin. `is_active=False` allein ist kein Widerruf, weil dieser
+Wert bereits vor der ersten Bestätigung gilt.
 
 ## Erweiterungsroutine
 

@@ -1,6 +1,7 @@
 import json
 import unicodedata
 import warnings
+from copy import copy
 from uuid import UUID
 
 from django import forms
@@ -23,7 +24,6 @@ from pypdf.errors import DependencyError, PyPdfError
 from .access import (
     ACCESS_PERMISSION_CODENAMES,
     APP_LABEL,
-    EMPLOYEE_ACCESS_PERMISSION,
     ROLE_NAMES,
     ROLE_USER_MANAGEMENT,
     USER_MANAGEMENT_PERMISSION,
@@ -289,6 +289,12 @@ class UserAccountForm(forms.Form):
         initial=True,
         widget=forms.CheckboxInput(attrs={"class": "uk-checkbox"}),
     )
+    revoke_registration = forms.BooleanField(
+        label="Offene Registrierung widerrufen",
+        required=False,
+        help_text="Verhindert die Bestätigung und den erneuten Versand eines Registrierungscodes.",
+        widget=forms.CheckboxInput(attrs={"class": "uk-checkbox"}),
+    )
     password1 = forms.CharField(
         label="Neues Passwort",
         required=False,
@@ -321,6 +327,8 @@ class UserAccountForm(forms.Form):
         ).order_by("name")
         self.fields["roles"].widget.attrs["class"] = "uk-checkbox"
         self.fields["direct_permissions"].widget.attrs["class"] = "uk-checkbox"
+        if account is None or not RegistrationVerification.objects.filter(user=account).exists():
+            self.fields.pop("revoke_registration")
         if account is not None and not self.is_bound:
             self.initial.update(
                 {
@@ -391,7 +399,7 @@ class UserAccountForm(forms.Form):
             if password1 != password2:
                 self.add_error("password2", "Die Passwörter stimmen nicht überein.")
             elif target_email:
-                user = self.account or get_user_model()()
+                user = copy(self.account) if self.account is not None else get_user_model()()
                 user.username = target_email
                 user.email = target_email
                 try:
@@ -428,13 +436,26 @@ class UserAccountForm(forms.Form):
     def save(self):
         user_model = get_user_model()
         selected_person = self.cleaned_data["person"]
-        privileged_permissions = (EMPLOYEE_ACCESS_PERMISSION, USER_MANAGEMENT_PERMISSION)
         with transaction.atomic():
             original_account = (
-                user_model.objects.get(pk=self.account.pk) if self.account is not None else None
+                user_model.objects.select_for_update().get(pk=self.account.pk)
+                if self.account is not None
+                else None
             )
-            previously_privileged = original_account is not None and any(
-                original_account.has_perm(permission) for permission in privileged_permissions
+            previous_roles = (
+                set(original_account.groups.values_list("pk", flat=True))
+                if original_account is not None
+                else set()
+            )
+            previous_permissions = (
+                set(original_account.user_permissions.values_list("pk", flat=True))
+                if original_account is not None
+                else set()
+            )
+            previous_person = (
+                Person.objects.select_for_update().filter(user=original_account).first()
+                if original_account is not None
+                else None
             )
             if selected_person is None:
                 person = Person(
@@ -449,12 +470,17 @@ class UserAccountForm(forms.Form):
                         "Die ausgewählte Person ist inzwischen einem Konto zugeordnet."
                     )
 
-            if self.account is None:
-                account = user_model()
-            else:
-                account = self.account
-            account.username = self.cleaned_data["target_email"]
-            account.email = self.cleaned_data["target_email"]
+            person_changed = original_account is not None and previous_person != person
+            if person_changed and (
+                not self.cleaned_data["password1"]
+                or original_account.check_password(self.cleaned_data["password1"])
+            ):
+                raise ValidationError(
+                    "Bei einem Personenwechsel muss ein neues Passwort vergeben werden."
+                )
+            account = copy(original_account) if original_account is not None else user_model()
+            account.username = person.email
+            account.email = person.email
             account.first_name = person.vorname
             account.last_name = person.nachname
             account.is_active = self.cleaned_data["is_active"]
@@ -462,7 +488,6 @@ class UserAccountForm(forms.Form):
                 account.set_password(self.cleaned_data["password1"])
             account.save()
 
-            previous_person = Person.objects.select_for_update().filter(user=account).first()
             if previous_person is not None and previous_person != person:
                 previous_person.user = None
                 previous_person.save(update_fields=["user", "updated_at"])
@@ -482,20 +507,31 @@ class UserAccountForm(forms.Form):
             account.user_permissions.set(
                 [*other_permissions, *self.cleaned_data["direct_permissions"]]
             )
-            # Read fresh permissions: the form's account may cache its previous rights.
-            updated_account = user_model.objects.get(pk=account.pk)
-            newly_privileged = not previously_privileged and any(
-                updated_account.has_perm(permission) for permission in privileged_permissions
+            access_changed = previous_roles != set(account.groups.values_list("pk", flat=True)) or (
+                previous_permissions != set(account.user_permissions.values_list("pk", flat=True))
             )
             credentials_changed = bool(self.cleaned_data["password1"]) or (
-                original_account is not None and original_account.email != account.email
+                original_account is not None
+                and (
+                    original_account.email != account.email
+                    or original_account.username != account.username
+                )
             )
-            if newly_privileged or credentials_changed or not account.is_active:
+            status_changed = (
+                original_account is not None and original_account.is_active != account.is_active
+            )
+            if original_account is not None and (
+                access_changed
+                or credentials_changed
+                or person_changed
+                or status_changed
+                or self.cleaned_data.get("revoke_registration", False)
+            ):
                 # A pending code was issued for the previous credentials or access state.
                 EmployeeLoginVerification.objects.filter(user=account).delete()
                 RegistrationVerification.objects.filter(user=account).delete()
-                # End only this account's active sessions. A privileged account must
-                # enter the normal password/MFA flow with its current credentials.
+                # Login completion persists its session under the same user-row
+                # lock, so this also catches sessions from concurrent requests.
                 for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator():
                     if session.get_decoded().get("_auth_user_id") == str(account.pk):
                         session.delete()
