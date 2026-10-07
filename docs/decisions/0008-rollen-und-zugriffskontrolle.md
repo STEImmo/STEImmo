@@ -43,9 +43,9 @@ Passwort erforderlich; die bisherigen Zugangsdaten dürfen nicht auf die neue Pe
 
 ### Parallele Anmeldung und Kontowiderruf (Issue #63)
 
-Der Abschluss einer Passwortanmeldung, die Ausstellung und Bestätigung eines
+Die Passwortprüfung, der Abschluss einer Passwortanmeldung, die Ausstellung und Bestätigung eines
 Mitarbeitercodes, Registrierungsbestätigung und erneuter Codeversand sowie die
-Benutzerverwaltung sperren zuerst dieselbe `User`-Zeile mit `select_for_update()`.
+Benutzerverwaltung sperren dieselbe `User`-Zeile mit `select_for_update()`.
 Danach werden bei Bedarf Person und Verifikationsdatensatz gesperrt. Die Anmeldung
 vergleicht die aktuell gesperrten Zugangsdaten mit dem tatsächlich geprüften
 Passwortstand (`password`, `username`, `email`) und verlangt ein weiterhin aktives
@@ -53,6 +53,30 @@ Konto. Ein inzwischen geänderter Stand wird mit der neutralen Anmeldefehlermeld
 abgewiesen; Berechtigungen werden am frisch geladenen Konto geprüft. Auch die
 Benutzerverwaltung verwendet den gesperrten aktuellen Kontostand statt eines
 älteren Formularobjekts und prüft das neue Passwort bei Personenwechsel erneut.
+
+Die Kontosperre umfasst bereits Djangos Passwortprüfung, weil diese einen veralteten
+Passwort-Hash automatisch aktualisieren und speichern kann. Ohne diese Sperre könnte
+das Hash-Upgrade einen parallel gespeicherten administrativen Passwortreset durch
+das alte Passwort ersetzen. Reine Passwortvergleiche bei der Formularvalidierung
+verwenden deshalb die Hash-Prüfung ohne schreibenden Setter. Zwischen Passwortprüfung
+und Anmeldeabschluss schützt weiterhin der Vergleich mit dem frisch gesperrten Kontostand.
+
+Die Benutzerverwaltung sperrt vor der individuellen Kontosperre zusätzlich die stabile
+Gruppe `Benutzerverwaltung` mit `select_for_update(no_key=True)`. Dadurch werden
+Kontoverwaltungsänderungen auch für verschiedene Konten nacheinander angewendet;
+Fremdschlüsselreferenzen auf die Gruppe bleiben möglich. Nach dem Setzen der Rollen,
+direkten Rechte und des Aktivstatus wird innerhalb derselben Transaktion erneut geprüft,
+ob ein weiterer aktiver Benutzerverwalter vorhanden ist, falls das bearbeitete Konto
+diese Berechtigung verliert. Andernfalls wird die gesamte Änderung zurückgerollt.
+Eine Prüfung nur bei der Formularvalidierung würde zwei bereits geprüfte, parallele
+Selbstentzüge erlauben und könnte alle Benutzerverwalter entfernen. Superuser behalten
+ihre Verwaltungsberechtigung unabhängig von der Gruppenzuordnung.
+
+Mitarbeitercodes werden unter der Kontosperre ausgestellt; der anschließende
+E-Mail-Versand läuft nach Abschluss der Kontotransaktion. Ein langsamer SMTP-Server
+darf einen administrativen Kontowiderruf nicht blockieren. Wird das Konto während
+des Versands geändert, bleibt ein gegebenenfalls später zugestellter Code ungültig.
+`DJANGO_EMAIL_TIMEOUT` begrenzt die SMTP-Wartezeit; der Standard beträgt zehn Sekunden.
 
 Eine erfolgreiche Anmeldung speichert die authentifizierte Datenbanksitzung noch
 innerhalb der Transaktion und unter der Kontosperre. Gewinnt die Anmeldung zuerst,
@@ -81,6 +105,13 @@ und verhindert sowohl Bestätigung als auch erneuten Versand. Der Wechsel von
 aktiv zu inaktiv sowie Änderungen an Zugangsdaten, Person oder Zugriffsrechten
 verwerfen Codes weiterhin. `is_active=False` allein ist kein Widerruf, weil dieser
 Wert bereits vor der ersten Bestätigung gilt.
+
+Die E-Mail-Adresse ist zugleich der Anmeldename des unveränderten Django-User-Modells.
+Registrierung und Benutzerverwaltung begrenzen Konto-E-Mail-Adressen daher auf dessen
+`username.max_length` (150 Zeichen). Das gilt auch für die Auswahl einer bereits
+vorhandenen Person; beim Speichern wird deren frisch gesperrte E-Mail erneut geprüft.
+Längere Adressen führen zu einem Formularfehler statt zu einem Datenbankfehler.
+Das Person-Modell und bestehende Migrationen bleiben unverändert.
 
 ## Erweiterungsroutine
 

@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import PBKDF2PasswordHasher
 from django.contrib.auth.models import AnonymousUser, Group, Permission
 from django.contrib.sessions.backends.db import SessionStore
 from django.contrib.sessions.exceptions import SessionInterrupted
@@ -20,8 +21,13 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.views import RoleAwareLoginView
-from wohnungsverwaltung.access import ROLE_APPLICANT, ROLE_EMPLOYEE
-from wohnungsverwaltung.forms import UserAccountForm
+from wohnungsverwaltung.access import (
+    ROLE_APPLICANT,
+    ROLE_EMPLOYEE,
+    ROLE_USER_MANAGEMENT,
+    USER_MANAGEMENT_PERMISSION,
+)
+from wohnungsverwaltung.forms import RegistrationForm, UserAccountForm
 from wohnungsverwaltung.models import EmployeeLoginVerification, Person, RegistrationVerification
 
 PASSWORD = "FjordTanne!4826"
@@ -35,7 +41,7 @@ class AccountChangesMixin:
         user.groups.add(Group.objects.get(name=role))
         return user
 
-    def account_form(self, account, **changes):
+    def account_form(self, account, *, actor=None, **changes):
         account = get_user_model().objects.get(pk=account.pk)
         data = {
             "person": str(account.person_profile.pk),
@@ -46,7 +52,7 @@ class AccountChangesMixin:
             "password2": "",
         }
         data.update(changes)
-        form = UserAccountForm(data, account=account)
+        form = UserAccountForm(data, account=account, actor=actor)
         self.assertTrue(form.is_valid(), form.errors)
         return form
 
@@ -226,11 +232,169 @@ class AccountAuthenticationRegressionTests(AccountChangesMixin, TestCase):
         self.assertEqual(Person.objects.get(user=account).email, account.email)
 
 
+class AccountFormEdgeCaseTests(AccountChangesMixin, TestCase):
+    LONG_EMAIL = "a" * 64 + "@" + "d" * 63 + "." + "e" * 30 + ".test"
+
+    def registration_data(self, email):
+        return {
+            "vorname": "Konto",
+            "nachname": "Test",
+            "email": email,
+            "password1": PASSWORD,
+            "password2": PASSWORD,
+        }
+
+    def new_account_data(self, person=None, email="account@example.test"):
+        return {
+            "person": str(person.pk) if person is not None else "",
+            "vorname": "" if person is not None else "Konto",
+            "nachname": "" if person is not None else "Test",
+            "email": "" if person is not None else email,
+            "roles": [Group.objects.get(name=ROLE_APPLICANT).pk],
+            "is_active": True,
+            "password1": PASSWORD,
+            "password2": PASSWORD,
+        }
+
+    def test_registration_rejects_emails_longer_than_the_login_identifier(self):
+        form = RegistrationForm(self.registration_data(self.LONG_EMAIL))
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+        self.assertFalse(get_user_model().objects.exists())
+
+    def test_registration_shows_a_form_error_for_long_email_instead_of_failing(self):
+        response = self.client.post(reverse("register"), self.registration_data(self.LONG_EMAIL))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("email", response.context["form"].errors)
+        self.assertFalse(get_user_model().objects.exists())
+        self.assertFalse(Person.objects.exists())
+
+    def test_registration_accepts_an_email_at_the_login_identifier_limit(self):
+        email = "a" * 64 + "@" + "d" * 63 + "." + "e" * 16 + ".test"
+        self.assertEqual(len(email), 150)
+        form = RegistrationForm(self.registration_data(email))
+        self.assertTrue(form.is_valid(), form.errors)
+        account = form.save()
+        self.assertEqual(account.username, email)
+        self.assertEqual(account.person_profile.email, email)
+
+    def test_new_account_rejects_an_inline_email_longer_than_the_login_identifier(self):
+        form = UserAccountForm(self.new_account_data(email=self.LONG_EMAIL))
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+
+    def test_new_account_rejects_a_selected_person_with_a_long_email(self):
+        person = Person.objects.create(vorname="Konto", nachname="Test", email=self.LONG_EMAIL)
+        form = UserAccountForm(self.new_account_data(person=person))
+        self.assertFalse(form.is_valid())
+        self.assertIn("person", form.errors)
+
+    def test_account_edit_rejects_a_person_email_longer_than_the_login_identifier(self):
+        account = self.create_account()
+        person = account.person_profile
+        person.email = self.LONG_EMAIL
+        person.save(update_fields=["email"])
+        form = UserAccountForm(
+            {"person": str(person.pk), "is_active": True, "password1": "", "password2": ""},
+            account=account,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("person", form.errors)
+
+    def test_account_save_rechecks_a_person_email_changed_after_validation(self):
+        person = Person.objects.create(
+            vorname="Konto", nachname="Test", email="account@example.test"
+        )
+        form = UserAccountForm(self.new_account_data(person=person))
+        self.assertTrue(form.is_valid(), form.errors)
+        person.email = self.LONG_EMAIL
+        person.save(update_fields=["email"])
+        with self.assertRaises(ValidationError):
+            form.save()
+        self.assertFalse(get_user_model().objects.exists())
+        person.refresh_from_db()
+        self.assertIsNone(person.user_id)
+
+    def test_person_transfer_validation_does_not_upgrade_a_stored_password_hash(self):
+        account = self.create_account()
+        account.password = PBKDF2PasswordHasher().encode(PASSWORD, "legacy-salt", iterations=1)
+        account.save(update_fields=["password"])
+        legacy_hash = account.password
+        target = Person.objects.create(vorname="Andere", nachname="Person", email="other@test.de")
+        form = UserAccountForm(self.new_account_data(person=target), account=account)
+        self.assertFalse(form.is_valid())
+        self.assertIn("password1", form.errors)
+        account.refresh_from_db()
+        self.assertEqual(account.password, legacy_hash)
+
+    def test_an_ordinary_login_still_upgrades_a_legacy_password_hash(self):
+        account = self.create_account(ROLE_EMPLOYEE)
+        account.password = PBKDF2PasswordHasher().encode(PASSWORD, "legacy-salt", iterations=1)
+        account.save(update_fields=["password"])
+        legacy_hash = account.password
+        response = self.client.post(
+            reverse("login"), {"username": account.username, "password": PASSWORD}
+        )
+        self.assertRedirects(response, reverse("employee_mfa_verify"))
+        account.refresh_from_db()
+        self.assertNotEqual(account.password, legacy_hash)
+        self.assertTrue(account.check_password(PASSWORD))
+        self.client.post(reverse("employee_mfa_verify"), {"code": self.mailed_code()})
+        self.assertEqual(self.client.session["_auth_user_id"], str(account.pk))
+
+    def assert_stale_change_keeps_last_manager(self, *, direct_permission=False, deactivate=False):
+        first = self.create_account(ROLE_USER_MANAGEMENT, email="first@example.test")
+        second = self.create_account(
+            ROLE_EMPLOYEE if direct_permission else ROLE_USER_MANAGEMENT,
+            email="second@example.test",
+        )
+        if direct_permission:
+            second.user_permissions.add(Permission.objects.get(codename="manage_user_accounts"))
+        first_form = self.account_form(
+            first, actor=first, roles=[Group.objects.get(name=ROLE_EMPLOYEE).pk]
+        )
+        second_form = self.account_form(
+            second,
+            actor=first if deactivate else second,
+            roles=[Group.objects.get(name=ROLE_EMPLOYEE).pk],
+            direct_permissions=[],
+            is_active=not deactivate,
+        )
+        changed = first_form.save()
+        self.assertFalse(changed.has_perm(USER_MANAGEMENT_PERMISSION))
+        with self.assertRaisesMessage(ValidationError, "letzte aktive Benutzerverwalter"):
+            second_form.save()
+        second.refresh_from_db()
+        self.assertTrue(second.has_perm(USER_MANAGEMENT_PERMISSION))
+
+    def test_stale_role_demotions_keep_the_last_active_manager(self):
+        self.assert_stale_change_keeps_last_manager()
+
+    def test_stale_direct_permission_removal_keeps_the_last_active_manager(self):
+        self.assert_stale_change_keeps_last_manager(direct_permission=True)
+
+    def test_stale_deactivation_keeps_the_last_active_manager(self):
+        self.assert_stale_change_keeps_last_manager(deactivate=True)
+
+    def test_a_superuser_can_change_roles_without_losing_management_access(self):
+        account = self.create_account(ROLE_USER_MANAGEMENT)
+        account.is_superuser = True
+        account.save(update_fields=["is_superuser"])
+        form = self.account_form(
+            account, actor=account, roles=[Group.objects.get(name=ROLE_APPLICANT).pk]
+        )
+        changed = form.save()
+        self.assertTrue(changed.has_perm(USER_MANAGEMENT_PERMISSION))
+
+
 class ConcurrentAccountAuthenticationTests(AccountChangesMixin, TransactionTestCase):
-    def run_revocation_before_login_finishes(self, authenticate, login_target, revoke):
+    def run_revocation_before_login_finishes(
+        self, authenticate, login_target, revoke, *, original_operation=None, pause_when=None
+    ):
         """Pause at login; resume only after the change commits or is blocked by its row lock."""
         from django.contrib.auth import login as original_login
 
+        original_operation = original_operation or original_login
         login_ready = threading.Event()
         resume_login = threading.Event()
         change_ready = threading.Event()
@@ -238,10 +402,12 @@ class ConcurrentAccountAuthenticationTests(AccountChangesMixin, TransactionTestC
         change_pid = []
 
         def paused_login(*args, **kwargs):
+            if pause_when is not None and not pause_when(*args, **kwargs):
+                return original_operation(*args, **kwargs)
             login_ready.set()
             if not resume_login.wait(10):
                 raise AssertionError("Timed out waiting for the controlled account change")
-            return original_login(*args, **kwargs)
+            return original_operation(*args, **kwargs)
 
         def login_worker():
             close_old_connections()
@@ -257,12 +423,18 @@ class ConcurrentAccountAuthenticationTests(AccountChangesMixin, TransactionTestC
                     cursor.execute("SELECT pg_backend_pid()")
                     change_pid.append(cursor.fetchone()[0])
                 change_ready.set()
-                revoke()
+                return revoke()
             finally:
                 change_done.set()
                 close_old_connections()
 
-        with patch(login_target, paused_login), ThreadPoolExecutor(max_workers=2) as executor:
+        patched = (
+            patch.object(*login_target, paused_login)
+            if isinstance(login_target, tuple)
+            else patch(login_target, paused_login)
+        )
+        was_blocked = False
+        with patched, ThreadPoolExecutor(max_workers=2) as executor:
             login_future = executor.submit(login_worker)
             try:
                 self.assertTrue(login_ready.wait(10), "Login did not reach the controlled boundary")
@@ -273,6 +445,7 @@ class ConcurrentAccountAuthenticationTests(AccountChangesMixin, TransactionTestC
                     with connection.cursor() as cursor:
                         cursor.execute("SELECT pg_blocking_pids(%s)", [change_pid[0]])
                         if cursor.fetchone()[0]:
+                            was_blocked = True
                             break
                     self.assertLess(
                         time.monotonic(), deadline, "Account change neither ran nor waited"
@@ -280,8 +453,78 @@ class ConcurrentAccountAuthenticationTests(AccountChangesMixin, TransactionTestC
                     change_done.wait(0.01)
             finally:
                 resume_login.set()
-            login_future.result(timeout=10)
-            change_future.result(timeout=10)
+            return (
+                login_future.result(timeout=10),
+                change_future.result(timeout=10),
+                was_blocked,
+            )
+
+    def test_password_hash_upgrade_cannot_overwrite_a_concurrent_password_reset(self):
+        account = self.create_account(ROLE_EMPLOYEE)
+        account.password = PBKDF2PasswordHasher().encode(PASSWORD, "legacy-salt", iterations=1)
+        account.save(update_fields=["password"])
+        user_model = get_user_model()
+        self.run_revocation_before_login_finishes(
+            lambda: self.client.post(
+                reverse("login"), {"username": account.username, "password": PASSWORD}
+            ),
+            (user_model, "check_password"),
+            lambda: self.edit_account(account, password1=NEW_PASSWORD, password2=NEW_PASSWORD),
+            original_operation=user_model.check_password,
+        )
+        account.refresh_from_db()
+        self.assertTrue(account.check_password(NEW_PASSWORD))
+        self.assertFalse(account.check_password(PASSWORD))
+        self.assertFalse(EmployeeLoginVerification.objects.filter(user=account).exists())
+        if mail.outbox:
+            self.client.post(reverse("employee_mfa_verify"), {"code": self.mailed_code()})
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_slow_mail_delivery_does_not_block_administrative_deactivation(self):
+        account = self.create_account(ROLE_EMPLOYEE)
+        delivered_codes = []
+        _, _, was_blocked = self.run_revocation_before_login_finishes(
+            lambda: self.client.post(
+                reverse("login"), {"username": account.username, "password": PASSWORD}
+            ),
+            "core.views.send_employee_mfa_code",
+            lambda: self.edit_account(account, is_active=False),
+            original_operation=lambda email, code: delivered_codes.append(code),
+        )
+        self.assertFalse(was_blocked, "SMTP delivery must not hold the account row lock")
+        account.refresh_from_db()
+        self.assertFalse(account.is_active)
+        self.assertFalse(EmployeeLoginVerification.objects.filter(user=account).exists())
+        self.client.post(reverse("employee_mfa_verify"), {"code": delivered_codes[0]})
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_concurrent_self_demotions_keep_one_active_account_manager(self):
+        first = self.create_account(ROLE_USER_MANAGEMENT, email="first@example.test")
+        second = self.create_account(ROLE_USER_MANAGEMENT, email="second@example.test")
+        employee_role = Group.objects.get(name=ROLE_EMPLOYEE)
+        first_form = self.account_form(first, actor=first, roles=[employee_role.pk])
+        second_form = self.account_form(second, actor=second, roles=[employee_role.pk])
+        groups_manager = type(first.groups)
+
+        def save_second():
+            try:
+                second_form.save()
+            except ValidationError:
+                return False
+            return True
+
+        _, second_succeeded, _ = self.run_revocation_before_login_finishes(
+            first_form.save,
+            (groups_manager, "set"),
+            save_second,
+            original_operation=groups_manager.set,
+            pause_when=lambda manager, *args, **kwargs: manager.instance.pk == first.pk,
+        )
+        self.assertFalse(second_succeeded)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertFalse(first.has_perm(USER_MANAGEMENT_PERMISSION))
+        self.assertTrue(second.has_perm(USER_MANAGEMENT_PERMISSION))
 
     def test_role_or_direct_permission_elevation_cannot_be_overtaken_by_applicant_login(self):
         for direct in (False, True):

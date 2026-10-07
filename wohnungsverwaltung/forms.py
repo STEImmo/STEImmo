@@ -7,6 +7,7 @@ from uuid import UUID
 from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.models import Session
@@ -84,6 +85,13 @@ METER_READING_FIELDS = (
 )
 
 ACCOUNT_CREATION_ERROR = "Mit diesen Angaben kann kein Konto erstellt werden."
+ACCOUNT_EMAIL_MAX_LENGTH = get_user_model()._meta.get_field("username").max_length
+ACCOUNT_EMAIL_LENGTH_ERROR = (
+    f"Die E-Mail-Adresse darf für ein Konto höchstens {ACCOUNT_EMAIL_MAX_LENGTH} Zeichen enthalten."
+)
+LAST_ACCOUNT_MANAGER_ERROR = (
+    "Der letzte aktive Benutzerverwalter darf seine Berechtigung nicht entfernen."
+)
 PHOTO_CONTENT_TYPES = {
     "JPEG": "image/jpeg",
     "PNG": "image/png",
@@ -107,6 +115,18 @@ def verified_photo_content_type(photo) -> str:
     return content_type
 
 
+def _validate_account_email_length(email: str) -> None:
+    if len(email) > ACCOUNT_EMAIL_MAX_LENGTH:
+        raise ValidationError(ACCOUNT_EMAIL_LENGTH_ERROR, code="max_length")
+
+
+def _has_other_active_account_manager(account) -> bool:
+    return any(
+        user.has_perm(USER_MANAGEMENT_PERMISSION)
+        for user in get_user_model().objects.filter(is_active=True).exclude(pk=account.pk)
+    )
+
+
 class RegistrationForm(forms.Form):
     vorname = forms.CharField(
         label="Vorname",
@@ -120,7 +140,8 @@ class RegistrationForm(forms.Form):
     )
     email = forms.EmailField(
         label="E-Mail-Adresse",
-        max_length=255,
+        max_length=ACCOUNT_EMAIL_MAX_LENGTH,
+        error_messages={"max_length": ACCOUNT_EMAIL_LENGTH_ERROR},
         widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "username"}),
     )
     password1 = forms.CharField(
@@ -136,6 +157,7 @@ class RegistrationForm(forms.Form):
 
     def clean_email(self) -> str:
         email = self.cleaned_data["email"].strip().lower()
+        _validate_account_email_length(email)
         user_model = get_user_model()
         if (
             Person.objects.filter(email__iexact=email).exists()
@@ -267,7 +289,8 @@ class UserAccountForm(forms.Form):
     )
     email = forms.EmailField(
         label="Neue Person: E-Mail-Adresse",
-        max_length=255,
+        max_length=ACCOUNT_EMAIL_MAX_LENGTH,
+        error_messages={"max_length": ACCOUNT_EMAIL_LENGTH_ERROR},
         required=False,
         widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "username"}),
     )
@@ -344,7 +367,9 @@ class UserAccountForm(forms.Form):
             )
 
     def clean_email(self) -> str:
-        return self.cleaned_data["email"].strip().lower()
+        email = self.cleaned_data["email"].strip().lower()
+        _validate_account_email_length(email)
+        return email
 
     def clean(self) -> dict:
         cleaned_data = super().clean()
@@ -370,6 +395,10 @@ class UserAccountForm(forms.Form):
             selected_person.email if selected_person is not None else inline_values["email"]
         )
         if target_email:
+            try:
+                _validate_account_email_length(target_email)
+            except ValidationError as error:
+                self.add_error("person" if selected_person is not None else "email", error)
             user_model = get_user_model()
             existing_accounts = user_model.objects.filter(
                 Q(username__iexact=target_email) | Q(email__iexact=target_email)
@@ -390,7 +419,9 @@ class UserAccountForm(forms.Form):
         if self.account is not None:
             current_person = getattr(self.account, "person_profile", None)
             person_changed = selected_person is None or selected_person != current_person
-            if person_changed and (not password1 or self.account.check_password(password1)):
+            if person_changed and (
+                not password1 or check_password(password1, self.account.password)
+            ):
                 self.add_error(
                     "password1",
                     "Bei einem Personenwechsel muss ein neues Passwort vergeben werden.",
@@ -418,29 +449,32 @@ class UserAccountForm(forms.Form):
             return
         roles = cleaned_data.get("roles") or []
         direct_permissions = cleaned_data.get("direct_permissions") or []
-        will_manage_accounts = any(role.name == ROLE_USER_MANAGEMENT for role in roles) or any(
-            permission.codename == "manage_user_accounts" for permission in direct_permissions
+        will_manage_accounts = (
+            self.account.is_superuser
+            or any(role.name == ROLE_USER_MANAGEMENT for role in roles)
+            or any(
+                permission.codename == "manage_user_accounts" for permission in direct_permissions
+            )
         )
         if self.account.has_perm(USER_MANAGEMENT_PERMISSION) and not will_manage_accounts:
-            user_model = get_user_model()
-            has_other_manager = any(
-                user.has_perm(USER_MANAGEMENT_PERMISSION)
-                for user in user_model.objects.filter(is_active=True).exclude(pk=self.account.pk)
-            )
-            if not has_other_manager:
-                self.add_error(
-                    "roles",
-                    "Der letzte aktive Benutzerverwalter darf seine Berechtigung nicht entfernen.",
-                )
+            if not _has_other_active_account_manager(self.account):
+                self.add_error("roles", LAST_ACCOUNT_MANAGER_ERROR)
 
     def save(self):
         user_model = get_user_model()
         selected_person = self.cleaned_data["person"]
         with transaction.atomic():
+            # Serialize account administration across different users before
+            # locking an individual account. NO KEY UPDATE leaves foreign-key
+            # references to this stable role available to authentication.
+            Group.objects.select_for_update(no_key=True).get(name=ROLE_USER_MANAGEMENT)
             original_account = (
                 user_model.objects.select_for_update().get(pk=self.account.pk)
                 if self.account is not None
                 else None
+            )
+            was_active_manager = original_account is not None and copy(original_account).has_perm(
+                USER_MANAGEMENT_PERMISSION
             )
             previous_roles = (
                 set(original_account.groups.values_list("pk", flat=True))
@@ -471,9 +505,10 @@ class UserAccountForm(forms.Form):
                     )
 
             person_changed = original_account is not None and previous_person != person
+            _validate_account_email_length(person.email)
             if person_changed and (
                 not self.cleaned_data["password1"]
-                or original_account.check_password(self.cleaned_data["password1"])
+                or check_password(self.cleaned_data["password1"], original_account.password)
             ):
                 raise ValidationError(
                     "Bei einem Personenwechsel muss ein neues Passwort vergeben werden."
@@ -507,6 +542,14 @@ class UserAccountForm(forms.Form):
             account.user_permissions.set(
                 [*other_permissions, *self.cleaned_data["direct_permissions"]]
             )
+            # Recheck the actual resulting permissions, including direct grants,
+            # preserved groups and superuser access. Failure rolls back all writes.
+            if (
+                was_active_manager
+                and not account.has_perm(USER_MANAGEMENT_PERMISSION)
+                and not _has_other_active_account_manager(account)
+            ):
+                raise ValidationError(LAST_ACCOUNT_MANAGER_ERROR)
             access_changed = previous_roles != set(account.groups.values_list("pk", flat=True)) or (
                 previous_permissions != set(account.user_permissions.values_list("pk", flat=True))
             )

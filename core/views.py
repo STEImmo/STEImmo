@@ -73,7 +73,9 @@ def _client_ip_fingerprint(request: HttpRequest) -> str | None:
 def _account_for_login_identifier(identifier: str):
     user_model = get_user_model()
     try:
-        return user_model._default_manager.get_by_natural_key(identifier)
+        return user_model._default_manager.select_for_update().get(
+            **{user_model.USERNAME_FIELD: identifier}
+        )
     except user_model.DoesNotExist:
         return None
 
@@ -118,6 +120,9 @@ def _record_failed_login(user, ip_fingerprint: str | None) -> None:
     now = timezone.now()
     with transaction.atomic():
         if user is not None:
+            # Keep the same lock order as password authentication, including
+            # throttle creation (whose user foreign key also needs a row lock).
+            get_user_model().objects.select_for_update().get(pk=user.pk)
             throttle, _created = AccountLoginThrottle.objects.get_or_create(user=user)
             throttle = AccountLoginThrottle.objects.select_for_update().get(pk=throttle.pk)
             if throttle.locked_until is None or throttle.locked_until <= now:
@@ -165,12 +170,15 @@ class ThrottledAuthenticationForm(AuthenticationForm):
     def clean(self):
         username = self.cleaned_data.get("username")
         password = self.cleaned_data.get("password")
-        if username and password:
-            self.login_user = _account_for_login_identifier(username)
-            if _is_login_throttled(self.login_user, self.ip_fingerprint):
-                self.login_was_throttled = True
-                raise self.get_invalid_login_error()
-        return super().clean()
+        with transaction.atomic():
+            if username and password:
+                self.login_user = _account_for_login_identifier(username)
+                if _is_login_throttled(self.login_user, self.ip_fingerprint):
+                    self.login_was_throttled = True
+                    raise self.get_invalid_login_error()
+            # Django may write an upgraded password hash during authentication.
+            # The user lock prevents that write from overwriting a password reset.
+            return super().clean()
 
     def get_invalid_login_error(self):
         return ValidationError(LOGIN_FAILURE_MESSAGE, code="invalid_login")
@@ -240,19 +248,22 @@ class RoleAwareLoginView(LoginView):
                 )
                 code = verification.issue_code()
                 verification.save()
-                send_employee_mfa_code(user.email, code)
                 self.request.session[EMPLOYEE_MFA_USER_SESSION_KEY] = user.pk
                 self.request.session[EMPLOYEE_MFA_CHALLENGE_SESSION_KEY] = verification.code_hash
                 self.request.session[EMPLOYEE_MFA_REDIRECT_SESSION_KEY] = (
                     self.get_redirect_url() or self.get_default_redirect_url_for_user(user)
                 )
-                messages.success(self.request, "Wir haben Ihnen einen Einmalcode gesendet.")
-                return redirect("employee_mfa_verify")
-            response = super().form_valid(form)
-            # SessionMiddleware runs after this transaction. Persist now so a
-            # subsequent account change can revoke even this unfinished response.
-            self.request.session.save()
-            return response
+            else:
+                response = super().form_valid(form)
+                # SessionMiddleware runs after this transaction. Persist now so a
+                # subsequent account change can revoke even this unfinished response.
+                self.request.session.save()
+                return response
+        # SMTP must not hold a database lock. A concurrent account change can
+        # invalidate the issued code even if delivery has not completed yet.
+        send_employee_mfa_code(user.email, code)
+        messages.success(self.request, "Wir haben Ihnen einen Einmalcode gesendet.")
+        return redirect("employee_mfa_verify")
 
     def get_default_redirect_url_for_user(self, user) -> str:
         if user.has_perm(EMPLOYEE_ACCESS_PERMISSION):
