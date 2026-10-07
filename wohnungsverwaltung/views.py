@@ -1094,6 +1094,13 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
     move_in_reference = None
     if can_manage_handover_photos:
         move_in_reference = _attach_move_in_photo_references(protocol, protocol.raeume.all())
+    archived_snapshot = None
+    if (
+        protocol.status == ProtokollStatus.SIGNED
+        and isinstance(protocol.export_snapshot, dict)
+        and isinstance(protocol.export_snapshot.get("rooms"), list)
+    ):
+        archived_snapshot = protocol.export_snapshot
     return render(
         request,
         "wohnungsverwaltung/handover_protocol_detail.html",
@@ -1104,6 +1111,7 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
             "handover_status_label": HANDOVER_STATUS_LABELS[protocol.uebergabe_status],
             "acceptance_status_label": ACCEPTANCE_STATUS_LABELS[protocol.abnahme_status],
             "protocol_status_label": PROTOCOL_STATUS_LABELS[protocol.status],
+            "archived_snapshot": archived_snapshot,
             "can_manage_handover_photos": can_manage_handover_photos,
             "move_in_reference": move_in_reference,
             **_move_in_reference_context(move_in_reference),
