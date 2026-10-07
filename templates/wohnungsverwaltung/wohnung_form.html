@@ -36,6 +36,26 @@
             </section>
 
             <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+                <h2 class="uk-h3">Anforderungen für die Bewerberauswahl</h2>
+                <p class="uk-text-meta">
+                    Diese Angaben steuern nur die Mitarbeiterübersicht. Eine Abweichung wird
+                    zur Einzelfallprüfung angezeigt und führt nicht automatisch zu einer Ablehnung.
+                </p>
+                <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
+                    <div>
+                        {% include "wohnungsverwaltung/_form_field.html" with field=form.max_occupants %}
+                        <p class="uk-text-meta">Leer lassen, solange keine begründete Höchstzahl festgelegt ist. Sie wird nicht aus der Zimmerzahl abgeleitet.</p>
+                        {% include "wohnungsverwaltung/_form_field.html" with field=form.occupancy_requirement_reason %}
+                    </div>
+                    <div>
+                        {% include "wohnungsverwaltung/_form_field.html" with field=form.pet_review_required %}
+                        <p class="uk-text-meta">Bei „Ja“ werden Bewerbungen mit Haustierangabe zur menschlichen Einzelfallprüfung markiert.</p>
+                        {% include "wohnungsverwaltung/_form_field.html" with field=form.pet_review_reason %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
                 <div class="uk-flex uk-flex-between uk-flex-middle">
                     <h2 class="uk-h3">Räume</h2>
                     {% if wohnung.pk %}

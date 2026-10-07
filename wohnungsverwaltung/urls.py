@@ -62,6 +62,26 @@ urlpatterns = [
         name="employee_application_detail",
     ),
     path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/prioritaet/",
+        views.employee_application_priority_update,
+        name="employee_application_priority_update",
+    ),
+    path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/einzelfall-freigeben/",
+        views.employee_application_suitability_approve,
+        name="employee_application_suitability_approve",
+    ),
+    path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/main-einladen/",
+        views.employee_application_invite,
+        name="employee_application_invite",
+    ),
+    path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/einladung-erneut-senden/",
+        views.employee_application_invitation_resend,
+        name="employee_application_invitation_resend",
+    ),
+    path(
         "bewerbungen/mitarbeiter/<uuid:application_id>/nachweise/<str:document_type>/",
         views.employee_application_document,
         name="employee_application_document",

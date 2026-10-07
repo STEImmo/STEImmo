@@ -45,6 +45,59 @@
         </article>
 
         <article class="uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
+            <h2 class="uk-card-title">Interne Prüfung</h2>
+            <p>Priorität: <strong>{{ application.get_review_priority_display }}</strong></p>
+            {% if application.review_priority_reason %}<p>{{ application.review_priority_reason|linebreaksbr }}</p>{% endif %}
+            <form method="post" action="{% url 'wohnungsverwaltung:employee_application_priority_update' application.pk %}" class="uk-form-stacked uk-margin">
+                {% csrf_token %}
+                {{ priority_form.as_p }}
+                <button class="uk-button uk-button-default" type="submit">Priorität speichern</button>
+            </form>
+
+            <h3 class="uk-h4">Einzelfallprüfung</h3>
+            {% if suitability_flags %}
+                <ul class="uk-list uk-list-bullet">{% for flag in suitability_flags %}<li>{{ flag }}</li>{% endfor %}</ul>
+                {% if has_current_suitability_approval %}
+                    <p class="uk-alert-success" uk-alert>Für die aktuellen Wohnungsanforderungen freigegeben.</p>
+                {% else %}
+                    <form method="post" action="{% url 'wohnungsverwaltung:employee_application_suitability_approve' application.pk %}" class="uk-form-stacked">
+                        {% csrf_token %}
+                        {{ eligibility_form.as_p }}
+                        <button class="uk-button uk-button-primary" type="submit">Einzelfall begründet freigeben</button>
+                    </form>
+                {% endif %}
+            {% else %}
+                <p>Keine Abweichung von den eingerichteten Anforderungen.</p>
+            {% endif %}
+
+            <h3 class="uk-h4">Main-Bewerbung freischalten</h3>
+            {% if application.main_application_unlocked %}
+                <p>Die Main-Bewerbung ist freigeschaltet.</p>
+                {% if not application.submitted_at and application.status == "open" and not application.interest_withdrawn_at %}
+                    <form method="post" action="{{ invitation_url }}">
+                        {% csrf_token %}
+                        <button class="uk-button uk-button-default" type="submit">Einladung erneut versenden</button>
+                    </form>
+                {% endif %}
+            {% elif application.status == "open" and not application.interest_withdrawn_at and not application.submitted_at %}
+                <form method="post" action="{% url 'wohnungsverwaltung:employee_application_invite' application.pk %}" class="uk-form-stacked">
+                    {% csrf_token %}
+                    {{ invitation_form.as_p }}
+                    <button class="uk-button uk-button-primary" type="submit">Main-Bewerbung freischalten und einladen</button>
+                </form>
+            {% endif %}
+
+            <h3 class="uk-h4">Änderungsverlauf</h3>
+            {% if review_events %}
+                <ul class="uk-list uk-list-divider">
+                    {% for event in review_events %}
+                        <li><strong>{{ event.get_kind_display }}</strong> · {{ event.created_at|date:"d.m.Y, H:i" }} Uhr · {{ event.actor|default:"Unbekannt" }}{% if event.reason %}<br>{{ event.reason|linebreaksbr }}{% endif %}</li>
+                    {% endfor %}
+                </ul>
+            {% else %}<p>Noch keine internen Änderungen dokumentiert.</p>{% endif %}
+        </article>
+
+        <article class="uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
             <h2 class="uk-card-title">Main-Bewerbung</h2>
             {% if application.submitted_at %}
                 <p>Main-Eingang: {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr</p>

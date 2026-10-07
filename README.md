@@ -180,7 +180,18 @@ Main-Bereich. Main-Nachweise werden erst nach der Einreichung sichtbar und
 weiterhin ausschließlich über geschützte Downloads bereitgestellt.
 Die Betreiberübersicht und Bewerbungsdetails untersagen Browser- und Proxy-Caching
 über private `no-store`-Antwortheader.
-Kategorienfilter, Priorisierung und Einladungen folgen in Issue #22.
+
+Die wohnungsbezogene Übersicht trennt passende Bewerbungen, offene
+Einzelfallprüfungen und alle Bewerbungen. Mitarbeiter können nach Kontaktdaten,
+Personenzahl, Status, Main-Status, Priorität und Eingangsdatum filtern und nach
+Eingang oder Priorität sortieren. Pro Seite erscheinen 20 Bewerbungen.
+Belegungsgrenzen und Tierhaltungsprüfungen müssen für jede Wohnung begründet
+eingerichtet werden. Abweichungen führen nur zu einer Einzelfallprüfung; eine
+begründete Freigabe gilt bis zur nächsten Änderung der Anforderungen.
+Prioritätsänderungen und Freigaben werden intern protokolliert. Eine manuelle
+Main-Freischaltung erfordert die Bestätigung einer positiven Mitarbeiterentscheidung
+und sendet eine E-Mail. Ein fehlgeschlagener Versand hebt die Freischaltung nicht
+auf und kann erneut angestoßen werden.
 
 ## Lokale Entwicklung
 

@@ -1,10 +1,12 @@
 from datetime import timedelta
 from io import BytesIO
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import TestCase
@@ -17,6 +19,7 @@ from .access import ROLE_APPLICANT, ROLE_EMPLOYEE, ROLE_TENANT, ROLE_USER_MANAGE
 from .models import (
     ApplicationProof,
     ApplicationProofCategory,
+    ApplicationReviewEvent,
     Bewerbung,
     BewerbungStatus,
     BewerbungStellplatz,
@@ -51,14 +54,13 @@ class EmployeeDashboardTests(TestCase):
             telefonnummer="0123456789",
             geburtsdatum="2000-01-02",
         )
-        return Bewerbung.objects.create(
-            person=person,
-            wohnung=unit,
-            personenanzahl=2,
-            haustiere=True,
-            ueber_mich="Ich studiere Informatik.",
-            **kwargs,
-        )
+        application_data = {
+            "personenanzahl": 2,
+            "haustiere": True,
+            "ueber_mich": "Ich studiere Informatik.",
+        }
+        application_data.update(kwargs)
+        return Bewerbung.objects.create(person=person, wohnung=unit, **application_data)
 
     def setUp(self):
         self.client.force_login(self.employee)
@@ -463,3 +465,197 @@ class EmployeeDashboardDisclosureTests(TestCase):
                 args=[self.submitted.pk, document_type],
             )
             self.assertEqual(self.client.get(url).status_code, 404)
+
+
+class EmployeeApplicationSelectionTests(TestCase):
+    def setUp(self):
+        self.employee = get_user_model().objects.create_user(username="selection-employee")
+        self.employee.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
+        self.applicant_user = get_user_model().objects.create_user(
+            username="selection-applicant", email="applicant@example.test", password="test"
+        )
+        self.applicant_user.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+        self.unit = Wohnung.objects.create(gebaeudenummer="1", wohnungsnummer="selection")
+        self.match = EmployeeDashboardTests.create_application(self.unit, haustiere=False)
+        self.occupancy_exception = EmployeeDashboardTests.create_application(
+            self.unit, personenanzahl=3, haustiere=False
+        )
+        self.pet_exception = EmployeeDashboardTests.create_application(self.unit, haustiere=True)
+        self.client.force_login(self.employee)
+        self.list_url = reverse("wohnungsverwaltung:employee_application_list")
+
+    def configure_requirements(self, **overrides):
+        self.unit.max_occupants = overrides.get("max_occupants", 2)
+        self.unit.occupancy_requirement_reason = overrides.get(
+            "occupancy_requirement_reason", "Grundriss und nutzbare Schlafräume"
+        )
+        self.unit.pet_review_required = overrides.get("pet_review_required", True)
+        self.unit.pet_review_reason = overrides.get(
+            "pet_review_reason", "Prüfung der konkreten Tierhaltung"
+        )
+        self.unit.save()
+
+    def test_unconfigured_requirements_do_not_exclude_applications(self):
+        response = self.client.get(self.list_url, {"wohnung": self.unit.pk})
+        self.assertEqual(
+            {item.pk for item in response.context["applications"]},
+            {self.match.pk, self.occupancy_exception.pk, self.pet_exception.pk},
+        )
+        self.assertContains(response, "Anforderungen offen")
+
+    def test_default_view_shows_only_matching_applications_and_review_tab_keeps_exceptions(self):
+        self.configure_requirements()
+        matching = self.client.get(self.list_url, {"wohnung": self.unit.pk})
+        review = self.client.get(self.list_url, {"wohnung": self.unit.pk, "segment": "review"})
+        self.assertEqual([item.pk for item in matching.context["applications"]], [self.match.pk])
+        self.assertEqual(
+            {item.pk for item in review.context["applications"]},
+            {self.occupancy_exception.pk, self.pet_exception.pk},
+        )
+        self.assertContains(review, "Einzelfallprüfung")
+
+    def test_manual_eligibility_approval_is_reasoned_and_invalidated_by_requirement_changes(self):
+        self.configure_requirements()
+        approval_url = reverse(
+            "wohnungsverwaltung:employee_application_suitability_approve",
+            args=[self.occupancy_exception.pk],
+        )
+        response = self.client.post(approval_url, {"reason": "Schlafräume sind flexibel nutzbar"})
+        self.assertEqual(response.status_code, 302)
+        event = ApplicationReviewEvent.objects.get(
+            application=self.occupancy_exception,
+            kind=ApplicationReviewEvent.Kind.ELIGIBILITY_APPROVED,
+        )
+        self.assertEqual(event.actor, self.employee)
+        self.assertEqual(event.reason, "Schlafräume sind flexibel nutzbar")
+        matching = self.client.get(self.list_url, {"wohnung": self.unit.pk})
+        self.assertIn(self.occupancy_exception, matching.context["applications"])
+
+        self.unit.max_occupants = 1
+        self.unit.save()
+        matching = self.client.get(self.list_url, {"wohnung": self.unit.pk})
+        review = self.client.get(self.list_url, {"wohnung": self.unit.pk, "segment": "review"})
+        self.assertNotIn(self.occupancy_exception, matching.context["applications"])
+        self.assertIn(self.occupancy_exception, review.context["applications"])
+
+    def test_filters_and_priority_sorting_keep_pagination_parameters(self):
+        self.configure_requirements(max_occupants=4, pet_review_required=False)
+        self.match.review_priority = Bewerbung.Priority.HIGH
+        self.match.personenanzahl = 4
+        self.match.save(update_fields=["review_priority", "personenanzahl"])
+        other = EmployeeDashboardTests.create_application(
+            self.unit, personenanzahl=4, haustiere=False
+        )
+        response = self.client.get(
+            self.list_url,
+            {"wohnung": self.unit.pk, "people": "4", "sort": "priority"},
+        )
+        self.assertEqual(list(response.context["applications"]), [self.match, other])
+
+    def test_priority_is_private_and_changes_are_audited(self):
+        priority_url = reverse(
+            "wohnungsverwaltung:employee_application_priority_update", args=[self.match.pk]
+        )
+        response = self.client.post(
+            priority_url,
+            {"priority": Bewerbung.Priority.HIGH, "reason": "Passende Raumaufteilung"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.match.refresh_from_db()
+        event = ApplicationReviewEvent.objects.get(
+            application=self.match, kind=ApplicationReviewEvent.Kind.PRIORITY_CHANGED
+        )
+        self.assertEqual(self.match.review_priority, Bewerbung.Priority.HIGH)
+        self.assertEqual(event.actor, self.employee)
+        self.assertEqual(event.reason, "Passende Raumaufteilung")
+
+        person = self.match.person
+        person.user = self.applicant_user
+        person.save(update_fields=["user"])
+        self.client.force_login(self.applicant_user)
+        response = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+        self.assertNotContains(response, "Passende Raumaufteilung")
+        self.assertNotContains(response, "Hoch")
+
+    def test_invitation_unlocks_only_selected_application_and_sends_email(self):
+        person = self.match.person
+        person.user = self.applicant_user
+        person.save(update_fields=["user"])
+        invite_url = reverse("wohnungsverwaltung:employee_application_invite", args=[self.match.pk])
+        response = self.client.post(
+            invite_url,
+            {
+                "confirm_positive_decision": "on",
+                "reason": "Besichtigung durchgeführt und positive Eignungsentscheidung",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.match.refresh_from_db()
+        self.occupancy_exception.refresh_from_db()
+        self.assertTrue(self.match.main_application_unlocked)
+        self.assertFalse(self.occupancy_exception.main_application_unlocked)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertTrue(
+            ApplicationReviewEvent.objects.filter(
+                application=self.match,
+                kind=ApplicationReviewEvent.Kind.INVITATION_SENT,
+                actor=self.employee,
+            ).exists()
+        )
+        self.client.force_login(self.applicant_user)
+        self.assertEqual(
+            self.client.get(
+                reverse("wohnungsverwaltung:main_application_status", args=[self.match.pk])
+            ).status_code,
+            200,
+        )
+
+    def test_failed_invitation_keeps_unlock_and_can_be_resent(self):
+        self.match.person.user = self.applicant_user
+        self.match.person.save(update_fields=["user"])
+        invite_url = reverse("wohnungsverwaltung:employee_application_invite", args=[self.match.pk])
+        with patch("wohnungsverwaltung.views.send_mail", side_effect=OSError("smtp down")):
+            self.client.post(
+                invite_url,
+                {
+                    "confirm_positive_decision": "on",
+                    "reason": "Positive Entscheidung nach persönlicher Prüfung",
+                },
+            )
+        self.match.refresh_from_db()
+        self.assertTrue(self.match.main_application_unlocked)
+        self.assertTrue(
+            ApplicationReviewEvent.objects.filter(
+                application=self.match,
+                kind=ApplicationReviewEvent.Kind.INVITATION_FAILED,
+            ).exists()
+        )
+        resend_url = reverse(
+            "wohnungsverwaltung:employee_application_invitation_resend", args=[self.match.pk]
+        )
+        with patch("wohnungsverwaltung.views.send_mail", return_value=1) as send_mail_mock:
+            response = self.client.post(resend_url)
+        self.assertEqual(response.status_code, 302)
+        send_mail_mock.assert_called_once()
+        self.assertTrue(
+            ApplicationReviewEvent.objects.filter(
+                application=self.match,
+                kind=ApplicationReviewEvent.Kind.INVITATION_SENT,
+            ).exists()
+        )
+
+    def test_empty_reasons_and_get_requests_cannot_change_review_state(self):
+        self.configure_requirements()
+        priority_url = reverse(
+            "wohnungsverwaltung:employee_application_priority_update", args=[self.match.pk]
+        )
+        response = self.client.get(priority_url)
+        self.assertEqual(response.status_code, 405)
+        response = self.client.post(
+            priority_url,
+            {"priority": Bewerbung.Priority.HIGH, "reason": "   "},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.match.refresh_from_db()
+        self.assertEqual(self.match.review_priority, Bewerbung.Priority.UNRATED)
+        self.assertFalse(ApplicationReviewEvent.objects.filter(application=self.match).exists())
