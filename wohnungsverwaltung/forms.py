@@ -999,6 +999,10 @@ class ApartmentSearchForm(forms.Form):
 
 
 class HandoverProtocolForm(forms.ModelForm):
+    removed_rooms = forms.ModelMultipleChoiceField(
+        queryset=Raumprotokoll.objects.none(), required=False, widget=forms.MultipleHiddenInput
+    )
+
     vermieter_name = forms.ChoiceField(
         label="Anwesend für den Vermieter",
         choices=(),
@@ -1079,6 +1083,8 @@ class HandoverProtocolForm(forms.ModelForm):
 
     def __init__(self, *args, wohnung_id: str | None = None, employee=None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        if not self.instance._state.adding:
+            self.fields["removed_rooms"].queryset = self.instance.raeume.all()
         self.fields["wohnung"].queryset = Wohnung.objects.order_by(
             "gebaeudenummer", "wohnungsnummer"
         )
@@ -1524,6 +1530,9 @@ class ProtocolConfirmationForm(forms.Form):
 
 
 class InlineRoomChecklistForm(forms.Form):
+    raumprotokoll = forms.ModelChoiceField(
+        queryset=Raumprotokoll.objects.none(), required=False, widget=forms.HiddenInput
+    )
     pruefpunkt = forms.ModelChoiceField(
         queryset=RaumMerkmal.objects.none(), required=False, widget=forms.HiddenInput
     )
@@ -1572,6 +1581,7 @@ class InlineRoomChecklistForm(forms.Form):
         wohnung_id: UUID | None = None,
         allow_photo_upload: bool = False,
         protocol=None,
+        removed_rooms=(),
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
@@ -1580,9 +1590,12 @@ class InlineRoomChecklistForm(forms.Form):
         self.existing_item = None
         self.existing_photo_checksums = set()
         if protocol is not None:
-            self.fields["pruefpunkt"].queryset = RaumMerkmal.objects.filter(
-                raumprotokoll__protokoll=protocol
-            ).prefetch_related("fotos")
+            self.fields["raumprotokoll"].queryset = protocol.raeume.all()
+            self.fields["pruefpunkt"].queryset = (
+                RaumMerkmal.objects.filter(raumprotokoll__protokoll=protocol)
+                .exclude(raumprotokoll__in=removed_rooms)
+                .prefetch_related("fotos")
+            )
             try:
                 self.existing_item = (
                     self.fields["pruefpunkt"].queryset.filter(pk=self["pruefpunkt"].value()).first()

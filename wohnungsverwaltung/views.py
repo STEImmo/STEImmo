@@ -1064,7 +1064,11 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
             with handover_photo_upload() as stored_photo_files:
                 protocol = form.save()
                 _save_inline_protocol_entries(
-                    protocol, room_formset, key_formset, stored_photo_files
+                    protocol,
+                    room_formset,
+                    key_formset,
+                    stored_photo_files,
+                    removed_rooms=form.cleaned_data["removed_rooms"],
                 )
                 _delete_draft(request, draft_scope)
         except (HandoverPhotoStorageError, DatabaseError) as error:
@@ -1085,7 +1089,9 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
             "page_title": "Übergabeprotokoll anlegen",
             "submit_label": "Protokoll anlegen",
             "room_formset": room_formset,
-            "room_form_groups": _room_form_groups(room_formset),
+            "room_form_groups": _room_form_groups(
+                room_formset, request.POST.getlist("removed_rooms")
+            ),
             "key_formset": key_formset,
             "move_in_reference": move_in_reference,
             "meter_comparison_rows": _meter_comparison_rows(form, move_in_reference),
@@ -1199,6 +1205,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         employee=request.user,
     )
     _set_selected_person_initial(form, selected_person_id)
+    form_valid = request.method == "POST" and form.is_valid()
     can_manage_handover_photos = _can_manage_handover_photos(request)
     room_formset = InlineRoomChecklistFormSet(
         data=request.POST or None,
@@ -1209,6 +1216,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
             "wohnung_id": _valid_wohnung_id(selected_wohnung_id or protocol.wohnung_id),
             "allow_photo_upload": can_manage_handover_photos,
             "protocol": protocol,
+            "removed_rooms": getattr(form, "cleaned_data", {}).get("removed_rooms", ()),
         },
     )
     key_formset = HandoverKeyFormSet(
@@ -1225,7 +1233,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         )
     if (
         request.method == "POST"
-        and form.is_valid()
+        and form_valid
         and room_formset.is_valid()
         and key_formset.is_valid()
     ):
@@ -1233,7 +1241,11 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
             with handover_photo_upload() as stored_photo_files:
                 protocol = form.save()
                 _save_inline_protocol_entries(
-                    protocol, room_formset, key_formset, stored_photo_files
+                    protocol,
+                    room_formset,
+                    key_formset,
+                    stored_photo_files,
+                    removed_rooms=form.cleaned_data["removed_rooms"],
                 )
                 _delete_draft(request, draft_scope)
         except (HandoverPhotoStorageError, DatabaseError) as error:
@@ -1256,7 +1268,9 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
             "submit_label": "Änderungen speichern",
             "protocol": protocol,
             "room_formset": room_formset,
-            "room_form_groups": _room_form_groups(room_formset),
+            "room_form_groups": _room_form_groups(
+                room_formset, request.POST.getlist("removed_rooms")
+            ),
             "key_formset": key_formset,
             "move_in_reference": move_in_reference,
             "meter_comparison_rows": _meter_comparison_rows(form, move_in_reference),
@@ -1727,10 +1741,22 @@ def _key_form_initial(wohnung) -> list[dict[str, object]]:
     ]
 
 
-def _save_inline_protocol_entries(protocol, room_formset, key_formset, stored_photo_files) -> None:
+def _save_inline_protocol_entries(
+    protocol, room_formset, key_formset, stored_photo_files, *, removed_rooms=()
+) -> None:
+    removed_rooms = list(removed_rooms)
+    removed_ids = {room.pk for room in removed_rooms}
+    for room in removed_rooms:
+        _delete_checklist_photos(RaumMerkmalFoto.objects.filter(raum_merkmal__raumprotokoll=room))
+        room.delete()
     for room_form in room_formset:
+        source_room = room_form.cleaned_data.get("raumprotokoll")
+        item = room_form.cleaned_data.get("pruefpunkt")
+        if (source_room is not None and source_room.pk in removed_ids) or (
+            item is not None and item.raumprotokoll_id in removed_ids
+        ):
+            continue
         if room_form.cleaned_data.get("DELETE"):
-            item = room_form.cleaned_data.get("pruefpunkt")
             if item is not None:
                 _delete_checklist_photos(item.fotos.all())
                 item.delete()
@@ -1760,11 +1786,12 @@ def _protocol_room_initial(protocol):
     for room in protocol.raeume.prefetch_related("raum_merkmale__merkmal").order_by("name", "pk"):
         items = list(room.raum_merkmale.all())
         if not items:
-            values.append({"raum": room.raum_id})
+            values.append({"raum": room.raum_id, "raumprotokoll": room.pk})
         for item in items:
             value = item.wert if isinstance(item.wert, dict) else {}
             values.append(
                 {
+                    "raumprotokoll": room.pk,
                     "pruefpunkt": item.pk,
                     "raum": room.raum_id,
                     "bereich": item.merkmal.bereich,
@@ -1784,14 +1811,22 @@ def _protocol_key_initial(protocol):
     ]
 
 
-def _room_form_groups(room_formset) -> list[dict[str, object]]:
+def _room_form_groups(room_formset, removed_rooms=()) -> list[dict[str, object]]:
     groups: list[dict[str, object]] = []
+    removed_ids = set(removed_rooms)
     for room_form in room_formset:
         cleaned_data = getattr(room_form, "cleaned_data", {})
         room_name = cleaned_data.get("raum") or room_form["raum"].value() or ""
         if not groups or groups[-1]["name"] != room_name:
+            room_protocol_id = str(room_form["raumprotokoll"].value() or "")
             groups.append(
-                {"name": room_name, "room_form": room_form, "checklist_forms": [room_form]}
+                {
+                    "name": room_name,
+                    "room_form": room_form,
+                    "checklist_forms": [room_form],
+                    "room_protocol_id": room_protocol_id,
+                    "remove_room": room_protocol_id in removed_ids,
+                }
             )
             continue
         groups[-1]["checklist_forms"].append(room_form)
