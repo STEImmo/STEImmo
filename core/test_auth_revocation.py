@@ -14,7 +14,7 @@ from django.contrib.sessions.exceptions import SessionInterrupted
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.contrib.sessions.models import Session
 from django.core import mail
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import close_old_connections, connection
 from django.test import Client, RequestFactory, TestCase, TransactionTestCase
 from django.urls import reverse
@@ -362,8 +362,12 @@ class AccountFormEdgeCaseTests(AccountChangesMixin, TestCase):
         )
         changed = first_form.save()
         self.assertFalse(changed.has_perm(USER_MANAGEMENT_PERMISSION))
-        with self.assertRaisesMessage(ValidationError, "letzte aktive Benutzerverwalter"):
-            second_form.save()
+        if deactivate:
+            with self.assertRaises(PermissionDenied):
+                second_form.save()
+        else:
+            with self.assertRaisesMessage(ValidationError, "letzte aktive Benutzerverwalter"):
+                second_form.save()
         second.refresh_from_db()
         self.assertTrue(second.has_perm(USER_MANAGEMENT_PERMISSION))
 
@@ -489,7 +493,7 @@ class ConcurrentAccountAuthenticationTests(AccountChangesMixin, TransactionTestC
             ),
             "core.views.send_employee_mfa_code",
             lambda: self.edit_account(account, is_active=False),
-            original_operation=lambda email, code: delivered_codes.append(code),
+            original_operation=lambda email, code: delivered_codes.append(code) or True,
         )
         self.assertFalse(was_blocked, "SMTP delivery must not hold the account row lock")
         account.refresh_from_db()

@@ -72,11 +72,43 @@ Eine Prüfung nur bei der Formularvalidierung würde zwei bereits geprüfte, par
 Selbstentzüge erlauben und könnte alle Benutzerverwalter entfernen. Superuser behalten
 ihre Verwaltungsberechtigung unabhängig von der Gruppenzuordnung.
 
+Unter dieser gemeinsamen Sperre lädt die Benutzerverwaltung auch das handelnde
+Konto frisch und sperrt dessen `User`-Zeile vor dem bearbeiteten Konto. Sie verlangt
+ein weiterhin aktives Konto mit `manage_user_accounts` und unveränderte Zugangsdaten
+gegenüber dem bereits authentifizierten Request. Ein Rechteentzug, eine Deaktivierung,
+ein Passwortreset oder Personenwechsel zwischen View-Zugriff und Speichern führt zu
+HTTP 403 und verhindert sämtliche Formularänderungen. Die Prüfung des Dekorators
+beim Betreten der View allein reicht dafür nicht: Eine schon laufende Anfrage könnte
+sonst entzogene Rechte wiederherstellen. Interne Formularaufrufe ohne Request-Akteur
+behalten ihren bisherigen programmgesteuerten Aufrufweg; beide Verwaltungs-Views
+übergeben immer den authentifizierten Benutzer als Akteur.
+
 Mitarbeitercodes werden unter der Kontosperre ausgestellt; der anschließende
 E-Mail-Versand läuft nach Abschluss der Kontotransaktion. Ein langsamer SMTP-Server
 darf einen administrativen Kontowiderruf nicht blockieren. Wird das Konto während
 des Versands geändert, bleibt ein gegebenenfalls später zugestellter Code ungültig.
 `DJANGO_EMAIL_TIMEOUT` begrenzt die SMTP-Wartezeit; der Standard beträgt zehn Sekunden.
+
+SMTP- und Netzwerkfehler sowie ein Versand ohne zugestellte Nachricht werden kontrolliert
+behandelt. Bei einer fehlgeschlagenen Registrierung bleibt das Konto unbestätigt;
+der Browser erhält die Bestätigungsseite mit vorausgefüllter E-Mail und einer Fehlermeldung.
+Der Registrierungscode kann nach der bestehenden Wartezeit von einer Minute erneut
+angefordert werden. Die Wartezeit bleibt auch nach einem Versandfehler erhalten,
+damit ein Mailausfall keine unbegrenzten Codeanforderungen und neuen Versuchskontingente
+ermöglicht. Die Rückmeldung beim erneuten Versand bleibt für existierende und unbekannte
+Registrierungen gleich, damit der Mailfehler keine zusätzliche Kontoauskunft ermöglicht.
+Ein neu ausgestellter Registrierungscode ersetzt den vorherigen auch bei einem Versandfehler;
+alte Codes werden nicht wiederhergestellt. Bei Mitarbeiter-MFA wird nur der betroffene
+Code samt ausstehendem Anmeldezustand im Browser verworfen und das Anmeldeformular erklärt den erneuten
+Versuch. Ein gültiges Passwort mit fehlgeschlagenem Versand zählt nicht als Passwortfehler.
+
+Die MFA-Bereinigung nach einem Mailfehler sperrt erneut zuerst das Konto und wirkt
+ausschließlich auf den Hash des gerade ausgestellten Codes. Eine verspätete Fehlermeldung
+darf keinen neueren Code löschen. Bei Registrierungsfehlern bleiben die gespeicherten
+Verifikationsdaten unverändert: Weder wird die Versandsperre eines neueren Codes aufgehoben
+noch eine widerrufene Registrierung wieder angelegt. Der eigentliche Mailversand bleibt
+außerhalb dieser Transaktionen.
+Die Protokollierung nennt nur die Fehlerklasse, keine E-Mail-Adresse, Codes oder Serverdetails.
 
 Eine erfolgreiche Anmeldung speichert die authentifizierte Datenbanksitzung noch
 innerhalb der Transaktion und unter der Kontosperre. Gewinnt die Anmeldung zuerst,
@@ -97,6 +129,12 @@ Ein veralteter Browser verwirft nur seinen eigenen ausstehenden Anmeldezustand u
 verbraucht keine Versuche des neu ausgestellten Codes. Bereits vor dieser Änderung
 begonnene MFA-Anmeldungen ohne diese Bindung müssen erneut gestartet werden.
 
+Die MFA-Zieladresse wird vor `login()` aus der Sitzung übernommen, weil Django beim
+Wechsel zwischen Konten die bisherige Sitzung leert. Die Zieladresse wird weiterhin auf
+denselben Host und das zulässige URL-Schema geprüft; andernfalls gilt die Standardseite
+der aktuellen Kontoberechtigungen. Auch Konten mit ausschließlich direktem
+Benutzerverwaltungsrecht gelangen damit in die Benutzerverwaltung.
+
 Eine inaktive Selbstregistrierung mit vorhandenem `RegistrationVerification` ist
 noch offen. Unverändertes Speichern erhält Hash, Ablaufzeit, Versuchszähler und
 Versandsperre. Die Benutzerverwaltung bietet für diese Konten ausdrücklich
@@ -111,6 +149,10 @@ Registrierung und Benutzerverwaltung begrenzen Konto-E-Mail-Adressen daher auf d
 `username.max_length` (150 Zeichen). Das gilt auch für die Auswahl einer bereits
 vorhandenen Person; beim Speichern wird deren frisch gesperrte E-Mail erneut geprüft.
 Längere Adressen führen zu einem Formularfehler statt zu einem Datenbankfehler.
+Vor- und Nachnamen sind ebenfalls auf die Feldlängen von `User.first_name` und
+`User.last_name` begrenzt (je 150 Zeichen). Bereits vorhandene Personen werden bei der
+Formularprüfung und erneut am gesperrten aktuellen Datensatz vor dem Speichern geprüft.
+Die Anwendung kürzt Namen nicht stillschweigend.
 Das Person-Modell und bestehende Migrationen bleiben unverändert.
 
 ## Erweiterungsroutine

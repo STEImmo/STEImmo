@@ -11,7 +11,7 @@ from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.models import Session
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.storage import Storage
 from django.db import transaction
 from django.db.models import Q
@@ -86,6 +86,8 @@ METER_READING_FIELDS = (
 
 ACCOUNT_CREATION_ERROR = "Mit diesen Angaben kann kein Konto erstellt werden."
 ACCOUNT_EMAIL_MAX_LENGTH = get_user_model()._meta.get_field("username").max_length
+ACCOUNT_FIRST_NAME_MAX_LENGTH = get_user_model()._meta.get_field("first_name").max_length
+ACCOUNT_LAST_NAME_MAX_LENGTH = get_user_model()._meta.get_field("last_name").max_length
 ACCOUNT_EMAIL_LENGTH_ERROR = (
     f"Die E-Mail-Adresse darf für ein Konto höchstens {ACCOUNT_EMAIL_MAX_LENGTH} Zeichen enthalten."
 )
@@ -120,6 +122,19 @@ def _validate_account_email_length(email: str) -> None:
         raise ValidationError(ACCOUNT_EMAIL_LENGTH_ERROR, code="max_length")
 
 
+def _validate_account_names(vorname: str, nachname: str) -> None:
+    errors = [
+        f"Der {label} darf für ein Konto höchstens {limit} Zeichen enthalten."
+        for value, label, limit in (
+            (vorname, "Vorname", ACCOUNT_FIRST_NAME_MAX_LENGTH),
+            (nachname, "Nachname", ACCOUNT_LAST_NAME_MAX_LENGTH),
+        )
+        if len(value) > limit
+    ]
+    if errors:
+        raise ValidationError(errors)
+
+
 def _has_other_active_account_manager(account) -> bool:
     return any(
         user.has_perm(USER_MANAGEMENT_PERMISSION)
@@ -130,12 +145,12 @@ def _has_other_active_account_manager(account) -> bool:
 class RegistrationForm(forms.Form):
     vorname = forms.CharField(
         label="Vorname",
-        max_length=255,
+        max_length=ACCOUNT_FIRST_NAME_MAX_LENGTH,
         widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "given-name"}),
     )
     nachname = forms.CharField(
         label="Nachname",
-        max_length=255,
+        max_length=ACCOUNT_LAST_NAME_MAX_LENGTH,
         widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "family-name"}),
     )
     email = forms.EmailField(
@@ -277,13 +292,13 @@ class UserAccountForm(forms.Form):
     )
     vorname = forms.CharField(
         label="Neue Person: Vorname",
-        max_length=255,
+        max_length=ACCOUNT_FIRST_NAME_MAX_LENGTH,
         required=False,
         widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "given-name"}),
     )
     nachname = forms.CharField(
         label="Neue Person: Nachname",
-        max_length=255,
+        max_length=ACCOUNT_LAST_NAME_MAX_LENGTH,
         required=False,
         widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "family-name"}),
     )
@@ -374,6 +389,11 @@ class UserAccountForm(forms.Form):
     def clean(self) -> dict:
         cleaned_data = super().clean()
         selected_person = cleaned_data.get("person")
+        if selected_person is not None:
+            try:
+                _validate_account_names(selected_person.vorname, selected_person.nachname)
+            except ValidationError as error:
+                self.add_error("person", error)
         inline_values = {
             field_name: cleaned_data.get(field_name, "").strip()
             for field_name in ("vorname", "nachname", "email")
@@ -468,6 +488,21 @@ class UserAccountForm(forms.Form):
             # locking an individual account. NO KEY UPDATE leaves foreign-key
             # references to this stable role available to authentication.
             Group.objects.select_for_update(no_key=True).get(name=ROLE_USER_MANAGEMENT)
+            if self.actor is not None:
+                actor = user_model.objects.select_for_update().filter(pk=self.actor.pk).first()
+                if (
+                    actor is None
+                    or not actor.is_active
+                    or not actor.has_perm(USER_MANAGEMENT_PERMISSION)
+                    or any(
+                        getattr(actor, field) != getattr(self.actor, field)
+                        for field in ("password", "username", "email")
+                    )
+                ):
+                    raise PermissionDenied(
+                        "Sie sind für diese Kontoänderung nicht mehr berechtigt. "
+                        "Bitte melden Sie sich erneut an."
+                    )
             original_account = (
                 user_model.objects.select_for_update().get(pk=self.account.pk)
                 if self.account is not None
@@ -506,6 +541,7 @@ class UserAccountForm(forms.Form):
 
             person_changed = original_account is not None and previous_person != person
             _validate_account_email_length(person.email)
+            _validate_account_names(person.vorname, person.nachname)
             if person_changed and (
                 not self.cleaned_data["password1"]
                 or check_password(self.cleaned_data["password1"], original_account.password)

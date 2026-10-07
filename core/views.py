@@ -1,5 +1,7 @@
 import ipaddress
+import logging
 from datetime import timedelta
+from smtplib import SMTPException
 
 from django.conf import settings
 from django.contrib import messages
@@ -40,6 +42,35 @@ EMPLOYEE_MFA_USER_SESSION_KEY = "employee_mfa_user_id"
 EMPLOYEE_MFA_REDIRECT_SESSION_KEY = "employee_mfa_redirect_url"
 EMPLOYEE_MFA_CHALLENGE_SESSION_KEY = "employee_mfa_challenge"
 LOGIN_FAILURE_MESSAGE = "Bitte überprüfen Sie Ihre Zugangsdaten und versuchen Sie es später erneut."
+logger = logging.getLogger(__name__)
+
+
+def _deliver_verification_code(sender, email: str, code: str) -> bool:
+    try:
+        delivered = sender(email, code)
+    except (SMTPException, OSError) as error:
+        # Do not log recipient addresses, codes or server error details.
+        logger.warning("Verification email delivery failed (%s).", type(error).__name__)
+        return False
+    if not delivered:
+        logger.warning("Verification email delivery failed (no delivery).")
+    return bool(delivered)
+
+
+def _discard_employee_code_after_delivery_failure(user_id: int, challenge: str) -> None:
+    with transaction.atomic():
+        user = get_user_model().objects.select_for_update().filter(pk=user_id).first()
+        if user is not None:
+            EmployeeLoginVerification.objects.filter(user=user, code_hash=challenge).delete()
+
+
+def _clear_pending_employee_login(request: HttpRequest) -> None:
+    for key in (
+        EMPLOYEE_MFA_USER_SESSION_KEY,
+        EMPLOYEE_MFA_REDIRECT_SESSION_KEY,
+        EMPLOYEE_MFA_CHALLENGE_SESSION_KEY,
+    ):
+        request.session.pop(key, None)
 
 
 def _login_lockout_duration() -> timedelta:
@@ -261,7 +292,15 @@ class RoleAwareLoginView(LoginView):
                 return response
         # SMTP must not hold a database lock. A concurrent account change can
         # invalidate the issued code even if delivery has not completed yet.
-        send_employee_mfa_code(user.email, code)
+        if not _deliver_verification_code(send_employee_mfa_code, user.email, code):
+            _discard_employee_code_after_delivery_failure(user.pk, verification.code_hash)
+            _clear_pending_employee_login(self.request)
+            form.add_error(
+                None,
+                "Der Einmalcode konnte nicht gesendet werden. "
+                "Bitte versuchen Sie die Anmeldung erneut.",
+            )
+            return super().form_invalid(form)
         messages.success(self.request, "Wir haben Ihnen einen Einmalcode gesendet.")
         return redirect("employee_mfa_verify")
 
@@ -290,38 +329,51 @@ def register(request: HttpRequest) -> HttpResponse:
         except IntegrityError:
             form.add_error("email", ACCOUNT_CREATION_ERROR)
         else:
-            send_registration_code(user.email, code)
             request.session["registration_verification_email"] = user.email
-            messages.success(request, "Wir haben Ihnen einen Bestätigungscode gesendet.")
+            if _deliver_verification_code(send_registration_code, user.email, code):
+                messages.success(request, "Wir haben Ihnen einen Bestätigungscode gesendet.")
+            else:
+                messages.error(
+                    request,
+                    "Der Bestätigungscode konnte nicht gesendet werden. "
+                    "Sie können ihn frühestens eine Minute nach dem letzten "
+                    "Versandversuch erneut anfordern.",
+                )
             return redirect("register_verify")
     return render(request, "registration/register.html", {"form": form})
 
 
-def send_registration_code(email: str, code: str) -> None:
-    send_mail(
-        subject="STEImmo: Bestätigungscode für Ihre Registrierung",
-        message=(
-            "Ihr Bestätigungscode lautet: "
-            f"{code}\n\n"
-            "Der Code ist 15 Minuten gültig. Falls Sie kein Konto angelegt haben, "
-            "können Sie diese E-Mail ignorieren."
-        ),
-        from_email=None,
-        recipient_list=[email],
+def send_registration_code(email: str, code: str) -> bool:
+    return (
+        send_mail(
+            subject="STEImmo: Bestätigungscode für Ihre Registrierung",
+            message=(
+                "Ihr Bestätigungscode lautet: "
+                f"{code}\n\n"
+                "Der Code ist 15 Minuten gültig. Falls Sie kein Konto angelegt haben, "
+                "können Sie diese E-Mail ignorieren."
+            ),
+            from_email=None,
+            recipient_list=[email],
+        )
+        == 1
     )
 
 
-def send_employee_mfa_code(email: str, code: str) -> None:
-    send_mail(
-        subject="STEImmo: Einmalcode für die Mitarbeiteranmeldung",
-        message=(
-            "Ihr Einmalcode lautet: "
-            f"{code}\n\n"
-            "Der Code ist 15 Minuten gültig. Falls Sie diese Anmeldung nicht gestartet haben, "
-            "ignorieren Sie diese E-Mail."
-        ),
-        from_email=None,
-        recipient_list=[email],
+def send_employee_mfa_code(email: str, code: str) -> bool:
+    return (
+        send_mail(
+            subject="STEImmo: Einmalcode für die Mitarbeiteranmeldung",
+            message=(
+                "Ihr Einmalcode lautet: "
+                f"{code}\n\n"
+                "Der Code ist 15 Minuten gültig. Falls Sie diese Anmeldung nicht gestartet haben, "
+                "ignorieren Sie diese E-Mail."
+            ),
+            from_email=None,
+            recipient_list=[email],
+        )
+        == 1
     )
 
 
@@ -395,11 +447,14 @@ def resend_registration_code(request: HttpRequest) -> HttpResponse:
             code = None
         else:
             if code is not None:
-                send_registration_code(user.email, code)
+                _deliver_verification_code(send_registration_code, user.email, code)
         request.session["registration_verification_email"] = form.cleaned_data["email"]
     messages.success(
         request,
-        "Falls eine offene Registrierung vorliegt, wurde ein neuer Bestätigungscode gesendet.",
+        "Falls eine offene Registrierung vorliegt und der Versand möglich ist, "
+        "erhalten Sie einen neuen Bestätigungscode. "
+        "Wenn keine E-Mail ankommt, können Sie den Code frühestens eine Minute "
+        "nach dem letzten Versandversuch erneut anfordern.",
     )
     return redirect("register_verify")
 
@@ -424,10 +479,11 @@ def employee_mfa_verify(request: HttpRequest) -> HttpResponse:
                     raise EmployeeLoginVerification.DoesNotExist
                 if verification.matches(form.cleaned_data["code"]):
                     verification.delete()
-                    login(request, user)
                     redirect_url = request.session.pop(EMPLOYEE_MFA_REDIRECT_SESSION_KEY, "")
-                    request.session.pop(EMPLOYEE_MFA_USER_SESSION_KEY, None)
-                    request.session.pop(EMPLOYEE_MFA_CHALLENGE_SESSION_KEY, None)
+                    # Switching accounts flushes the old session, so capture the
+                    # checked destination before login() changes the session.
+                    login(request, user)
+                    _clear_pending_employee_login(request)
                     request.session.save()
                     if url_has_allowed_host_and_scheme(
                         url=redirect_url,
@@ -435,14 +491,12 @@ def employee_mfa_verify(request: HttpRequest) -> HttpResponse:
                         require_https=request.is_secure(),
                     ):
                         return redirect(redirect_url)
-                    return redirect("verwaltung:wohnung_list")
+                    return redirect(RoleAwareLoginView().get_default_redirect_url_for_user(user))
                 else:
                     verification.attempts += 1
                     verification.save(update_fields=["attempts"])
         except (EmployeeLoginVerification.DoesNotExist, get_user_model().DoesNotExist):
-            request.session.pop(EMPLOYEE_MFA_USER_SESSION_KEY, None)
-            request.session.pop(EMPLOYEE_MFA_REDIRECT_SESSION_KEY, None)
-            request.session.pop(EMPLOYEE_MFA_CHALLENGE_SESSION_KEY, None)
+            _clear_pending_employee_login(request)
             return redirect("login")
         else:
             form.add_error(None, "Der Code konnte nicht bestätigt werden.")
