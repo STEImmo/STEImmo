@@ -933,6 +933,22 @@ def _draft_overview_entries(request: HttpRequest) -> list[dict[str, object]]:
     return entries
 
 
+def _validate_draft_storage_values(payload):
+    # PostgreSQL JSONB cannot store nonfinite numbers, null characters or
+    # unpaired Unicode surrogates. Validate before touching an existing draft.
+    json.dumps(payload, allow_nan=False, ensure_ascii=False).encode("utf-8")
+    pending = [payload]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            pending.extend(value.keys())
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
+        elif isinstance(value, str) and "\x00" in value:
+            raise ValueError("JSONB does not support null characters.")
+
+
 @employee_required
 def handover_protocol_draft_save(request: HttpRequest) -> JsonResponse | HttpResponse:
     if request.method != "POST":
@@ -940,8 +956,9 @@ def handover_protocol_draft_save(request: HttpRequest) -> JsonResponse | HttpRes
     if len(request.body) > DRAFT_MAXIMUM_SIZE:
         return JsonResponse({"error": "Der Entwurf ist zu groß."}, status=400)
     try:
-        payload = json.loads(request.body)
-    except json.JSONDecodeError:
+        payload = json.loads(request.body.decode("utf-8"))
+        _validate_draft_storage_values(payload)
+    except (ValueError, RecursionError):
         return JsonResponse({"error": "Ungültige Entwurfsdaten."}, status=400)
 
     draft_scope = payload.get("scope") if isinstance(payload, dict) else None
