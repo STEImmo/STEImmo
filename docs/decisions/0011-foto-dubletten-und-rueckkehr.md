@@ -21,6 +21,13 @@ keine neuen Dateien gespeichert und keine Bestandsfotos entfernt. Der Abgleich
 kann nach Wiederherstellung des Speicherzugriffs erneut erfolgen. Bereits
 gespeicherte Inhalts-Hashes benötigen keinen erneuten Zugriff auf die Originaldatei.
 
+Auch das Protokoll-Bearbeitungsformular gleicht ältere Fotos anhand ihres Inhalts
+ab (Issue #69). Nach der endgültigen Raumzuordnung werden die Inhalts-Hashes des
+tatsächlich betroffenen Prüfpunkts vor Schreibvorgängen ermittelt. Nicht lesbare
+Bestandsfotos erzeugen einen Foto-Feldfehler. Identischer Inhalt wird bei der
+Speicherung übersprungen; ältere Fotos ohne gespeicherten Hash bleiben unverändert.
+Ohne neue Fotoauswahl ist für normale Protokolländerungen kein Dateiabgleich nötig.
+
 Ein Upload oder das Entfernen eines Fotos aus der Protokollübersicht führt mit
 einem Fragment direkt zum betroffenen Prüfpunkt dieser Übersicht zurück. Die
 Raum-Unterseite bleibt nur das Ziel für die dort gestarteten Aktionen.
