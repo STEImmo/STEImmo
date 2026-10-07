@@ -103,12 +103,16 @@ def _client_ip_fingerprint(request: HttpRequest) -> str | None:
 
 def _account_for_login_identifier(identifier: str):
     user_model = get_user_model()
+    lookup = user_model.USERNAME_FIELD
+    if "@" in identifier:
+        lookup += "__iexact"
     try:
-        return user_model._default_manager.select_for_update().get(
-            **{user_model.USERNAME_FIELD: identifier}
-        )
+        return user_model._default_manager.select_for_update().get(**{lookup: identifier})
     except user_model.DoesNotExist:
         return None
+    except user_model.MultipleObjectsReturned:
+        # Do not choose an owner for ambiguous legacy email spellings.
+        raise ValidationError(LOGIN_FAILURE_MESSAGE, code="invalid_login") from None
 
 
 def _clear_expired_account_throttle(user, now) -> bool:
@@ -204,6 +208,10 @@ class ThrottledAuthenticationForm(AuthenticationForm):
         with transaction.atomic():
             if username and password:
                 self.login_user = _account_for_login_identifier(username)
+                if self.login_user is not None:
+                    # Authenticate the exact account locked above, including
+                    # legacy Person email addresses containing uppercase letters.
+                    self.cleaned_data["username"] = self.login_user.get_username()
                 if _is_login_throttled(self.login_user, self.ip_fingerprint):
                     self.login_was_throttled = True
                     raise self.get_invalid_login_error()
