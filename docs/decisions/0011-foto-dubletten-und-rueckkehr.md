@@ -35,6 +35,16 @@ Fotos; die konfigurierte Grenze wird nicht erhöht. Ein wiederholter Upload bei
 voller Kapazität erzeugt deshalb keinen Limitfehler. Bei einer tatsächlichen
 Überschreitung werden weiterhin weder Fotos noch Protokolländerungen gespeichert.
 
+Beim Entfernen und Ersetzen eines einzelnen Prüfpunkts berücksichtigt der Abgleich
+nur fortbestehende Gegenstücke (Issue #86). Das Formset ermittelt zuerst die zur
+Löschung markierten, bereits auf dieses Protokoll begrenzten Prüfpunkt-IDs.
+Diese Einträge zählen weder zur Dublettenprüfung noch zur Fotoanzahl des Ersatzes.
+Eine gleichzeitig ausdrücklich über dieselbe ID übermittelte Änderung erzeugt
+einen Feldfehler. Die Speicherung entfernt markierte Prüfpunkte vor neuen oder
+geänderten Zeilen, unabhängig von deren Formularreihenfolge. Alle Schritte und
+Bereinigungsaufträge bleiben in der bestehenden Protokolltransaktion; alte
+Dateien werden erst nach deren erfolgreichem Commit gelöscht.
+
 Ein Upload oder das Entfernen eines Fotos aus der Protokollübersicht führt mit
 einem Fragment direkt zum betroffenen Prüfpunkt dieser Übersicht zurück. Die
 Raum-Unterseite bleibt nur das Ziel für die dort gestarteten Aktionen.

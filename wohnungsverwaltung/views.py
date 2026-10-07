@@ -1749,17 +1749,17 @@ def _save_inline_protocol_entries(
     for room in removed_rooms:
         _delete_checklist_photos(RaumMerkmalFoto.objects.filter(raum_merkmal__raumprotokoll=room))
         room.delete()
+    for room_form in room_formset.deleted_forms:
+        item = room_form.cleaned_data.get("pruefpunkt")
+        if item is not None and item.raumprotokoll_id not in removed_ids:
+            _delete_checklist_photos(item.fotos.all())
+            item.delete()
     for room_form in room_formset:
         source_room = room_form.cleaned_data.get("raumprotokoll")
         item = room_form.cleaned_data.get("pruefpunkt")
         if (source_room is not None and source_room.pk in removed_ids) or (
             item is not None and item.raumprotokoll_id in removed_ids
         ):
-            continue
-        if room_form.cleaned_data.get("DELETE"):
-            if item is not None:
-                _delete_checklist_photos(item.fotos.all())
-                item.delete()
             continue
         if (
             room_form.cleaned_data
