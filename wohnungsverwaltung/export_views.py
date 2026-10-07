@@ -29,7 +29,7 @@ from .handover_export import (
     load_protocol,
     token_matches,
 )
-from .models import Protokoll, ProtokollStatus
+from .models import Protokoll, ProtokollStatus, ProtokollTyp, Wohnung, WohnungStatus
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +125,11 @@ def handover_protocol_confirm(request, protocol_id):
                     "name": snapshot["tenant"],
                     "data": form.cleaned_data["mieter"],
                 }
+            Wohnung.objects.filter(pk=protocol.wohnung_id).update(
+                status=WohnungStatus.TAKEN
+                if protocol.protokoll_typ == ProtokollTyp.MOVE_IN
+                else WohnungStatus.FREE
+            )
             archive_protocol(
                 protocol,
                 snapshot,
