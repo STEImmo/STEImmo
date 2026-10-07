@@ -29,6 +29,7 @@ from .access import (
     ROLE_USER_MANAGEMENT,
     USER_MANAGEMENT_PERMISSION,
 )
+from .handover_photos import save_handover_photo
 from .models import (
     AbnahmeStatus,
     ApplicationProof,
@@ -1640,7 +1641,7 @@ class InlineRoomChecklistForm(forms.Form):
     def has_entry(self) -> bool:
         return self.cleaned_data.get("merkmal") is not None
 
-    def save(self, protocol: Protokoll) -> RaumMerkmal:
+    def save(self, protocol: Protokoll, stored_photo_files) -> RaumMerkmal:
         raum = self.cleaned_data["raum"]
         room, _created = Raumprotokoll.objects.get_or_create(
             protokoll=protocol,
@@ -1664,12 +1665,15 @@ class InlineRoomChecklistForm(forms.Form):
             checksum = calculate_photo_checksum(photo)
             if checklist_item.fotos.filter(inhalt_hash_sha256=checksum).exists():
                 continue
-            RaumMerkmalFoto.objects.create(
-                raum_merkmal=checklist_item,
-                datei=photo,
-                content_type=verified_photo_content_type(photo),
-                dateigroesse=photo.size,
-                inhalt_hash_sha256=checksum,
+            save_handover_photo(
+                RaumMerkmalFoto(
+                    raum_merkmal=checklist_item,
+                    datei=photo,
+                    content_type=verified_photo_content_type(photo),
+                    dateigroesse=photo.size,
+                    inhalt_hash_sha256=checksum,
+                ),
+                stored_photo_files,
             )
         return checklist_item
 

@@ -58,6 +58,12 @@ from .forms import (
     verified_photo_content_type,
 )
 from .handover_lock import protocol_mutation
+from .handover_photos import (
+    PHOTO_SAVE_ERROR,
+    HandoverPhotoStorageError,
+    handover_photo_upload,
+    save_handover_photo,
+)
 from .models import (
     ApplicationProof,
     ApplicationProofCategory,
@@ -1036,13 +1042,22 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
         and room_formset.is_valid()
         and key_formset.is_valid()
     ):
-        with transaction.atomic():
-            protocol = form.save()
-            _save_inline_protocol_entries(protocol, room_formset, key_formset)
-        _delete_draft(request, draft_scope)
-        request.session["handover_protocol_draft_key_to_clear"] = "handover-protocol-draft:create"
-        messages.success(request, "Das Übergabeprotokoll wurde angelegt.")
-        return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
+        try:
+            with handover_photo_upload() as stored_photo_files:
+                protocol = form.save()
+                _save_inline_protocol_entries(
+                    protocol, room_formset, key_formset, stored_photo_files
+                )
+                _delete_draft(request, draft_scope)
+        except (HandoverPhotoStorageError, DatabaseError) as error:
+            logger.error("Protocol creation failed (%s).", type(error).__name__)
+            form.add_error(None, PHOTO_SAVE_ERROR)
+        else:
+            request.session["handover_protocol_draft_key_to_clear"] = (
+                "handover-protocol-draft:create"
+            )
+            messages.success(request, "Das Übergabeprotokoll wurde angelegt.")
+            return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
     return render(
         request,
@@ -1147,15 +1162,23 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         and room_formset.is_valid()
         and key_formset.is_valid()
     ):
-        with transaction.atomic():
-            protocol = form.save()
-            _save_inline_protocol_entries(protocol, room_formset, key_formset)
-        _delete_draft(request, draft_scope)
-        request.session["handover_protocol_draft_key_to_clear"] = (
-            f"handover-protocol-draft:edit:{protocol.pk}"
-        )
-        messages.success(request, "Das Übergabeprotokoll wurde aktualisiert.")
-        return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
+        try:
+            with handover_photo_upload() as stored_photo_files:
+                protocol = form.save()
+                _save_inline_protocol_entries(
+                    protocol, room_formset, key_formset, stored_photo_files
+                )
+                _delete_draft(request, draft_scope)
+        except (HandoverPhotoStorageError, DatabaseError) as error:
+            logger.error("Protocol edit failed (%s).", type(error).__name__)
+            protocol.refresh_from_db()
+            form.add_error(None, PHOTO_SAVE_ERROR)
+        else:
+            request.session["handover_protocol_draft_key_to_clear"] = (
+                f"handover-protocol-draft:edit:{protocol.pk}"
+            )
+            messages.success(request, "Das Übergabeprotokoll wurde aktualisiert.")
+            return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
     return render(
         request,
@@ -1337,17 +1360,23 @@ def handover_protocol_checklist_item_photo_upload(
         return redirect(_photo_return_url(request, protocol, room, checklist_item))
 
     try:
-        with transaction.atomic():
+        with handover_photo_upload() as stored_photo_files:
             for photo, checksum in photos_to_save:
-                RaumMerkmalFoto.objects.create(
-                    raum_merkmal=checklist_item,
-                    datei=photo,
-                    content_type=verified_photo_content_type(photo),
-                    dateigroesse=photo.size,
-                    inhalt_hash_sha256=checksum,
+                save_handover_photo(
+                    RaumMerkmalFoto(
+                        raum_merkmal=checklist_item,
+                        datei=photo,
+                        content_type=verified_photo_content_type(photo),
+                        dateigroesse=photo.size,
+                        inhalt_hash_sha256=checksum,
+                    ),
+                    stored_photo_files,
                 )
     except IntegrityError:
         messages.info(request, "Dieses Foto ist für den Prüfpunkt bereits gespeichert.")
+    except (HandoverPhotoStorageError, DatabaseError) as error:
+        logger.error("Protocol photo upload failed (%s).", type(error).__name__)
+        messages.error(request, PHOTO_SAVE_ERROR)
     else:
         messages.success(request, "Die Fotos wurden am Prüfpunkt gespeichert.")
     return redirect(_photo_return_url(request, protocol, room, checklist_item))
@@ -1645,7 +1674,7 @@ def _key_form_initial(wohnung) -> list[dict[str, object]]:
     ]
 
 
-def _save_inline_protocol_entries(protocol, room_formset, key_formset) -> None:
+def _save_inline_protocol_entries(protocol, room_formset, key_formset, stored_photo_files) -> None:
     for room_form in room_formset:
         if room_form.cleaned_data.get("DELETE"):
             item = room_form.cleaned_data.get("pruefpunkt")
@@ -1658,7 +1687,7 @@ def _save_inline_protocol_entries(protocol, room_formset, key_formset) -> None:
             and not room_form.cleaned_data.get("DELETE")
             and room_form.has_entry()
         ):
-            room_form.save(protocol)
+            room_form.save(protocol, stored_photo_files)
 
     for key_form in key_formset:
         if key_form.cleaned_data.get("DELETE"):
