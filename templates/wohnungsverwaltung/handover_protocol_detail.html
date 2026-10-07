@@ -22,7 +22,12 @@
                 <dt>Datum und Uhrzeit</dt>
                 <dd>{{ protocol.uebergabe_zeitpunkt|date:"d.m.Y H:i" }}</dd>
                 <dt>Wohnung</dt>
-                <dd>Gebäude {{ protocol.wohnung.gebaeudenummer }}, Wohnung {{ protocol.wohnung.wohnungsnummer }}</dd>
+                <dd>
+                    {{ apartment_label }}
+                    {% if uses_current_apartment_label %}
+                        <div class="uk-text-meta">Historische Wohnungsbezeichnung nicht gesichert. Aktuelle Bezeichnung aus dem Wohnungsstamm.</div>
+                    {% endif %}
+                </dd>
                 <dt>Vertretung des Unternehmens</dt>
                 <dd>{{ representative_name }}</dd>
                 <dt>Beteiligte Person</dt>

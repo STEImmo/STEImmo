@@ -1097,6 +1097,30 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
     )
 
 
+def _archived_apartment_label(protocol):
+    if protocol.status != ProtokollStatus.SIGNED or not isinstance(protocol.export_snapshot, dict):
+        return ""
+    sections = protocol.export_snapshot.get("sections")
+    if not isinstance(sections, list):
+        return ""
+    for section in sections:
+        if not isinstance(section, dict) or section.get("title") != "Zuordnung":
+            continue
+        rows = section.get("rows")
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if (
+                isinstance(row, list)
+                and len(row) == 2
+                and row[0] == "Wohnung"
+                and isinstance(row[1], str)
+                and row[1].strip()
+            ):
+                return row[1]
+    return ""
+
+
 @employee_required
 def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
     protocol = get_object_or_404(
@@ -1118,6 +1142,7 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
         and isinstance(protocol.export_snapshot.get("rooms"), list)
     ):
         archived_snapshot = protocol.export_snapshot
+    archived_apartment_label = _archived_apartment_label(protocol)
     return render(
         request,
         "wohnungsverwaltung/handover_protocol_detail.html",
@@ -1129,6 +1154,9 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
             "acceptance_status_label": ACCEPTANCE_STATUS_LABELS[protocol.abnahme_status],
             "protocol_status_label": PROTOCOL_STATUS_LABELS[protocol.status],
             "archived_snapshot": archived_snapshot,
+            "apartment_label": archived_apartment_label or str(protocol.wohnung),
+            "uses_current_apartment_label": protocol.status == ProtokollStatus.SIGNED
+            and not archived_apartment_label,
             "can_manage_handover_photos": can_manage_handover_photos,
             "move_in_reference": move_in_reference,
             **_move_in_reference_context(move_in_reference),

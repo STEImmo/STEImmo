@@ -99,6 +99,13 @@ weggelassen. Bereits archivierte PDFs bleiben unverändert herunterladbar.
   ausgewählte Dateien erhalten. Nach einem Neuladen müssen ungespeicherte
   Dateien aus Sicherheitsgründen erneut ausgewählt werden.
 - Stamm- und Referenzdatenänderungen verändern keine archivierten Dokumente.
+- Die Zuordnungsanzeige bestätigter Protokolle liest die Wohnungsbezeichnung aus
+  dem gespeicherten Abschnitt „Zuordnung“, unabhängig von der Raumdarstellung
+  (#77). Wohnungsumbenennungen verändern dadurch weder die historische Anzeige
+  noch den Snapshot oder die PDF-Datei. Offene Protokolle verwenden den aktuellen
+  Namen; fehlt bei einem Altprotokoll die gesicherte Bezeichnung, wird der aktuelle
+  Wohnungsstamm mit einem ausdrücklichen Hinweis verwendet. Eine nachträgliche
+  Archivierung sichert die Bezeichnung zum tatsächlichen Sicherungszeitpunkt.
 - Bestätigte Protokolle zeigen Räume, Prüfpunkte und Feststellungen aus dem
   gespeicherten Abschluss-Snapshot; spätere Vorlagenänderungen verändern diese
   Darstellung nicht (#74). Abschlussvorschau und archivierte Raumansicht nutzen
