@@ -137,7 +137,7 @@ Eine Roadmap-Phase gilt erst als abgeschlossen, wenn ihre Akzeptanzkriterien erf
 | `Mitarbeiter` | Verwaltungsbereich und Übergabeprotokolle |
 | `Benutzerverwaltung` | Mitarbeiterzugriff sowie Konten, Rollen und Seitenrechte verwalten |
 
-Konten mit Mitarbeiterzugriff oder Benutzerverwaltung – auch bei direkt zugewiesenem Einzelrecht – benötigen bei jeder Anmeldung zusätzlich zum Passwort einen sechsstelligen E-Mail-Einmalcode. Der Code ist 15 Minuten gültig, wird nur gehasht gespeichert und erlaubt höchstens fünf Versuche. Es gibt bewusst keine dauerhafte Browserfreigabe. In der lokalen Entwicklungsumgebung erscheint der Code im automatisch gestarteten Mailpit-Postfach unter [http://localhost:8025](http://localhost:8025); Produktion verwendet den konfigurierten SMTP-Backend.
+Konten mit Mitarbeiterzugriff oder Benutzerverwaltung – auch bei direkt zugewiesenem Einzelrecht – benötigen bei jeder Anmeldung zusätzlich zum Passwort einen sechsstelligen E-Mail-Einmalcode. Der Code ist 15 Minuten gültig, wird nur gehasht gespeichert und erlaubt höchstens fünf Versuche. Es gibt bewusst keine dauerhafte Browserfreigabe. Erhält ein zuvor nicht privilegiertes Konto Mitarbeiter- oder Benutzerverwaltungsrechte, werden bestehende Sitzungen beendet; der nächste Zugriff erfordert eine neue Anmeldung mit Einmalcode. In der lokalen Entwicklungsumgebung erscheint der Code im automatisch gestarteten Mailpit-Postfach unter [http://localhost:8025](http://localhost:8025); Produktion verwendet den konfigurierten SMTP-Backend.
 
 Die reguläre Anmeldung unter `/accounts/login/` sperrt nach drei falschen Passwörtern das betroffene Konto für 15 Minuten. Zusätzlich werden zehn fehlgeschlagene Anmeldungen derselben IP-Adresse innerhalb von 15 Minuten begrenzt. Die Anwendung speichert dafür nie die IP-Adresse selbst, sondern nur einen mit dem Servergeheimnis abgeleiteten Fingerprint. Falsches Passwort, unbekanntes Konto und Sperren liefern dieselbe neutrale Meldung. Django-Admin ist bewusst nicht Teil dieser Anmeldestrecke. Hinter einem Reverse-Proxy darf `DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS` ausschließlich mit dessen vertrauenswürdigen IP-Adressen gesetzt werden; nur dann wird dessen `X-Forwarded-For` berücksichtigt.
 
@@ -164,6 +164,23 @@ Mit dem Development-Override wird beim Containerstart außerdem ein ausschließl
 Der lokale Bootstrap reaktiviert dieses fiktive Konto und setzt sein Passwort bei jedem Entwicklungsstart auf den dokumentierten Wert zurück. Die Zugangsdaten sind absichtlich öffentlich und dürfen niemals außerhalb der lokalen Entwicklungsumgebung verwendet werden.
 
 Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD` und `DJANGO_EMAIL_USE_TLS`. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
+
+## Bewerbungen im Betreiberbereich
+
+Die Mitarbeiternavigation blendet **Wohnungen finden** und **Bewerbungsvorschau** aus.
+
+Unter **Bewerbungen** sehen berechtigte Mitarbeiter alle Wohnungen mit der Anzahl
+zugeordneter Bewerbungen. Nach Auswahl einer Wohnung erscheint eine Tabelle mit
+Name, Personenanzahl, Haustieren, Bearbeitungsstatus und Pre-Eingangsdatum.
+Auch abgelehnte, gesperrte und zurückgezogene Bewerbungen bleiben sichtbar.
+Die neuesten Pre-Bewerbungen stehen zuerst; pro Seite werden 20 Bewerbungen angezeigt.
+
+Die Detailansicht zeigt Kontaktdaten und Pre-Angaben sowie einen getrennten
+Main-Bereich. Main-Nachweise werden erst nach der Einreichung sichtbar und
+weiterhin ausschließlich über geschützte Downloads bereitgestellt.
+Die Betreiberübersicht und Bewerbungsdetails untersagen Browser- und Proxy-Caching
+über private `no-store`-Antwortheader.
+Kategorienfilter, Priorisierung und Einladungen folgen in Issue #22.
 
 ## Lokale Entwicklung
 

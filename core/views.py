@@ -314,8 +314,17 @@ def register_verify(request: HttpRequest) -> HttpResponse:
             form.add_error(None, "Der Code konnte nicht bestätigt werden.")
         else:
             if user is not None:
-                login(request, user)
                 request.session.pop("registration_verification_email", None)
+                if user.has_perm(EMPLOYEE_ACCESS_PERMISSION) or user.has_perm(
+                    USER_MANAGEMENT_PERMISSION
+                ):
+                    messages.success(
+                        request,
+                        "Ihr Konto wurde bestätigt. Bitte melden Sie sich mit Passwort und "
+                        "Mitarbeiter-Einmalcode an.",
+                    )
+                    return redirect("login")
+                login(request, user)
                 messages.success(request, "Ihr Konto wurde bestätigt.")
                 return redirect("wohnungsverwaltung:pre_application_list")
             form.add_error(None, "Der Code konnte nicht bestätigt werden.")
