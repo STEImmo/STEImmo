@@ -1960,17 +1960,34 @@ def _stellplatz_form(request: HttpRequest, stellplatz: Stellplatz, title: str) -
         form = StellplatzForm(request.POST, instance=stellplatz)
         zuordnung_form = StellplatzZuordnungForm(request.POST, instance=zuordnung)
         if form.is_valid() and zuordnung_form.is_valid():
-            with transaction.atomic():
-                stellplatz = form.save()
-                if zuordnung_form.cleaned_data["wohnung"] is None:
-                    if not zuordnung._state.adding:
-                        zuordnung.delete()
-                else:
-                    zuordnung = zuordnung_form.save(commit=False)
-                    zuordnung.stellplatz = stellplatz
-                    zuordnung.save()
-            messages.success(request, "Der Stellplatz und seine Zuordnung wurden gespeichert.")
-            return redirect("verwaltung:stellplatz_edit", stellplatz_id=stellplatz.pk)
+            try:
+                with transaction.atomic():
+                    if not stellplatz._state.adding:
+                        get_object_or_404(Stellplatz.objects.select_for_update(), pk=stellplatz.pk)
+                        # The relation may have changed while these forms were validated.
+                        zuordnung = StellplatzZuordnung.objects.filter(
+                            stellplatz=stellplatz
+                        ).first()
+                        if zuordnung is None:
+                            zuordnung = StellplatzZuordnung(stellplatz=stellplatz)
+                    stellplatz = form.save()
+                    selected_unit = zuordnung_form.cleaned_data["wohnung"]
+                    if selected_unit is None:
+                        if not zuordnung._state.adding:
+                            zuordnung.delete()
+                    else:
+                        zuordnung.stellplatz = stellplatz
+                        zuordnung.wohnung = selected_unit
+                        zuordnung.save()
+            except IntegrityError:
+                zuordnung_form.add_error(
+                    "wohnung",
+                    "Die Stellplatzzuordnung konnte nicht gespeichert werden. "
+                    "Bitte prüfen Sie die aktuelle Zuordnung und versuchen Sie es erneut.",
+                )
+            else:
+                messages.success(request, "Der Stellplatz und seine Zuordnung wurden gespeichert.")
+                return redirect("verwaltung:stellplatz_edit", stellplatz_id=stellplatz.pk)
     else:
         form = StellplatzForm(instance=stellplatz)
         zuordnung_form = StellplatzZuordnungForm(instance=zuordnung)
