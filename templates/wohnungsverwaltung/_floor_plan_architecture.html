@@ -1,0 +1,72 @@
+{# All coordinates are traced in the source orientation; the parent SVG rotates them. #}
+{% if layer == 'shell' %}
+    {% if floor_number == 0 %}
+        <path class="plan-shell" d="M116 162H302V292H396V162H812L853 510H116Z"/>
+        <path class="plan-shared" d="M305 165H391V279H785V327H399V299H305Z"/>
+        <path class="plan-shared" d="M605 165H810L823 278H605Z"/>
+    {% elif floor_number == 4 %}
+        <path class="plan-roof" d="M20 36L264 5V183L296 166V540H20Z"/>
+        <path class="plan-roof-lines" d="M20 36L73 33M20 540L73 503M296 540L245 503M264 5L209 17M20 168L126 239M296 166L148 234M20 540L126 439L296 540"/>
+        <path class="plan-shell" d="M73 33L209 17V182H148V234L245 207V503H73V384H38V330H73V247H126V208H73Z"/>
+        <path class="plan-shared" d="M41 333H126V383H76V378H41Z"/>
+    {% else %}
+        <path class="plan-shell" d="M52 25L274 0V172H298V512H52Z"/>
+        <path class="plan-shared" d="M138 43H169V317H191V337H145V374H121V318H138Z M54 323H121V373H54Z"/>
+    {% endif %}
+{% else %}
+    {% if floor_number == 0 %}
+        <path class="plan-walls" d="M231 166V277H299M400 253H478V166M120 280H231M231 328H303M303 302V505M231 359V505M120 420H173V505M303 377H394M402 331H478V505M509 305V349H605M702 331V455M702 402H848M785 402V455"/>
+        <path class="plan-door-gap" d="M231 247V270M431 253H455M231 335V356M303 335V358M478 355V378M535 349H558M702 349V372M750 402H773M481 297H505M333 302H357M535 305H559M645 331H669"/>
+        <path class="plan-doors" d="M231 247H208Q208 270 231 270M431 253V229Q455 229 455 253M303 335H326Q326 358 303 358M478 355H501Q501 378 478 378M750 402V379Q773 379 773 402"/>
+        <rect x="320" y="180" width="60" height="83" fill="url(#plan-step-horizontal)" class="plan-stair-outline"/>
+        <path class="plan-lines" d="M350 258V188L346 194M350 188L354 194"/>
+        <g transform="translate(787 284)"><rect width="39" height="41" class="plan-lift"/><path d="M4 4L35 37M35 4L4 37" class="plan-lines"/><path d="M0 11V31" class="plan-door-gap"/></g>
+        <text x="808" y="309" class="plan-room-label">Aufzug</text>
+        <text x="710" y="215" class="plan-room-label">Fahrradraum</text>
+        <rect x="619" y="413" width="70" height="89" fill="url(#plan-step-horizontal)" class="plan-stair-outline"/>
+        <path class="plan-lines" d="M654 495V420L650 426M654 420L658 426"/>
+        <g class="plan-furniture">
+            <use href="#plan-bed" transform="translate(135 294) scale(2)"/><use href="#plan-bed" transform="translate(322 315) scale(2)"/>
+            <use href="#plan-bed" transform="translate(416 411) scale(2)"/><use href="#plan-bed" transform="translate(718 339) scale(2)"/>
+            <use href="#plan-sofa" transform="translate(137 248) scale(2)"/><use href="#plan-sofa" transform="translate(530 248) scale(2)"/>
+            <use href="#plan-sofa" transform="translate(244 473) scale(2)"/><use href="#plan-sofa" transform="translate(525 472) scale(2)"/>
+            <use href="#plan-bath" transform="translate(269 175) scale(2)"/><use href="#plan-bath" transform="translate(406 176) scale(2)"/>
+            <use href="#plan-bath" transform="translate(137 449) scale(2)"/><use href="#plan-bath" transform="translate(815 406) scale(2)"/>
+        </g>
+        <path class="plan-balconies" d="M207 512V550H278V512M515 512V550H578V512"/>
+        <path class="plan-windows" d="M157 163H204M249 163H282M419 163H457M506 163H558M116 197V244M116 369V404M187 510H227M264 510H287M335 510H365M423 510H454M519 510H572"/>
+    {% elif floor_number == 4 %}
+        <path class="plan-walls" d="M74 117H122V59M74 183H126V208M153 24V59M148 182H209M155 247V305H242M74 297H107V327M74 386H116V438M74 441H155V503M128 383V426H191V503M155 439H245M194 439V503"/>
+        <path class="plan-door-gap" d="M99 117H118M104 183H122M155 277V295M90 297H106M105 327H123M155 344V365M105 386H122M116 404V422M155 451V469M194 456V474"/>
+        <path class="plan-doors" d="M99 117V98Q118 98 118 117M104 183V165Q122 165 122 183M155 277H173Q173 295 155 295M105 327V309Q123 309 123 327M155 344H174Q174 365 155 365M116 404H134Q134 422 116 422"/>
+        <rect x="46" y="337" width="58" height="38" fill="url(#plan-step-vertical)" class="plan-stair-outline"/>
+        <path class="plan-lines" d="M51 355H99L93 351M99 355L93 359"/>
+        <g transform="translate(116 27)"><rect width="34" height="31" class="plan-lift"/><path d="M4 4L30 27M30 4L4 27" class="plan-lines"/><path d="M10 31H26" class="plan-door-gap"/></g>
+        <g transform="translate(133 43) rotate(-90)"><text class="plan-room-label">Aufzug</text></g>
+        <g class="plan-furniture">
+            <use href="#plan-bath" x="80" y="39"/><use href="#plan-sofa" x="175" y="64"/><use href="#plan-table" x="162" y="128"/>
+            <use href="#plan-bed" x="79" y="251"/><use href="#plan-bed" x="188" y="261"/><use href="#plan-table" x="180" y="344"/>
+            <use href="#plan-bath" x="79" y="396"/><use href="#plan-bed" x="83" y="456"/><use href="#plan-bed" x="205" y="453"/>
+        </g>
+        <path class="plan-balconies" d="M211 52H239V135H211"/>
+        <path class="plan-windows" d="M210 60V108M244 264V301M244 344V373M244 450V474M91 503H121M161 503H182M74 397V414M74 256V277"/>
+    {% else %}
+        <path class="plan-walls" d="M54 71H106V19M54 92H135M54 126H94V167M173 46H271M221 12V46M173 122H271M207 124V167M54 253H135M103 253V316M54 281H104M173 263H294M235 264V316M193 337H294M54 419H122M104 376V418M143 456H193V510M193 456H294M237 456V510"/>
+        <path class="plan-door-gap" d="M106 49V67M108 92H127M94 141V159M196 46H214M183 122H201M135 50V70M173 48V68M135 211V230M173 208V227M79 253H97M103 286V304M193 337H211M122 393V411M193 470V488M191 392V410"/>
+        <path class="plan-doors" d="M106 49H124Q124 67 106 67M108 92V110Q127 110 127 92M94 141H112Q112 159 94 159M196 46V64Q214 64 214 46M183 122V140Q201 140 201 122M135 50H153Q153 70 135 70M173 48H191Q191 68 173 68M135 211H153Q153 230 135 230M173 208H191Q191 227 173 227M122 393H140Q140 411 122 411M191 392H209Q209 410 191 410"/>
+        <rect x="60" y="328" width="60" height="39" fill="url(#plan-step-vertical)" class="plan-stair-outline"/>
+        <path class="plan-lines" d="M65 347H114L108 343M114 347L108 351"/>
+        <g transform="translate(139 16)"><rect width="29" height="27" class="plan-lift"/><path d="M4 4L25 23M25 4L4 23" class="plan-lines"/><path d="M8 27H22" class="plan-door-gap"/></g>
+        <g transform="translate(154 30) rotate(-90)"><text class="plan-room-label">Aufzug</text></g>
+        <g class="plan-furniture">
+            <use href="#plan-bath" x="62" y="34"/><use href="#plan-bed" x="63" y="136"/><use href="#plan-sofa" x="70" y="103"/>
+            <use href="#plan-bath" x="235" y="17"/><use href="#plan-bed" x="227" y="131"/><use href="#plan-sofa" x="190" y="75"/>
+            <use href="#plan-sofa" x="65" y="200"/><use href="#plan-bath" x="62" y="287"/><use href="#plan-table" x="219" y="211"/>
+            <use href="#plan-bath" x="263" y="277"/><use href="#plan-bed" x="241" y="345"/>
+            <use href="#plan-bath" x="63" y="385"/><use href="#plan-sofa" x="63" y="483"/><use href="#plan-bed" x="149" y="468"/><use href="#plan-bath" x="266" y="469"/>
+        </g>
+        <path class="plan-balconies" d="M274 47H305V121H274M299 194H327V267H299M299 382H327V456H299M52 115H29V163H52M52 199H29V247H52M52 435H29V485H52"/>
+        <path class="plan-windows" d="M274 59V98M274 131V154M298 205V243M298 338V361M298 398V430M298 470V496M52 46V67M52 119V146M52 203V231M52 287V309M52 390V411M52 447V478M153 512H175"/>
+    {% endif %}
+{% endif %}
+

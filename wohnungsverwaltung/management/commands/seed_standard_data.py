@@ -1,10 +1,11 @@
 from datetime import datetime
 from decimal import Decimal
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
+from wohnungsverwaltung.building_plans import APARTMENTS
 from wohnungsverwaltung.models import (
     AbnahmeStatus,
     Geschlecht,
@@ -162,11 +163,13 @@ class Command(BaseCommand):
         return people
 
     def _create_units(self) -> dict[str, Wohnung]:
+        if Wohnung.objects.filter(wohnungsnummer__in=[row[0] for row in APARTMENTS]).exists():
+            raise CommandError(
+                "Alte Beispielnummern vorhanden. Zuerst sync_building_inventory --apply ausführen."
+            )
         units = {}
-        for number in range(1, 26):
-            floor = (number - 1) // 5
-            unit_number = f"{floor + 1}.{(number - 1) % 5 + 1:02d}"
-            size = Decimal("42.00") + Decimal(number * 2)
+        for number, (legacy_number, unit_number, floor, area) in enumerate(APARTMENTS, start=1):
+            size = Decimal(area)
             rooms = Decimal("1.50") + Decimal((number - 1) % 4) * Decimal("0.50")
             rent = Decimal("720.00") + Decimal(number * 18)
             status = (
@@ -194,7 +197,7 @@ class Command(BaseCommand):
                     "zaehlernummer_strom": f"ST-1-{number:02d}",
                 },
             )
-            units[unit_number] = unit
+            units[legacy_number] = unit
         return units
 
     def _create_unit_keys(self, units: dict[str, Wohnung]) -> None:

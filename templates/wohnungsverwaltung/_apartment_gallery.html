@@ -1,0 +1,16 @@
+{% if photos %}
+<div class="apartment-gallery uk-margin-medium-bottom" uk-lightbox="animation: fade">
+    {% for photo in photos %}
+    <a class="apartment-gallery-photo{% if forloop.first %} apartment-gallery-main{% endif %}" href="{% url 'wohnungsverwaltung_public:apartment_photo' photo.pk %}" data-caption="{{ photo.caption|default:'Wohnungsfoto' }}">
+        <img src="{% url 'wohnungsverwaltung_public:apartment_photo' photo.pk %}" alt="{{ photo.caption|default:'Foto der Wohnung' }}"{% if not forloop.first %} loading="lazy"{% endif %}>
+        {% if forloop.first %}<span class="uk-label apartment-gallery-count">{{ photos|length }} Foto{{ photos|length|pluralize }} · Vergrößern</span>{% endif %}
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="apartment-gallery uk-margin-medium-bottom">
+    <div class="apartment-gallery-main">{% include "wohnungsverwaltung/_apartment_image_placeholder.html" %}</div>
+    <div>{% include "wohnungsverwaltung/_apartment_image_placeholder.html" %}</div>
+    <div>{% include "wohnungsverwaltung/_apartment_image_placeholder.html" %}</div>
+</div>
+{% endif %}

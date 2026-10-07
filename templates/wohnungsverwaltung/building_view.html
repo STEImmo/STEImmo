@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Gebäude erkunden – STEImmo{% endblock %}
+{% block content %}
+<section class="uk-section uk-section-default">
+    <div class="uk-container">
+        <h1 class="uk-heading-small uk-margin-small-bottom">Ihr Zuhause beginnt hier.</h1>
+        <p class="uk-text-lead">{{ total_units }} Wohnungen in einem Haus. Wählen Sie ein Stockwerk.</p>
+        {% if floors %}
+        <div class="uk-grid-large uk-flex-middle" uk-grid>
+            <div class="uk-width-3-4@m">{% include "wohnungsverwaltung/_building_facade.html" %}<p class="uk-text-meta uk-text-center">Westfassade · vereinfachte Darstellung nach der Gebäudeansicht</p></div>
+            <div class="uk-width-1-4@m">
+                <h2 class="uk-h3">Stockwerk auswählen</h2>
+                <div class="floor-choice-list">
+                    {% for floor in floors %}<a class="uk-button uk-button-default floor-choice" href="{% url 'wohnungsverwaltung_public:floor_view' floor.number %}"><span>{{ floor.label }}</span><span class="uk-text-meta">{{ floor.units|length }} Wohnungen · {{ floor.available_count }} frei →</span></a>{% endfor %}
+                </div>
+                <a class="uk-button uk-button-text uk-margin-top" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Direkt zur Wohnungssuche</a>
+            </div>
+        </div>
+        {% else %}<p>Noch keine Wohnungen vorhanden.</p>{% endif %}
+    </div>
+</section>
+{% endblock %}

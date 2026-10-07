@@ -7,6 +7,7 @@
     <div class="uk-container">
         <h1 class="uk-heading-medium">Wohnungen finden</h1>
         <p class="uk-text-lead">Filtern Sie die verfügbaren Wohnungen nach Ihren Wünschen.</p>
+        <a class="uk-button uk-button-default uk-margin-bottom" href="{% url 'wohnungsverwaltung_public:building_view' %}">Gebäude und Etagen erkunden</a>
 
         <form method="get" action="{% url 'wohnungsverwaltung_public:apartment_search' %}" class="uk-card uk-card-default uk-card-body uk-margin-large-bottom" novalidate>
             <div class="uk-grid-small uk-child-width-1-2@s uk-child-width-1-4@m" uk-grid>

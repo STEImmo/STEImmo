@@ -18,6 +18,7 @@
         </div>
 
         <form method="post">
+            {% if wohnung.pk %}<a class="uk-button uk-button-default uk-margin-bottom" href="{% url 'verwaltung:apartment_photos' wohnung.pk %}">Wohnungsfotos verwalten</a>{% endif %}
             {% csrf_token %}
             {% for error in form.non_field_errors %}
                 <div class="uk-alert-danger" uk-alert><p>{{ error }}</p></div>

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ floor_label }} – STEImmo{% endblock %}
+{% block content %}
+<section class="uk-section uk-section-default">
+    <div class="uk-container">
+        <ul class="uk-breadcrumb"><li><a href="{% url 'wohnungsverwaltung_public:building_view' %}">Gebäude</a></li><li><span>{{ floor_label }}</span></li></ul>
+        <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
+            <div><h1 class="uk-heading-small uk-margin-remove-bottom">{{ floor_label }}</h1><p class="uk-text-lead">{{ units|length }} Wohnungen · Wählen Sie Ihre Wohnung im Grundriss.</p></div>
+            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:building_view' %}">Zur Gebäudeansicht</a>
+        </div>
+        <ul class="uk-subnav uk-subnav-pill" aria-label="Andere Etage wählen">
+            {% for number, label in floor_numbers %}<li{% if number == floor_number %} class="uk-active"{% endif %}><a href="{% url 'wohnungsverwaltung_public:floor_view' number %}"{% if number == floor_number %} aria-current="page"{% endif %}>{{ label }}</a></li>{% endfor %}
+        </ul>
+        <p class="uk-text-meta uk-hidden@m">Auf kleinen Bildschirmen können Sie den Grundriss seitlich verschieben.</p>
+        <div class="floor-plan-frame uk-margin-medium-top" tabindex="0" role="region" aria-label="Grundriss {{ floor_label }} – seitlich scrollbar">{% include "wohnungsverwaltung/_floor_plan.html" %}</div>
+        <div class="uk-flex uk-flex-center uk-flex-wrap uk-grid-small" uk-grid><span><span class="uk-label uk-label-success">Verfügbar</span> Auswählbar</span><span><span class="uk-label">Nicht verfügbar</span> Ausgegraut</span></div>
+        <p class="uk-text-meta uk-text-center">Vereinfachter Grundriss nach der Vorlage · nicht maßstabsgetreu. Die Zuordnung der Wohnungsnummern ist vorläufig.</p>
+        <p class="uk-text-center"><a class="uk-button uk-button-text" href="{% static plan_reference.image %}" target="_blank" rel="noopener">Originalplan öffnen</a></p>
+        <h2 class="uk-h3 uk-margin-medium-top">Wohnungen auf dieser Etage</h2>
+        <div class="uk-grid-small uk-child-width-1-2@s uk-child-width-1-3@m" uk-grid>
+        {% for wohnung in units %}<div>
+            {% if wohnung.status == 'free' %}<a class="uk-card uk-card-default uk-card-body uk-display-block apartment-list-link" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' wohnung.pk %}"><span class="uk-label uk-label-success">Verfügbar</span><h3 class="uk-h4 uk-margin-small-top">Wohnung {{ wohnung.wohnungsnummer }}</h3><span>{{ wohnung.groesse_qm }} m² · {{ wohnung.zimmeranzahl }} Zimmer</span><p class="uk-margin-small-top uk-margin-remove-bottom">{{ wohnung.kaltmiete }} € Kaltmiete →</p></a>
+            {% else %}<div class="uk-card uk-card-body uk-background-muted uk-text-muted"><span class="uk-label">Nicht verfügbar</span><h3 class="uk-h4 uk-text-muted">Wohnung {{ wohnung.wohnungsnummer }}</h3><span>{{ wohnung.groesse_qm }} m²</span></div>{% endif %}
+        </div>{% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

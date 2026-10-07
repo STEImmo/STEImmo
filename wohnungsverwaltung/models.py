@@ -325,6 +325,21 @@ class Wohnung(models.Model):
         return f"Gebäude {self.gebaeudenummer}, Wohnung {self.wohnungsnummer}"
 
 
+def apartment_photo_upload_path(instance, _filename):
+    return f"apartments/{instance.apartment_id}/{uuid.uuid4().hex}.jpg"
+
+
+class ApartmentPhoto(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    apartment = models.ForeignKey(Wohnung, on_delete=models.CASCADE, related_name="photos")
+    image = models.ImageField(upload_to=apartment_photo_upload_path)
+    caption = models.CharField(max_length=160, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("created_at", "pk")
+
+
 class Bewerbung(models.Model):
     bewerbung_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="bewerbungen")

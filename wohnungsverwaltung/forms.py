@@ -1,4 +1,5 @@
 import json
+from io import BytesIO
 from uuid import UUID
 
 from django import forms
@@ -7,10 +8,12 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.db.models import Q
 from django.forms.formsets import BaseFormSet
 from django.forms.models import inlineformset_factory
+from PIL import Image, ImageOps
 
 from .access import (
     ACCESS_PERMISSION_CODENAMES,
@@ -21,6 +24,7 @@ from .access import (
 )
 from .models import (
     AbnahmeStatus,
+    ApartmentPhoto,
     Bewerbung,
     Merkmal,
     Person,
@@ -967,6 +971,43 @@ class RoomChecklistItemForm(forms.Form):
             merkmal=self.cleaned_data["merkmal"],
             wert=_finding_value(self.cleaned_data["wert"], self.cleaned_data["zusatzangaben"]),
         )
+
+
+class ApartmentPhotoForm(forms.ModelForm):
+    class Meta:
+        model = ApartmentPhoto
+        fields = ("image", "caption")
+        labels = {"image": "Wohnungsfoto", "caption": "Bildbeschreibung"}
+        widgets = {
+            "image": forms.FileInput(
+                attrs={"class": "uk-input", "accept": "image/jpeg,image/png,image/webp"}
+            ),
+            "caption": forms.TextInput(
+                attrs={"class": "uk-input", "placeholder": "Zum Beispiel: Wohnbereich"}
+            ),
+        }
+
+    def clean_image(self):
+        upload = self.cleaned_data["image"]
+        if upload.size > settings.APARTMENT_PHOTO_MAX_SIZE:
+            raise forms.ValidationError("Die Datei ist zu groß. Erlaubt sind höchstens 8 MiB.")
+        try:
+            upload.seek(0)
+            with Image.open(upload) as source:
+                if source.format not in {"JPEG", "PNG", "WEBP"}:
+                    raise forms.ValidationError("Erlaubt sind JPEG, PNG und WebP.")
+                if source.width * source.height > 25_000_000:
+                    raise forms.ValidationError("Das Bild darf höchstens 25 Megapixel haben.")
+                image = ImageOps.exif_transpose(source).convert("RGB")
+                image.thumbnail((2400, 2400))
+                # Encode pixels into a new file; discard EXIF/location and other metadata.
+                output = BytesIO()
+                clean_image = Image.new("RGB", image.size)
+                clean_image.paste(image)
+                clean_image.save(output, "JPEG", quality=88)
+        except (OSError, ValueError, Image.DecompressionBombError) as error:
+            raise forms.ValidationError("Das Bild konnte nicht verarbeitet werden.") from error
+        return SimpleUploadedFile("photo.jpg", output.getvalue(), content_type="image/jpeg")
 
 
 class MultiplePhotoInput(forms.ClearableFileInput):

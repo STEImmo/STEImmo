@@ -10,6 +10,16 @@ Studierende können verfügbare Einheiten suchen, filtern, ansehen und sich dara
 
 ## Projektstatus
 
+Die Gebäudeansicht ist lokal unter [Gebäude erkunden](http://localhost:8000/wohnungen/gebaeude/)
+erreichbar: Gebäude → Etagenplan → Wohnungsdetails. Öffentliche Wohnungsfotos können im
+Mitarbeiterbereich unter **Wohnung bearbeiten → Wohnungsfotos verwalten** gepflegt werden.
+Die Etagenpläne sind vereinfachte Vektorgrafiken nach den Vorlagen. Von den Wohnungsdetails
+führt **Zur Besichtigung anmelden** zur wohnungsbezogenen Voranfrage; die Hauptbewerbung
+wird später freigeschaltet.
+Die Einrichtung, der Abgleich älterer Beispielwohnungen und die noch vorläufige räumliche
+Zuordnung sind in der [Dokumentation zu US-02](docs/prototypes/16-building-apartment-view.md)
+beschrieben.
+
 Der Stack ist festgelegt. Die Foundation ist umgesetzt; die fachlichen MVP-Vertical-Slices folgen.
 
 Statussymbole:
