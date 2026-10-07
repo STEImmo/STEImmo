@@ -149,3 +149,112 @@ class InlineLegacyPhotoTests(PhotoComparisonFixture, TestCase):
         self.assertEqual(response.status_code, 302)
         self.item.refresh_from_db()
         self.assertEqual(self.item.wert["text"], "Neue Feststellung")
+
+
+class UniquePhotoLimitTests(PhotoComparisonFixture, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.set_original_hash()
+
+    def test_direct_duplicate_at_full_capacity_is_accepted_without_writes(self):
+        before = self.stored_paths()
+        with self.settings(HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM=1):
+            response = self.client.post(
+                self.upload_url, {"fotos": self.photo_upload("identical.png")}, follow=True
+            )
+        self.assertContains(response, "Dieses Foto ist für den Prüfpunkt bereits gespeichert.")
+        self.assertEqual(self.item.fotos.count(), 1)
+        self.assertEqual(self.stored_paths(), before)
+
+    def test_inline_duplicate_at_full_capacity_does_not_block_other_changes(self):
+        before = self.stored_paths()
+        with self.settings(HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM=1):
+            response = self.client.post(
+                self.edit_url, self.inline_payload(self.photo_upload("identical.png"))
+            )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.item.fotos.count(), 1)
+        self.assertEqual(self.stored_paths(), before)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.wert["text"], "Neue Feststellung")
+
+    def test_direct_mixed_upload_uses_only_one_available_slot(self):
+        before = self.stored_paths()
+        with self.settings(HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM=2):
+            response = self.client.post(
+                self.upload_url,
+                {
+                    "fotos": [
+                        self.photo_upload("identical.png"),
+                        self.photo_upload("new.png", "red"),
+                    ]
+                },
+                follow=True,
+            )
+        self.assertContains(response, "Die Fotos wurden am Prüfpunkt gespeichert.")
+        self.assertEqual(self.item.fotos.count(), 2)
+        self.assertEqual(len(self.stored_paths() - before), 1)
+
+    def test_inherited_room_counts_only_new_content_of_legacy_mixed_upload(self):
+        self.photo.inhalt_hash_sha256 = ""
+        self.photo.save(update_fields=["inhalt_hash_sha256"])
+        before = self.stored_paths()
+        data = self.valid_form_data()
+        data.update(
+            {
+                "rooms-TOTAL_FORMS": "2",
+                "rooms-0-raum": str(self.kitchen.pk),
+                "rooms-0-bereich": "Küche",
+                "rooms-0-merkmal": str(self.second_room_feature.pk),
+                "rooms-0-wert": "Boden",
+                "rooms-1-raum": "",
+                "rooms-1-bereich": "Küche",
+                "rooms-1-merkmal": str(self.room_feature.pk),
+                "rooms-1-wert": "Neue Feststellung",
+                "rooms-1-fotos": [
+                    self.photo_upload("identical.png"),
+                    self.photo_upload("new.png", "red"),
+                ],
+            }
+        )
+        with self.settings(HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM=2):
+            response = self.client.post(self.edit_url, data)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.item.fotos.count(), 2)
+        self.assertEqual(len(self.stored_paths() - before), 1)
+        self.photo.refresh_from_db()
+        self.assertEqual(self.photo.inhalt_hash_sha256, "")
+
+    def test_direct_truly_new_upload_over_limit_is_rejected_without_writes(self):
+        before = self.stored_paths()
+        with self.settings(HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM=2):
+            response = self.client.post(
+                self.upload_url,
+                {
+                    "fotos": [
+                        self.photo_upload("red.png", "red"),
+                        self.photo_upload("blue.png", "blue"),
+                    ]
+                },
+                follow=True,
+            )
+        self.assertContains(response, "Für einen Prüfpunkt sind höchstens 2 Fotos erlaubt.")
+        self.assertEqual(self.item.fotos.count(), 1)
+        self.assertEqual(self.stored_paths(), before)
+
+    def test_inline_truly_new_upload_over_limit_preserves_checkpoint_and_files(self):
+        before = self.stored_paths()
+        previous_value = self.item.wert
+        with self.settings(HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM=2):
+            response = self.client.post(
+                self.edit_url,
+                self.inline_payload(
+                    [self.photo_upload("red.png", "red"), self.photo_upload("blue.png", "blue")]
+                ),
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("fotos", response.context["room_formset"].forms[0].errors)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.wert, previous_value)
+        self.assertEqual(self.item.fotos.count(), 1)
+        self.assertEqual(self.stored_paths(), before)

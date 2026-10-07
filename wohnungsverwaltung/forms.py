@@ -1432,14 +1432,19 @@ class RoomChecklistPhotoUploadForm(forms.Form):
         ),
     )
 
-    def __init__(self, *args, existing_photo_count: int, **kwargs) -> None:
+    def __init__(self, *args, existing_photos, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.existing_photo_count = existing_photo_count
+        self.existing_photos = list(existing_photos)
 
     def clean_fotos(self):
         photos = self.cleaned_data["fotos"]
+        try:
+            checksums = existing_photo_checksums(self.existing_photos)
+        except HandoverPhotoReadError as error:
+            raise forms.ValidationError(PHOTO_READ_ERROR) from error
+        photos = [photo for photo in photos if calculate_photo_checksum(photo) not in checksums]
         maximum = settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM
-        if self.existing_photo_count + len(photos) > maximum:
+        if len(self.existing_photos) + len(photos) > maximum:
             raise forms.ValidationError(
                 f"Für einen Prüfpunkt sind höchstens {maximum} Fotos erlaubt."
             )
@@ -1654,6 +1659,12 @@ class InlineRoomChecklistForm(forms.Form):
             except HandoverPhotoReadError:
                 self.add_error("fotos", PHOTO_READ_ERROR)
                 return
+        photos = [
+            photo
+            for photo in photos
+            if calculate_photo_checksum(photo) not in self.existing_photo_checksums
+        ]
+        cleaned_data["fotos"] = photos
         if existing_count + len(photos) > settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM:
             maximum = settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM
             self.add_error("fotos", f"Für einen Prüfpunkt sind höchstens {maximum} Fotos erlaubt.")

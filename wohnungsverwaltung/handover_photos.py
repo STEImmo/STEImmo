@@ -37,6 +37,7 @@ def existing_photo_checksums(photos) -> set[str]:
             with photo.datei.open("rb") as photo_file:
                 checksums.add(calculate_photo_checksum(photo_file))
         except (OSError, ValueError) as error:
+            logger.error("Could not compare a stored photo (%s).", type(error).__name__)
             raise HandoverPhotoReadError from error
     return checksums
 
