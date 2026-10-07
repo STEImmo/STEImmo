@@ -29,17 +29,18 @@ APARTMENTS = (
     ("5.02", "402", 4, "64.90"),
 )
 
-# Coordinates follow the ground-floor reference (953 × 747 pixels), not floor area.
-# Number-to-outline assignment is inferred and still requires confirmation.
+# Ground geometry regularizes the user's sketch into aligned architectural lines.
+# Provisional user assignment: 1 upper middle, 2 right, 3 lower middle,
+# 4 lower left, 5 upper left. Exact locations still require confirmation.
 GROUND_SHAPES = (
-    ("400,166 597,166 597,278 509,278 509,297 478,297 478,278 400,278", 548, 215),
-    ("120,166 299,166 299,276 278,276 278,297 233,297 233,352 120,352", 175, 222),
-    ("120,359 231,359 231,328 303,328 303,302 394,302 394,505 120,505", 264, 437),
-    ("402,331 509,331 509,305 605,305 605,505 402,505", 538, 418),
-    ("613,331 831,331 848,455 702,455 702,402 613,402", 663, 365),
+    ("400,20 660,20 660,180 490,180 490,140 400,140", 585, 95),
+    ("660,230 960,230 980,410 660,410", 835, 340),
+    ("400,240 600,240 600,230 660,230 660,480 400,480", 565, 380),
+    ("40,280 200,280 200,225 270,225 270,200 400,200 400,480 40,480", 215, 380),
+    ("40,20 300,20 300,200 270,200 270,225 200,225 200,280 40,280", 120, 95),
 )
-# These polygons use the original image pixel coordinates. The image and hit areas
-# share one SVG transform, so viewport size cannot shift them relative to each other.
+# These polygons and the vector architecture use the same source coordinates
+# and SVG transform, keeping the drawing and selectable areas aligned.
 UPPER_SHAPES = (
     ("54,375 122,375 122,415 136,415 136,510 54,510", 92, 469),
     ("54,175 135,175 135,260 122,260 122,316 54,316", 92, 217),
@@ -62,7 +63,7 @@ PLAN_REFERENCES = {
         "image": "plans/ground-floor-reference.png",
         "width": 953,
         "height": 747,
-        "viewbox": "95 140 770 460",
+        "viewbox": "0 0 1008 590",
         "transform": "",
         "label_rotation": 0,
     },

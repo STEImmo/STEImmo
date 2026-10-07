@@ -4,13 +4,19 @@ Der Prototyp läuft in der bestehenden Django-Anwendung über Docker. Einstieg: 
 
 ## Seiten und Grundrisse
 
-1. Gebäudeansicht mit vereinfachter Westfassade und auswählbaren Stockwerken.
+1. Gebäudeansicht mit vereinfachter Westfassade und auswählbaren Stockwerken. Auf Nutzerwunsch ist die ursprüngliche Straßenseite mit zwei Gauben und drei Balkonachsen wiederhergestellt; die zuvor erfundene EG-Eingangstür entfällt. Eine Auswahl direkt an der Fassade; Wohnungs- und Verfügbarkeitszahlen stehen auf den Stockwerksschildern. Keine zweite Auswahlliste daneben. Dekorative Bäume liegen außerhalb der Beschriftungen und fangen keine Klicks ab.
 2. Eigene Etagenansicht mit einem vereinfachten SVG-Vektorgrundriss, freien anklickbaren und nicht verfügbaren ausgegrauten Wohnungen. Die Wohnungsliste ergänzt die grafische Auswahl.
 3. Wohnungsdetails mit gespeicherten Werten, Fotogalerie und „Zur Besichtigung anmelden“.
 
-Die Vektorgrafiken orientieren sich an den gelieferten EG-, OG- und DG-Zeichnungen. Flurachse, Aufzug, Treppenhaus, versetzte Konturen, Raumtrennwände und Balkonpositionen sind vereinfacht nachgebaut. OG und DG werden gemeinsam mit den Auswahlflächen gedreht; die Beschriftungen bleiben aufrecht. Die PNGs unter static/plans werden ausschließlich über „Originalplan öffnen“ als Vergleichsvorlagen angeboten, nicht als Hintergrund der dargestellten Grundrisse.
+Die Gebäudeseite nutzt ab Desktopbreite ein UIkit-Grid mit 2/3 Fassade links und 1/3 Hausüberblick rechts. Der Überblick zeigt Wohnungszahl, vorhandene Etagen und aktuell verfügbare Wohnungen aus derselben Datenbankauswertung wie die Fassadenschilder. Auswahlhilfe und Link zur Suche ergänzen ihn. Auf kleineren Bildschirmen stehen beide Bereiche untereinander. Es gibt weiterhin keine zweite Stockwerksauswahl.
+
+Die einzelnen Fassadenfenster liegen mittig in ihrer Einfassung. Die seitlichen Laibungen haben gleiche Breite und gespiegelte Konturen; obere und untere Kanten verlaufen parallel. Die vereinfachten Fenster erhalten wie in der Westansicht eine ungeteilte Glasfläche.
+
+Die Vektorgrafiken orientieren sich an den gelieferten Zeichnungen. Für das EG dient die vereinfachte Nutzerskizze als Grundlage für Wandaufteilung und Proportionen. Die Geometrie ist auf gemeinsame horizontale und vertikale Achsen ausgerichtet; lediglich die tatsächliche schräge rechte Außenkante bleibt erhalten. Die ruhige bestehende Farbgebung mit hellen Fensterlinien, dezenten Türbögen und Balkonflächen wird weiterverwendet. Balkone, Treppe, Aufzug, Flur und Fahrradabstellbereich sind schematisch dargestellt und beschriftet. Der Aufzug liegt am rechten Flurende unterhalb des Fahrradbereichs, mit Zugang vom Flur auf der linken Schachtseite. Möbelsymbole, Fahrradständersymbole und der Außenstellplatz sind im EG auf Nutzerwunsch entfernt. OG und DG bleiben nach den ursprünglichen Architekturplänen gezeichnet und werden gemeinsam mit den Auswahlflächen gedreht; die Beschriftungen bleiben aufrecht. Die PNGs unter static/plans werden ausschließlich über „Originalplan öffnen“ als Vergleichsvorlagen angeboten, nicht als Hintergrund der dargestellten Grundrisse. Der dort verlinkte EG-Originalplan bleibt die ursprüngliche Architekturzeichnung.
 
 Die Darstellung ist nicht maßstabsgetreu. Die Wohnungsnummern sind den Flächen vorläufig zugeordnet und müssen fachlich bestätigt werden. Die drei Obergeschosse verwenden denselben Grundrisstyp. UIkit 3.25.24 bleibt die Komponentenbasis; es gibt keine zusätzliche Bibliothek oder eigenständige HTML-Vorschau.
+
+Die vorläufige EG-Zuordnung folgt der Nachrechnung des Nutzers: Wohnung 1 oben mittig, Wohnung 2 rechts unter dem Fahrradbereich, Wohnung 3 unten mittig, Wohnung 4 unten links und Wohnung 5 oben links. Dies ist keine bestätigte Lageangabe. Die Wohnungsnummern und Wohnflächen in der Datenbank bleiben unverändert; lediglich ihre Positionen in der Zeichnung werden zugeordnet.
 
 ## Wohnungsdaten
 
@@ -36,9 +42,11 @@ Ohne Option erfolgt nur eine Prüfung. --apply übernimmt Nummern, Etagen und Fl
 
 ## Besichtigungsanfrage
 
-Der Button auf der Detailseite führt zur bestehenden wohnungsbezogenen Voranfrage. Nach der Anmeldung ist die Wohnung bereits ausgewählt. Formular und Erfolgsnachricht sprechen von einer Besichtigungsanfrage. Ein Besichtigungstermin wird separat bestätigt; die Anfrage bucht keinen Termin.
+Der Button auf der Detailseite führt über einen wohnungsbezogenen Einstieg zur bestehenden Voranfrage. Ohne Anmeldung wird die Zielwohnung über den Login erhalten. Mit Bewerberzugang und Personenprofil öffnet sich das Formular für diese Wohnung. Mitarbeiterkonten ohne Bewerberzugang und Bewerberkonten ohne Personenprofil erhalten eine verständliche Hinweisseite. Die geschützten Bewerbungsseiten behalten ihre Berechtigungsprüfung. Es werden keine Rollen oder Profile automatisch ergänzt. Formular und Erfolgsnachricht sprechen von einer Besichtigungsanfrage. Ein Besichtigungstermin wird separat bestätigt; die Anfrage bucht keinen Termin.
 
 Intern bleibt dies eine Pre-Bewerbung im vorhandenen Bewerbung-Modell. Es wird kein zweiter Bewerbungsablauf eingeführt. Die Hauptbewerbung bleibt gesperrt, bis Mitarbeiter sie nach Besichtigung und positiver Eignungsentscheidung freigeben. Der neue Test prüft Wohnungszuordnung, erfolgreiche Anfrage und weiterhin gesperrten Hauptbewerbungszugang.
+
+Der derzeit auf GitHub definierte Ablauf ist Konto → Pre-Bewerbung → Vorauswahl → Besichtigung → Hauptbewerbung: US-04 (#18) verlangt ein angemeldetes Bewerberkonto. US-13 (#32) ordnet Besichtigungstermine einer Bewerbung zu und zeigt sie im geschützten Bewerberbereich. Der Nutzer bevorzugt möglicherweise eine erste Besichtigungsanfrage ohne Konto; das ist noch nicht entschieden und hier nicht implementiert. Eine solche Anfrage ist nicht mit der bestehenden Pre-Bewerbung gleichzusetzen. Der Buttonhinweis benennt deshalb Konto und Vorauswahl ausdrücklich.
 
 ## Wohnungsfotos
 
@@ -53,13 +61,25 @@ Berechtigte Mitarbeiter können unter Verwaltung → Wohnung bearbeiten → Wohn
 
 ## Prüfung und offene Punkte
 
-210 Django-Tests erfolgreich. Systemcheck, Migrationsprüfung, Ruff und Formatprüfung erfolgreich. Im Browser geprüft: Vektorpläne, Klickweg zur Wohnungsdetailseite und Weiterleitung zur wohnungsbezogenen Anfrage über die Anmeldung.
+Nach EG- und Zugangskorrektur: 213 Django-Tests erfolgreich. Systemcheck, Migrationsprüfung, Ruff und Formatprüfung erfolgreich. Im Browser geprüft: EG-Vektorplan, Klickweg zur Wohnungsdetailseite und Weiterleitung zur wohnungsbezogenen Anfrage über die Anmeldung. Der Teststand enthält den zwischenzeitlich integrierten Wegfall der öffentlichen Barrierefreiheitsangabe und fünf neue Tests zum Besichtigungseinstieg.
 
-Offen sind die Bestätigung der räumlichen Wohnungsnummernzuordnung, echte Fotos und reale Angaben zu Zimmern, Kosten und Ausstattung. Es wurde nicht gepusht und kein PR erstellt. US-02 bleibt bis zur fachlichen Abnahme und zum Review offen.
+Offen sind die Bestätigung der räumlichen Wohnungsnummernzuordnung, echte Fotos und reale Angaben zu Zimmern, Kosten und Ausstattung. Der erste Stand wurde vom Nutzer als 9fba447 gepusht. Die anschließenden EG- und Zugangskorrekturen liegen lokal. Die drei Originalplan-PNGs fehlen noch im gepushten Commit. US-02 bleibt bis zur fachlichen Abnahme und zum Review offen.
+
+## EG-Korrektur nach Review
+
+Nach den ersten Einzelkorrekturen hat der Nutzer eine eigene vereinfachte EG-Skizze bereitgestellt. Nach weiterer Rückmeldung wird sie als geometrische Orientierung genutzt, nicht als wörtliche Nachzeichnung ihrer ungeraden Linien und Markierungsfarben. Wandsegmente und Auswahlflächen sind gemeinsam begradigt und ausgerichtet, Türöffnungen und Balkonanschlüsse erhalten. Der zusätzliche linke Wandstummel an der Tür neben dem Treppenbereich ist entfernt. Gemeinschaftsbereiche ergänzen die Darstellung im bisherigen Stil; im EG gibt es keine Möbel- oder Stellplatzdarstellung mehr. Die bisher angenommene Nummernzuordnung bleibt erhalten und muss bestätigt werden; Obergeschosse und DG sind unverändert.
+
+Letzter EG-Detailabgleich: In Wohnung 1 liegt die Badtür in der senkrechten Trennwand, die oben an die Außenwand anschließt; die Wohnungseingangstür liegt direkt neben dieser Wand. In Wohnung 5 zeigt der kleine Abschluss am Abstellraum nach links. Die Treppe nutzt die ganze Breite des Treppenbereichs, endet aber vor der seitlichen Wohnungstür; die zusätzliche Treppenbeschriftung entfällt. Der nördliche Zugang ist als „Eingang“ markiert. Die Innenwand in Wohnung 3 reicht bis zur unteren Außenwand. Eine Trennwand gliedert den Rollstuhl-Eingangsbereich neben dem Fahrradraum ab. Drei nördliche Eingänge sind nach den Türbögen der Vorlage dargestellt; der Rollstuhl-Eingangsbereich hat einen offenen Durchgang zum Flur. Zusätzliche unbestätigte Türbögen zum Flur entfallen.
+
+## Warum mehrere neue Dateien?
+
+Ein Template ist die Vorlage einer Webseite. Dateien mit führendem Unterstrich sind kleine Teile davon: Die Gebäudeseite bindet die Fassade ein, die Etagenansicht den Plan, die Detailseite die Galerie. Diese Bausteine laufen zusammen in derselben Django-Anwendung. Sie sind keine zusätzlichen Apps oder Programme.
+
+building_plans.py liefert Nummern, Etagen, Flächen und grafische Auswahlkoordinaten. Die sichtbaren Wände und Räume stehen dagegen in _floor_plan_architecture.html. Beide müssen zusammen geändert werden, damit anklickbare Flächen und Zeichnung übereinstimmen. Die beiden Verwaltungsbefehle betreffen ausschließlich Entwicklungs-/Beispieldaten: seed_standard_data legt sie an, sync_building_inventory gleicht einen vorhandenen alten Wohnungssatz ab. Die Migration ergänzt die Fototabelle; die Testdatei prüft Verhalten und Zugriffsschutz. Die Referenz-PNGs dienen nur dem Vergleich.
 
 ## Dateien für den Commit
 
-Alle folgenden 30 Dateien gehören zur gemeinsamen Umsetzung auf feat/16-building-apartment-view:
+Alle folgenden 31 Dateien gehören zur gemeinsamen Umsetzung einschließlich der Korrektur auf feat/16-building-apartment-view:
 
 | Datei | Zweck |
 |---|---|
@@ -81,6 +101,7 @@ Alle folgenden 30 Dateien gehören zur gemeinsamen Umsetzung auf feat/16-buildin
 | templates/wohnungsverwaltung/apartment_photos.html | Mitarbeiterseite zum Hochladen und Entfernen von Fotos. |
 | templates/wohnungsverwaltung/wohnung_form.html | Link von der Wohnungspflege zur Fotopflege. |
 | templates/wohnungsverwaltung/pre_application_form.html | Besichtigungswortlaut und Erklärung beim wohnungsbezogenen Einstieg. |
+| templates/wohnungsverwaltung/viewing_request_unavailable.html | Verständliche Erklärung bei fehlendem Bewerberzugang oder Personenprofil. |
 | wohnungsverwaltung/models.py | Neues ApartmentPhoto-Modell samt Dateipfad. |
 | wohnungsverwaltung/forms.py | Foto-Validierung und sichere Bildaufbereitung. |
 | wohnungsverwaltung/views.py | Gebäude-/Etagenansichten, Detaildaten, Fotoverwaltung/-auslieferung und Besichtigungs-Erfolgsnachricht. |
@@ -102,4 +123,4 @@ Vorgeschlagene Commit-Nachricht:
 feat: add building explorer and viewing request entry
 ```
 
-Die 30 Dateien bilden einen zusammengehörenden Funktionsstand; Schema-Migration, Views und Templates sollten gemeinsam übernommen werden. Auf einer anderen Entwicklungsumgebung ist python manage.py migrate erforderlich. Der lokale Inventarabgleich wird bei Bedarf ausdrücklich ausgeführt, nicht automatisch beim Start.
+Die 31 Dateien bilden einen zusammengehörenden Funktionsstand; Schema-Migration, Views und Templates sollten gemeinsam übernommen werden. Auf einer anderen Entwicklungsumgebung ist python manage.py migrate erforderlich. Der lokale Inventarabgleich wird bei Bedarf ausdrücklich ausgeführt, nicht automatisch beim Start.

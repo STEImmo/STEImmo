@@ -1,13 +1,29 @@
 <svg class="building-facade" viewBox="0 0 1100 790" role="group" aria-labelledby="facade-title facade-description">
     <title id="facade-title">Gebäude mit auswählbaren Stockwerken</title>
-    <desc id="facade-description">Vereinfachte Westfassade nach der Projektzeichnung: dunkles Dach mit Gauben, helle Fassade und drei Balkonachsen. Wählen Sie ein Stockwerk.</desc>
+    <desc id="facade-description">Vereinfachte Westfassade nach der Projektzeichnung: dunkles Dach mit zwei Gauben, helle Fassade und drei Balkonachsen. Wählen Sie ein Stockwerk oder seine Beschriftung.</desc>
     <defs>
         <linearGradient id="glass" x2="1" y2="1"><stop stop-color="#b6c0c0"/><stop offset="1" stop-color="#5e7075"/></linearGradient>
         <linearGradient id="wall" x2="1" y2="0"><stop stop-color="#d7d3c7"/><stop offset="1" stop-color="#c6c1b3"/></linearGradient>
         <pattern id="roof-lines" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#4b4d4c"/><path d="M0 0V8" stroke="#656762" stroke-width="1"/></pattern>
-        <g id="facade-window"><path d="M-8 -8H44L52 0V57L44 65H-8Z" fill="#eae7dd"/><path d="M-8 -8L0 0V57L-8 65Z" fill="#aaa596"/><rect width="36" height="57" fill="url(#glass)" stroke="#f0eee6" stroke-width="3"/><path d="M18 0V57" stroke="#c5cbc7" stroke-width="2"/></g>
+        <g id="facade-window">
+            <rect x="-10" y="-1" width="56" height="59" fill="#eae7dd"/>
+            <path d="M-10 -1H46L36 7H0Z" fill="#f0ede3"/>
+            <path d="M-10 -1L0 7V50L-10 58Z" fill="#aaa596"/>
+            <path d="M46 -1L36 7V50L46 58Z" fill="#d4d0c3"/>
+            <path d="M-10 58L0 50H36L46 58Z" fill="#f0ede3"/>
+            <rect y="7" width="36" height="43" fill="url(#glass)" stroke="#f0eee6" stroke-width="3"/>
+        </g>
         <g id="balcony"><rect width="126" height="88" fill="#817f72"/><rect x="9" y="5" width="46" height="74" fill="url(#glass)" stroke="#e8e4d7" stroke-width="4"/><rect x="68" y="5" width="46" height="74" fill="url(#glass)" stroke="#e8e4d7" stroke-width="4"/><path d="M32 5V79M91 5V79" stroke="#d3d6ce" stroke-width="2"/><path d="M-7 85H132V96H-7Z" fill="#aaa89d"/><rect x="-5" y="57" width="136" height="28" fill="#90958b" fill-opacity=".7" stroke="#dadbd2" stroke-width="2"/><path d="M3 57V85M19 57V85M35 57V85M51 57V85M67 57V85M83 57V85M99 57V85M115 57V85" stroke="#d2d4cc" stroke-width="1.5"/></g>
-        <g id="floor-front"><rect x="200" width="680" height="112" fill="url(#wall)"/><path d="M205 1H875M205 109H875" stroke="#eeece2" stroke-width="5"/><use href="#facade-window" x="219" y="22"/><use href="#balcony" x="283" y="9"/><use href="#facade-window" x="438" y="22"/><use href="#balcony" x="501" y="9"/><use href="#facade-window" x="656" y="22"/><use href="#balcony" x="720" y="9"/></g>
+        <g id="floor-front">
+            <rect x="200" width="680" height="112" fill="url(#wall)"/>
+            <path d="M205 1H875M205 109H875" stroke="#eeece2" stroke-width="5"/>
+            <use href="#facade-window" x="219" y="22"/>
+            <use href="#balcony" x="283" y="9"/>
+            <use href="#facade-window" x="438" y="22"/>
+            <use href="#balcony" x="501" y="9"/>
+            <use href="#facade-window" x="656" y="22"/>
+            <use href="#balcony" x="720" y="9"/>
+        </g>
     </defs>
     <ellipse cx="546" cy="717" rx="435" ry="17" fill="#e8e8e5"/>
     <path d="M880 237L915 251V689L880 703Z" fill="#a9a79d"/>
@@ -21,16 +37,15 @@
         <path d="M361 177V214M389 177V214M417 177V214M445 177V214M473 177V214M501 177V214M733 184V216M760 184V216M788 184V216" stroke="#e7e5dd" stroke-width="6"/>
         <path d="M321 167H535M696 175H833M180 240H901" stroke="#d6d5ce" stroke-width="7"/>
         <path class="facade-hit" d="M179 239L301 133H558L575 146H874L897 239Z"/>
-        <g class="facade-floor-label"><rect x="22" y="163" width="152" height="41" rx="3"/><text x="34" y="189">Dachgeschoss</text><path d="M174 184H236"/></g>
+        <g class="facade-floor-label"><rect x="22" y="163" width="152" height="53" rx="3"/><text x="34" y="184">Dachgeschoss</text><text class="facade-floor-summary" x="34" y="203">{{ floor.units|length }} Wohnungen · {{ floor.available_count }} frei</text><path d="M174 189H236"/></g>
         {% else %}
         <g transform="translate(0 {{ floor.facade_y }})"><use href="#floor-front"/>
-            {% if floor.number == 0 %}<rect x="439" y="18" width="36" height="91" fill="#696e65" stroke="#eeeade" stroke-width="4"/>{% endif %}
             <rect class="facade-hit" x="200" y="0" width="680" height="112"/>
-            <g class="facade-floor-label"><rect x="22" y="35" width="152" height="41" rx="3"/><text x="34" y="61">{% if floor.number == 0 %}Erdgeschoss{% else %}{{ floor.number }}. Obergeschoss{% endif %}</text><path d="M174 56H200"/></g>
+            <g class="facade-floor-label"><rect x="22" y="30" width="152" height="53" rx="3"/><text x="34" y="51">{% if floor.number == 0 %}Erdgeschoss{% else %}{{ floor.number }}. Obergeschoss{% endif %}</text><text class="facade-floor-summary" x="34" y="70">{{ floor.units|length }} Wohnungen · {{ floor.available_count }} frei</text><path d="M174 56H200"/></g>
         </g>
         {% endif %}
     </a>
     {% endfor %}
     <path d="M89 711H994" stroke="#999e93" stroke-width="3"/>
-    <g aria-hidden="true"><path d="M121 710L125 586M124 635L95 610M124 624L148 604" stroke="#92968a" stroke-width="7"/><path d="M76 585C74 551 107 544 124 551C153 530 182 558 172 585C188 608 155 631 133 619C111 641 74 622 76 601Z" fill="#bac3b0"/><path d="M961 710V646" stroke="#92968a" stroke-width="5"/><ellipse cx="961" cy="638" rx="25" ry="35" fill="#c5ccbd"/></g>
+    <g aria-hidden="true" pointer-events="none"><path d="M961 710V646" stroke="#92968a" stroke-width="5"/><ellipse cx="961" cy="638" rx="25" ry="35" fill="#c5ccbd"/></g>
 </svg>

@@ -7,13 +7,22 @@
         <p class="uk-text-lead">{{ total_units }} Wohnungen in einem Haus. Wählen Sie ein Stockwerk.</p>
         {% if floors %}
         <div class="uk-grid-large uk-flex-middle" uk-grid>
-            <div class="uk-width-3-4@m">{% include "wohnungsverwaltung/_building_facade.html" %}<p class="uk-text-meta uk-text-center">Westfassade · vereinfachte Darstellung nach der Gebäudeansicht</p></div>
-            <div class="uk-width-1-4@m">
-                <h2 class="uk-h3">Stockwerk auswählen</h2>
-                <div class="floor-choice-list">
-                    {% for floor in floors %}<a class="uk-button uk-button-default floor-choice" href="{% url 'wohnungsverwaltung_public:floor_view' floor.number %}"><span>{{ floor.label }}</span><span class="uk-text-meta">{{ floor.units|length }} Wohnungen · {{ floor.available_count }} frei →</span></a>{% endfor %}
-                </div>
-                <a class="uk-button uk-button-text uk-margin-top" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Direkt zur Wohnungssuche</a>
+            <div class="uk-width-2-3@m">
+                {% include "wohnungsverwaltung/_building_facade.html" %}
+                <p class="uk-text-meta uk-text-center">Westfassade · vereinfachte Darstellung nach der Gebäudeansicht</p>
+            </div>
+            <div class="uk-width-1-3@m">
+                <aside class="uk-card uk-card-default uk-card-body" aria-labelledby="building-overview-title">
+                    <h2 id="building-overview-title" class="uk-card-title">Das Haus auf einen Blick</h2>
+                    <dl class="uk-description-list uk-description-list-divider">
+                        <dt>Wohnungen insgesamt</dt><dd class="uk-text-large">{{ total_units }}</dd>
+                        <dt>Etagen</dt><dd class="uk-text-large">{{ floors|length }}</dd>
+                        <dt>Aktuell verfügbar</dt><dd class="uk-text-large">{{ total_available }} Wohnung{% if total_available != 1 %}en{% endif %}</dd>
+                    </dl>
+                    <p>Wählen Sie ein Stockwerk am Gebäude oder auf seinem Schild. Im Etagenplan können Sie die freien Wohnungen entdecken.</p>
+                    <p class="uk-text-meta">Oder suchen Sie direkt nach einer passenden Wohnung und filtern Sie nach Ihren Wünschen.</p>
+                    <a class="uk-button uk-button-primary uk-width-1-1" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Freie Wohnungen finden</a>
+                </aside>
             </div>
         </div>
         {% else %}<p>Noch keine Wohnungen vorhanden.</p>{% endif %}

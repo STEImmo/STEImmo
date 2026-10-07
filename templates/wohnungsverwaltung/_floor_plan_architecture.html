@@ -1,9 +1,8 @@
 {# All coordinates are traced in the source orientation; the parent SVG rotates them. #}
 {% if layer == 'shell' %}
     {% if floor_number == 0 %}
-        <path class="plan-shell" d="M116 162H302V292H396V162H812L853 510H116Z"/>
-        <path class="plan-shared" d="M305 165H391V279H785V327H399V299H305Z"/>
-        <path class="plan-shared" d="M605 165H810L823 278H605Z"/>
+        <path class="plan-shared" d="M40 20H300V200H400V20H940L980 410H660V480H40Z"/>
+        <path class="plan-balcony-area" d="M140 480H280V570H140Z M480 480H630V570H480Z M780 410H900V500H780Z"/>
     {% elif floor_number == 4 %}
         <path class="plan-roof" d="M20 36L264 5V183L296 166V540H20Z"/>
         <path class="plan-roof-lines" d="M20 36L73 33M20 540L73 503M296 540L245 503M264 5L209 17M20 168L126 239M296 166L148 234M20 540L126 439L296 540"/>
@@ -15,26 +14,26 @@
     {% endif %}
 {% else %}
     {% if floor_number == 0 %}
-        <path class="plan-walls" d="M231 166V277H299M400 253H478V166M120 280H231M231 328H303M303 302V505M231 359V505M120 420H173V505M303 377H394M402 331H478V505M509 305V349H605M702 331V455M702 402H848M785 402V455"/>
-        <path class="plan-door-gap" d="M231 247V270M431 253H455M231 335V356M303 335V358M478 355V378M535 349H558M702 349V372M750 402H773M481 297H505M333 302H357M535 305H559M645 331H669"/>
-        <path class="plan-doors" d="M231 247H208Q208 270 231 270M431 253V229Q455 229 455 253M303 335H326Q326 358 303 358M478 355H501Q501 378 478 378M750 402V379Q773 379 773 402"/>
-        <rect x="320" y="180" width="60" height="83" fill="url(#plan-step-horizontal)" class="plan-stair-outline"/>
-        <path class="plan-lines" d="M350 258V188L346 194M350 188L354 194"/>
-        <g transform="translate(787 284)"><rect width="39" height="41" class="plan-lift"/><path d="M4 4L35 37M35 4L4 37" class="plan-lines"/><path d="M0 11V31" class="plan-door-gap"/></g>
-        <text x="808" y="309" class="plan-room-label">Aufzug</text>
-        <text x="710" y="215" class="plan-room-label">Fahrradraum</text>
-        <rect x="619" y="413" width="70" height="89" fill="url(#plan-step-horizontal)" class="plan-stair-outline"/>
-        <path class="plan-lines" d="M654 495V420L650 426M654 420L658 426"/>
-        <g class="plan-furniture">
-            <use href="#plan-bed" transform="translate(135 294) scale(2)"/><use href="#plan-bed" transform="translate(322 315) scale(2)"/>
-            <use href="#plan-bed" transform="translate(416 411) scale(2)"/><use href="#plan-bed" transform="translate(718 339) scale(2)"/>
-            <use href="#plan-sofa" transform="translate(137 248) scale(2)"/><use href="#plan-sofa" transform="translate(530 248) scale(2)"/>
-            <use href="#plan-sofa" transform="translate(244 473) scale(2)"/><use href="#plan-sofa" transform="translate(525 472) scale(2)"/>
-            <use href="#plan-bath" transform="translate(269 175) scale(2)"/><use href="#plan-bath" transform="translate(406 176) scale(2)"/>
-            <use href="#plan-bath" transform="translate(137 449) scale(2)"/><use href="#plan-bath" transform="translate(815 406) scale(2)"/>
-        </g>
-        <path class="plan-balconies" d="M207 512V550H278V512M515 512V550H578V512"/>
-        <path class="plan-windows" d="M157 163H204M249 163H282M419 163H457M506 163H558M116 197V244M116 369V404M187 510H227M264 510H287M335 510H365M423 510H454M519 510H572"/>
+        {# Orthogonal interior walls; only the exterior right wall follows the plot angle. #}
+        <path class="plan-walls" d="M40 20H300V145 M300 185V200 M40 20V195 M40 245V480 M40 175H130 M165 175H200V280H40 M200 20V130H220 M270 200V225H200 M270 200H315 M340 200H400V280 M270 280H310 M350 280H400 M280 280V480 M400 280V480 M400 360H440 M470 360H490V480 M40 360H70 M95 360H130V480 M40 480H175 M220 480H260 M280 480H540 M580 480H660 M400 20H660 M940 20L980 410 M400 20V140H490 M490 20V105 M490 140V180 M525 180H660 M660 20V180 M400 240H540 M575 240H600V230H830 M880 230H960 M490 240V280 M490 280H530 M575 280H660 M660 230V480 M780 230V265H800 M830 230V265H815 M780 310V410H815 M850 410H980 M870 310H920 M950 310H969 M890 310V410 M660 410H780"/>
+        <path class="plan-walls" d="M660 20H675 M710 20H745 M780 20H885 M925 20H940 M720 20V180 M660 180H675 M710 180H956"/>
+        <path class="plan-doors" d="M300 145H265Q265 185 300 185 M130 175V210Q165 210 165 175 M315 200V225Q340 225 340 200 M310 280V315Q350 315 350 280 M70 360V385Q95 385 95 360 M440 360V390Q470 390 470 360 M490 105H525Q525 140 490 140 M490 180V145Q525 145 525 180 M540 240V275Q575 275 575 240 M530 280V315Q575 315 575 280 M830 230V270Q880 270 880 230 M920 310V340Q950 340 950 310 M175 480V440Q220 440 220 480 M540 480V440Q580 440 580 480 M815 410V375Q850 375 850 410"/>
+        <path class="plan-doors" d="M675 20V55Q710 55 710 20 M745 20V55Q780 55 780 20 M885 20V60Q925 60 925 20"/>
+        <path class="plan-windows" d="M85 20H180 M235 20H270 M40 195V245 M430 20H470 M525 20H610 M830 20H865 M60 480H105 M145 480H175 M320 480H360 M415 480H450 M495 480H530 M720 410H765 M910 410H955"/>
+        <path class="plan-balconies" d="M140 485V570H280V485 M480 485V570H630V485 M780 415V500H900V415"/>
+        <text x="210" y="535" class="plan-room-label">Balkon</text>
+        <text x="555" y="535" class="plan-room-label">Balkon</text>
+        <text x="840" y="468" class="plan-room-label">Balkon</text>
+        <rect x="300" y="45" width="100" height="90" fill="url(#plan-step-horizontal)" class="plan-stair-outline"/>
+        <text x="350" y="15" class="plan-room-label">Eingang</text>
+        <path class="plan-lines" d="M350 23V37L344 31 M350 37L356 31"/>
+        <path class="plan-lines" d="M350 125V58L344 65 M350 58L356 65"/>
+        <text x="780" y="208" class="plan-room-label">Flur</text>
+        <g transform="translate(906 180)"><rect width="50" height="50" class="plan-lift"/><path d="M5 5L45 45M45 5L5 45" class="plan-lines"/><path d="M0 13V38" class="plan-door-gap"/></g>
+        <text x="931" y="206" class="plan-room-label plan-lift-label">Aufzug</text>
+        <text x="820" y="90" class="plan-room-label">Fahrradabstellbereich</text>
+        <text x="690" y="78" class="plan-room-label plan-lift-label">Eingang</text>
+        <text x="690" y="94" class="plan-room-label plan-lift-label">Rollstuhl</text>
     {% elif floor_number == 4 %}
         <path class="plan-walls" d="M74 117H122V59M74 183H126V208M153 24V59M148 182H209M155 247V305H242M74 297H107V327M74 386H116V438M74 441H155V503M128 383V426H191V503M155 439H245M194 439V503"/>
         <path class="plan-door-gap" d="M99 117H118M104 183H122M155 277V295M90 297H106M105 327H123M155 344V365M105 386H122M116 404V422M155 451V469M194 456V474"/>

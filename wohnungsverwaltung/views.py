@@ -4,6 +4,7 @@ from uuid import UUID
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
@@ -21,6 +22,7 @@ from django.utils import timezone
 from PIL import Image
 
 from .access import (
+    APPLICANT_ACCESS_PERMISSION,
     EMPLOYEE_ACCESS_PERMISSION,
     applicant_required,
     employee_required,
@@ -184,6 +186,7 @@ def building_view(request: HttpRequest) -> HttpResponse:
         {
             "floors": list(floors_by_number.values()),
             "total_units": sum(len(f["units"]) for f in floors_by_number.values()),
+            "total_available": sum(f["available_count"] for f in floors_by_number.values()),
         },
     )
 
@@ -305,6 +308,24 @@ def pre_application_preview(request: HttpRequest) -> HttpResponse:
         request,
         "wohnungsverwaltung/pre_application_preview.html",
         {"form": BewerbungForm(applicant=Person())},
+    )
+
+
+@login_required
+def viewing_request(request: HttpRequest, unit_id: UUID) -> HttpResponse:
+    unit = get_object_or_404(Wohnung.objects.available(), pk=unit_id)
+    if (
+        request.user.has_perm(APPLICANT_ACCESS_PERMISSION)
+        and getattr(request.user, "person_profile", None) is not None
+    ):
+        return redirect("wohnungsverwaltung:pre_application_create_for_unit", unit_id=unit.pk)
+    return render(
+        request,
+        "wohnungsverwaltung/viewing_request_unavailable.html",
+        {
+            "wohnung": unit,
+            "missing_profile": request.user.has_perm(APPLICANT_ACCESS_PERMISSION),
+        },
     )
 
 

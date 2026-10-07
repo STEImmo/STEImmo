@@ -10,9 +10,9 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
 
-from .access import ROLE_EMPLOYEE
+from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
 from .building_plans import APARTMENTS
-from .models import ApartmentPhoto, Wohnung, WohnungStatus
+from .models import ApartmentPhoto, Person, Wohnung, WohnungStatus
 
 
 class BuildingViewTests(TestCase):
@@ -36,8 +36,14 @@ class BuildingViewTests(TestCase):
         response = self.client.get(reverse("wohnungsverwaltung_public:building_view"))
         self.assertEqual(response.status_code, 200)
         self.assertEqual([floor["number"] for floor in response.context["floors"]], [4, 2])
+        self.assertEqual(response.context["total_available"], 2)
+        self.assertContains(response, "Das Haus auf einen Blick")
         self.assertNotContains(response, "Wohnung A-17")
-        self.assertContains(response, reverse("wohnungsverwaltung_public:floor_view", args=[2]))
+        self.assertContains(response, "Westfassade")
+        self.assertContains(response, "1 frei")
+        self.assertContains(
+            response, reverse("wohnungsverwaltung_public:floor_view", args=[2]), count=1
+        )
         response = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[2]))
         self.assertContains(response, free.wohnungsnummer)
         self.assertContains(response, taken.wohnungsnummer)
@@ -74,7 +80,7 @@ class BuildingViewTests(TestCase):
         self.assertNotContains(response, "Für diese Wohnung bewerben")
         self.assertContains(
             response,
-            reverse("wohnungsverwaltung:pre_application_create_for_unit", args=[unit.pk]),
+            reverse("wohnungsverwaltung_public:viewing_request", args=[unit.pk]),
         )
 
     def test_unavailable_detail_is_not_public(self):
@@ -83,6 +89,48 @@ class BuildingViewTests(TestCase):
             reverse("wohnungsverwaltung_public:apartment_detail_placeholder", args=[unit.pk])
         )
         self.assertEqual(response.status_code, 404)
+
+
+class ViewingRequestEntryTests(TestCase):
+    def setUp(self):
+        self.unit = Wohnung.objects.create(wohnungsnummer="1", gebaeudenummer="1")
+        self.url = reverse("wohnungsverwaltung_public:viewing_request", args=[self.unit.pk])
+        self.user = get_user_model().objects.create_user(username="viewing-entry-test")
+
+    def test_anonymous_entry_preserves_unit_after_login(self):
+        self.assertRedirects(self.client.get(self.url), f"{reverse('login')}?next={self.url}")
+
+    def test_employee_receives_explanation_without_applicant_access(self):
+        self.user.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
+        self.client.force_login(self.user)
+        response = self.client.get(self.url)
+        self.assertContains(response, "Für diese Anfrage benötigen Sie ein Bewerberkonto")
+        protected = reverse(
+            "wohnungsverwaltung:pre_application_create_for_unit", args=[self.unit.pk]
+        )
+        self.assertEqual(self.client.get(protected).status_code, 403)
+
+    def test_applicant_without_profile_receives_profile_explanation(self):
+        self.user.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+        self.client.force_login(self.user)
+        self.assertContains(self.client.get(self.url), "Personenprofil fehlt")
+
+    def test_complete_applicant_reaches_existing_unit_request(self):
+        self.user.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+        Person.objects.create(
+            user=self.user, vorname="Test", nachname="Person", email="test@example.test"
+        )
+        self.client.force_login(self.user)
+        self.assertRedirects(
+            self.client.get(self.url),
+            reverse("wohnungsverwaltung:pre_application_create_for_unit", args=[self.unit.pk]),
+        )
+
+    def test_unavailable_unit_cannot_be_requested(self):
+        self.unit.status = WohnungStatus.TAKEN
+        self.unit.save()
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.get(self.url).status_code, 404)
 
 
 class ApartmentPhotoTests(TestCase):

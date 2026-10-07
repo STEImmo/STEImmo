@@ -31,8 +31,8 @@
                     <dt>Kaution</dt><dd>{% if wohnung.kaution %}{{ wohnung.kaution }} €{% else %}<span class="uk-text-muted">Angabe fehlt</span>{% endif %}</dd>
                 </dl>
                 <p class="uk-text-meta">Details zu Nebenkosten, enthaltenen Heizkosten und Stellplätzen werden noch ergänzt.</p>
-                <a class="uk-button uk-button-primary uk-width-1-1" href="{% url 'wohnungsverwaltung:pre_application_create_for_unit' wohnung.pk %}">Zur Besichtigung anmelden</a>
-                <p class="uk-text-meta">Stellen Sie zunächst eine Anfrage für diese Wohnung. Ein Besichtigungstermin wird separat bestätigt.</p>
+                <a class="uk-button uk-button-primary uk-width-1-1" href="{% url 'wohnungsverwaltung_public:viewing_request' wohnung.pk %}">Zur Besichtigung anmelden</a>
+                <p class="uk-text-meta">Für die Vorauswahl senden Sie eine Voranfrage über Ihr Bewerberkonto. Ein Besichtigungstermin wird nach Prüfung separat bestätigt.</p>
             </aside></div>
         </div>
     </div>
