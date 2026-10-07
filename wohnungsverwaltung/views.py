@@ -59,9 +59,12 @@ from .forms import (
 )
 from .handover_lock import protocol_mutation
 from .handover_photos import (
+    PHOTO_READ_ERROR,
     PHOTO_SAVE_ERROR,
+    HandoverPhotoReadError,
     HandoverPhotoStorageError,
     delete_handover_photo,
+    existing_photo_checksums,
     handover_photo_upload,
     save_handover_photo,
 )
@@ -1344,10 +1347,12 @@ def handover_protocol_checklist_item_photo_upload(
                 messages.error(request, error)
         return redirect(_photo_return_url(request, protocol, room, checklist_item))
 
-    existing_checksums = {
-        photo.inhalt_hash_sha256 or calculate_photo_checksum(photo.datei)
-        for photo in checklist_item.fotos.all()
-    }
+    try:
+        existing_checksums = existing_photo_checksums(checklist_item.fotos.all())
+    except HandoverPhotoReadError as error:
+        logger.error("Protocol photo comparison failed (%s).", type(error).__name__)
+        messages.error(request, PHOTO_READ_ERROR)
+        return redirect(_photo_return_url(request, protocol, room, checklist_item))
     photos_to_save = []
     for photo in form.cleaned_data["fotos"]:
         checksum = calculate_photo_checksum(photo)

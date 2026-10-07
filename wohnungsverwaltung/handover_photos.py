@@ -6,17 +6,39 @@ from contextlib import contextmanager
 from django.core.files.storage import Storage
 from django.db import DatabaseError, transaction
 
-from .models import HandoverPhotoCleanup, RaumMerkmalFoto
+from .models import HandoverPhotoCleanup, RaumMerkmalFoto, calculate_photo_checksum
 
 logger = logging.getLogger(__name__)
 PHOTO_SAVE_ERROR = (
     "Die Fotos konnten nicht sicher gespeichert werden. Bitte wählen Sie die Fotos "
     "erneut aus und versuchen Sie es noch einmal."
 )
+PHOTO_READ_ERROR = (
+    "Ein vorhandenes Foto konnte nicht gelesen werden. Die neuen Fotos wurden nicht "
+    "gespeichert. Bitte versuchen Sie es später erneut."
+)
 
 
 class HandoverPhotoStorageError(Exception):
     pass
+
+
+class HandoverPhotoReadError(Exception):
+    pass
+
+
+def existing_photo_checksums(photos) -> set[str]:
+    checksums = set()
+    for photo in photos:
+        if photo.inhalt_hash_sha256:
+            checksums.add(photo.inhalt_hash_sha256)
+            continue
+        try:
+            with photo.datei.open("rb") as photo_file:
+                checksums.add(calculate_photo_checksum(photo_file))
+        except (OSError, ValueError) as error:
+            raise HandoverPhotoReadError from error
+    return checksums
 
 
 def _cleanup_removed_photo_file(storage: Storage, name: str, cleanup_id) -> None:
