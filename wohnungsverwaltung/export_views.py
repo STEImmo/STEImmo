@@ -18,6 +18,7 @@ from .access import (
     tenant_required,
 )
 from .export_forms import ProtocolSigningForm
+from .handover_archive_files import cleanup_archive_files
 from .handover_export import (
     ExportLimitExceeded,
     archive_protocol,
@@ -78,14 +79,6 @@ def handover_protocol_finalize(request, protocol_id):
     )
 
 
-def _cleanup(paths):
-    for path in paths:
-        try:
-            default_storage.delete(path)
-        except OSError:
-            logger.error("Temporäre Exportdatei konnte nicht bereinigt werden.")
-
-
 @employee_required
 @never_cache
 @require_POST
@@ -142,10 +135,10 @@ def handover_protocol_confirm(request, protocol_id):
                 user=request.user,
             )
     except ExportLimitExceeded as error:
-        _cleanup(stored)
+        cleanup_archive_files(stored)
         return JsonResponse({"error": str(error)}, status=413)
     except (OSError, ValueError):
-        _cleanup(stored)
+        cleanup_archive_files(stored)
         logger.error("Übergabeabschluss wegen Export- oder Speicherfehler abgebrochen.")
         return JsonResponse(
             {
@@ -157,7 +150,7 @@ def handover_protocol_confirm(request, protocol_id):
             status=503,
         )
     except Exception:
-        _cleanup(stored)
+        cleanup_archive_files(stored)
         raise
     return JsonResponse({"redirect": _detail_url(protocol.pk)})
 
@@ -224,13 +217,13 @@ def handover_protocol_pdf_create(request, protocol_id):
                     protocol, build_snapshot(protocol), {}, timezone.now(), stored, legacy=True
                 )
     except ExportLimitExceeded as error:
-        _cleanup(stored)
+        cleanup_archive_files(stored)
         messages.error(request, str(error))
         return render(request, "wohnungsverwaltung/handover_export_error.html", status=413)
     except (OSError, ValueError):
-        _cleanup(stored)
+        cleanup_archive_files(stored)
         return render(request, "wohnungsverwaltung/handover_export_error.html", status=503)
     except Exception:
-        _cleanup(stored)
+        cleanup_archive_files(stored)
         raise
     return redirect("wohnungsverwaltung:handover_protocol_pdf", protocol_id=protocol_id)
