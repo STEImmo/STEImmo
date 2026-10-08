@@ -1,4 +1,4 @@
-"""Track new photo files so a failed database transaction can clean them up."""
+"""Recover photo files from failed uploads and committed photo removals."""
 
 import logging
 from contextlib import contextmanager
@@ -17,6 +17,29 @@ PHOTO_SAVE_ERROR = (
 
 class HandoverPhotoStorageError(Exception):
     pass
+
+
+def _cleanup_removed_photo_file(storage: Storage, name: str, cleanup_id) -> None:
+    try:
+        if RaumMerkmalFoto.objects.filter(datei=name).exists():
+            raise ValueError("Photo is still referenced.")
+        storage.delete(name)
+        HandoverPhotoCleanup.objects.filter(pk=cleanup_id).delete()
+    except Exception as error:
+        # The committed job survives a storage failure or process interruption.
+        logger.error("Could not clean up a removed photo file (%s).", type(error).__name__)
+
+
+def delete_handover_photo(photo: RaumMerkmalFoto) -> None:
+    with transaction.atomic():
+        storage = photo.datei.storage
+        name = photo.datei.name
+        cleanup = None
+        if name:
+            cleanup, _created = HandoverPhotoCleanup.objects.get_or_create(storage_name=name)
+        photo.delete()
+        if cleanup is not None:
+            transaction.on_commit(lambda: _cleanup_removed_photo_file(storage, name, cleanup.pk))
 
 
 def save_handover_photo(photo: RaumMerkmalFoto, stored_files: list[tuple[Storage, str]]) -> None:

@@ -1,4 +1,4 @@
-"""Retry cleanup of files left by a failed protocol photo upload."""
+"""Retry cleanup of files from failed uploads or removed protocol photos."""
 
 import logging
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Retry deletion of new protocol photo files after a failed upload."
+    help = "Retry deletion of protocol photo files after failed uploads or photo removal."
 
     def handle(self, *args, **options):
         storage = RaumMerkmalFoto._meta.get_field("datei").storage

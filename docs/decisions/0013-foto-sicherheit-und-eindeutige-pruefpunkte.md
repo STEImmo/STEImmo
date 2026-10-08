@@ -52,6 +52,17 @@ Fotoauswahl. Protokollentwürfe werden erst bei erfolgreicher Speicherung
 entfernt. Fehlermeldungen im Log nennen die Fehlerklasse, keine Dateiinhalte
 oder vom Storage gelieferten Detailmeldungen.
 
+### Bereinigung entfernter Fotos (Issue #67)
+
+Auch beim Entfernen vorhandener Fotos wird `HandoverPhotoCleanup` verwendet.
+Bereinigungsauftrag und Entfernung der Foto-Referenz erfolgen in derselben
+Datenbanktransaktion. Erst nach erfolgreichem Commit beginnt die Dateilöschung.
+Eine Ausnahme wird kontrolliert protokolliert und lässt den Auftrag für den
+bestehenden Wiederholungsbefehl erhalten. Weitere Bereinigungen können fortfahren.
+Bei einem Rollback bleiben Datei und Fotoeintrag erhalten; der Lösch-Callback
+wird verworfen. Noch referenzierte Dateien werden auch beim sofortigen
+Bereinigungsversuch geschützt. Es ist keine neue Tabelle oder Abhängigkeit nötig.
+
 ### Validierung nach endgültiger Raumzuordnung (Issue #66)
 
 Mehrere Prüfpunktzeilen dürfen den Raum aus der vorherigen Zeile übernehmen.

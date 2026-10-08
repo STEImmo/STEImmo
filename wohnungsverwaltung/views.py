@@ -61,6 +61,7 @@ from .handover_lock import protocol_mutation
 from .handover_photos import (
     PHOTO_SAVE_ERROR,
     HandoverPhotoStorageError,
+    delete_handover_photo,
     handover_photo_upload,
     save_handover_photo,
 )
@@ -1422,13 +1423,7 @@ def handover_protocol_checklist_item_photo_delete(
 
 def _delete_checklist_photos(photos) -> None:
     for photo in list(photos):
-        storage = photo.datei.storage
-        stored_name = photo.datei.name
-        photo.delete()
-        if stored_name:
-            transaction.on_commit(
-                lambda storage=storage, stored_name=stored_name: storage.delete(stored_name)
-            )
+        delete_handover_photo(photo)
 
 
 def _photo_return_url(
