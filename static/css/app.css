@@ -223,7 +223,7 @@ a:active,
     color: var(--steimmo-color-primary-active);
 }
 
-.uk-navbar-container {
+.uk-navbar-container:not(.uk-navbar-transparent) {
     background: var(--steimmo-color-surface-inverse);
     color: var(--steimmo-color-text-inverse);
 }
@@ -527,8 +527,6 @@ a:active,
     outline-offset: var(--steimmo-focus-offset);
 }
 
-.uk-navbar-container :focus-visible,
-.uk-button-primary:focus-visible,
-.uk-button-danger:focus-visible {
+.uk-navbar-container :focus-visible {
     outline-color: var(--steimmo-color-focus-ring-inverse);
 }

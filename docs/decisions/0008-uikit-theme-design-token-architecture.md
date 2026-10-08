@@ -23,7 +23,7 @@ Die Umsetzung bestätigt die Token-Ablage in static/css/app.css und bindet die v
 | Warnung | --steimmo-color-warning, --steimmo-color-warning-text, --steimmo-color-warning-surface | #825000, #5E3A00, #FFF3D6 |
 | Fehler/Gefahr | --steimmo-color-danger, --steimmo-color-danger-text, --steimmo-color-danger-surface | #922222, #922222, #FDECEC |
 | Information | --steimmo-color-info, --steimmo-color-info-surface | #174957, #EAF3F5 |
-| Fokus | --steimmo-color-focus-ring, --steimmo-color-focus-ring-inverse | #155EEF auf hellen Flächen, #FFFFFF auf dunkler Navigation und Aktionsflächen |
+| Fokus | --steimmo-color-focus-ring, --steimmo-color-focus-ring-inverse | #155EEF auf hellen Flächen einschließlich des Außenrings von Aktionsbuttons, #FFFFFF auf dunkler Navigation |
 | Deaktiviert | --steimmo-color-disabled-text, --steimmo-color-disabled-surface, --steimmo-color-disabled-border | #595959, #ECEAE6, #C9C4BE |
 
 Typografie verwendet den Systemschrift-Stack, eine Skala von 0.75rem bis 2.5rem und Zeilenhöhen von 1.25, 1.5 und 1.65. Spacing reicht in einer kleinen Skala von 0.25rem bis 3rem. Radien sind 4px, 8px, 10px und pillenförmig; Karten und Dialoge verwenden zentrale kleine und mittlere Schatten. Diese Werte liegen ebenfalls als --steimmo- Tokens in app.css.
