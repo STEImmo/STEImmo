@@ -53,15 +53,15 @@ a.plan-apartment:focus-visible .plan-apartment-shape { fill: #d1e6f7; stroke: #1
 .plan-caption rect { fill: #fff; fill-opacity: .96; stroke: #bac5b5; stroke-width: .6; }
 .plan-caption .plan-number { font-weight: 700; }
 .plan-caption .plan-area { font-size: 8px; }
-.is-ground .plan-caption { font-size: 14px; }
-.is-ground .plan-caption .plan-area { font-size: 12px; }
-.is-ground .plan-room-label { font-size: 14px; }
-.is-ground .plan-apartment-shape { stroke: none; }
-.is-ground .plan-walls { stroke: #596254; stroke-width: 3; stroke-linecap: butt; stroke-linejoin: miter; }
-.is-ground .plan-windows { stroke: #b5cddd; stroke-width: 4; }
-.is-ground .plan-balconies { stroke: #a5ada0; stroke-width: 1.5; }
-.is-ground .plan-doors { stroke-width: 1; }
-.is-ground .plan-lift-label { font-size: 10px; }
+:is(.is-ground, .is-regular) .plan-caption { font-size: 14px; }
+:is(.is-ground, .is-regular) .plan-caption .plan-area { font-size: 12px; }
+:is(.is-ground, .is-regular) .plan-room-label { font-size: 14px; }
+:is(.is-ground, .is-regular) .plan-apartment-shape { stroke: none; }
+:is(.is-ground, .is-regular) .plan-walls { stroke: #596254; stroke-width: 3; stroke-linecap: butt; stroke-linejoin: miter; }
+:is(.is-ground, .is-regular) .plan-windows { stroke: #b5cddd; stroke-width: 4; }
+:is(.is-ground, .is-regular) .plan-balconies { stroke: #a5ada0; stroke-width: 1.5; }
+:is(.is-ground, .is-regular) .plan-doors { stroke-width: 1; }
+:is(.is-ground, .is-regular) .plan-lift-label { font-size: 10px; }
 .plan-balcony-area { fill: #edf5ec; }
 .plan-caption.is-unavailable { fill: #666; }
 .plan-caption.is-unavailable rect { stroke: #aaa; }

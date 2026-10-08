@@ -61,9 +61,53 @@ class BuildingViewTests(TestCase):
         response = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[9]))
         self.assertEqual(response.status_code, 404)
 
+    def test_upper_floors_share_plan_with_their_own_units(self):
+        for floor in (1, 2, 3):
+            for number in range(1, 7):
+                self.create_unit(str(floor * 100 + number), floor)
+        responses = [
+            self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[floor]))
+            for floor in (1, 2, 3)
+        ]
+        for floor, response in zip((1, 2, 3), responses, strict=True):
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(len(response.context["plan_units"]), 6)
+            self.assertEqual(
+                [item["unit"].wohnungsnummer for item in response.context["plan_units"]],
+                [str(floor * 100 + number) for number in range(1, 7)],
+            )
+            self.assertContains(response, "Balkon", count=6)
+            self.assertContains(response, "Aufzug")
+            self.assertNotContains(response, "Fahrradabstellbereich")
+            self.assertNotContains(response, 'class="plan-furniture"')
+            positions = response.context["plan_units"]
+            self.assertLess(positions[5]["x"], positions[0]["x"])
+            self.assertLess(positions[0]["x"], positions[1]["x"])
+            self.assertGreater(positions[2]["y"], positions[1]["y"])
+            self.assertGreater(positions[2]["x"], positions[3]["x"])
+            self.assertGreater(positions[3]["x"], positions[4]["x"])
+            self.assertLess(positions[5]["y"], positions[4]["y"])
+        for response in responses[1:]:
+            self.assertEqual(
+                [item["points"] for item in responses[0].context["plan_units"]],
+                [item["points"] for item in response.context["plan_units"]],
+            )
+
     def test_header_links_directly_to_building(self):
         response = self.client.get(reverse("home"))
         self.assertContains(response, reverse("wohnungsverwaltung_public:building_view"))
+
+    def test_attic_places_401_right_and_402_left(self):
+        for number in ("401", "402"):
+            self.create_unit(number, 4)
+        response = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[4]))
+        self.assertEqual(response.status_code, 200)
+        right, left = response.context["plan_units"]
+        self.assertEqual(right["unit"].wohnungsnummer, "401")
+        self.assertEqual(left["unit"].wohnungsnummer, "402")
+        self.assertGreater(right["x"], left["x"])
+        self.assertContains(response, "Aufzug")
+        self.assertNotContains(response, 'class="plan-furniture"')
 
     def test_detail_displays_stored_data_and_existing_application_link(self):
         unit = self.create_unit("A-17", 2)

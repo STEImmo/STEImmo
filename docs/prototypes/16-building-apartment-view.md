@@ -12,13 +12,19 @@ Die Gebäudeseite nutzt ab Desktopbreite ein UIkit-Grid mit 2/3 Fassade links un
 
 Die einzelnen Fassadenfenster liegen mittig in ihrer Einfassung. Die seitlichen Laibungen haben gleiche Breite und gespiegelte Konturen; obere und untere Kanten verlaufen parallel. Die vereinfachten Fenster erhalten wie in der Westansicht eine ungeteilte Glasfläche.
 
-Die Vektorgrafiken orientieren sich an den gelieferten Zeichnungen. Für das EG dient die vereinfachte Nutzerskizze als Grundlage für Wandaufteilung und Proportionen. Die Geometrie ist auf gemeinsame horizontale und vertikale Achsen ausgerichtet; lediglich die tatsächliche schräge rechte Außenkante bleibt erhalten. Die ruhige bestehende Farbgebung mit hellen Fensterlinien, dezenten Türbögen und Balkonflächen wird weiterverwendet. Balkone, Treppe, Aufzug, Flur und Fahrradabstellbereich sind schematisch dargestellt und beschriftet. Der Aufzug liegt am rechten Flurende unterhalb des Fahrradbereichs, mit Zugang vom Flur auf der linken Schachtseite. Möbelsymbole, Fahrradständersymbole und der Außenstellplatz sind im EG auf Nutzerwunsch entfernt. OG und DG bleiben nach den ursprünglichen Architekturplänen gezeichnet und werden gemeinsam mit den Auswahlflächen gedreht; die Beschriftungen bleiben aufrecht. Die PNGs unter static/plans werden ausschließlich über „Originalplan öffnen“ als Vergleichsvorlagen angeboten, nicht als Hintergrund der dargestellten Grundrisse. Der dort verlinkte EG-Originalplan bleibt die ursprüngliche Architekturzeichnung.
+Die Vektorgrafiken orientieren sich an den gelieferten Zeichnungen. Für das EG dient die vereinfachte Nutzerskizze als Grundlage für Wandaufteilung und Proportionen. Die Geometrie ist auf gemeinsame horizontale und vertikale Achsen ausgerichtet; lediglich die tatsächliche schräge rechte Außenkante bleibt erhalten. Die ruhige bestehende Farbgebung mit hellen Fensterlinien, dezenten Türbögen und Balkonflächen wird weiterverwendet. Balkone, Treppe, Aufzug, Flur und Fahrradabstellbereich sind schematisch dargestellt und beschriftet. Der Aufzug liegt am rechten Flurende unterhalb des Fahrradbereichs, mit Zugang vom Flur auf der linken Schachtseite. Möbelsymbole, Fahrradständersymbole und der Außenstellplatz sind im EG auf Nutzerwunsch entfernt. Auch das DG verwendet die horizontale Orientierung und den bereinigten Zeichenstil. Seine Geometrie folgt der beschrifteten Nutzerskizze und der Architekturvorlage: Wohnung 402 links, 401 rechts, drei Balkonabschnitte und eine Trennwand zwischen den beiden unteren Balkonabschnitten. Die PNGs unter static/plans werden ausschließlich über „Originalplan öffnen“ als Vergleichsvorlagen angeboten, nicht als Hintergrund der dargestellten Grundrisse. Der dort verlinkte EG-Originalplan bleibt die ursprüngliche Architekturzeichnung.
 
 Die Darstellung ist nicht maßstabsgetreu. Die Wohnungsnummern sind den Flächen vorläufig zugeordnet und müssen fachlich bestätigt werden. Die drei Obergeschosse verwenden denselben Grundrisstyp. UIkit 3.25.24 bleibt die Komponentenbasis; es gibt keine zusätzliche Bibliothek oder eigenständige HTML-Vorschau.
 
 Die vorläufige EG-Zuordnung folgt der Nachrechnung des Nutzers: Wohnung 1 oben mittig, Wohnung 2 rechts unter dem Fahrradbereich, Wohnung 3 unten mittig, Wohnung 4 unten links und Wohnung 5 oben links. Dies ist keine bestätigte Lageangabe. Die Wohnungsnummern und Wohnflächen in der Datenbank bleiben unverändert; lediglich ihre Positionen in der Zeichnung werden zugeordnet.
 
+Das 1., 2. und 3. OG verwenden einen gemeinsamen bereinigten Vektorplan im EG-Zeichenstil: sechs Wohnungen, eine Wohnung im Bereich des EG-Fahrradraums, drei kleinere Balkone an der oberen Seite und drei weitere Balkone. Wände, Raumgrenzen und Türöffnungen folgen der neuen Nutzerskizze für das 1. und 2. OG. Im 3. OG haben die oberen Balkone nach der zusätzlich gelieferten Skizze schmalere Flächen und seitliche Rundungen; die innere Aufteilung bleibt gleich. Möbel entfallen. Die Treppe zeigt zwei getrennte Läufe mit entgegengesetzten Pfeilen und einem gemeinsamen Podest; der Aufzug bleibt am rechten Flurende. Die OG-Nummerierung folgt der beschrifteten Nutzerskizze im Uhrzeigersinn: 1 oben mittig, 2 oben rechts, 3 unten rechts, 4 unten mittig, 5 unten links, 6 oben links (jeweils mit Etagenpräfix 1, 2 oder 3). Die Balkontüren im EG und in den drei OG haben einheitliche schematische Breite von 33 Zeichnungseinheiten; Wandöffnungen und Türbögen sind darauf abgestimmt. Die Wohnflächen stammen unverändert aus den jeweiligen Datenbankeinträgen. Die DG-Zeichnung liegt in `_attic_floor_architecture.html`; `ATTIC_SHAPES` ordnet die beiden Auswahlflächen zu. Die Datei `_regular_floor_architecture.html` enthält die gemeinsame Zeichnung für alle drei Obergeschosse; `REGULAR_SHAPES` enthält deren Auswahlflächen.
+
+Die Doppelbögen an den DG-Balkonen werden als zweiflügelige Balkontüren dargestellt. Sonstige Außenöffnungen werden als Fenster dargestellt; die ungesicherten gestrichelten Rechtecke im DG sind auf Nutzerwunsch entfernt. Aus zwei Öffnungsbögen allein lässt sich die Bauart nicht sicher bestimmen. Diese Darstellung enthält keine verifizierte Bauteilliste.
+
 ## Wohnungsdaten
+
+Letzter Anschlussabgleich: OG-Beschriftung für Wohnung 3 mittig zwischen den Raumwänden platziert. Balkonlinien im EG und den OG enden direkt an der Fassade; kleine unbeabsichtigte Außenwandlücken sind geschlossen. Wandanschlüsse an der schrägen rechten Außenkante sind auf die tatsächliche Kante verlängert. Der Türbogen des rechten OG-Bads liegt in dessen Öffnung an der Außenkante. Der Hinweis zur vorläufigen Zuordnung entfällt auf Nutzerwunsch in den Etagenansichten; der Hinweis zur nicht maßstabsgetreuen Darstellung bleibt bestehen. Die dokumentierten Grenzen der Quellen bleiben davon unberührt.
 
 Die vom Nutzer gelieferte Liste ist in wohnungsverwaltung/building_plans.py hinterlegt:
 
@@ -67,7 +73,7 @@ Offen sind die Bestätigung der räumlichen Wohnungsnummernzuordnung, echte Foto
 
 ## EG-Korrektur nach Review
 
-Nach den ersten Einzelkorrekturen hat der Nutzer eine eigene vereinfachte EG-Skizze bereitgestellt. Nach weiterer Rückmeldung wird sie als geometrische Orientierung genutzt, nicht als wörtliche Nachzeichnung ihrer ungeraden Linien und Markierungsfarben. Wandsegmente und Auswahlflächen sind gemeinsam begradigt und ausgerichtet, Türöffnungen und Balkonanschlüsse erhalten. Der zusätzliche linke Wandstummel an der Tür neben dem Treppenbereich ist entfernt. Gemeinschaftsbereiche ergänzen die Darstellung im bisherigen Stil; im EG gibt es keine Möbel- oder Stellplatzdarstellung mehr. Die bisher angenommene Nummernzuordnung bleibt erhalten und muss bestätigt werden; Obergeschosse und DG sind unverändert.
+Nach den ersten Einzelkorrekturen hat der Nutzer eine eigene vereinfachte EG-Skizze bereitgestellt. Nach weiterer Rückmeldung wird sie als geometrische Orientierung genutzt, nicht als wörtliche Nachzeichnung ihrer ungeraden Linien und Markierungsfarben. Wandsegmente und Auswahlflächen sind gemeinsam begradigt und ausgerichtet, Türöffnungen und Balkonanschlüsse erhalten. Der zusätzliche linke Wandstummel an der Tür neben dem Treppenbereich ist entfernt. Gemeinschaftsbereiche ergänzen die Darstellung im bisherigen Stil; im EG gibt es keine Möbel- oder Stellplatzdarstellung mehr. Die bisher angenommene Nummernzuordnung bleibt erhalten und muss bestätigt werden; Diese EG-Korrekturen betreffen nur das Erdgeschoss; die späteren OG-/DG-Anpassungen sind oben beschrieben.
 
 Letzter EG-Detailabgleich: In Wohnung 1 liegt die Badtür in der senkrechten Trennwand, die oben an die Außenwand anschließt; die Wohnungseingangstür liegt direkt neben dieser Wand. In Wohnung 5 zeigt der kleine Abschluss am Abstellraum nach links. Die Treppe nutzt die ganze Breite des Treppenbereichs, endet aber vor der seitlichen Wohnungstür; die zusätzliche Treppenbeschriftung entfällt. Der nördliche Zugang ist als „Eingang“ markiert. Die Innenwand in Wohnung 3 reicht bis zur unteren Außenwand. Eine Trennwand gliedert den Rollstuhl-Eingangsbereich neben dem Fahrradraum ab. Drei nördliche Eingänge sind nach den Türbögen der Vorlage dargestellt; der Rollstuhl-Eingangsbereich hat einen offenen Durchgang zum Flur. Zusätzliche unbestätigte Türbögen zum Flur entfallen.
 
@@ -79,7 +85,7 @@ building_plans.py liefert Nummern, Etagen, Flächen und grafische Auswahlkoordin
 
 ## Dateien für den Commit
 
-Alle folgenden 31 Dateien gehören zur gemeinsamen Umsetzung einschließlich der Korrektur auf feat/16-building-apartment-view:
+Alle folgenden 33 Dateien gehören zur gemeinsamen Umsetzung einschließlich der Korrektur auf feat/16-building-apartment-view:
 
 | Datei | Zweck |
 |---|---|
@@ -92,6 +98,8 @@ Alle folgenden 31 Dateien gehören zur gemeinsamen Umsetzung einschließlich der
 | templates/base.html | Header-Link zur Gebäudeansicht und Stylesheet-Version. |
 | templates/wohnungsverwaltung/building_view.html | Eigene Gebäudeseite und Stockwerksauswahl. |
 | templates/wohnungsverwaltung/_building_facade.html | Anklickbare SVG-Fassade. |
+| templates/wohnungsverwaltung/_attic_floor_architecture.html | DG-Zeichnung mit Raumgrenzen, Treppe, Aufzug und zweiflügeligen Balkontüren. |
+| templates/wohnungsverwaltung/_regular_floor_architecture.html | Gemeinsame bereinigte Zeichnung für alle drei Obergeschosse mit Balkonen und zweiläufiger Treppe. |
 | templates/wohnungsverwaltung/floor_view.html | Eigene Etagenansicht mit Plan und Wohnungsliste. |
 | templates/wohnungsverwaltung/_floor_plan.html | SVG-Rahmen, Wohnungsflächen, Links und Beschriftungen. |
 | templates/wohnungsverwaltung/_floor_plan_architecture.html | Vektorzeichnung für EG, OG und DG: Wände, Flur, Aufzug, Treppen, Türen, Fenster, Möbel und Balkone. |
@@ -123,4 +131,4 @@ Vorgeschlagene Commit-Nachricht:
 feat: add building explorer and viewing request entry
 ```
 
-Die 31 Dateien bilden einen zusammengehörenden Funktionsstand; Schema-Migration, Views und Templates sollten gemeinsam übernommen werden. Auf einer anderen Entwicklungsumgebung ist python manage.py migrate erforderlich. Der lokale Inventarabgleich wird bei Bedarf ausdrücklich ausgeführt, nicht automatisch beim Start.
+Die 33 Dateien bilden einen zusammengehörenden Funktionsstand; Schema-Migration, Views und Templates sollten gemeinsam übernommen werden. Auf einer anderen Entwicklungsumgebung ist python manage.py migrate erforderlich. Der lokale Inventarabgleich wird bei Bedarf ausdrücklich ausgeführt, nicht automatisch beim Start.

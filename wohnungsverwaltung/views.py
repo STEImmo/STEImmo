@@ -33,7 +33,7 @@ from .building_plans import (
     ATTIC_SHAPES,
     GROUND_SHAPES,
     PLAN_REFERENCES,
-    UPPER_SHAPES,
+    REGULAR_SHAPES,
     floor_label,
 )
 from .forms import (
@@ -198,7 +198,11 @@ def floor_view(request: HttpRequest, floor_number: int) -> HttpResponse:
     if not units:
         raise Http404("Diese Etage ist nicht vorhanden.")
     shapes = (
-        GROUND_SHAPES if floor_number == 0 else ATTIC_SHAPES if floor_number == 4 else UPPER_SHAPES
+        GROUND_SHAPES
+        if floor_number == 0
+        else ATTIC_SHAPES
+        if floor_number == 4
+        else REGULAR_SHAPES
     )
     plan_units = []
     for unit, (points, x, y) in zip(units, shapes, strict=False):
@@ -218,7 +222,7 @@ def floor_view(request: HttpRequest, floor_number: int) -> HttpResponse:
             "units": units,
             "plan_units": plan_units,
             "plan_reference": PLAN_REFERENCES[
-                "ground" if floor_number == 0 else "attic" if floor_number == 4 else "upper"
+                "ground" if floor_number == 0 else "attic" if floor_number == 4 else "regular"
             ],
         },
     )

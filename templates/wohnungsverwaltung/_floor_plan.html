@@ -1,7 +1,7 @@
 {% load static %}
-<svg class="floor-plan{% if floor_number == 0 %} is-ground{% endif %}" viewBox="{{ plan_reference.viewbox }}" role="group" aria-labelledby="plan-title plan-description">
+<svg class="floor-plan{% if floor_number == 0 %} is-ground{% elif floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %} is-regular{% endif %}" viewBox="{{ plan_reference.viewbox }}" role="group" aria-labelledby="plan-title plan-description">
     <title id="plan-title">{{ floor_label }}: Wohnungen auswählen</title>
-    <desc id="plan-description">Vereinfachter Vektorgrundriss nach den Vorlagen, nicht maßstabsgetreu. Die Zuordnung der Wohnungsnummern ist vorläufig.</desc>
+    <desc id="plan-description">Vereinfachter Vektorgrundriss nach den Vorlagen, nicht maßstabsgetreu.</desc>
     <defs>
         <pattern id="plan-step-vertical" width="6" height="40" patternUnits="userSpaceOnUse"><rect width="6" height="40" fill="#fff"/><path d="M0 0V40" stroke="#adb1ab" stroke-width=".7"/></pattern>
         <pattern id="plan-step-horizontal" width="60" height="8" patternUnits="userSpaceOnUse"><rect width="60" height="8" fill="#fff"/><path d="M0 0H60" stroke="#adb1ab" stroke-width="1"/></pattern>
@@ -23,9 +23,9 @@
         <g class="plan-annotations" pointer-events="none" aria-hidden="true">
             {% for item in plan_units %}
             <g class="plan-caption{% if item.unit.status != 'free' %} is-unavailable{% endif %}" transform="translate({{ item.x }} {{ item.y }}) rotate({{ plan_reference.label_rotation }})">
-                {% if floor_number == 0 %}<rect x="-45" y="-18" width="90" height="38" rx="2"/>{% else %}<rect x="-27" y="-12" width="54" height="27" rx="2"/>{% endif %}
-                <text text-anchor="middle" y="{% if floor_number == 0 %}-3{% else %}-1{% endif %}" class="plan-number">Whg. {{ item.unit.wohnungsnummer }}</text>
-                <text text-anchor="middle" y="{% if floor_number == 0 %}14{% else %}10{% endif %}" class="plan-area">{{ item.unit.groesse_qm }} m²</text>
+                {% if floor_number == 0 or floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %}<rect x="-45" y="-18" width="90" height="38" rx="2"/>{% else %}<rect x="-27" y="-12" width="54" height="27" rx="2"/>{% endif %}
+                <text text-anchor="middle" y="{% if floor_number == 0 or floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %}-3{% else %}-1{% endif %}" class="plan-number">Whg. {{ item.unit.wohnungsnummer }}</text>
+                <text text-anchor="middle" y="{% if floor_number == 0 or floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %}14{% else %}10{% endif %}" class="plan-area">{{ item.unit.groesse_qm }} m²</text>
             </g>
             {% endfor %}
         </g>

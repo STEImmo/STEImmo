@@ -41,24 +41,32 @@ GROUND_SHAPES = (
 )
 # These polygons and the vector architecture use the same source coordinates
 # and SVG transform, keeping the drawing and selectable areas aligned.
-UPPER_SHAPES = (
-    ("54,375 122,375 122,415 136,415 136,510 54,510", 92, 469),
-    ("54,175 135,175 135,260 122,260 122,316 54,316", 92, 217),
-    ("54,25 135,15 135,167 54,167", 94, 128),
-    ("143,421 191,421 191,382 294,382 294,510 143,510", 231, 444),
-    ("173,176 294,176 294,376 193,376 193,318 173,318", 231, 225),
-    ("173,13 271,2 271,166 173,166", 222, 83),
+# Shared drawing for all three upper floors. Number positions remain provisional.
+REGULAR_SHAPES = (
+    ("410,68 685,68 685,218 502,218 502,194 410,194", 590, 130),
+    ("685,68 958,68 978,218 685,218", 780, 145),
+    ("680,282 987,282 1014,480 680,480", 854, 352),
+    ("410,282 680,282 680,520 410,520", 585, 420),
+    ("44,326 228,326 228,268 310,268 310,326 410,326 410,520 44,520", 230, 430),
+    ("44,68 310,68 310,268 228,268 228,326 44,326", 135, 140),
 )
 ATTIC_SHAPES = (
     (
-        "74,33 111,28 111,59 153,59 153,23 209,17 209,182 148,182 "
-        "148,234 242,208 242,306 155,306 155,327 74,327 74,247 126,247 126,208 74,208",
-        174,
-        153,
+        "454,112 1082,112 1120,404 714,404 714,480 497,480 497,289 454,289",
+        850,
+        328,
     ),
-    ("74,386 128,386 128,383 155,383 155,331 245,331 245,503 74,503", 195, 416),
+    ("80,109 340,109 340,230 454,230 454,289 497,289 497,480 80,480", 365, 385),
 )
 PLAN_REFERENCES = {
+    "regular": {
+        "image": "plans/upper-floor-reference.png",
+        "width": 358,
+        "height": 541,
+        "viewbox": "0 0 1047 613",
+        "transform": "",
+        "label_rotation": 0,
+    },
     "ground": {
         "image": "plans/ground-floor-reference.png",
         "width": 953,
@@ -67,21 +75,13 @@ PLAN_REFERENCES = {
         "transform": "",
         "label_rotation": 0,
     },
-    "upper": {
-        "image": "plans/upper-floor-reference.png",
-        "width": 358,
-        "height": 541,
-        "viewbox": "15 20 515 315",
-        "transform": "translate(541 0) rotate(90)",
-        "label_rotation": -90,
-    },
     "attic": {
         "image": "plans/attic-reference.png",
         "width": 305,
         "height": 561,
-        "viewbox": "12 10 545 290",
-        "transform": "translate(561 0) rotate(90)",
-        "label_rotation": -90,
+        "viewbox": "0 0 1160 590",
+        "transform": "",
+        "label_rotation": 0,
     },
 }
 

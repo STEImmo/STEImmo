@@ -3,24 +3,20 @@
     {% if floor_number == 0 %}
         <path class="plan-shared" d="M40 20H300V200H400V20H940L980 410H660V480H40Z"/>
         <path class="plan-balcony-area" d="M140 480H280V570H140Z M480 480H630V570H480Z M780 410H900V500H780Z"/>
+    {% elif floor_number == 1 or floor_number == 2 or floor_number == 3 %}
+        {% include "wohnungsverwaltung/_regular_floor_architecture.html" with layer="shell" %}
     {% elif floor_number == 4 %}
-        <path class="plan-roof" d="M20 36L264 5V183L296 166V540H20Z"/>
-        <path class="plan-roof-lines" d="M20 36L73 33M20 540L73 503M296 540L245 503M264 5L209 17M20 168L126 239M296 166L148 234M20 540L126 439L296 540"/>
-        <path class="plan-shell" d="M73 33L209 17V182H148V234L245 207V503H73V384H38V330H73V247H126V208H73Z"/>
-        <path class="plan-shared" d="M41 333H126V383H76V378H41Z"/>
-    {% else %}
-        <path class="plan-shell" d="M52 25L274 0V172H298V512H52Z"/>
-        <path class="plan-shared" d="M138 43H169V317H191V337H145V374H121V318H138Z M54 323H121V373H54Z"/>
+        {% include "wohnungsverwaltung/_attic_floor_architecture.html" with layer=layer %}
     {% endif %}
 {% else %}
     {% if floor_number == 0 %}
         {# Orthogonal interior walls; only the exterior right wall follows the plot angle. #}
-        <path class="plan-walls" d="M40 20H300V145 M300 185V200 M40 20V195 M40 245V480 M40 175H130 M165 175H200V280H40 M200 20V130H220 M270 200V225H200 M270 200H315 M340 200H400V280 M270 280H310 M350 280H400 M280 280V480 M400 280V480 M400 360H440 M470 360H490V480 M40 360H70 M95 360H130V480 M40 480H175 M220 480H260 M280 480H540 M580 480H660 M400 20H660 M940 20L980 410 M400 20V140H490 M490 20V105 M490 140V180 M525 180H660 M660 20V180 M400 240H540 M575 240H600V230H830 M880 230H960 M490 240V280 M490 280H530 M575 280H660 M660 230V480 M780 230V265H800 M830 230V265H815 M780 310V410H815 M850 410H980 M870 310H920 M950 310H969 M890 310V410 M660 410H780"/>
+        <path class="plan-walls" d="M40 20H300V145 M300 185V200 M40 20V195 M40 245V480 M40 175H130 M165 175H200V280H40 M200 20V130H220 M270 200V225H200 M270 200H315 M340 200H400V280 M270 280H310 M350 280H400 M280 280V480 M400 280V480 M400 360H440 M470 360H490V480 M40 360H70 M95 360H130V480 M40 480H175 M208 480H540 M573 480H660 M400 20H660 M940 20L980 410 M400 20V140H490 M490 20V105 M490 140V180 M525 180H660 M660 20V180 M400 240H540 M575 240H600V230H830 M880 230H961.5 M490 240V280 M490 280H530 M575 280H660 M660 230V480 M780 230V265H800 M830 230V265H815 M780 310V410H815 M848 410H980 M870 310H920 M950 310H970.1 M890 310V410 M660 410H780"/>
         <path class="plan-walls" d="M660 20H675 M710 20H745 M780 20H885 M925 20H940 M720 20V180 M660 180H675 M710 180H956"/>
-        <path class="plan-doors" d="M300 145H265Q265 185 300 185 M130 175V210Q165 210 165 175 M315 200V225Q340 225 340 200 M310 280V315Q350 315 350 280 M70 360V385Q95 385 95 360 M440 360V390Q470 390 470 360 M490 105H525Q525 140 490 140 M490 180V145Q525 145 525 180 M540 240V275Q575 275 575 240 M530 280V315Q575 315 575 280 M830 230V270Q880 270 880 230 M920 310V340Q950 340 950 310 M175 480V440Q220 440 220 480 M540 480V440Q580 440 580 480 M815 410V375Q850 375 850 410"/>
+        <path class="plan-doors" d="M300 145H265Q265 185 300 185 M130 175V210Q165 210 165 175 M315 200V225Q340 225 340 200 M310 280V315Q350 315 350 280 M70 360V385Q95 385 95 360 M440 360V390Q470 390 470 360 M490 105H525Q525 140 490 140 M490 180V145Q525 145 525 180 M540 240V275Q575 275 575 240 M530 280V315Q575 315 575 280 M830 230V270Q880 270 880 230 M920 310V340Q950 340 950 310 M175 480V447Q208 447 208 480 M540 480V447Q573 447 573 480 M815 410V377Q848 377 848 410"/>
         <path class="plan-doors" d="M675 20V55Q710 55 710 20 M745 20V55Q780 55 780 20 M885 20V60Q925 60 925 20"/>
         <path class="plan-windows" d="M85 20H180 M235 20H270 M40 195V245 M430 20H470 M525 20H610 M830 20H865 M60 480H105 M145 480H175 M320 480H360 M415 480H450 M495 480H530 M720 410H765 M910 410H955"/>
-        <path class="plan-balconies" d="M140 485V570H280V485 M480 485V570H630V485 M780 415V500H900V415"/>
+        <path class="plan-balconies" d="M140 480V570H280V480 M480 480V570H630V480 M780 410V500H900V410"/>
         <text x="210" y="535" class="plan-room-label">Balkon</text>
         <text x="555" y="535" class="plan-room-label">Balkon</text>
         <text x="840" y="468" class="plan-room-label">Balkon</text>
@@ -34,38 +30,10 @@
         <text x="820" y="90" class="plan-room-label">Fahrradabstellbereich</text>
         <text x="690" y="78" class="plan-room-label plan-lift-label">Eingang</text>
         <text x="690" y="94" class="plan-room-label plan-lift-label">Rollstuhl</text>
+    {% elif floor_number == 1 or floor_number == 2 or floor_number == 3 %}
+        {% include "wohnungsverwaltung/_regular_floor_architecture.html" with layer="details" %}
     {% elif floor_number == 4 %}
-        <path class="plan-walls" d="M74 117H122V59M74 183H126V208M153 24V59M148 182H209M155 247V305H242M74 297H107V327M74 386H116V438M74 441H155V503M128 383V426H191V503M155 439H245M194 439V503"/>
-        <path class="plan-door-gap" d="M99 117H118M104 183H122M155 277V295M90 297H106M105 327H123M155 344V365M105 386H122M116 404V422M155 451V469M194 456V474"/>
-        <path class="plan-doors" d="M99 117V98Q118 98 118 117M104 183V165Q122 165 122 183M155 277H173Q173 295 155 295M105 327V309Q123 309 123 327M155 344H174Q174 365 155 365M116 404H134Q134 422 116 422"/>
-        <rect x="46" y="337" width="58" height="38" fill="url(#plan-step-vertical)" class="plan-stair-outline"/>
-        <path class="plan-lines" d="M51 355H99L93 351M99 355L93 359"/>
-        <g transform="translate(116 27)"><rect width="34" height="31" class="plan-lift"/><path d="M4 4L30 27M30 4L4 27" class="plan-lines"/><path d="M10 31H26" class="plan-door-gap"/></g>
-        <g transform="translate(133 43) rotate(-90)"><text class="plan-room-label">Aufzug</text></g>
-        <g class="plan-furniture">
-            <use href="#plan-bath" x="80" y="39"/><use href="#plan-sofa" x="175" y="64"/><use href="#plan-table" x="162" y="128"/>
-            <use href="#plan-bed" x="79" y="251"/><use href="#plan-bed" x="188" y="261"/><use href="#plan-table" x="180" y="344"/>
-            <use href="#plan-bath" x="79" y="396"/><use href="#plan-bed" x="83" y="456"/><use href="#plan-bed" x="205" y="453"/>
-        </g>
-        <path class="plan-balconies" d="M211 52H239V135H211"/>
-        <path class="plan-windows" d="M210 60V108M244 264V301M244 344V373M244 450V474M91 503H121M161 503H182M74 397V414M74 256V277"/>
-    {% else %}
-        <path class="plan-walls" d="M54 71H106V19M54 92H135M54 126H94V167M173 46H271M221 12V46M173 122H271M207 124V167M54 253H135M103 253V316M54 281H104M173 263H294M235 264V316M193 337H294M54 419H122M104 376V418M143 456H193V510M193 456H294M237 456V510"/>
-        <path class="plan-door-gap" d="M106 49V67M108 92H127M94 141V159M196 46H214M183 122H201M135 50V70M173 48V68M135 211V230M173 208V227M79 253H97M103 286V304M193 337H211M122 393V411M193 470V488M191 392V410"/>
-        <path class="plan-doors" d="M106 49H124Q124 67 106 67M108 92V110Q127 110 127 92M94 141H112Q112 159 94 159M196 46V64Q214 64 214 46M183 122V140Q201 140 201 122M135 50H153Q153 70 135 70M173 48H191Q191 68 173 68M135 211H153Q153 230 135 230M173 208H191Q191 227 173 227M122 393H140Q140 411 122 411M191 392H209Q209 410 191 410"/>
-        <rect x="60" y="328" width="60" height="39" fill="url(#plan-step-vertical)" class="plan-stair-outline"/>
-        <path class="plan-lines" d="M65 347H114L108 343M114 347L108 351"/>
-        <g transform="translate(139 16)"><rect width="29" height="27" class="plan-lift"/><path d="M4 4L25 23M25 4L4 23" class="plan-lines"/><path d="M8 27H22" class="plan-door-gap"/></g>
-        <g transform="translate(154 30) rotate(-90)"><text class="plan-room-label">Aufzug</text></g>
-        <g class="plan-furniture">
-            <use href="#plan-bath" x="62" y="34"/><use href="#plan-bed" x="63" y="136"/><use href="#plan-sofa" x="70" y="103"/>
-            <use href="#plan-bath" x="235" y="17"/><use href="#plan-bed" x="227" y="131"/><use href="#plan-sofa" x="190" y="75"/>
-            <use href="#plan-sofa" x="65" y="200"/><use href="#plan-bath" x="62" y="287"/><use href="#plan-table" x="219" y="211"/>
-            <use href="#plan-bath" x="263" y="277"/><use href="#plan-bed" x="241" y="345"/>
-            <use href="#plan-bath" x="63" y="385"/><use href="#plan-sofa" x="63" y="483"/><use href="#plan-bed" x="149" y="468"/><use href="#plan-bath" x="266" y="469"/>
-        </g>
-        <path class="plan-balconies" d="M274 47H305V121H274M299 194H327V267H299M299 382H327V456H299M52 115H29V163H52M52 199H29V247H52M52 435H29V485H52"/>
-        <path class="plan-windows" d="M274 59V98M274 131V154M298 205V243M298 338V361M298 398V430M298 470V496M52 46V67M52 119V146M52 203V231M52 287V309M52 390V411M52 447V478M153 512H175"/>
+        {% include "wohnungsverwaltung/_attic_floor_architecture.html" with layer=layer %}
     {% endif %}
 {% endif %}
 
