@@ -131,10 +131,14 @@
     </div>
     <p class="uk-text-meta">Wählen Sie einen Raum aus den Stammdaten der gewählten Wohnung.</p>
     {{ room_formset.management_form }}
+    {% for error in form.removed_rooms.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
     {% if room_formset.non_form_errors %}<div class="uk-alert-danger" role="alert">{{ room_formset.non_form_errors }}</div>{% endif %}
     <div id="room-formset">
         {% for group in room_form_groups %}
-            <article class="uk-card uk-card-default uk-margin" data-room-card>
+            <article class="uk-card uk-card-default uk-margin" data-room-card{% if group.remove_room %} hidden{% endif %}>
+                {% if group.room_protocol_id %}
+                    <input type="checkbox" hidden name="removed_rooms" value="{{ group.room_protocol_id }}" data-room-removal{% if group.remove_room %} checked{% endif %}>
+                {% endif %}
                 <header class="uk-card-header">
                     <div class="uk-flex uk-flex-between uk-flex-middle">
                         <h3 class="uk-card-title uk-margin-remove" data-room-title>Raum</h3>
@@ -153,6 +157,8 @@
                     <div data-room-checklist-items>
                         {% for checklist_form in group.checklist_forms %}
                             <div class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-room-checklist-form>
+                                {{ checklist_form.raumprotokoll }}
+                                {% for error in checklist_form.raumprotokoll.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
                                 {{ checklist_form.pruefpunkt }}
                                 {% for error in checklist_form.pruefpunkt.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
                                 {% if checklist_form.existing_item %}
@@ -207,6 +213,7 @@
                 <h4 class="uk-heading-bullet">Prüfpunkte</h4>
                 <div data-room-checklist-items>
                     <div class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-room-checklist-form>
+                        {{ room_formset.empty_form.raumprotokoll }}
                         {{ room_formset.empty_form.pruefpunkt }}
                         <div hidden>{{ room_formset.empty_form.DELETE }}</div>
                         <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
@@ -236,6 +243,7 @@
     </template>
     <template id="room-checklist-empty-form">
         <div class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-room-checklist-form>
+            {{ room_formset.empty_form.raumprotokoll }}
             {{ room_formset.empty_form.pruefpunkt }}
             <input type="hidden" name="rooms-__prefix__-raum" id="id_rooms-__prefix__-raum" data-room-value>
             <div hidden>{{ room_formset.empty_form.DELETE }}</div>
