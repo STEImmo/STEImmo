@@ -92,3 +92,14 @@ class InheritedRoomValidationTests(TestCase):
         self.assertIn("raum", response.context["room_formset"].forms[0].errors)
         self.assertIn("raum", response.context["room_formset"].forms[1].errors)
         self.assertEqual(self.room.raum_merkmale.count(), 1)
+
+    def test_other_error_on_leading_checkpoint_preserves_inherited_room(self):
+        data = self.inherited_payload()
+        data["rooms-0-wert"] = ""
+        response = self.client.post(self.edit_url, data)
+        self.assertEqual(response.status_code, 200)
+        forms = response.context["room_formset"].forms
+        self.assertIn("wert", forms[0].errors)
+        self.assertNotIn("raum", forms[1].errors)
+        self.assertEqual(forms[1].cleaned_data["raum"], self.kitchen)
+        self.assertEqual(self.room.raum_merkmale.count(), 1)
