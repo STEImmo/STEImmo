@@ -15,6 +15,12 @@ Pro Prüfpunkt ist dieser Hash eindeutig. Bereits vorhandene ältere Fotos ohne
 Hash werden beim nächsten Upload dennoch anhand ihres Dateiinhalts berücksichtigt;
 sie werden nicht nachträglich verändert oder gelöscht.
 
+Ist die Datei eines älteren Fotos für den Abgleich nicht lesbar, wird der neue
+Upload mit einer verständlichen Fehlermeldung abgelehnt (Issue #68). Es werden
+keine neuen Dateien gespeichert und keine Bestandsfotos entfernt. Der Abgleich
+kann nach Wiederherstellung des Speicherzugriffs erneut erfolgen. Bereits
+gespeicherte Inhalts-Hashes benötigen keinen erneuten Zugriff auf die Originaldatei.
+
 Ein Upload oder das Entfernen eines Fotos aus der Protokollübersicht führt mit
 einem Fragment direkt zum betroffenen Prüfpunkt dieser Übersicht zurück. Die
 Raum-Unterseite bleibt nur das Ziel für die dort gestarteten Aktionen.
