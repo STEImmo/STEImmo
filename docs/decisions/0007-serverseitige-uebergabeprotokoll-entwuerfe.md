@@ -23,6 +23,13 @@ Unvollständige Daten bleiben ausschließlich im Entwurf und erzeugen kein
 fachlich wirksames `Protokoll`. Nach dem erfolgreichen Speichern wird der
 zugehörige Entwurf server- und browserseitig gelöscht.
 
+Entwurfsanfragen verwenden UTF-8 und speicherbares JSON. Vor einer Änderung
+werden JSON-Serialisierbarkeit, endliche Zahlen und gültige Unicode-Zeichen
+geprüft; insbesondere werden Nullzeichen und ungepaarte Surrogate abgewiesen.
+Übermäßig verschachtelte Daten erhalten ebenfalls einen Validierungsfehler.
+Ungültige Daten liefern HTTP 400 und verändern keinen bestehenden Entwurf (#75).
+Unvollständige fachliche Formulareingaben bleiben weiterhin zulässige Entwürfe.
+
 ## Konsequenzen
 
 - Entwürfe sind in der Übersicht desselben Browsers sichtbar und gezielt

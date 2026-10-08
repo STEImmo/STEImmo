@@ -59,12 +59,9 @@ from .forms import (
 )
 from .handover_lock import protocol_mutation
 from .handover_photos import (
-    PHOTO_READ_ERROR,
     PHOTO_SAVE_ERROR,
-    HandoverPhotoReadError,
     HandoverPhotoStorageError,
     delete_handover_photo,
-    existing_photo_checksums,
     handover_photo_upload,
     save_handover_photo,
 )
@@ -936,6 +933,22 @@ def _draft_overview_entries(request: HttpRequest) -> list[dict[str, object]]:
     return entries
 
 
+def _validate_draft_storage_values(payload):
+    # PostgreSQL JSONB cannot store nonfinite numbers, null characters or
+    # unpaired Unicode surrogates. Validate before touching an existing draft.
+    json.dumps(payload, allow_nan=False, ensure_ascii=False).encode("utf-8")
+    pending = [payload]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            pending.extend(value.keys())
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
+        elif isinstance(value, str) and "\x00" in value:
+            raise ValueError("JSONB does not support null characters.")
+
+
 @employee_required
 def handover_protocol_draft_save(request: HttpRequest) -> JsonResponse | HttpResponse:
     if request.method != "POST":
@@ -943,8 +956,9 @@ def handover_protocol_draft_save(request: HttpRequest) -> JsonResponse | HttpRes
     if len(request.body) > DRAFT_MAXIMUM_SIZE:
         return JsonResponse({"error": "Der Entwurf ist zu groß."}, status=400)
     try:
-        payload = json.loads(request.body)
-    except json.JSONDecodeError:
+        payload = json.loads(request.body.decode("utf-8"))
+        _validate_draft_storage_values(payload)
+    except (ValueError, RecursionError):
         return JsonResponse({"error": "Ungültige Entwurfsdaten."}, status=400)
 
     draft_scope = payload.get("scope") if isinstance(payload, dict) else None
@@ -1083,6 +1097,30 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
     )
 
 
+def _archived_apartment_label(protocol):
+    if protocol.status != ProtokollStatus.SIGNED or not isinstance(protocol.export_snapshot, dict):
+        return ""
+    sections = protocol.export_snapshot.get("sections")
+    if not isinstance(sections, list):
+        return ""
+    for section in sections:
+        if not isinstance(section, dict) or section.get("title") != "Zuordnung":
+            continue
+        rows = section.get("rows")
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if (
+                isinstance(row, list)
+                and len(row) == 2
+                and row[0] == "Wohnung"
+                and isinstance(row[1], str)
+                and row[1].strip()
+            ):
+                return row[1]
+    return ""
+
+
 @employee_required
 def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
     protocol = get_object_or_404(
@@ -1097,6 +1135,14 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
     move_in_reference = None
     if can_manage_handover_photos:
         move_in_reference = _attach_move_in_photo_references(protocol, protocol.raeume.all())
+    archived_snapshot = None
+    if (
+        protocol.status == ProtokollStatus.SIGNED
+        and isinstance(protocol.export_snapshot, dict)
+        and isinstance(protocol.export_snapshot.get("rooms"), list)
+    ):
+        archived_snapshot = protocol.export_snapshot
+    archived_apartment_label = _archived_apartment_label(protocol)
     return render(
         request,
         "wohnungsverwaltung/handover_protocol_detail.html",
@@ -1107,6 +1153,10 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
             "handover_status_label": HANDOVER_STATUS_LABELS[protocol.uebergabe_status],
             "acceptance_status_label": ACCEPTANCE_STATUS_LABELS[protocol.abnahme_status],
             "protocol_status_label": PROTOCOL_STATUS_LABELS[protocol.status],
+            "archived_snapshot": archived_snapshot,
+            "apartment_label": archived_apartment_label or str(protocol.wohnung),
+            "uses_current_apartment_label": protocol.status == ProtokollStatus.SIGNED
+            and not archived_apartment_label,
             "can_manage_handover_photos": can_manage_handover_photos,
             "move_in_reference": move_in_reference,
             **_move_in_reference_context(move_in_reference),
@@ -1339,7 +1389,7 @@ def handover_protocol_checklist_item_photo_upload(
     form = RoomChecklistPhotoUploadForm(
         request.POST,
         request.FILES,
-        existing_photo_count=checklist_item.fotos.count(),
+        existing_photos=checklist_item.fotos.all(),
     )
     if not form.is_valid():
         for errors in form.errors.values():
@@ -1347,19 +1397,9 @@ def handover_protocol_checklist_item_photo_upload(
                 messages.error(request, error)
         return redirect(_photo_return_url(request, protocol, room, checklist_item))
 
-    try:
-        existing_checksums = existing_photo_checksums(checklist_item.fotos.all())
-    except HandoverPhotoReadError as error:
-        logger.error("Protocol photo comparison failed (%s).", type(error).__name__)
-        messages.error(request, PHOTO_READ_ERROR)
-        return redirect(_photo_return_url(request, protocol, room, checklist_item))
-    photos_to_save = []
-    for photo in form.cleaned_data["fotos"]:
-        checksum = calculate_photo_checksum(photo)
-        if checksum in existing_checksums:
-            continue
-        existing_checksums.add(checksum)
-        photos_to_save.append((photo, checksum))
+    photos_to_save = [
+        (photo, calculate_photo_checksum(photo)) for photo in form.cleaned_data["fotos"]
+    ]
 
     if not photos_to_save:
         messages.info(request, "Dieses Foto ist für den Prüfpunkt bereits gespeichert.")
@@ -1920,17 +1960,34 @@ def _stellplatz_form(request: HttpRequest, stellplatz: Stellplatz, title: str) -
         form = StellplatzForm(request.POST, instance=stellplatz)
         zuordnung_form = StellplatzZuordnungForm(request.POST, instance=zuordnung)
         if form.is_valid() and zuordnung_form.is_valid():
-            with transaction.atomic():
-                stellplatz = form.save()
-                if zuordnung_form.cleaned_data["wohnung"] is None:
-                    if not zuordnung._state.adding:
-                        zuordnung.delete()
-                else:
-                    zuordnung = zuordnung_form.save(commit=False)
-                    zuordnung.stellplatz = stellplatz
-                    zuordnung.save()
-            messages.success(request, "Der Stellplatz und seine Zuordnung wurden gespeichert.")
-            return redirect("verwaltung:stellplatz_edit", stellplatz_id=stellplatz.pk)
+            try:
+                with transaction.atomic():
+                    if not stellplatz._state.adding:
+                        get_object_or_404(Stellplatz.objects.select_for_update(), pk=stellplatz.pk)
+                        # The relation may have changed while these forms were validated.
+                        zuordnung = StellplatzZuordnung.objects.filter(
+                            stellplatz=stellplatz
+                        ).first()
+                        if zuordnung is None:
+                            zuordnung = StellplatzZuordnung(stellplatz=stellplatz)
+                    stellplatz = form.save()
+                    selected_unit = zuordnung_form.cleaned_data["wohnung"]
+                    if selected_unit is None:
+                        if not zuordnung._state.adding:
+                            zuordnung.delete()
+                    else:
+                        zuordnung.stellplatz = stellplatz
+                        zuordnung.wohnung = selected_unit
+                        zuordnung.save()
+            except IntegrityError:
+                zuordnung_form.add_error(
+                    "wohnung",
+                    "Die Stellplatzzuordnung konnte nicht gespeichert werden. "
+                    "Bitte prüfen Sie die aktuelle Zuordnung und versuchen Sie es erneut.",
+                )
+            else:
+                messages.success(request, "Der Stellplatz und seine Zuordnung wurden gespeichert.")
+                return redirect("verwaltung:stellplatz_edit", stellplatz_id=stellplatz.pk)
     else:
         form = StellplatzForm(instance=stellplatz)
         zuordnung_form = StellplatzZuordnungForm(instance=zuordnung)

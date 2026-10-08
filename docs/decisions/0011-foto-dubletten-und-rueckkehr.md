@@ -28,6 +28,13 @@ Bestandsfotos erzeugen einen Foto-Feldfehler. Identischer Inhalt wird bei der
 Speicherung übersprungen; ältere Fotos ohne gespeicherten Hash bleiben unverändert.
 Ohne neue Fotoauswahl ist für normale Protokolländerungen kein Dateiabgleich nötig.
 
+Die Fotoanzahl wird auf beiden Uploadwegen erst nach dem Abgleich geprüft
+(Issue #70). Bereits gespeicherter Inhalt wird aus der neuen Fotoauswahl entfernt.
+Zur Grenze zählt die Anzahl der bestehenden Fotoeinträge plus tatsächlich neue
+Fotos; die konfigurierte Grenze wird nicht erhöht. Ein wiederholter Upload bei
+voller Kapazität erzeugt deshalb keinen Limitfehler. Bei einer tatsächlichen
+Überschreitung werden weiterhin weder Fotos noch Protokolländerungen gespeichert.
+
 Ein Upload oder das Entfernen eines Fotos aus der Protokollübersicht führt mit
 einem Fragment direkt zum betroffenen Prüfpunkt dieser Übersicht zurück. Die
 Raum-Unterseite bleibt nur das Ziel für die dort gestarteten Aktionen.
