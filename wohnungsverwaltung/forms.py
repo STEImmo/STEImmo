@@ -29,7 +29,12 @@ from .access import (
     ROLE_USER_MANAGEMENT,
     USER_MANAGEMENT_PERMISSION,
 )
-from .handover_photos import save_handover_photo
+from .handover_photos import (
+    PHOTO_READ_ERROR,
+    HandoverPhotoReadError,
+    existing_photo_checksums,
+    save_handover_photo,
+)
 from .models import (
     AbnahmeStatus,
     ApplicationProof,
@@ -1568,6 +1573,7 @@ class InlineRoomChecklistForm(forms.Form):
         self.allow_photo_upload = allow_photo_upload
         self.protocol = protocol
         self.existing_item = None
+        self.existing_photo_checksums = set()
         if protocol is not None:
             self.fields["pruefpunkt"].queryset = RaumMerkmal.objects.filter(
                 raumprotokoll__protokoll=protocol
@@ -1642,6 +1648,12 @@ class InlineRoomChecklistForm(forms.Form):
                 self.add_error("merkmal", "Dieser Prüfpunkt ist in diesem Raum bereits erfasst.")
         existing_count = existing.fotos.count() if existing else 0
         photos = cleaned_data.get("fotos", [])
+        if photos and existing:
+            try:
+                self.existing_photo_checksums = existing_photo_checksums(existing.fotos.all())
+            except HandoverPhotoReadError:
+                self.add_error("fotos", PHOTO_READ_ERROR)
+                return
         if existing_count + len(photos) > settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM:
             maximum = settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM
             self.add_error("fotos", f"Für einen Prüfpunkt sind höchstens {maximum} Fotos erlaubt.")
@@ -1671,8 +1683,9 @@ class InlineRoomChecklistForm(forms.Form):
             )
         for photo in self.cleaned_data["fotos"]:
             checksum = calculate_photo_checksum(photo)
-            if checklist_item.fotos.filter(inhalt_hash_sha256=checksum).exists():
+            if checksum in self.existing_photo_checksums:
                 continue
+            self.existing_photo_checksums.add(checksum)
             save_handover_photo(
                 RaumMerkmalFoto(
                     raum_merkmal=checklist_item,

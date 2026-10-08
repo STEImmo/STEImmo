@@ -91,3 +91,61 @@ class LegacyPhotoReadTests(PhotoComparisonFixture, TestCase):
             open_file.assert_not_called()
         self.assertEqual(response.status_code, 302)
         self.assertEqual(self.item.fotos.count(), 2)
+
+
+class InlineLegacyPhotoTests(PhotoComparisonFixture, TestCase):
+    def test_inline_edit_skips_legacy_duplicate_with_or_without_checkpoint_id(self):
+        before = self.stored_paths()
+        for with_id in (True, False):
+            with self.subTest(with_id=with_id):
+                data = self.inline_payload(self.photo_upload("identical.png"))
+                if not with_id:
+                    data.pop("rooms-0-pruefpunkt")
+                response = self.client.post(self.edit_url, data)
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(self.item.fotos.count(), 1)
+                self.assertEqual(self.stored_paths(), before)
+                self.photo.refresh_from_db()
+                self.assertEqual(self.photo.inhalt_hash_sha256, "")
+                self.item.refresh_from_db()
+                self.assertEqual(self.item.wert["text"], "Neue Feststellung")
+
+    def test_inline_edit_stores_only_new_content_from_mixed_legacy_upload(self):
+        before = self.stored_paths()
+        response = self.client.post(
+            self.edit_url,
+            self.inline_payload(
+                [self.photo_upload("identical.png"), self.photo_upload("new.png", "red")]
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.item.fotos.count(), 2)
+        self.assertEqual(len(self.stored_paths() - before), 1)
+        self.photo.refresh_from_db()
+        self.assertEqual(self.photo.inhalt_hash_sha256, "")
+
+    def test_inline_edit_rejects_unreadable_legacy_comparison_without_changing_protocol(self):
+        before = self.stored_paths()
+        previous_value = self.item.wert
+        for error in (FileNotFoundError, PermissionError):
+            with self.subTest(error=error.__name__):
+                with patch.object(self.storage, "open", side_effect=error("unavailable original")):
+                    response = self.client.post(
+                        self.edit_url, self.inline_payload(self.photo_upload("new.png", "red"))
+                    )
+                self.assertContains(response, "Ein vorhandenes Foto konnte nicht gelesen werden.")
+                self.assertIn("fotos", response.context["room_formset"].forms[0].errors)
+                self.item.refresh_from_db()
+                self.assertEqual(self.item.wert, previous_value)
+                self.assertEqual(self.item.fotos.count(), 1)
+                self.assertEqual(self.stored_paths(), before)
+
+    def test_inline_edit_without_new_photos_does_not_read_legacy_files(self):
+        data = self.inline_payload([])
+        data.pop("rooms-0-fotos")
+        with patch.object(self.storage, "open", side_effect=FileNotFoundError) as open_file:
+            response = self.client.post(self.edit_url, data)
+            open_file.assert_not_called()
+        self.assertEqual(response.status_code, 302)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.wert["text"], "Neue Feststellung")
