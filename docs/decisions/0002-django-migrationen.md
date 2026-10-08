@@ -14,6 +14,8 @@ Die fachliche Datenbankstruktur wird in Django-Modellen beschrieben und über ve
 
 Die Compose-Konfiguration stellt PostgreSQL bereit; sie enthält keine zweite, parallele SQL-Quelle für das fachliche Schema. Neue Änderungen werden mit `makemigrations` erzeugt und beim nächsten Containerstart angewendet.
 
+Migrationstests registrieren vor dem Wechsel auf ein historisches Schema ein Cleanup, das sämtliche aktuellen Blattmigrationen wiederherstellt. Damit läuft die Wiederherstellung auch nach einer fehlgeschlagenen Vorbereitung; nachfolgende Tests erhalten unabhängig von ihrer Reihenfolge das aktuelle Schema. Eine fest verdrahtete historische Zielmigration genügt dafür nicht. Die eigentliche Backfill-Prüfung verwendet weiterhin die vorgesehenen historischen Modelle.
+
 Die im ER-Modell festgelegten Status- und Merkmalswerte werden als echte PostgreSQL-Enum-Typen angelegt. Neue Enum-Werte benötigen deshalb zusätzlich eine explizite Migration mit `ALTER TYPE ... ADD VALUE`; reine Änderungen an `TextChoices` aktualisieren einen bestehenden PostgreSQL-Enum-Typ nicht automatisch.
 
 Die Zuordnung `BewerbungStellplatz` verwendet entsprechend dem ER-Modell einen zusammengesetzten Primärschlüssel aus Bewerbung und Stellplatz. Django 5.2 unterstützt diese Primärschlüssel; Modelle mit zusammengesetztem Primärschlüssel können derzeit jedoch nicht im Django-Admin registriert werden. Die Zuordnung wird deshalb zunächst über die normale ORM-Schicht verwaltet.
