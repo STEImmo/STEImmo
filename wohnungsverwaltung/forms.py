@@ -1615,28 +1615,36 @@ class InlineRoomChecklistForm(forms.Form):
             self.add_error("zusatzangaben", error)
         if photos and not self.allow_photo_upload:
             self.add_error("fotos", "Nur die Verwaltung darf Fotos hochladen.")
+        return cleaned_data
+
+    def validate_room_assignment(self) -> None:
+        """Validate the checkpoint after the formset has resolved its room."""
+        cleaned_data = self.cleaned_data
+        room = cleaned_data.get("raum")
+        feature = cleaned_data.get("merkmal")
+        if room is None or feature is None:
+            return
         existing = cleaned_data.get("pruefpunkt")
-        if existing is None and self.protocol and values["raum"] and feature:
+        if existing is None and self.protocol:
             existing = (
                 self.fields["pruefpunkt"]
-                .queryset.filter(raumprotokoll__raum=values["raum"], merkmal=feature)
+                .queryset.filter(raumprotokoll__raum=room, merkmal=feature)
                 .first()
             )
-        if existing and not cleaned_data.get("DELETE") and not values["wert"]:
-            self.add_error("wert", "Ein vorhandener Prüfpunkt darf nicht leer gespeichert werden.")
-        if existing and values["raum"] and feature:
+        if existing:
+            self.existing_item = existing
             collision = (
                 self.fields["pruefpunkt"]
-                .queryset.filter(raumprotokoll__raum=values["raum"], merkmal=feature)
+                .queryset.filter(raumprotokoll__raum=room, merkmal=feature)
                 .exclude(pk=existing.pk)
             )
             if collision.exists():
                 self.add_error("merkmal", "Dieser Prüfpunkt ist in diesem Raum bereits erfasst.")
         existing_count = existing.fotos.count() if existing else 0
+        photos = cleaned_data.get("fotos", [])
         if existing_count + len(photos) > settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM:
             maximum = settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM
             self.add_error("fotos", f"Für einen Prüfpunkt sind höchstens {maximum} Fotos erlaubt.")
-        return cleaned_data
 
     def has_entry(self) -> bool:
         return self.cleaned_data.get("merkmal") is not None
@@ -1690,6 +1698,9 @@ class RoomChecklistFormSet(BaseFormSet):
                 or not room_form.has_entry()
             ):
                 continue
+            if "raum" in room_form.errors:
+                current_room = None
+                continue
             room = room_form.cleaned_data.get("raum")
             if room is not None:
                 current_room = room
@@ -1697,6 +1708,11 @@ class RoomChecklistFormSet(BaseFormSet):
                 room_form.cleaned_data["raum"] = current_room
             else:
                 room_form.add_error("raum", "Bitte wählen Sie für den ersten Prüfpunkt einen Raum.")
+                continue
+            if room_form.errors:
+                continue
+            room_form.validate_room_assignment()
+            if room_form.errors:
                 continue
             checklist_entries.append(room_form)
 

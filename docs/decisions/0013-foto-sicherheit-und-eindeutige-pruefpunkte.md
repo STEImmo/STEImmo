@@ -52,6 +52,17 @@ Fotoauswahl. Protokollentwürfe werden erst bei erfolgreicher Speicherung
 entfernt. Fehlermeldungen im Log nennen die Fehlerklasse, keine Dateiinhalte
 oder vom Storage gelieferten Detailmeldungen.
 
+### Validierung nach endgültiger Raumzuordnung (Issue #66)
+
+Mehrere Prüfpunktzeilen dürfen den Raum aus der vorherigen Zeile übernehmen.
+Das Formset löst zuerst diese endgültige Zuordnung auf und prüft danach den
+betroffenen vorhandenen Prüfpunkt, Kollisionen und die gemeinsame Anzahl
+vorhandener und neuer Fotos. Eine Prüfung nur im einzelnen Formular würde bei
+noch leerem Raum die Fotos eines passenden vorhandenen Prüfpunkts übersehen.
+Dies gilt ebenso für unterstützte ältere Entwürfe ohne Prüfpunkt-ID.
+Fehlerhafte Zeilen werden nicht zur weiteren Prüfung oder Speicherung verwendet.
+Die zulässige Fotoanzahl und das Datenmodell bleiben unverändert.
+
 ## Konsequenzen
 
 - Client-seitig deklarierte Typen können nicht mehr zur HTML-Auslieferung von
