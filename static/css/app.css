@@ -24,6 +24,7 @@ body {
 .facade-floor:focus-visible .facade-hit { fill: #1e87f033; stroke: #1e87f0; }
 .facade-floor:hover .facade-floor-label rect,
 .facade-floor:focus-visible .facade-floor-label rect { stroke: #1e87f0; stroke-width: 2; }
+.floor-navigation { scroll-margin-top: 18px; }
 .floor-plan-frame { max-width: 1100px; margin-left: auto; margin-right: auto; overflow-x: auto; }
 .floor-plan { min-width: 680px; }
 .floor-plan-frame:focus-visible { outline: 2px solid #1e87f0; outline-offset: 4px; }

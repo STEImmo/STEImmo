@@ -29,7 +29,7 @@
     <path d="M880 237L915 251V689L880 703Z" fill="#a9a79d"/>
     <rect x="200" y="686" width="680" height="25" fill="#b4b1a5"/>
     {% for floor in floors %}
-    <a href="{% url 'wohnungsverwaltung_public:floor_view' floor.number %}" class="facade-floor" aria-label="{{ floor.label }}: {{ floor.units|length }} Wohnungen, {{ floor.available_count }} verfügbar">
+    <a href="{% url 'wohnungsverwaltung_public:floor_view' floor.number %}#etagenplan" class="facade-floor" aria-label="{{ floor.label }}: {{ floor.units|length }} Wohnungen, {{ floor.available_count }} verfügbar">
         {% if floor.number == 4 %}
         <path d="M179 239L301 133H558L575 146H874L897 239Z" fill="url(#roof-lines)" stroke="#424541" stroke-width="3"/>
         <path d="M329 170H527V222H329Z M703 177H826V224H703Z" fill="#b5b6ae" stroke="#343c3d" stroke-width="4"/>

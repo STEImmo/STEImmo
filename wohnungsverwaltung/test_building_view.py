@@ -42,9 +42,17 @@ class BuildingViewTests(TestCase):
         self.assertContains(response, "Westfassade")
         self.assertContains(response, "1 frei")
         self.assertContains(
-            response, reverse("wohnungsverwaltung_public:floor_view", args=[2]), count=1
+            response,
+            reverse("wohnungsverwaltung_public:floor_view", args=[2]) + "#etagenplan",
+            count=1,
         )
         response = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[2]))
+        self.assertContains(response, 'id="etagenplan"', count=1)
+        for floor, _label in response.context["floor_numbers"]:
+            self.assertContains(
+                response,
+                reverse("wohnungsverwaltung_public:floor_view", args=[floor]) + "#etagenplan",
+            )
         self.assertContains(response, free.wohnungsnummer)
         self.assertContains(response, taken.wohnungsnummer)
         self.assertNotContains(response, "D-01")

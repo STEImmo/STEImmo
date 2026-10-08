@@ -60,7 +60,6 @@ ATTIC_SHAPES = (
 )
 PLAN_REFERENCES = {
     "regular": {
-        "image": "plans/upper-floor-reference.png",
         "width": 358,
         "height": 541,
         "viewbox": "0 0 1047 613",
@@ -68,7 +67,6 @@ PLAN_REFERENCES = {
         "label_rotation": 0,
     },
     "ground": {
-        "image": "plans/ground-floor-reference.png",
         "width": 953,
         "height": 747,
         "viewbox": "0 0 1008 590",
@@ -76,7 +74,6 @@ PLAN_REFERENCES = {
         "label_rotation": 0,
     },
     "attic": {
-        "image": "plans/attic-reference.png",
         "width": 305,
         "height": 561,
         "viewbox": "0 0 1160 590",

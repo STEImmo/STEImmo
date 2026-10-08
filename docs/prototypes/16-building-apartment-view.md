@@ -5,14 +5,14 @@ Der Prototyp läuft in der bestehenden Django-Anwendung über Docker. Einstieg: 
 ## Seiten und Grundrisse
 
 1. Gebäudeansicht mit vereinfachter Westfassade und auswählbaren Stockwerken. Auf Nutzerwunsch ist die ursprüngliche Straßenseite mit zwei Gauben und drei Balkonachsen wiederhergestellt; die zuvor erfundene EG-Eingangstür entfällt. Eine Auswahl direkt an der Fassade; Wohnungs- und Verfügbarkeitszahlen stehen auf den Stockwerksschildern. Keine zweite Auswahlliste daneben. Dekorative Bäume liegen außerhalb der Beschriftungen und fangen keine Klicks ab.
-2. Eigene Etagenansicht mit einem vereinfachten SVG-Vektorgrundriss, freien anklickbaren und nicht verfügbaren ausgegrauten Wohnungen. Die Wohnungsliste ergänzt die grafische Auswahl.
+2. Eigene Etagenansicht mit einem vereinfachten SVG-Vektorgrundriss, freien anklickbaren und nicht verfügbaren ausgegrauten Wohnungen. Die Wohnungsliste ergänzt die grafische Auswahl. Links von der Fassade, aus den Wohnungsdetails und zwischen den Etagen führen zum Anker `#etagenplan`: Die Ansicht startet bei der Geschossauswahl direkt über dem Grundriss. Überschrift und Rückweg zum Gebäude bleiben oberhalb erreichbar. Dafür wird die native Browsernavigation ohne zusätzliches JavaScript verwendet.
 3. Wohnungsdetails mit gespeicherten Werten, Fotogalerie und „Zur Besichtigung anmelden“.
 
 Die Gebäudeseite nutzt ab Desktopbreite ein UIkit-Grid mit 2/3 Fassade links und 1/3 Hausüberblick rechts. Der Überblick zeigt Wohnungszahl, vorhandene Etagen und aktuell verfügbare Wohnungen aus derselben Datenbankauswertung wie die Fassadenschilder. Auswahlhilfe und Link zur Suche ergänzen ihn. Auf kleineren Bildschirmen stehen beide Bereiche untereinander. Es gibt weiterhin keine zweite Stockwerksauswahl.
 
 Die einzelnen Fassadenfenster liegen mittig in ihrer Einfassung. Die seitlichen Laibungen haben gleiche Breite und gespiegelte Konturen; obere und untere Kanten verlaufen parallel. Die vereinfachten Fenster erhalten wie in der Westansicht eine ungeteilte Glasfläche.
 
-Die Vektorgrafiken orientieren sich an den gelieferten Zeichnungen. Für das EG dient die vereinfachte Nutzerskizze als Grundlage für Wandaufteilung und Proportionen. Die Geometrie ist auf gemeinsame horizontale und vertikale Achsen ausgerichtet; lediglich die tatsächliche schräge rechte Außenkante bleibt erhalten. Die ruhige bestehende Farbgebung mit hellen Fensterlinien, dezenten Türbögen und Balkonflächen wird weiterverwendet. Balkone, Treppe, Aufzug, Flur und Fahrradabstellbereich sind schematisch dargestellt und beschriftet. Der Aufzug liegt am rechten Flurende unterhalb des Fahrradbereichs, mit Zugang vom Flur auf der linken Schachtseite. Möbelsymbole, Fahrradständersymbole und der Außenstellplatz sind im EG auf Nutzerwunsch entfernt. Auch das DG verwendet die horizontale Orientierung und den bereinigten Zeichenstil. Seine Geometrie folgt der beschrifteten Nutzerskizze und der Architekturvorlage: Wohnung 402 links, 401 rechts, drei Balkonabschnitte und eine Trennwand zwischen den beiden unteren Balkonabschnitten. Die PNGs unter static/plans werden ausschließlich über „Originalplan öffnen“ als Vergleichsvorlagen angeboten, nicht als Hintergrund der dargestellten Grundrisse. Der dort verlinkte EG-Originalplan bleibt die ursprüngliche Architekturzeichnung.
+Die Vektorgrafiken orientieren sich an den gelieferten Zeichnungen. Für das EG dient die vereinfachte Nutzerskizze als Grundlage für Wandaufteilung und Proportionen. Die Geometrie ist auf gemeinsame horizontale und vertikale Achsen ausgerichtet; lediglich die tatsächliche schräge rechte Außenkante bleibt erhalten. Die ruhige bestehende Farbgebung mit hellen Fensterlinien, dezenten Türbögen und Balkonflächen wird weiterverwendet. Balkone, Treppe, Aufzug, Flur und Fahrradabstellbereich sind schematisch dargestellt und beschriftet. Der Aufzug liegt am rechten Flurende unterhalb des Fahrradbereichs, mit Zugang vom Flur auf der linken Schachtseite. Möbelsymbole, Fahrradständersymbole und der Außenstellplatz sind im EG auf Nutzerwunsch entfernt. Auch das DG verwendet die horizontale Orientierung und den bereinigten Zeichenstil. Seine Geometrie folgt der beschrifteten Nutzerskizze und der Architekturvorlage: Wohnung 402 links, 401 rechts, drei Balkonabschnitte und eine Trennwand zwischen den beiden unteren Balkonabschnitten. Die Anwendung verwendet ausschließlich die nachgebauten SVG-Zeichnungen. Der Link zu den Originalplänen und die drei Originalplan-PNGs wurden auf Nutzerwunsch aus dem Projekt entfernt.
 
 Die Darstellung ist nicht maßstabsgetreu. Die Wohnungsnummern sind den Flächen vorläufig zugeordnet und müssen fachlich bestätigt werden. Die drei Obergeschosse verwenden denselben Grundrisstyp. UIkit 3.25.24 bleibt die Komponentenbasis; es gibt keine zusätzliche Bibliothek oder eigenständige HTML-Vorschau.
 
@@ -69,7 +69,7 @@ Berechtigte Mitarbeiter können unter Verwaltung → Wohnung bearbeiten → Wohn
 
 Nach EG- und Zugangskorrektur: 213 Django-Tests erfolgreich. Systemcheck, Migrationsprüfung, Ruff und Formatprüfung erfolgreich. Im Browser geprüft: EG-Vektorplan, Klickweg zur Wohnungsdetailseite und Weiterleitung zur wohnungsbezogenen Anfrage über die Anmeldung. Der Teststand enthält den zwischenzeitlich integrierten Wegfall der öffentlichen Barrierefreiheitsangabe und fünf neue Tests zum Besichtigungseinstieg.
 
-Offen sind die Bestätigung der räumlichen Wohnungsnummernzuordnung, echte Fotos und reale Angaben zu Zimmern, Kosten und Ausstattung. Der erste Stand wurde vom Nutzer als 9fba447 gepusht. Die anschließenden EG- und Zugangskorrekturen liegen lokal. Die drei Originalplan-PNGs fehlen noch im gepushten Commit. US-02 bleibt bis zur fachlichen Abnahme und zum Review offen.
+Offen sind die Bestätigung der räumlichen Wohnungsnummernzuordnung, echte Fotos und reale Angaben zu Zimmern, Kosten und Ausstattung. Der erste Stand wurde vom Nutzer als 9fba447 gepusht. Die anschließenden EG- und Zugangskorrekturen liegen lokal. US-02 bleibt bis zur fachlichen Abnahme und zum Review offen.
 
 ## EG-Korrektur nach Review
 
@@ -85,16 +85,13 @@ building_plans.py liefert Nummern, Etagen, Flächen und grafische Auswahlkoordin
 
 ## Dateien für den Commit
 
-Alle folgenden 33 Dateien gehören zur gemeinsamen Umsetzung einschließlich der Korrektur auf feat/16-building-apartment-view:
+Alle folgenden 30 Dateien gehören zur gemeinsamen Umsetzung einschließlich der Korrektur auf feat/16-building-apartment-view:
 
 | Datei | Zweck |
 |---|---|
 | README.md | Einstieg und Verweis auf diese Dokumentation. |
 | config/settings.py | Größen- und Mengenlimit für Wohnungsfotos. |
 | static/css/app.css | Fassaden-/Plan-Darstellung, Hover, Beschriftungen, Galerie und mobiles Layout. |
-| static/plans/ground-floor-reference.png | EG-Vorlage zum manuellen Vergleich. |
-| static/plans/upper-floor-reference.png | OG-Vorlage zum manuellen Vergleich. |
-| static/plans/attic-reference.png | DG-Vorlage zum manuellen Vergleich. |
 | templates/base.html | Header-Link zur Gebäudeansicht und Stylesheet-Version. |
 | templates/wohnungsverwaltung/building_view.html | Eigene Gebäudeseite und Stockwerksauswahl. |
 | templates/wohnungsverwaltung/_building_facade.html | Anklickbare SVG-Fassade. |
@@ -131,4 +128,4 @@ Vorgeschlagene Commit-Nachricht:
 feat: add building explorer and viewing request entry
 ```
 
-Die 33 Dateien bilden einen zusammengehörenden Funktionsstand; Schema-Migration, Views und Templates sollten gemeinsam übernommen werden. Auf einer anderen Entwicklungsumgebung ist python manage.py migrate erforderlich. Der lokale Inventarabgleich wird bei Bedarf ausdrücklich ausgeführt, nicht automatisch beim Start.
+Die 30 Dateien bilden einen zusammengehörenden Funktionsstand; Schema-Migration, Views und Templates sollten gemeinsam übernommen werden. Auf einer anderen Entwicklungsumgebung ist python manage.py migrate erforderlich. Der lokale Inventarabgleich wird bei Bedarf ausdrücklich ausgeführt, nicht automatisch beim Start.
