@@ -106,6 +106,14 @@ weggelassen. Bereits archivierte PDFs bleiben unverändert herunterladbar.
   Namen; fehlt bei einem Altprotokoll die gesicherte Bezeichnung, wird der aktuelle
   Wohnungsstamm mit einem ausdrücklichen Hinweis verwendet. Eine nachträgliche
   Archivierung sichert die Bezeichnung zum tatsächlichen Sicherungszeitpunkt.
+- Die Beteiligtenanzeige bestätigter Protokolle verwendet den gesicherten
+  Mieternamen aus `export_snapshot.tenant`, ersatzweise aus „Zuordnung / Mieter“
+  (#82). Spätere Personenstammdatenänderungen verändern weder diese Anzeige noch
+  Unterschrift oder Archiv. Offene Vorgänge verwenden den aktuellen Namen. Fehlt
+  der gesicherte Name bei einem Altprotokoll, wird der aktuelle Personenstamm
+  ausdrücklich gekennzeichnet; nachträgliche Archivierung sichert den Namen zum
+  tatsächlichen Sicherungszeitpunkt. Aktuelle Kontaktdaten bleiben unabhängig
+  davon nutzbar.
 - Bestätigte Protokolle zeigen Räume, Prüfpunkte und Feststellungen aus dem
   gespeicherten Abschluss-Snapshot; spätere Vorlagenänderungen verändern diese
   Darstellung nicht (#74). Abschlussvorschau und archivierte Raumansicht nutzen

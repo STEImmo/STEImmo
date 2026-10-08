@@ -1097,7 +1097,7 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
     )
 
 
-def _archived_apartment_label(protocol):
+def _archived_assignment_label(protocol, label):
     if protocol.status != ProtokollStatus.SIGNED or not isinstance(protocol.export_snapshot, dict):
         return ""
     sections = protocol.export_snapshot.get("sections")
@@ -1113,12 +1113,21 @@ def _archived_apartment_label(protocol):
             if (
                 isinstance(row, list)
                 and len(row) == 2
-                and row[0] == "Wohnung"
+                and row[0] == label
                 and isinstance(row[1], str)
                 and row[1].strip()
             ):
                 return row[1]
     return ""
+
+
+def _archived_tenant_name(protocol):
+    if protocol.status != ProtokollStatus.SIGNED or not isinstance(protocol.export_snapshot, dict):
+        return ""
+    name = protocol.export_snapshot.get("tenant")
+    if isinstance(name, str) and name.strip():
+        return name
+    return _archived_assignment_label(protocol, "Mieter")
 
 
 @employee_required
@@ -1142,7 +1151,8 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
         and isinstance(protocol.export_snapshot.get("rooms"), list)
     ):
         archived_snapshot = protocol.export_snapshot
-    archived_apartment_label = _archived_apartment_label(protocol)
+    archived_apartment_label = _archived_assignment_label(protocol, "Wohnung")
+    archived_tenant_name = _archived_tenant_name(protocol)
     return render(
         request,
         "wohnungsverwaltung/handover_protocol_detail.html",
@@ -1157,6 +1167,9 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
             "apartment_label": archived_apartment_label or str(protocol.wohnung),
             "uses_current_apartment_label": protocol.status == ProtokollStatus.SIGNED
             and not archived_apartment_label,
+            "tenant_name": archived_tenant_name or str(protocol.person),
+            "uses_current_tenant_name": protocol.status == ProtokollStatus.SIGNED
+            and not archived_tenant_name,
             "can_manage_handover_photos": can_manage_handover_photos,
             "move_in_reference": move_in_reference,
             **_move_in_reference_context(move_in_reference),
