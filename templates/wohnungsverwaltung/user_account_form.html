@@ -42,6 +42,13 @@
                 <label>{{ form.is_active }} {{ form.is_active.label }}</label>
                 {% for error in form.is_active.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
             </div>
+            {% if form.revoke_registration %}
+                <div class="uk-margin">
+                    <label>{{ form.revoke_registration }} {{ form.revoke_registration.label }}</label>
+                    <p class="uk-text-meta">{{ form.revoke_registration.help_text }}</p>
+                    {% for error in form.revoke_registration.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                </div>
+            {% endif %}
             <p class="uk-text-meta">{% if account %}Leer lassen, um das bestehende Passwort beizubehalten.{% else %}Für neue Konten ist ein Passwort erforderlich.{% endif %}</p>
             {% for field in form %}
                 {% if field.name == "password1" or field.name == "password2" %}
