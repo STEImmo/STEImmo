@@ -3,7 +3,7 @@
 {% block content %}
 <section class="uk-section uk-section-default">
     <div class="uk-container uk-container-small">
-        <h1 class="uk-heading-small">Besichtigung für Wohnung {{ wohnung.wohnungsnummer }}</h1>
+        <h1 class="uk-heading-small">Besichtigung für Wohnung {{ wohnung.display_number }}</h1>
         <div class="uk-alert-primary" uk-alert>
             {% if missing_profile %}
                 <h2 class="uk-h4">Ihr Personenprofil fehlt</h2>

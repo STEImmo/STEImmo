@@ -2,8 +2,8 @@
 {% block title %}Wohnungsfotos verwalten – STEImmo{% endblock %}
 {% block content %}
 <section class="uk-section uk-section-default"><div class="uk-container">
-    <ul class="uk-breadcrumb"><li><a href="{% url 'verwaltung:wohnung_list' %}">Wohnungen</a></li><li><a href="{% url 'verwaltung:wohnung_edit' wohnung.pk %}">Wohnung {{ wohnung.wohnungsnummer }}</a></li><li><span>Fotos</span></li></ul>
-    <h1 class="uk-heading-small">Fotos für Wohnung {{ wohnung.wohnungsnummer }}</h1>
+    <ul class="uk-breadcrumb"><li><a href="{% url 'verwaltung:wohnung_list' %}">Wohnungen</a></li><li><a href="{% url 'verwaltung:wohnung_edit' wohnung.pk %}">Wohnung {{ wohnung.display_number }}</a></li><li><span>Fotos</span></li></ul>
+    <h1 class="uk-heading-small">Fotos für Wohnung {{ wohnung.display_number }}</h1>
     <p>Diese Fotos erscheinen öffentlich bei einer verfügbaren Wohnung. Das erste hochgeladene Foto wird als großes Titelbild verwendet.</p>
     <form method="post" enctype="multipart/form-data" class="uk-card uk-card-default uk-card-body uk-margin-bottom">
         {% csrf_token %}

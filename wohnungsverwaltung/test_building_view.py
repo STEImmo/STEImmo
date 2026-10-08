@@ -55,6 +55,14 @@ class BuildingViewTests(TestCase):
             )
         self.assertContains(response, free.wohnungsnummer)
         self.assertContains(response, taken.wohnungsnummer)
+        self.assertContains(response, f"Whg. {free.wohnungsnummer}")
+        self.assertNotContains(response, f"Whg. {taken.wohnungsnummer}")
+        self.assertContains(response, 'class="plan-apartment is-unavailable"')
+        self.assertContains(response, 'class="plan-unavailable-caption"', count=1)
+        self.assertContains(response, '<ul id="etagenplan"')
+        self.assertNotContains(response, "uk-sticky")
+        self.assertNotContains(response, "Auswählbar")
+        self.assertNotContains(response, "Ausgegraut")
         self.assertNotContains(response, "D-01")
         self.assertContains(
             response,
@@ -68,6 +76,20 @@ class BuildingViewTests(TestCase):
     def test_unknown_floor_returns_404(self):
         response = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[9]))
         self.assertEqual(response.status_code, 404)
+
+    def test_ground_floor_displays_three_digit_numbers_without_changing_stored_numbers(self):
+        units = [self.create_unit(str(number), 0) for number in range(1, 6)]
+        floor = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[0]))
+        search = self.client.get(reverse("wohnungsverwaltung_public:apartment_search"))
+        for number, unit in enumerate(units, start=1):
+            self.assertContains(floor, f"Whg. {number:03d}")
+            self.assertContains(search, f"Wohnung {number:03d}")
+            detail = self.client.get(
+                reverse("wohnungsverwaltung_public:apartment_detail_placeholder", args=[unit.pk])
+            )
+            self.assertContains(detail, f"Wohnung {number:03d}")
+            unit.refresh_from_db()
+            self.assertEqual(unit.wohnungsnummer, str(number))
 
     def test_upper_floors_share_plan_with_their_own_units(self):
         for floor in (1, 2, 3):
@@ -116,6 +138,7 @@ class BuildingViewTests(TestCase):
         self.assertGreater(right["x"], left["x"])
         self.assertContains(response, "Aufzug")
         self.assertNotContains(response, 'class="plan-furniture"')
+        self.assertNotContains(response, 'class="plan-windows"')
 
     def test_detail_displays_stored_data_and_existing_application_link(self):
         unit = self.create_unit("A-17", 2)

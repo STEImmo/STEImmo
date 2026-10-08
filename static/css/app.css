@@ -37,7 +37,9 @@ body {
 a.plan-apartment { cursor: pointer; }
 a.plan-apartment:hover .plan-apartment-shape,
 a.plan-apartment:focus-visible .plan-apartment-shape { fill: #d1e6f7; stroke: #1e87f0; }
-.is-unavailable .plan-apartment-shape { fill: #e1e2df; stroke: #999e96; }
+.is-unavailable .plan-apartment-shape { fill: url(#plan-unavailable-hatch); stroke: #999e96; }
+.plan-unavailable-caption rect { fill: #f2f2ef; stroke: #b4b8b0; stroke-width: 1; }
+.plan-unavailable-caption text { fill: #5e645a; font: 12px Arial, sans-serif; }
 .plan-linework { pointer-events: none; }
 .plan-walls { stroke: #8a9285; stroke-width: 1.5; }
 .plan-door-gap { stroke: #f6f6f2; stroke-width: 3; }

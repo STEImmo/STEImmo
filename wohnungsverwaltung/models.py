@@ -278,6 +278,13 @@ class WohnungQuerySet(models.QuerySet):
 class Wohnung(models.Model):
     objects = WohnungQuerySet.as_manager()
 
+    @property
+    def display_number(self) -> str:
+        """Keep the original identifier while matching the public floor numbering."""
+        if self.etage == 0 and self.wohnungsnummer in {"1", "2", "3", "4", "5"}:
+            return self.wohnungsnummer.zfill(3)
+        return self.wohnungsnummer
+
     wohnung_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     etage = models.SmallIntegerField(default=0)
     wohnungsnummer = models.CharField(max_length=255)

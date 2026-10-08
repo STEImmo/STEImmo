@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Wohnung {{ wohnung.wohnungsnummer }} – STEImmo{% endblock %}
+{% block title %}Wohnung {{ wohnung.display_number }} – STEImmo{% endblock %}
 
 {% block content %}
 <section class="uk-section uk-section-default">
     <div class="uk-container">
-        <ul class="uk-breadcrumb"><li><a href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Wohnungen finden</a></li><li><a href="{% url 'wohnungsverwaltung_public:floor_view' wohnung.etage %}#etagenplan">{{ floor_label }}</a></li><li><span>Wohnung {{ wohnung.wohnungsnummer }}</span></li></ul>
-        <h1 class="uk-heading-medium">Wohnung {{ wohnung.wohnungsnummer }}</h1>
+        <ul class="uk-breadcrumb"><li><a href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Wohnungen finden</a></li><li><a href="{% url 'wohnungsverwaltung_public:floor_view' wohnung.etage %}#etagenplan">{{ floor_label }}</a></li><li><span>Wohnung {{ wohnung.display_number }}</span></li></ul>
+        <h1 class="uk-heading-medium">Wohnung {{ wohnung.display_number }}</h1>
         <p class="uk-text-lead">Gebäude {{ wohnung.gebaeudenummer }} · {{ floor_label }}</p>
         {% include "wohnungsverwaltung/_apartment_gallery.html" %}
         <div class="uk-grid-large" uk-grid>
