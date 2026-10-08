@@ -34,7 +34,18 @@ entfernten Dateien zu deduplizieren.
 
 Die Migration legt für historische Raumprotokolle je Wohnung und Namen einen Raumstamm an. Mehrfach vorhandene gleichnamige Räume desselben Protokolls müssen vor der Migration fachlich bereinigt werden.
 
+Inline-Prüfpunkte übernehmen die gültige Raumauswahl der vorangehenden Zeile auch
+bei anderen Feldfehlern. Erst danach wird die raumbezogene Prüfung ausgeführt.
+Eine ungültige Raumauswahl unterbricht die Vererbung, damit Folgezeilen keinem
+vorherigen Raum versehentlich zugeordnet werden.
+
 ## Konsequenzen
+
+Die erneute Anzeige nach Formularfehlern gruppiert Raumkarten zusätzlich anhand
+ihrer Raumprotokoll-ID. Ein entfernter gespeicherter Raum und eine neue Ersatzkarte
+desselben Wohnungsraums bleiben dadurch getrennt, einschließlich sichtbarer Fehler
+der Ersatzkarte. Neue Prüfpunkte einer bestehenden Karte übernehmen im Browser
+deren Raumprotokoll-ID; neue Raumkarten erhalten keine alte Identität.
 
 - Es gibt weder ein globales Raum-Enum noch ein Küchen-Sondermodell.
 - Vergleiche erfolgen über die Raum-ID; historische Anzeigen verwenden den Namens-Snapshot.

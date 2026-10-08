@@ -1817,8 +1817,12 @@ def _room_form_groups(room_formset, removed_rooms=()) -> list[dict[str, object]]
     for room_form in room_formset:
         cleaned_data = getattr(room_form, "cleaned_data", {})
         room_name = cleaned_data.get("raum") or room_form["raum"].value() or ""
-        if not groups or groups[-1]["name"] != room_name:
-            room_protocol_id = str(room_form["raumprotokoll"].value() or "")
+        room_protocol_id = str(room_form["raumprotokoll"].value() or "")
+        if (
+            not groups
+            or groups[-1]["name"] != room_name
+            or groups[-1]["room_protocol_id"] != room_protocol_id
+        ):
             groups.append(
                 {
                     "name": room_name,

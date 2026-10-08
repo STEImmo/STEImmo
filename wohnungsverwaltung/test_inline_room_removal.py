@@ -238,3 +238,47 @@ class InlineRoomRemovalTests(TestCase):
         self.assertEqual(item.fotos.count(), 1)
         self.assertTrue(item.fotos.get().datei.storage.exists(item.fotos.get().datei.name))
         self.assertFalse(self.photo.datei.storage.exists(self.photo.datei.name))
+
+    def test_invalid_replacement_room_remains_visible_separate_from_removed_room(self):
+        data = self.removal_payload()
+        data.update(
+            {
+                "rooms-TOTAL_FORMS": "2",
+                "rooms-1-raum": str(self.kitchen.pk),
+                "rooms-1-bereich": "Küche",
+                "rooms-1-merkmal": str(self.room_feature.pk),
+                "rooms-1-wert": "",
+            }
+        )
+        response = self.client.post(self.edit_url, data)
+        self.assertEqual(response.status_code, 200)
+        groups = response.context["room_form_groups"]
+        self.assertEqual(len(groups), 2)
+        self.assertTrue(groups[0]["remove_room"])
+        self.assertEqual(groups[0]["room_protocol_id"], str(self.room.pk))
+        self.assertFalse(groups[1]["remove_room"])
+        self.assertEqual(groups[1]["room_protocol_id"], "")
+        self.assertIn("wert", groups[1]["checklist_forms"][0].errors)
+        self.assert_original_room_preserved()
+
+    def test_new_checkpoint_on_existing_room_keeps_group_after_validation_error(self):
+        data = self.payload()
+        data.update(
+            {
+                "rooms-TOTAL_FORMS": "2",
+                "rooms-0-raumprotokoll": str(self.room.pk),
+                "rooms-1-raumprotokoll": str(self.room.pk),
+                "rooms-1-raum": str(self.kitchen.pk),
+                "rooms-1-bereich": "Küche",
+                "rooms-1-merkmal": str(self.second_room_feature.pk),
+                "rooms-1-wert": "",
+            }
+        )
+        response = self.client.post(self.edit_url, data)
+        self.assertEqual(response.status_code, 200)
+        groups = response.context["room_form_groups"]
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(len(groups[0]["checklist_forms"]), 2)
+        self.assertFalse(groups[0]["remove_room"])
+        self.assertIn("wert", groups[0]["checklist_forms"][1].errors)
+        self.assert_original_room_preserved()

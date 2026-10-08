@@ -1731,10 +1731,12 @@ class RoomChecklistFormSet(BaseFormSet):
         for room_form in self.forms:
             if (
                 not getattr(room_form, "cleaned_data", None)
-                or room_form.errors
                 or room_form.cleaned_data.get("DELETE")
                 or not room_form.has_entry()
             ):
+                continue
+            if "raum" in room_form.errors:
+                current_room = None
                 continue
             room = room_form.cleaned_data.get("raum")
             if room is not None:
@@ -1743,6 +1745,8 @@ class RoomChecklistFormSet(BaseFormSet):
                 room_form.cleaned_data["raum"] = current_room
             else:
                 room_form.add_error("raum", "Bitte wählen Sie für den ersten Prüfpunkt einen Raum.")
+                continue
+            if room_form.errors:
                 continue
             room_form.validate_room_assignment()
             if room_form.errors:

@@ -11,6 +11,7 @@ from django.contrib.auth.views import LoginView
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.db import IntegrityError, connection, transaction
+from django.db.models import Q
 from django.db.utils import OperationalError
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -104,10 +105,15 @@ def _client_ip_fingerprint(request: HttpRequest) -> str | None:
 def _account_for_login_identifier(identifier: str):
     user_model = get_user_model()
     lookup = user_model.USERNAME_FIELD
+    identifiers = Q(**{lookup: identifier})
     if "@" in identifier:
         lookup += "__iexact"
+        # Registration uses Python's Unicode lowercase mapping. Keep the raw
+        # spelling as well so legacy addresses remain usable and ambiguous
+        # canonical/legacy pairs are rejected together.
+        identifiers |= Q(**{lookup: identifier}) | Q(**{lookup: identifier.lower()})
     try:
-        return user_model._default_manager.select_for_update().get(**{lookup: identifier})
+        return user_model._default_manager.select_for_update().get(identifiers)
     except user_model.DoesNotExist:
         return None
     except user_model.MultipleObjectsReturned:

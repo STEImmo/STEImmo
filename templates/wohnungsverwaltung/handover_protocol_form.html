@@ -239,6 +239,11 @@
                 input.value = roomId;
                 input.setAttribute("value", roomId);
             });
+            const roomProtocolId = card.querySelector("[data-room-removal]")?.value || "";
+            card.querySelectorAll('input[name$="-raumprotokoll"]').forEach((input) => {
+                input.value = roomProtocolId;
+                input.setAttribute("value", roomProtocolId);
+            });
             const title = card.querySelector("[data-room-title]");
             if (title) {
                 title.textContent = roomName ? `Raum: ${roomName}` : "Raum";
