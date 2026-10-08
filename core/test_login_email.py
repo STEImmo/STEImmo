@@ -10,6 +10,44 @@ from wohnungsverwaltung.models import AccountLoginThrottle
 
 
 class EmailLoginTests(AccountChangesMixin, TestCase):
+    def test_registration_unicode_domain_spelling_can_be_used_for_login(self):
+        email = "Mara@İ.example"
+        self.client.post(
+            reverse("register"),
+            {
+                "vorname": "Mara",
+                "nachname": "Muster",
+                "email": email,
+                "password1": PASSWORD,
+                "password2": PASSWORD,
+            },
+        )
+        account = get_user_model().objects.get(email=email.lower())
+        self.client.post(
+            reverse("register_verify"), {"email": account.email, "code": self.mailed_code()}
+        )
+        self.client.logout()
+        response = self.client.post(reverse("login"), {"username": email, "password": PASSWORD})
+        self.assertRedirects(response, reverse("wohnungsverwaltung:pre_application_list"))
+        self.assertEqual(self.client.session["_auth_user_id"], str(account.pk))
+
+    def test_legacy_unicode_domain_spelling_remains_usable(self):
+        account = self.create_account(email="Mara@İ.example")
+        response = self.client.post(
+            reverse("login"), {"username": account.username, "password": PASSWORD}
+        )
+        self.assertRedirects(response, reverse("wohnungsverwaltung:pre_application_list"))
+        self.assertEqual(self.client.session["_auth_user_id"], str(account.pk))
+
+    def test_ambiguous_raw_unicode_identifier_does_not_authenticate(self):
+        first = self.create_account(email="Mara@İ.example")
+        self.create_account(email=first.email.lower())
+        response = self.client.post(
+            reverse("login"), {"username": first.username, "password": PASSWORD}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
     def test_registration_email_spelling_can_be_used_for_login(self):
         email = "Mara.Muster@Example.Test"
         self.client.post(
