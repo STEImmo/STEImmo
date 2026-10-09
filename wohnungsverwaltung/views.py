@@ -58,6 +58,13 @@ from .forms import (
     verified_photo_content_type,
 )
 from .handover_lock import protocol_mutation
+from .handover_photos import (
+    PHOTO_SAVE_ERROR,
+    HandoverPhotoStorageError,
+    delete_handover_photo,
+    handover_photo_upload,
+    save_handover_photo,
+)
 from .models import (
     ApplicationProof,
     ApplicationProofCategory,
@@ -926,6 +933,22 @@ def _draft_overview_entries(request: HttpRequest) -> list[dict[str, object]]:
     return entries
 
 
+def _validate_draft_storage_values(payload):
+    # PostgreSQL JSONB cannot store nonfinite numbers, null characters or
+    # unpaired Unicode surrogates. Validate before touching an existing draft.
+    json.dumps(payload, allow_nan=False, ensure_ascii=False).encode("utf-8")
+    pending = [payload]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            pending.extend(value.keys())
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
+        elif isinstance(value, str) and "\x00" in value:
+            raise ValueError("JSONB does not support null characters.")
+
+
 @employee_required
 def handover_protocol_draft_save(request: HttpRequest) -> JsonResponse | HttpResponse:
     if request.method != "POST":
@@ -933,8 +956,9 @@ def handover_protocol_draft_save(request: HttpRequest) -> JsonResponse | HttpRes
     if len(request.body) > DRAFT_MAXIMUM_SIZE:
         return JsonResponse({"error": "Der Entwurf ist zu groß."}, status=400)
     try:
-        payload = json.loads(request.body)
-    except json.JSONDecodeError:
+        payload = json.loads(request.body.decode("utf-8"))
+        _validate_draft_storage_values(payload)
+    except (ValueError, RecursionError):
         return JsonResponse({"error": "Ungültige Entwurfsdaten."}, status=400)
 
     draft_scope = payload.get("scope") if isinstance(payload, dict) else None
@@ -1036,13 +1060,26 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
         and room_formset.is_valid()
         and key_formset.is_valid()
     ):
-        with transaction.atomic():
-            protocol = form.save()
-            _save_inline_protocol_entries(protocol, room_formset, key_formset)
-        _delete_draft(request, draft_scope)
-        request.session["handover_protocol_draft_key_to_clear"] = "handover-protocol-draft:create"
-        messages.success(request, "Das Übergabeprotokoll wurde angelegt.")
-        return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
+        try:
+            with handover_photo_upload() as stored_photo_files:
+                protocol = form.save()
+                _save_inline_protocol_entries(
+                    protocol,
+                    room_formset,
+                    key_formset,
+                    stored_photo_files,
+                    removed_rooms=form.cleaned_data["removed_rooms"],
+                )
+                _delete_draft(request, draft_scope)
+        except (HandoverPhotoStorageError, DatabaseError) as error:
+            logger.error("Protocol creation failed (%s).", type(error).__name__)
+            form.add_error(None, PHOTO_SAVE_ERROR)
+        else:
+            request.session["handover_protocol_draft_key_to_clear"] = (
+                "handover-protocol-draft:create"
+            )
+            messages.success(request, "Das Übergabeprotokoll wurde angelegt.")
+            return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
     return render(
         request,
@@ -1052,7 +1089,9 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
             "page_title": "Übergabeprotokoll anlegen",
             "submit_label": "Protokoll anlegen",
             "room_formset": room_formset,
-            "room_form_groups": _room_form_groups(room_formset),
+            "room_form_groups": _room_form_groups(
+                room_formset, request.POST.getlist("removed_rooms")
+            ),
             "key_formset": key_formset,
             "move_in_reference": move_in_reference,
             "meter_comparison_rows": _meter_comparison_rows(form, move_in_reference),
@@ -1062,6 +1101,39 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
             **_draft_form_context(server_draft),
         },
     )
+
+
+def _archived_assignment_label(protocol, label):
+    if protocol.status != ProtokollStatus.SIGNED or not isinstance(protocol.export_snapshot, dict):
+        return ""
+    sections = protocol.export_snapshot.get("sections")
+    if not isinstance(sections, list):
+        return ""
+    for section in sections:
+        if not isinstance(section, dict) or section.get("title") != "Zuordnung":
+            continue
+        rows = section.get("rows")
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if (
+                isinstance(row, list)
+                and len(row) == 2
+                and row[0] == label
+                and isinstance(row[1], str)
+                and row[1].strip()
+            ):
+                return row[1]
+    return ""
+
+
+def _archived_tenant_name(protocol):
+    if protocol.status != ProtokollStatus.SIGNED or not isinstance(protocol.export_snapshot, dict):
+        return ""
+    name = protocol.export_snapshot.get("tenant")
+    if isinstance(name, str) and name.strip():
+        return name
+    return _archived_assignment_label(protocol, "Mieter")
 
 
 @employee_required
@@ -1078,6 +1150,15 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
     move_in_reference = None
     if can_manage_handover_photos:
         move_in_reference = _attach_move_in_photo_references(protocol, protocol.raeume.all())
+    archived_snapshot = None
+    if (
+        protocol.status == ProtokollStatus.SIGNED
+        and isinstance(protocol.export_snapshot, dict)
+        and isinstance(protocol.export_snapshot.get("rooms"), list)
+    ):
+        archived_snapshot = protocol.export_snapshot
+    archived_apartment_label = _archived_assignment_label(protocol, "Wohnung")
+    archived_tenant_name = _archived_tenant_name(protocol)
     return render(
         request,
         "wohnungsverwaltung/handover_protocol_detail.html",
@@ -1088,6 +1169,13 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
             "handover_status_label": HANDOVER_STATUS_LABELS[protocol.uebergabe_status],
             "acceptance_status_label": ACCEPTANCE_STATUS_LABELS[protocol.abnahme_status],
             "protocol_status_label": PROTOCOL_STATUS_LABELS[protocol.status],
+            "archived_snapshot": archived_snapshot,
+            "apartment_label": archived_apartment_label or str(protocol.wohnung),
+            "uses_current_apartment_label": protocol.status == ProtokollStatus.SIGNED
+            and not archived_apartment_label,
+            "tenant_name": archived_tenant_name or str(protocol.person),
+            "uses_current_tenant_name": protocol.status == ProtokollStatus.SIGNED
+            and not archived_tenant_name,
             "can_manage_handover_photos": can_manage_handover_photos,
             "move_in_reference": move_in_reference,
             **_move_in_reference_context(move_in_reference),
@@ -1117,6 +1205,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         employee=request.user,
     )
     _set_selected_person_initial(form, selected_person_id)
+    form_valid = request.method == "POST" and form.is_valid()
     can_manage_handover_photos = _can_manage_handover_photos(request)
     room_formset = InlineRoomChecklistFormSet(
         data=request.POST or None,
@@ -1127,6 +1216,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
             "wohnung_id": _valid_wohnung_id(selected_wohnung_id or protocol.wohnung_id),
             "allow_photo_upload": can_manage_handover_photos,
             "protocol": protocol,
+            "removed_rooms": getattr(form, "cleaned_data", {}).get("removed_rooms", ()),
         },
     )
     key_formset = HandoverKeyFormSet(
@@ -1143,19 +1233,31 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         )
     if (
         request.method == "POST"
-        and form.is_valid()
+        and form_valid
         and room_formset.is_valid()
         and key_formset.is_valid()
     ):
-        with transaction.atomic():
-            protocol = form.save()
-            _save_inline_protocol_entries(protocol, room_formset, key_formset)
-        _delete_draft(request, draft_scope)
-        request.session["handover_protocol_draft_key_to_clear"] = (
-            f"handover-protocol-draft:edit:{protocol.pk}"
-        )
-        messages.success(request, "Das Übergabeprotokoll wurde aktualisiert.")
-        return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
+        try:
+            with handover_photo_upload() as stored_photo_files:
+                protocol = form.save()
+                _save_inline_protocol_entries(
+                    protocol,
+                    room_formset,
+                    key_formset,
+                    stored_photo_files,
+                    removed_rooms=form.cleaned_data["removed_rooms"],
+                )
+                _delete_draft(request, draft_scope)
+        except (HandoverPhotoStorageError, DatabaseError) as error:
+            logger.error("Protocol edit failed (%s).", type(error).__name__)
+            protocol.refresh_from_db()
+            form.add_error(None, PHOTO_SAVE_ERROR)
+        else:
+            request.session["handover_protocol_draft_key_to_clear"] = (
+                f"handover-protocol-draft:edit:{protocol.pk}"
+            )
+            messages.success(request, "Das Übergabeprotokoll wurde aktualisiert.")
+            return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
     return render(
         request,
@@ -1166,7 +1268,9 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
             "submit_label": "Änderungen speichern",
             "protocol": protocol,
             "room_formset": room_formset,
-            "room_form_groups": _room_form_groups(room_formset),
+            "room_form_groups": _room_form_groups(
+                room_formset, request.POST.getlist("removed_rooms")
+            ),
             "key_formset": key_formset,
             "move_in_reference": move_in_reference,
             "meter_comparison_rows": _meter_comparison_rows(form, move_in_reference),
@@ -1312,7 +1416,7 @@ def handover_protocol_checklist_item_photo_upload(
     form = RoomChecklistPhotoUploadForm(
         request.POST,
         request.FILES,
-        existing_photo_count=checklist_item.fotos.count(),
+        existing_photos=checklist_item.fotos.all(),
     )
     if not form.is_valid():
         for errors in form.errors.values():
@@ -1320,34 +1424,32 @@ def handover_protocol_checklist_item_photo_upload(
                 messages.error(request, error)
         return redirect(_photo_return_url(request, protocol, room, checklist_item))
 
-    existing_checksums = {
-        photo.inhalt_hash_sha256 or calculate_photo_checksum(photo.datei)
-        for photo in checklist_item.fotos.all()
-    }
-    photos_to_save = []
-    for photo in form.cleaned_data["fotos"]:
-        checksum = calculate_photo_checksum(photo)
-        if checksum in existing_checksums:
-            continue
-        existing_checksums.add(checksum)
-        photos_to_save.append((photo, checksum))
+    photos_to_save = [
+        (photo, calculate_photo_checksum(photo)) for photo in form.cleaned_data["fotos"]
+    ]
 
     if not photos_to_save:
         messages.info(request, "Dieses Foto ist für den Prüfpunkt bereits gespeichert.")
         return redirect(_photo_return_url(request, protocol, room, checklist_item))
 
     try:
-        with transaction.atomic():
+        with handover_photo_upload() as stored_photo_files:
             for photo, checksum in photos_to_save:
-                RaumMerkmalFoto.objects.create(
-                    raum_merkmal=checklist_item,
-                    datei=photo,
-                    content_type=verified_photo_content_type(photo),
-                    dateigroesse=photo.size,
-                    inhalt_hash_sha256=checksum,
+                save_handover_photo(
+                    RaumMerkmalFoto(
+                        raum_merkmal=checklist_item,
+                        datei=photo,
+                        content_type=verified_photo_content_type(photo),
+                        dateigroesse=photo.size,
+                        inhalt_hash_sha256=checksum,
+                    ),
+                    stored_photo_files,
                 )
     except IntegrityError:
         messages.info(request, "Dieses Foto ist für den Prüfpunkt bereits gespeichert.")
+    except (HandoverPhotoStorageError, DatabaseError) as error:
+        logger.error("Protocol photo upload failed (%s).", type(error).__name__)
+        messages.error(request, PHOTO_SAVE_ERROR)
     else:
         messages.success(request, "Die Fotos wurden am Prüfpunkt gespeichert.")
     return redirect(_photo_return_url(request, protocol, room, checklist_item))
@@ -1393,13 +1495,7 @@ def handover_protocol_checklist_item_photo_delete(
 
 def _delete_checklist_photos(photos) -> None:
     for photo in list(photos):
-        storage = photo.datei.storage
-        stored_name = photo.datei.name
-        photo.delete()
-        if stored_name:
-            transaction.on_commit(
-                lambda storage=storage, stored_name=stored_name: storage.delete(stored_name)
-            )
+        delete_handover_photo(photo)
 
 
 def _photo_return_url(
@@ -1645,10 +1741,22 @@ def _key_form_initial(wohnung) -> list[dict[str, object]]:
     ]
 
 
-def _save_inline_protocol_entries(protocol, room_formset, key_formset) -> None:
+def _save_inline_protocol_entries(
+    protocol, room_formset, key_formset, stored_photo_files, *, removed_rooms=()
+) -> None:
+    removed_rooms = list(removed_rooms)
+    removed_ids = {room.pk for room in removed_rooms}
+    for room in removed_rooms:
+        _delete_checklist_photos(RaumMerkmalFoto.objects.filter(raum_merkmal__raumprotokoll=room))
+        room.delete()
     for room_form in room_formset:
+        source_room = room_form.cleaned_data.get("raumprotokoll")
+        item = room_form.cleaned_data.get("pruefpunkt")
+        if (source_room is not None and source_room.pk in removed_ids) or (
+            item is not None and item.raumprotokoll_id in removed_ids
+        ):
+            continue
         if room_form.cleaned_data.get("DELETE"):
-            item = room_form.cleaned_data.get("pruefpunkt")
             if item is not None:
                 _delete_checklist_photos(item.fotos.all())
                 item.delete()
@@ -1658,7 +1766,7 @@ def _save_inline_protocol_entries(protocol, room_formset, key_formset) -> None:
             and not room_form.cleaned_data.get("DELETE")
             and room_form.has_entry()
         ):
-            room_form.save(protocol)
+            room_form.save(protocol, stored_photo_files)
 
     for key_form in key_formset:
         if key_form.cleaned_data.get("DELETE"):
@@ -1678,11 +1786,12 @@ def _protocol_room_initial(protocol):
     for room in protocol.raeume.prefetch_related("raum_merkmale__merkmal").order_by("name", "pk"):
         items = list(room.raum_merkmale.all())
         if not items:
-            values.append({"raum": room.raum_id})
+            values.append({"raum": room.raum_id, "raumprotokoll": room.pk})
         for item in items:
             value = item.wert if isinstance(item.wert, dict) else {}
             values.append(
                 {
+                    "raumprotokoll": room.pk,
                     "pruefpunkt": item.pk,
                     "raum": room.raum_id,
                     "bereich": item.merkmal.bereich,
@@ -1702,14 +1811,26 @@ def _protocol_key_initial(protocol):
     ]
 
 
-def _room_form_groups(room_formset) -> list[dict[str, object]]:
+def _room_form_groups(room_formset, removed_rooms=()) -> list[dict[str, object]]:
     groups: list[dict[str, object]] = []
+    removed_ids = set(removed_rooms)
     for room_form in room_formset:
         cleaned_data = getattr(room_form, "cleaned_data", {})
         room_name = cleaned_data.get("raum") or room_form["raum"].value() or ""
-        if not groups or groups[-1]["name"] != room_name:
+        room_protocol_id = str(room_form["raumprotokoll"].value() or "")
+        if (
+            not groups
+            or groups[-1]["name"] != room_name
+            or groups[-1]["room_protocol_id"] != room_protocol_id
+        ):
             groups.append(
-                {"name": room_name, "room_form": room_form, "checklist_forms": [room_form]}
+                {
+                    "name": room_name,
+                    "room_form": room_form,
+                    "checklist_forms": [room_form],
+                    "room_protocol_id": room_protocol_id,
+                    "remove_room": room_protocol_id in removed_ids,
+                }
             )
             continue
         groups[-1]["checklist_forms"].append(room_form)
@@ -1891,17 +2012,34 @@ def _stellplatz_form(request: HttpRequest, stellplatz: Stellplatz, title: str) -
         form = StellplatzForm(request.POST, instance=stellplatz)
         zuordnung_form = StellplatzZuordnungForm(request.POST, instance=zuordnung)
         if form.is_valid() and zuordnung_form.is_valid():
-            with transaction.atomic():
-                stellplatz = form.save()
-                if zuordnung_form.cleaned_data["wohnung"] is None:
-                    if not zuordnung._state.adding:
-                        zuordnung.delete()
-                else:
-                    zuordnung = zuordnung_form.save(commit=False)
-                    zuordnung.stellplatz = stellplatz
-                    zuordnung.save()
-            messages.success(request, "Der Stellplatz und seine Zuordnung wurden gespeichert.")
-            return redirect("verwaltung:stellplatz_edit", stellplatz_id=stellplatz.pk)
+            try:
+                with transaction.atomic():
+                    if not stellplatz._state.adding:
+                        get_object_or_404(Stellplatz.objects.select_for_update(), pk=stellplatz.pk)
+                        # The relation may have changed while these forms were validated.
+                        zuordnung = StellplatzZuordnung.objects.filter(
+                            stellplatz=stellplatz
+                        ).first()
+                        if zuordnung is None:
+                            zuordnung = StellplatzZuordnung(stellplatz=stellplatz)
+                    stellplatz = form.save()
+                    selected_unit = zuordnung_form.cleaned_data["wohnung"]
+                    if selected_unit is None:
+                        if not zuordnung._state.adding:
+                            zuordnung.delete()
+                    else:
+                        zuordnung.stellplatz = stellplatz
+                        zuordnung.wohnung = selected_unit
+                        zuordnung.save()
+            except IntegrityError:
+                zuordnung_form.add_error(
+                    "wohnung",
+                    "Die Stellplatzzuordnung konnte nicht gespeichert werden. "
+                    "Bitte prüfen Sie die aktuelle Zuordnung und versuchen Sie es erneut.",
+                )
+            else:
+                messages.success(request, "Der Stellplatz und seine Zuordnung wurden gespeichert.")
+                return redirect("verwaltung:stellplatz_edit", stellplatz_id=stellplatz.pk)
     else:
         form = StellplatzForm(instance=stellplatz)
         zuordnung_form = StellplatzZuordnungForm(instance=zuordnung)

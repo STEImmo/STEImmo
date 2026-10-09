@@ -29,6 +29,12 @@ from .access import (
     ROLE_USER_MANAGEMENT,
     USER_MANAGEMENT_PERMISSION,
 )
+from .handover_photos import (
+    PHOTO_READ_ERROR,
+    HandoverPhotoReadError,
+    existing_photo_checksums,
+    save_handover_photo,
+)
 from .models import (
     AbnahmeStatus,
     ApplicationProof,
@@ -993,6 +999,10 @@ class ApartmentSearchForm(forms.Form):
 
 
 class HandoverProtocolForm(forms.ModelForm):
+    removed_rooms = forms.ModelMultipleChoiceField(
+        queryset=Raumprotokoll.objects.none(), required=False, widget=forms.MultipleHiddenInput
+    )
+
     vermieter_name = forms.ChoiceField(
         label="Anwesend für den Vermieter",
         choices=(),
@@ -1073,6 +1083,8 @@ class HandoverProtocolForm(forms.ModelForm):
 
     def __init__(self, *args, wohnung_id: str | None = None, employee=None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        if not self.instance._state.adding:
+            self.fields["removed_rooms"].queryset = self.instance.raeume.all()
         self.fields["wohnung"].queryset = Wohnung.objects.order_by(
             "gebaeudenummer", "wohnungsnummer"
         )
@@ -1426,14 +1438,19 @@ class RoomChecklistPhotoUploadForm(forms.Form):
         ),
     )
 
-    def __init__(self, *args, existing_photo_count: int, **kwargs) -> None:
+    def __init__(self, *args, existing_photos, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.existing_photo_count = existing_photo_count
+        self.existing_photos = list(existing_photos)
 
     def clean_fotos(self):
         photos = self.cleaned_data["fotos"]
+        try:
+            checksums = existing_photo_checksums(self.existing_photos)
+        except HandoverPhotoReadError as error:
+            raise forms.ValidationError(PHOTO_READ_ERROR) from error
+        photos = [photo for photo in photos if calculate_photo_checksum(photo) not in checksums]
         maximum = settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM
-        if self.existing_photo_count + len(photos) > maximum:
+        if len(self.existing_photos) + len(photos) > maximum:
             raise forms.ValidationError(
                 f"Für einen Prüfpunkt sind höchstens {maximum} Fotos erlaubt."
             )
@@ -1513,6 +1530,9 @@ class ProtocolConfirmationForm(forms.Form):
 
 
 class InlineRoomChecklistForm(forms.Form):
+    raumprotokoll = forms.ModelChoiceField(
+        queryset=Raumprotokoll.objects.none(), required=False, widget=forms.HiddenInput
+    )
     pruefpunkt = forms.ModelChoiceField(
         queryset=RaumMerkmal.objects.none(), required=False, widget=forms.HiddenInput
     )
@@ -1561,16 +1581,21 @@ class InlineRoomChecklistForm(forms.Form):
         wohnung_id: UUID | None = None,
         allow_photo_upload: bool = False,
         protocol=None,
+        removed_rooms=(),
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.allow_photo_upload = allow_photo_upload
         self.protocol = protocol
         self.existing_item = None
+        self.existing_photo_checksums = set()
         if protocol is not None:
-            self.fields["pruefpunkt"].queryset = RaumMerkmal.objects.filter(
-                raumprotokoll__protokoll=protocol
-            ).prefetch_related("fotos")
+            self.fields["raumprotokoll"].queryset = protocol.raeume.all()
+            self.fields["pruefpunkt"].queryset = (
+                RaumMerkmal.objects.filter(raumprotokoll__protokoll=protocol)
+                .exclude(raumprotokoll__in=removed_rooms)
+                .prefetch_related("fotos")
+            )
             try:
                 self.existing_item = (
                     self.fields["pruefpunkt"].queryset.filter(pk=self["pruefpunkt"].value()).first()
@@ -1614,33 +1639,53 @@ class InlineRoomChecklistForm(forms.Form):
             self.add_error("zusatzangaben", error)
         if photos and not self.allow_photo_upload:
             self.add_error("fotos", "Nur die Verwaltung darf Fotos hochladen.")
+        return cleaned_data
+
+    def validate_room_assignment(self) -> None:
+        """Validate the checkpoint after the formset has resolved its room."""
+        cleaned_data = self.cleaned_data
+        room = cleaned_data.get("raum")
+        feature = cleaned_data.get("merkmal")
+        if room is None or feature is None:
+            return
         existing = cleaned_data.get("pruefpunkt")
-        if existing is None and self.protocol and values["raum"] and feature:
+        if existing is None and self.protocol:
             existing = (
                 self.fields["pruefpunkt"]
-                .queryset.filter(raumprotokoll__raum=values["raum"], merkmal=feature)
+                .queryset.filter(raumprotokoll__raum=room, merkmal=feature)
                 .first()
             )
-        if existing and not cleaned_data.get("DELETE") and not values["wert"]:
-            self.add_error("wert", "Ein vorhandener Prüfpunkt darf nicht leer gespeichert werden.")
-        if existing and values["raum"] and feature:
+        if existing:
+            self.existing_item = existing
             collision = (
                 self.fields["pruefpunkt"]
-                .queryset.filter(raumprotokoll__raum=values["raum"], merkmal=feature)
+                .queryset.filter(raumprotokoll__raum=room, merkmal=feature)
                 .exclude(pk=existing.pk)
             )
             if collision.exists():
                 self.add_error("merkmal", "Dieser Prüfpunkt ist in diesem Raum bereits erfasst.")
         existing_count = existing.fotos.count() if existing else 0
+        photos = cleaned_data.get("fotos", [])
+        if photos and existing:
+            try:
+                self.existing_photo_checksums = existing_photo_checksums(existing.fotos.all())
+            except HandoverPhotoReadError:
+                self.add_error("fotos", PHOTO_READ_ERROR)
+                return
+        photos = [
+            photo
+            for photo in photos
+            if calculate_photo_checksum(photo) not in self.existing_photo_checksums
+        ]
+        cleaned_data["fotos"] = photos
         if existing_count + len(photos) > settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM:
             maximum = settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM
             self.add_error("fotos", f"Für einen Prüfpunkt sind höchstens {maximum} Fotos erlaubt.")
-        return cleaned_data
 
     def has_entry(self) -> bool:
         return self.cleaned_data.get("merkmal") is not None
 
-    def save(self, protocol: Protokoll) -> RaumMerkmal:
+    def save(self, protocol: Protokoll, stored_photo_files) -> RaumMerkmal:
         raum = self.cleaned_data["raum"]
         room, _created = Raumprotokoll.objects.get_or_create(
             protokoll=protocol,
@@ -1662,14 +1707,18 @@ class InlineRoomChecklistForm(forms.Form):
             )
         for photo in self.cleaned_data["fotos"]:
             checksum = calculate_photo_checksum(photo)
-            if checklist_item.fotos.filter(inhalt_hash_sha256=checksum).exists():
+            if checksum in self.existing_photo_checksums:
                 continue
-            RaumMerkmalFoto.objects.create(
-                raum_merkmal=checklist_item,
-                datei=photo,
-                content_type=verified_photo_content_type(photo),
-                dateigroesse=photo.size,
-                inhalt_hash_sha256=checksum,
+            self.existing_photo_checksums.add(checksum)
+            save_handover_photo(
+                RaumMerkmalFoto(
+                    raum_merkmal=checklist_item,
+                    datei=photo,
+                    content_type=verified_photo_content_type(photo),
+                    dateigroesse=photo.size,
+                    inhalt_hash_sha256=checksum,
+                ),
+                stored_photo_files,
             )
         return checklist_item
 
@@ -1686,6 +1735,9 @@ class RoomChecklistFormSet(BaseFormSet):
                 or not room_form.has_entry()
             ):
                 continue
+            if "raum" in room_form.errors:
+                current_room = None
+                continue
             room = room_form.cleaned_data.get("raum")
             if room is not None:
                 current_room = room
@@ -1693,6 +1745,11 @@ class RoomChecklistFormSet(BaseFormSet):
                 room_form.cleaned_data["raum"] = current_room
             else:
                 room_form.add_error("raum", "Bitte wählen Sie für den ersten Prüfpunkt einen Raum.")
+                continue
+            if room_form.errors:
+                continue
+            room_form.validate_room_assignment()
+            if room_form.errors:
                 continue
             checklist_entries.append(room_form)
 

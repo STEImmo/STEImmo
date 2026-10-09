@@ -99,6 +99,28 @@ weggelassen. Bereits archivierte PDFs bleiben unverändert herunterladbar.
   ausgewählte Dateien erhalten. Nach einem Neuladen müssen ungespeicherte
   Dateien aus Sicherheitsgründen erneut ausgewählt werden.
 - Stamm- und Referenzdatenänderungen verändern keine archivierten Dokumente.
+- Die Zuordnungsanzeige bestätigter Protokolle liest die Wohnungsbezeichnung aus
+  dem gespeicherten Abschnitt „Zuordnung“, unabhängig von der Raumdarstellung
+  (#77). Wohnungsumbenennungen verändern dadurch weder die historische Anzeige
+  noch den Snapshot oder die PDF-Datei. Offene Protokolle verwenden den aktuellen
+  Namen; fehlt bei einem Altprotokoll die gesicherte Bezeichnung, wird der aktuelle
+  Wohnungsstamm mit einem ausdrücklichen Hinweis verwendet. Eine nachträgliche
+  Archivierung sichert die Bezeichnung zum tatsächlichen Sicherungszeitpunkt.
+- Die Beteiligtenanzeige bestätigter Protokolle verwendet den gesicherten
+  Mieternamen aus `export_snapshot.tenant`, ersatzweise aus „Zuordnung / Mieter“
+  (#82). Spätere Personenstammdatenänderungen verändern weder diese Anzeige noch
+  Unterschrift oder Archiv. Offene Vorgänge verwenden den aktuellen Namen. Fehlt
+  der gesicherte Name bei einem Altprotokoll, wird der aktuelle Personenstamm
+  ausdrücklich gekennzeichnet; nachträgliche Archivierung sichert den Namen zum
+  tatsächlichen Sicherungszeitpunkt. Aktuelle Kontaktdaten bleiben unabhängig
+  davon nutzbar.
+- Bestätigte Protokolle zeigen Räume, Prüfpunkte und Feststellungen aus dem
+  gespeicherten Abschluss-Snapshot; spätere Vorlagenänderungen verändern diese
+  Darstellung nicht (#74). Abschlussvorschau und archivierte Raumansicht nutzen
+  dasselbe Template-Partial. Altprotokolle ohne Snapshot zeigen ausdrücklich
+  gekennzeichnete aktuelle Vorlagen; historische Bezeichnungen werden nicht
+  rückwirkend erfunden. Nachträglich gesicherte Altprotokolle verwenden ihren
+  tatsächlichen Sicherungsstand.
 - PDF-Layouts sind versionierte Ausgaben; bestehende PDFs werden nicht neu gestaltet.
 - US-11 bleibt ein eigener Branch/PR auf Basis des Fotofeatures. Die additive
   Migration `0018_merge_photo_safety_and_pdf` verbindet dessen Sicherheitsmigration

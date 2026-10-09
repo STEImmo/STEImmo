@@ -28,6 +28,16 @@ untergeordnete Daten direkt im Anlege- und Bearbeitungsformular erfasst.
 Schlüsselpositionen werden mit den Daten der gewählten Wohnung vorbelegt und
 als protokollspezifische Momentaufnahme gespeichert.
 
+Beim erstmaligen regulären Abschluss eines offenen Protokolls wird die Wohnung
+gemäß Epic #41 auf `taken` (Einzug) beziehungsweise `free` (Auszug) gesetzt (#76).
+Die Statusänderung und das Archiv werden in derselben Datenbanktransaktion
+gespeichert. Das Status-Update sperrt die Wohnungszeile bis zum Transaktionsende;
+die bestehende Verfügbarkeitsprüfung einer Bewerbung wartet dadurch auf den
+Abschluss und prüft den endgültigen Status. Schlägt die Archivierung fehl,
+bleiben Protokoll und Wohnungsstatus unverändert. Vorschau, gesperrte Protokolle,
+wiederholte Bestätigungen und nachträgliche Altarchivierung ändern den Status
+nicht, damit ältere Vorgänge keine spätere Belegung überschreiben.
+
 Die manuelle Anzahl von Anlagenblättern wird nicht mehr in der Oberfläche
 verwendet: Sie hatte keine prüfbare Quelle. Die Projektvorgabe verlangt Foto-
 und Mängeldokumentation. Eine Dateiablage wird erst mit einem eigenen,

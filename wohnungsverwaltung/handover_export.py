@@ -26,6 +26,7 @@ from reportlab.platypus import Image as PDFImage
 from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate
 
 from .forms import ACCEPTANCE_STATUS_LABELS, HANDOVER_STATUS_LABELS, HANDOVER_TYPE_LABELS
+from .handover_archive_files import save_archive_file
 from .models import Protokoll, ProtokollStatus, ProtokollTyp, ProtokollUnterschrift
 
 SALT = "handover-final-content-v1"
@@ -503,8 +504,9 @@ def archive_protocol(
     pdf = render_pdf(snapshot, signatures)
     prefix = f"private/handovers/{protocol.pk}/{uuid4().hex}"
     for role, value in signatures.items():
-        path = default_storage.save(f"{prefix}/{role}.png", ContentFile(value["data"]))
-        stored_paths.append(path)
+        path = save_archive_file(
+            default_storage, f"{prefix}/{role}.png", ContentFile(value["data"]), stored_paths
+        )
         ProtokollUnterschrift.objects.create(
             protokoll=protocol,
             rolle=role,
@@ -513,8 +515,9 @@ def archive_protocol(
             hash_sha256=digest(value["data"]),
             erfasst_am=now,
         )
-    path = default_storage.save(f"{prefix}/protokoll.pdf", ContentFile(pdf))
-    stored_paths.append(path)
+    path = save_archive_file(
+        default_storage, f"{prefix}/protokoll.pdf", ContentFile(pdf), stored_paths
+    )
     protocol.export_snapshot = snapshot
     protocol.dokument_pfad = path
     protocol.dokument_hash_sha256 = digest(pdf)

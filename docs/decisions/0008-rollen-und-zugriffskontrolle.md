@@ -147,6 +147,18 @@ verwerfen Codes weiterhin. `is_active=False` allein ist kein Widerruf, weil dies
 Wert bereits vor der ersten Bestätigung gilt.
 
 Die E-Mail-Adresse ist zugleich der Anmeldename des unveränderten Django-User-Modells.
+Bei der Anmeldung werden E-Mail-Anmeldenamen unabhängig von Groß-/Kleinschreibung
+aufgelöst. Die Passwortprüfung verwendet anschließend den tatsächlichen Anmeldenamen
+des bereits gesperrten Kontos. So beziehen sich Passwortprüfung, Fehlversuchslimit
+und Anmeldeabschluss auch bei älteren Personen mit großgeschriebenen E-Mail-Adressen
+auf dasselbe Konto. Mehrdeutige Alt-Dubletten werden mit der neutralen Fehlermeldung
+abgewiesen; ein Konto wird nicht anhand einer bevorzugten Schreibweise ausgewählt.
+Anmeldenamen ohne E-Mail-Form behalten ihre bisherige exakte Zuordnung (Issue #64).
+Für E-Mail-Anmeldenamen wird zusätzlich die bei der Registrierung verwendete
+Python-Kleinschreibung geprüft. PostgreSQLs Großschreibung ist bei Unicode-Domänen
+wie `İ.example` nicht deren Umkehrung. Die ursprüngliche Schreibweise bleibt für
+Alt-Konten zugelassen; treffen ursprüngliche und normalisierte Suche verschiedene
+Konten, bleibt die Anmeldung mit neutraler Fehlermeldung gesperrt.
 Registrierung und Benutzerverwaltung begrenzen Konto-E-Mail-Adressen daher auf dessen
 `username.max_length` (150 Zeichen). Das gilt auch für die Auswahl einer bereits
 vorhandenen Person; beim Speichern wird deren frisch gesperrte E-Mail erneut geprüft.

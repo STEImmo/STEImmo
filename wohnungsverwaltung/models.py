@@ -776,6 +776,26 @@ class RaumMerkmalFoto(models.Model):
         ]
 
 
+class HandoverPhotoCleanup(models.Model):
+    cleanup_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    storage_name = models.CharField(max_length=512, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "handover_photo_cleanup"
+        ordering = ("created_at", "cleanup_id")
+
+
+class HandoverArchiveCleanup(models.Model):
+    cleanup_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    storage_name = models.CharField(max_length=512, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "handover_archive_cleanup"
+        ordering = ("created_at", "cleanup_id")
+
+
 class ProtokollSchluessel(models.Model):
     protokoll_schluessel_id = models.UUIDField(
         primary_key=True,

@@ -97,6 +97,18 @@ Offene Aufträge müssen betrieblich regelmäßig mit
 `python manage.py retry_application_proof_cleanup` wiederholt werden; der Befehl
 liefert bei fehlgeschlagenen Löschungen einen Fehlerstatus.
 
+Nach einem fehlgeschlagenen Protokollfoto-Upload werden neu geschriebene Dateien
+bereinigt. Scheitert diese Bereinigung, bleibt ein Auftrag erhalten. Offene
+Foto-Aufträge werden mit `python manage.py retry_handover_photo_cleanup`
+wiederholt; fehlgeschlagene Löschungen liefern einen Fehlerstatus. Bereits
+referenzierte Fotos werden dabei geschützt.
+
+Beim Entfernen eines Protokollfotos wird derselbe Bereinigungsauftrag zusammen
+mit der Datenbankreferenz geändert. Erst nach dem Commit wird die Datei gelöscht.
+Scheitert die Löschung oder endet der Prozess vorher, bleibt der Auftrag für
+den Wiederholungsbefehl erhalten. Dies gilt auch beim Entfernen eines Prüfpunkts
+oder eines Protokollraums.
+
 Private Uploads verwenden Dateirechte `0600` und Verzeichnisrechte `0700`.
 Öffentliche statische Dateien verwenden separat `0644` und `0755`, damit ein
 Reverse-Proxy sie lesen kann. Bei bereits mit privaten Rechten erzeugten
