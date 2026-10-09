@@ -180,7 +180,8 @@ class HandoverAvailabilityConcurrencyTests(TransactionTestCase):
             return render_pdf(*args)
 
         def note_application_lock(queryset, *args, **kwargs):
-            application_lock_requested.set()
+            if rendering.is_set():
+                application_lock_requested.set()
             return select_for_update(queryset, *args, **kwargs)
 
         with (

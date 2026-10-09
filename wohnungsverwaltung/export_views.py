@@ -4,6 +4,7 @@ from io import BytesIO
 from django.contrib import messages
 from django.core.files.storage import default_storage
 from django.db import transaction
+from django.db.models import Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -125,11 +126,23 @@ def handover_protocol_confirm(request, protocol_id):
                     "name": snapshot["tenant"],
                     "data": form.cleaned_data["mieter"],
                 }
-            Wohnung.objects.filter(pk=protocol.wohnung_id).update(
-                status=WohnungStatus.TAKEN
-                if protocol.protokoll_typ == ProtokollTyp.MOVE_IN
-                else WohnungStatus.FREE
-            )
+            # Serialize different protocols for this apartment before comparing chronology.
+            Wohnung.objects.select_for_update().get(pk=protocol.wohnung_id)
+            later_handover = Q(uebergabe_zeitpunkt__gt=protocol.uebergabe_zeitpunkt)
+            if protocol.protokoll_typ == ProtokollTyp.MOVE_OUT:
+                # At equal timestamps, move-out precedes move-in regardless of confirmation order.
+                later_handover |= Q(
+                    uebergabe_zeitpunkt=protocol.uebergabe_zeitpunkt,
+                    protokoll_typ=ProtokollTyp.MOVE_IN,
+                )
+            if not Protokoll.objects.filter(
+                later_handover, wohnung_id=protocol.wohnung_id, status=ProtokollStatus.SIGNED
+            ).exists():
+                Wohnung.objects.filter(pk=protocol.wohnung_id).update(
+                    status=WohnungStatus.TAKEN
+                    if protocol.protokoll_typ == ProtokollTyp.MOVE_IN
+                    else WohnungStatus.FREE
+                )
             archive_protocol(
                 protocol,
                 snapshot,

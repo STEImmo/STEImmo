@@ -31,12 +31,22 @@ als protokollspezifische Momentaufnahme gespeichert.
 Beim erstmaligen regulären Abschluss eines offenen Protokolls wird die Wohnung
 gemäß Epic #41 auf `taken` (Einzug) beziehungsweise `free` (Auszug) gesetzt (#76).
 Die Statusänderung und das Archiv werden in derselben Datenbanktransaktion
-gespeichert. Das Status-Update sperrt die Wohnungszeile bis zum Transaktionsende;
+gespeichert. Vor dem chronologischen Vergleich wird die Wohnungszeile bis zum
+Transaktionsende ausdrücklich gesperrt. Damit werden auch parallele Abschlüsse
+unterschiedlicher Protokolle derselben Wohnung nacheinander beurteilt. Nur ein
+fachlich letzter bestätigter Vorgang darf den Status ändern: Maßgeblich ist
+`uebergabe_zeitpunkt`, nicht die Reihenfolge der Bestätigungen. Bei identischen
+Zeitpunkten wird der Auszug vor dem Einzug eingeordnet; die Wohnung bleibt damit
+nach einem gleichzeitigen Mieterwechsel belegt. Offene und gesperrte Vorgänge
+gehen nicht in den Vergleich ein. Ein später bestätigter älterer Vorgang wird
+vollständig archiviert, ohne eine neuere Belegung zu überschreiben (#102).
+
+Die Sperre bleibt auch beim Abschluss eines älteren Vorgangs bestehen;
 die bestehende Verfügbarkeitsprüfung einer Bewerbung wartet dadurch auf den
 Abschluss und prüft den endgültigen Status. Schlägt die Archivierung fehl,
 bleiben Protokoll und Wohnungsstatus unverändert. Vorschau, gesperrte Protokolle,
 wiederholte Bestätigungen und nachträgliche Altarchivierung ändern den Status
-nicht, damit ältere Vorgänge keine spätere Belegung überschreiben.
+nicht.
 
 Die manuelle Anzahl von Anlagenblättern wird nicht mehr in der Oberfläche
 verwendet: Sie hatte keine prüfbare Quelle. Die Projektvorgabe verlangt Foto-
