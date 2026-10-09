@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Wohnung {{ wohnung.display_number }} – STEImmo{% endblock %}
 
@@ -21,7 +22,6 @@
                 <p class="uk-text-muted">Beschreibung und Angaben zu Ausstattung, Heizung, Energie und möglichem Einzug werden noch ergänzt.</p>
                 <h2 class="uk-h3">Lage auf der Etage</h2>
                 <p><a href="{% url 'wohnungsverwaltung_public:floor_view' wohnung.etage %}#etagenplan">Etagenplan ansehen</a></p>
-                <p class="uk-text-meta">Die Position der Wohnungsnummer im Plan ist vorläufig.</p>
             </div>
             <div class="uk-width-1-3@m"><aside class="uk-card uk-card-default uk-card-body">
                 <h2 class="uk-card-title">Kosten</h2>
@@ -37,4 +37,8 @@
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/apartment-gallery.js' %}" defer></script>
 {% endblock %}

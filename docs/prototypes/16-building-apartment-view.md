@@ -4,6 +4,8 @@ Der Prototyp läuft in der bestehenden Django-Anwendung über Docker. Einstieg: 
 
 ## Seiten und Grundrisse
 
+Der Rückweg „Zur Gebäudeansicht“ steht neben der Geschossauswahl und bleibt beim Ankereinstieg sichtbar. Auf schmalen Bildschirmen bricht die Navigationszeile um. Der Hinweis zur vorläufigen Position entfällt auch auf der Wohnungsdetailseite; die dokumentierten Grenzen der Zuordnung bleiben bestehen.
+
 DG: Die möglichen Dachflächenfenster aus den rot gestrichelten Rechtecken der Vorlage werden auf Nutzerwunsch weggelassen. Ihre Interpretation ist unbestätigt; der vereinfachte Auswahlplan bleibt ohne diese Symbole und ohne erfundene Außenfenster.
 
 Nicht verfügbare Wohnungen erscheinen im Grundriss als graue, diagonal schraffierte Flächen mit dem Hinweis „Nicht verfügbar“, ohne sichtbare Nummern-/Flächenschilder. Ihre zugänglichen Statusbeschreibungen bleiben erhalten. Die Verfügbarkeitslegende unter dem Plan entfällt auf Nutzerwunsch.
@@ -72,8 +74,15 @@ Berechtigte Mitarbeiter können unter Verwaltung → Wohnung bearbeiten → Wohn
 - Öffentlich ausgelieferte Fotos nur für verfügbare Wohnungen; Mitarbeiter können auch andere Wohnungsfotos verwalten.
 - Speicherung in MEDIA_ROOT außerhalb der Versionskontrolle; keine Freigabe des gesamten Medienverzeichnisses.
 - Ohne hochgeladene Fotos bleiben neutrale Platzhalter sichtbar.
+- Vier KI-generierte Beispieldateien liegen auf ausdrücklichen Nutzerwunsch unter `docs/demo-photos/`. Die dortige README beschreibt das Hochladen über die Verwaltung auf einer anderen Entwicklungsumgebung. Die aktuelle lokale Wohnung 001 enthält sie bereits. Der Commit der Beispiele importiert sie nicht automatisch in die Datenbank; echte Uploads bleiben außerhalb von Git.
+- Die Detailseite zeigt höchstens drei Fotos. Weitere Bilder werden durch einen Stapelhinweis „+N Fotos“ auf dem dritten Bild angekündigt und bleiben in der UIkit-Lightbox erreichbar. Ein Klick auf ein Foto öffnet es direkt, ohne zusätzlichen Detailbutton. Das Uploadlimit bleibt bei zwölf. Ein interaktiver 360°-Rundgang ist nicht implementiert und nicht Bestandteil von US-02; ein Panoramabild würde derzeit als normales Foto angezeigt.
+- Die Fotoverweise kennzeichnen den Bildtyp ausdrücklich, da die geschützten Auslieferungsadressen keine Dateiendung besitzen. Ein kleines Vanilla-JavaScript ergänzt die normale UIkit-Aufräumroutine, falls beim schnellen Schließen während einer Lade-/Einblendanimation das `hidden`-Ereignis ausbleibt. Damit wird die Scrollsperre zuverlässig aufgehoben; die lokale UIkit-Version bleibt unverändert.
 
 ## Prüfung und offene Punkte
+
+Nach der Galerie-Korrektur: 24 relevante Django-Tests, Systemcheck, Migrationsprüfung, Ruff und Formatprüfung erfolgreich. Im Browser geprüft: drei sichtbare Fotos auf Desktop und Mobilgeräten, Stapelhinweis auf dem dritten Foto, geladene vergrößerte Bilder und Zugriff auf das vierte Foto. Nach normalem und sofortigem Schließen ist die Lightbox entfernt und die Seite wieder scrollbar. Die GitHub-User-Story wurde in dieser Runde nicht verändert.
+
+Vor der letzten Galerie-Korrektur: 219 Django-Tests erfolgreich, einschließlich Galerie mit mehr als drei Fotos. Vier mit Imagegen erzeugte Demo-Fotos (Wohnbereich, Küche, Schlafzimmer, Bad) sind in der lokalen Fotopflege von Wohnung 001 hinterlegt und als „Demo – KI-Beispiel“ beschriftet. Vergrößern und Weiterblättern in der UIkit-Lightbox wurden nach der Galerie-Korrektur im Browser erfolgreich geprüft. Die Arbeitskopien im Medienbereich gehören nicht in Git; die ausdrücklich freigegebenen Beispieldateien unter `docs/demo-photos/` dürfen mitcommitted werden. Sie zeigen nicht die tatsächliche Immobilie. Barrierefreiheit entfällt nach Auftraggeberentscheidung; Heizung/Ausstattung dürfen laut Nutzer vorerst Platzhalter bleiben. Letzte UI-/Teständerungen müssen vor einem PR noch committed und gepusht werden; formelles Review und CI stehen aus.
 
 Nach EG- und Zugangskorrektur: 213 Django-Tests erfolgreich. Systemcheck, Migrationsprüfung, Ruff und Formatprüfung erfolgreich. Im Browser geprüft: EG-Vektorplan, Klickweg zur Wohnungsdetailseite und Weiterleitung zur wohnungsbezogenen Anfrage über die Anmeldung. Der Teststand enthält den zwischenzeitlich integrierten Wegfall der öffentlichen Barrierefreiheitsangabe und fünf neue Tests zum Besichtigungseinstieg.
 
@@ -93,13 +102,14 @@ building_plans.py liefert Nummern, Etagen, Flächen und grafische Auswahlkoordin
 
 ## Dateien für den Commit
 
-Alle folgenden 30 Dateien gehören zur gemeinsamen Umsetzung einschließlich der Korrektur auf feat/16-building-apartment-view:
+Alle folgenden 36 Dateien gehören zur gemeinsamen Umsetzung einschließlich der Korrektur auf feat/16-building-apartment-view:
 
 | Datei | Zweck |
 |---|---|
 | README.md | Einstieg und Verweis auf diese Dokumentation. |
 | config/settings.py | Größen- und Mengenlimit für Wohnungsfotos. |
 | static/css/app.css | Fassaden-/Plan-Darstellung, Hover, Beschriftungen, Galerie und mobiles Layout. |
+| static/js/apartment-gallery.js | Gezielte UIkit-Aufräumroutine bei schnellem Schließen der Fotogalerie. |
 | templates/base.html | Header-Link zur Gebäudeansicht und Stylesheet-Version. |
 | templates/wohnungsverwaltung/building_view.html | Eigene Gebäudeseite und Stockwerksauswahl. |
 | templates/wohnungsverwaltung/_building_facade.html | Anklickbare SVG-Fassade. |
@@ -127,6 +137,11 @@ Alle folgenden 30 Dateien gehören zur gemeinsamen Umsetzung einschließlich der
 | wohnungsverwaltung/test_building_view.py | Tests für Navigation, Detaildaten, Fotoupload/-schutz und Inventarabgleich. |
 | wohnungsverwaltung/tests.py | Aktualisierte Detail-Erwartung und Test für Besichtigungsanfrage ohne Main-Freischaltung. |
 | docs/prototypes/16-building-apartment-view.md | Umsetzung, Einrichtung, Grenzen und diese Commitübersicht. |
+| docs/demo-photos/README.md | Kennzeichnung und Anleitung für die vier KI-generierten Beispieldateien. |
+| docs/demo-photos/01-wohnbereich.jpg | Fiktiver Wohnbereich für Tests und Vorführungen. |
+| docs/demo-photos/02-kueche.jpg | Fiktive Küche für Tests und Vorführungen. |
+| docs/demo-photos/03-schlafzimmer.jpg | Fiktives Schlafzimmer für Tests und Vorführungen. |
+| docs/demo-photos/04-bad.jpg | Fiktives Bad als viertes Galeriebild für Tests und Vorführungen. |
 
 Nicht in diesen Feature-Commit gehören die bereits zuvor vorhandenen unversionierten Dateien .gitattributes, .idea/, docs/prototypes/filter-design-teal.svg und docs/prototypes/filter-design-waldgruen.svg. Sie bleiben unangetastet. Ebenso keine .env-Dateien, Docker-Datenbankdaten, Uploads oder Screenshots übernehmen.
 
@@ -136,4 +151,4 @@ Vorgeschlagene Commit-Nachricht:
 feat: add building explorer and viewing request entry
 ```
 
-Die 30 Dateien bilden einen zusammengehörenden Funktionsstand; Schema-Migration, Views und Templates sollten gemeinsam übernommen werden. Auf einer anderen Entwicklungsumgebung ist python manage.py migrate erforderlich. Der lokale Inventarabgleich wird bei Bedarf ausdrücklich ausgeführt, nicht automatisch beim Start.
+Die 36 Dateien bilden einen zusammengehörenden Funktionsstand; Schema-Migration, Views und Templates sollten gemeinsam übernommen werden. Auf einer anderen Entwicklungsumgebung ist python manage.py migrate erforderlich. Der lokale Inventarabgleich wird bei Bedarf ausdrücklich ausgeführt, nicht automatisch beim Start.

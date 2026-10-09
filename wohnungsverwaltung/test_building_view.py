@@ -153,6 +153,7 @@ class BuildingViewTests(TestCase):
         self.assertContains(response, "Wohnungsfoto folgt")
         self.assertContains(response, "Zur Besichtigung anmelden")
         self.assertNotContains(response, "Für diese Wohnung bewerben")
+        self.assertNotContains(response, "Die Position der Wohnungsnummer im Plan ist vorläufig.")
         self.assertContains(
             response,
             reverse("wohnungsverwaltung_public:viewing_request", args=[unit.pk]),
@@ -209,6 +210,25 @@ class ViewingRequestEntryTests(TestCase):
 
 
 class ApartmentPhotoTests(TestCase):
+    def test_gallery_stacks_extra_photos_and_explicitly_identifies_images(self):
+        for _ in range(4):
+            self.upload()
+        self.client.logout()
+        response = self.client.get(
+            reverse("wohnungsverwaltung_public:apartment_detail_placeholder", args=[self.unit.pk])
+        )
+        self.assertEqual(len(response.context["photos"]), 4)
+        self.assertContains(response, "+1 Foto")
+        gallery_html = response.content.decode().split("data-apartment-gallery", 1)[1]
+        gallery_html = gallery_html.split("</div>", 1)[0]
+        self.assertEqual(gallery_html.count("<img "), 3)
+        self.assertContains(response, 'data-type="image"', count=4)
+        self.assertContains(response, 'uk-lightbox="animation: fade"', count=1)
+        for photo in self.unit.photos.all():
+            self.assertContains(
+                response, reverse("wohnungsverwaltung_public:apartment_photo", args=[photo.pk])
+            )
+
     def setUp(self):
         self.media = TemporaryDirectory()
         self.addCleanup(self.media.cleanup)

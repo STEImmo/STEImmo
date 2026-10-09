@@ -4,13 +4,14 @@
 <section class="uk-section uk-section-small uk-section-default">
     <div class="uk-container">
         <ul class="uk-breadcrumb"><li><a href="{% url 'wohnungsverwaltung_public:building_view' %}">Gebäude</a></li><li><span>{{ floor_label }}</span></li></ul>
-        <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
-            <div><h1 class="uk-h2 uk-margin-remove">{{ floor_label }}</h1><p class="uk-text-meta uk-margin-small-top uk-margin-small-bottom">{{ units|length }} Wohnungen · Wählen Sie eine freie Wohnung im Grundriss.</p></div>
-            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:building_view' %}">Zur Gebäudeansicht</a>
-        </div>
-        <ul id="etagenplan" class="uk-subnav uk-subnav-pill floor-navigation" aria-label="Andere Etage wählen">
+        <h1 class="uk-h2 uk-margin-remove">{{ floor_label }}</h1>
+        <p class="uk-text-meta uk-margin-small-top uk-margin-small-bottom">{{ units|length }} Wohnungen · Wählen Sie eine freie Wohnung im Grundriss.</p>
+        <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-margin-top uk-margin-bottom">
+        <ul id="etagenplan" class="uk-subnav uk-subnav-pill uk-margin-remove floor-navigation" aria-label="Andere Etage wählen">
             {% for number, label in floor_numbers %}<li{% if number == floor_number %} class="uk-active"{% endif %}><a href="{% url 'wohnungsverwaltung_public:floor_view' number %}#etagenplan"{% if number == floor_number %} aria-current="page"{% endif %}>{{ label }}</a></li>{% endfor %}
         </ul>
+            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:building_view' %}">Zur Gebäudeansicht</a>
+        </div>
         <p class="uk-text-meta uk-hidden@m">Auf kleinen Bildschirmen können Sie den Grundriss seitlich verschieben.</p>
         <div class="floor-plan-frame uk-margin-medium-top" tabindex="0" role="region" aria-label="Grundriss {{ floor_label }} – seitlich scrollbar">{% include "wohnungsverwaltung/_floor_plan.html" %}</div>
         <p class="uk-text-meta uk-text-center">Vereinfachter Grundriss nach der Vorlage · nicht maßstabsgetreu.</p>
