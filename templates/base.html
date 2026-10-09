@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}STEImmo{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'vendor/uikit/uikit.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=3">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=4">
 </head>
 <body>
     <nav class="uk-navbar-container" uk-navbar>
@@ -51,7 +51,7 @@
         {% if messages %}
             <div class="uk-container uk-margin-top">
                 {% for message in messages %}
-                    <div class="uk-alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% else %}success{% endif %}" uk-alert>
+                    <div class="uk-alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% elif message.tags == 'info' %}primary{% else %}success{% endif %}" uk-alert>
                         <a class="uk-alert-close" uk-close></a>
                         <p>{{ message }}</p>
                     </div>
