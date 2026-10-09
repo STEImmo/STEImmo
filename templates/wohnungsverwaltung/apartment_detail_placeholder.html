@@ -18,8 +18,15 @@
                     <dt>Zimmer</dt><dd>{% if wohnung.zimmeranzahl %}{{ wohnung.zimmeranzahl }}{% else %}Angabe fehlt{% endif %}</dd>
                     <dt>Verfügbarkeit</dt><dd><span class="uk-label uk-label-success">Verfügbar</span></dd>
                 </dl>
-                <h2 class="uk-h3">Beschreibung & Ausstattung</h2>
-                <p class="uk-text-muted">Beschreibung und Angaben zu Ausstattung, Heizung, Energie und möglichem Einzug werden noch ergänzt.</p>
+                <h2 class="uk-h3">Beschreibung</h2>
+                {% if wohnung.description %}<p>{{ wohnung.description|linebreaksbr }}</p>{% else %}<p class="uk-text-muted">Noch nicht angegeben</p>{% endif %}
+                <h2 class="uk-h3">Ausstattung & weitere Angaben</h2>
+                <dl class="uk-description-list uk-description-list-divider">
+                    <dt>Ausstattung</dt><dd>{% if wohnung.equipment %}{{ wohnung.equipment|linebreaksbr }}{% else %}<span class="uk-text-muted">Noch nicht angegeben</span>{% endif %}</dd>
+                    <dt>Heizungstyp</dt><dd>{% if wohnung.heating_type %}{{ wohnung.heating_type }}{% else %}<span class="uk-text-muted">Noch nicht angegeben</span>{% endif %}</dd>
+                    <dt>Energieangaben</dt><dd>{% if wohnung.energy_information %}{{ wohnung.energy_information|linebreaksbr }}{% else %}<span class="uk-text-muted">Noch nicht angegeben</span>{% endif %}</dd>
+                    <dt>Geplanter Einzug</dt><dd>{% if wohnung.planned_move_in %}{{ wohnung.planned_move_in }}{% else %}<span class="uk-text-muted">Noch nicht angegeben</span>{% endif %}</dd>
+                </dl>
                 <h2 class="uk-h3">Lage auf der Etage</h2>
                 <p><a href="{% url 'wohnungsverwaltung_public:floor_view' wohnung.etage %}#etagenplan">Etagenplan ansehen</a></p>
             </div>

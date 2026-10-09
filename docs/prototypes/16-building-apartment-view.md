@@ -46,7 +46,11 @@ Die vom Nutzer gelieferte Liste ist in wohnungsverwaltung/building_plans.py hint
 
 Nummern, Etagen und Flächen wurden in der lokalen Entwicklungsdatenbank abgeglichen. IDs und Fremdschlüssel bleiben erhalten. Mieten, Zimmerzahlen und Status stammen weiterhin aus den vorhandenen Beispieldaten; die neue Wohnungsliste bestätigt diese Werte nicht.
 
-Wohnfläche, Zimmer, Mieten, Kaution, Status und Fotos sind im System hinterlegt beziehungsweise pflegbar. Beschreibung, Ausstattung, Heizungstyp, Energieausweis, Einzugsdatum, Lagebeschreibung, Kostenaufschlüsselung und Stellplatzzuordnung haben im aktuellen Wohnungsmodell keine entsprechenden Felder. Die Detailseite fasst diese offenen Informationen in kurzen Hinweisen zusammen; sie werden nicht aus den Architekturzeichnungen erfunden. Das Barrierefreiheitskriterium in #16 ist weiterhin mit #53 abzugleichen.
+Wohnfläche, Zimmer, Mieten, Kaution, Status und Fotos sind im System hinterlegt beziehungsweise pflegbar. Beschreibung, Ausstattung, Heizungstyp, Energieangaben und geplanter Einzug werden seit Migration `0021_apartment_public_details` als optionale Wohnungsfelder in der Verwaltung gepflegt. Fehlende Angaben erscheinen auf der Detailseite einzeln als „Noch nicht angegeben“. Mehrzeilige Texte werden als escaped Text mit Zeilenumbrüchen dargestellt; eingegebenes HTML wird nicht ausgeführt. Für den geplanten Einzug ist eine ungefähre Textangabe möglich, ohne ein unbelegtes Tagesdatum zu erfinden. Ein Energieausweis-Upload ist nicht Bestandteil dieser Erweiterung. Lagebeschreibung und Kostenaufschlüsselung werden weiterhin nicht eigens gepflegt; der Hinweis zu fehlenden Kostendetails bleibt erhalten. Die öffentliche Barrierefreiheitsangabe entfällt gemäß Auftraggeberentscheidung.
+
+Die lokale Entwicklung und `seed_standard_data` ergänzen ausschließlich leere Beschreibungen und Einzugsangaben mit belegten Projektinformationen: Umbau eines Bestandsgebäudes in Würzburg, Wohnanlage mit 25 Einheiten, Schwerpunkt Studierende, geplanter Erstbezug März 2027. Individuell gepflegte Detailtexte bleiben beim erneuten Seed erhalten. Ausstattung, Heizungsart und Energiekennwerte werden nicht aus Planzeichnungen oder Möbeln abgeleitet und bleiben zunächst leer. Quellen: [Projektpitch](https://drive.google.com/file/d/1Z6vXQ0n6QF-1dPcyZrBSp2pUK5_UGXj5/view) und [Präsentation vom 23.09.2026](https://docs.google.com/presentation/d/13qISXTeQAF99jrCga_LmigeaW8Wyg3ra_aGRE3CpFrw/edit). Auf bestehenden anderen Umgebungen zuerst migrieren und die Angaben über „Wohnung bearbeiten → Öffentliche Detailangaben“ ergänzen; `seed_standard_data` ist wegen weiterer Beispielwerte kein Aktualisierungsbefehl für reale Daten.
+
+US-02: Die vom Agenten angehängten Fortschrittsnotizen wurden auf Nutzerauftrag am 09.10.2026 aus der Issue-Beschreibung entfernt. Story, Kriterien, Einordnung und vorhandene Häkchen wurden ansonsten unverändert gelassen. Weitere Fortschrittsberichte werden als Kommentartext zum manuellen Einfügen bereitgestellt.
 
 Auf anderen lokalen Datenbanken mit dem ursprünglichen Satz von genau 25 Beispielwohnungen ist der Abgleich explizit auszuführen:
 
@@ -80,6 +84,8 @@ Berechtigte Mitarbeiter können unter Verwaltung → Wohnung bearbeiten → Wohn
 
 ## Prüfung und offene Punkte
 
+Detailangaben am 09.10.2026: 224 Django-Tests erfolgreich; Systemcheck, Migrationsprüfung und Ruff-Prüfungen erfolgreich. Migration 0021 lokal angewendet. Im Browser öffentliche Angaben auf Desktop und Mobilgerät ohne Seitenüberlauf geprüft sowie Mitarbeiteranmeldung mit Einmalcode, Detailfelder und erfolgreiches Speichern über die Verwaltung geprüft. Ausstattung, Heizung und Energie bleiben bis zu belegten Angaben offen. Kein Commit, Push oder PR durch den Agenten.
+
 Nach der Galerie-Korrektur: 24 relevante Django-Tests, Systemcheck, Migrationsprüfung, Ruff und Formatprüfung erfolgreich. Im Browser geprüft: drei sichtbare Fotos auf Desktop und Mobilgeräten, Stapelhinweis auf dem dritten Foto, geladene vergrößerte Bilder und Zugriff auf das vierte Foto. Nach normalem und sofortigem Schließen ist die Lightbox entfernt und die Seite wieder scrollbar. Die GitHub-User-Story wurde in dieser Runde nicht verändert.
 
 Vor der letzten Galerie-Korrektur: 219 Django-Tests erfolgreich, einschließlich Galerie mit mehr als drei Fotos. Vier mit Imagegen erzeugte Demo-Fotos (Wohnbereich, Küche, Schlafzimmer, Bad) sind in der lokalen Fotopflege von Wohnung 001 hinterlegt und als „Demo – KI-Beispiel“ beschriftet. Vergrößern und Weiterblättern in der UIkit-Lightbox wurden nach der Galerie-Korrektur im Browser erfolgreich geprüft. Die Arbeitskopien im Medienbereich gehören nicht in Git; die ausdrücklich freigegebenen Beispieldateien unter `docs/demo-photos/` dürfen mitcommitted werden. Sie zeigen nicht die tatsächliche Immobilie. Barrierefreiheit entfällt nach Auftraggeberentscheidung; Heizung/Ausstattung dürfen laut Nutzer vorerst Platzhalter bleiben. Letzte UI-/Teständerungen müssen vor einem PR noch committed und gepusht werden; formelles Review und CI stehen aus.
@@ -102,7 +108,7 @@ building_plans.py liefert Nummern, Etagen, Flächen und grafische Auswahlkoordin
 
 ## Dateien für den Commit
 
-Alle folgenden 36 Dateien gehören zur gemeinsamen Umsetzung einschließlich der Korrektur auf feat/16-building-apartment-view:
+Alle folgenden 38 Dateien gehören zur gemeinsamen Umsetzung einschließlich der Korrektur auf feat/16-building-apartment-view:
 
 | Datei | Zweck |
 |---|---|
@@ -134,8 +140,10 @@ Alle folgenden 36 Dateien gehören zur gemeinsamen Umsetzung einschließlich der
 | wohnungsverwaltung/management/commands/seed_standard_data.py | Neue lokale Beispieldaten mit richtiger Wohnungsverteilung. |
 | wohnungsverwaltung/management/commands/sync_building_inventory.py | Expliziter, geschützter Abgleich alter Entwicklungsdaten bei erhaltenen IDs. |
 | wohnungsverwaltung/migrations/0020_apartment_photos.py | Additive Datenbank-Migration für Fotos. |
+| wohnungsverwaltung/migrations/0021_apartment_public_details.py | Additive Migration für optionale öffentliche Detailangaben. |
 | wohnungsverwaltung/test_building_view.py | Tests für Navigation, Detaildaten, Fotoupload/-schutz und Inventarabgleich. |
 | wohnungsverwaltung/tests.py | Aktualisierte Detail-Erwartung und Test für Besichtigungsanfrage ohne Main-Freischaltung. |
+| wohnungsverwaltung/test_management.py | Speichern und Leerlassen der optionalen Detailangaben über die Mitarbeiterverwaltung. |
 | docs/prototypes/16-building-apartment-view.md | Umsetzung, Einrichtung, Grenzen und diese Commitübersicht. |
 | docs/demo-photos/README.md | Kennzeichnung und Anleitung für die vier KI-generierten Beispieldateien. |
 | docs/demo-photos/01-wohnbereich.jpg | Fiktiver Wohnbereich für Tests und Vorführungen. |
@@ -151,4 +159,4 @@ Vorgeschlagene Commit-Nachricht:
 feat: add building explorer and viewing request entry
 ```
 
-Die 36 Dateien bilden einen zusammengehörenden Funktionsstand; Schema-Migration, Views und Templates sollten gemeinsam übernommen werden. Auf einer anderen Entwicklungsumgebung ist python manage.py migrate erforderlich. Der lokale Inventarabgleich wird bei Bedarf ausdrücklich ausgeführt, nicht automatisch beim Start.
+Die 38 Dateien bilden einen zusammengehörenden Funktionsstand; Schema-Migration, Views und Templates sollten gemeinsam übernommen werden. Auf einer anderen Entwicklungsumgebung ist python manage.py migrate erforderlich. Der lokale Inventarabgleich wird bei Bedarf ausdrücklich ausgeführt, nicht automatisch beim Start.

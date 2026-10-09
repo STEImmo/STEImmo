@@ -295,6 +295,11 @@ class Wohnung(models.Model):
     warmmiete = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     kaution = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     barrierefrei = models.BooleanField(default=False)
+    description = models.TextField(blank=True, default="", max_length=5000)
+    equipment = models.TextField(blank=True, default="", max_length=3000)
+    heating_type = models.CharField(max_length=120, blank=True, default="")
+    energy_information = models.TextField(blank=True, default="", max_length=3000)
+    planned_move_in = models.CharField(max_length=120, blank=True, default="")
     status = PostgreSQLEnumField(
         enum_type="wohnung_status_enum",
         choices=WohnungStatus.choices,

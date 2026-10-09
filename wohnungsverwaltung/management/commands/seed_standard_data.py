@@ -197,6 +197,21 @@ class Command(BaseCommand):
                     "zaehlernummer_strom": f"ST-1-{number:02d}",
                 },
             )
+            public_details = {
+                "description": (
+                    "Die Wohnung gehört zu einer Wohnanlage mit 25 Einheiten, die durch den "
+                    "Umbau eines Bestandsgebäudes in Würzburg entsteht. "
+                    "Das Angebot richtet sich insbesondere an Studierende."
+                ),
+                "planned_move_in": "Voraussichtlich März 2027",
+            }
+            missing_details = {
+                name: value for name, value in public_details.items() if not getattr(unit, name)
+            }
+            if missing_details:
+                for name, value in missing_details.items():
+                    setattr(unit, name, value)
+                unit.save(update_fields=[*missing_details, "updated_at"])
             units[legacy_number] = unit
         return units
 

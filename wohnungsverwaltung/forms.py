@@ -1394,6 +1394,11 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "zaehlernummer_wasser_warm",
             "zaehlernummer_heizung",
             "zaehlernummer_strom",
+            "description",
+            "equipment",
+            "heating_type",
+            "energy_information",
+            "planned_move_in",
         ]
         labels = {
             "gebaeudenummer": "Gebäudenummer",
@@ -1408,6 +1413,25 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "zaehlernummer_wasser_warm": "Zählernummer Warmwasser",
             "zaehlernummer_heizung": "Zählernummer Heizung",
             "zaehlernummer_strom": "Zählernummer Strom",
+            "description": "Beschreibung",
+            "equipment": "Ausstattung",
+            "heating_type": "Heizungstyp",
+            "energy_information": "Energieangaben",
+            "planned_move_in": "Geplanter Einzug",
+        }
+        widgets = {
+            "description": forms.Textarea(attrs={"class": "uk-textarea", "rows": 4}),
+            "equipment": forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
+            "energy_information": forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
+        }
+        help_texts = {
+            "description": "Nur belegte Informationen zur Wohnung eintragen.",
+            "equipment": "Zum Beispiel bestätigte Ausstattung, ein Merkmal pro Zeile.",
+            "heating_type": "Leer lassen, solange der Heizungstyp nicht bestätigt ist.",
+            "energy_information": "Nur bestätigte Angaben aus dem Energieausweis übernehmen.",
+            "planned_move_in": (
+                "Auch ungefähre Angaben sind möglich, zum Beispiel: Voraussichtlich März 2027."
+            ),
         }
 
 

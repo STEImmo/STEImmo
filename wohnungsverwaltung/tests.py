@@ -1854,6 +1854,20 @@ class HandoverProtocolViewsTests(TestCase):
 
 
 class SeedStandardDataCommandTests(TestCase):
+    def test_seed_supplies_sourced_description_without_overwriting_edited_details(self):
+        call_command("seed_standard_data")
+        unit = Wohnung.objects.get(wohnungsnummer="1")
+        self.assertIn("Bestandsgebäudes in Würzburg", unit.description)
+        self.assertEqual(unit.planned_move_in, "Voraussichtlich März 2027")
+        self.assertEqual(unit.heating_type, "")
+        unit.description = "Individuell gepflegte Beschreibung"
+        unit.planned_move_in = "Nach Vereinbarung"
+        unit.save()
+        call_command("seed_standard_data")
+        unit.refresh_from_db()
+        self.assertEqual(unit.description, "Individuell gepflegte Beschreibung")
+        self.assertEqual(unit.planned_move_in, "Nach Vereinbarung")
+
     def test_command_creates_25_units_and_is_idempotent(self) -> None:
         call_command("seed_standard_data")
 

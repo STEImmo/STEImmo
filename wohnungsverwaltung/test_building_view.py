@@ -16,6 +16,32 @@ from .models import ApartmentPhoto, Person, Wohnung, WohnungStatus
 
 
 class BuildingViewTests(TestCase):
+    def test_detail_shows_each_missing_optional_information(self):
+        unit = self.create_unit("1", 0)
+        response = self.client.get(
+            reverse("wohnungsverwaltung_public:apartment_detail_placeholder", args=[unit.pk])
+        )
+        self.assertContains(response, "Noch nicht angegeben", count=5)
+        self.assertNotContains(response, "Beschreibung und Angaben zu Ausstattung")
+
+    def test_detail_shows_saved_information_and_escapes_markup(self):
+        unit = self.create_unit("1", 0)
+        unit.description = "<script>alert('test')</script>"
+        unit.equipment = "Balkon\nAbstellraum"
+        unit.heating_type = "Fernwärme"
+        unit.energy_information = "Nachweis wird bereitgestellt."
+        unit.planned_move_in = "Voraussichtlich März 2027"
+        unit.save()
+        response = self.client.get(
+            reverse("wohnungsverwaltung_public:apartment_detail_placeholder", args=[unit.pk])
+        )
+        self.assertContains(response, "&lt;script&gt;")
+        self.assertNotContains(response, "<script>alert")
+        self.assertContains(response, "Balkon<br>Abstellraum")
+        self.assertContains(response, "Fernwärme")
+        self.assertContains(response, "Nachweis wird bereitgestellt.")
+        self.assertContains(response, "Voraussichtlich März 2027")
+
     def create_unit(self, number, floor, status=WohnungStatus.FREE):
         return Wohnung.objects.create(
             wohnungsnummer=number,
