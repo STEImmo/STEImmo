@@ -8,7 +8,9 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import Paginator
 from django.db import DatabaseError, IntegrityError, transaction
+from django.db.models import Count
 from django.db.models.deletion import ProtectedError
 from django.http import (
     FileResponse,
@@ -21,6 +23,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 from PIL import Image
 
 from .access import (
@@ -43,11 +46,13 @@ from .forms import (
     METER_READING_FIELDS,
     ApartmentPhotoForm,
     ApartmentSearchForm,
+    ApplicationProofStorageError,
     BewerbungForm,
     HandoverKeyForm,
     HandoverKeyFormSet,
     HandoverProtocolForm,
     InlineRoomChecklistFormSet,
+    MainApplicationForm,
     MerkmalForm,
     MerkmalOptionFormSet,
     RaumForm,
@@ -63,8 +68,18 @@ from .forms import (
     verified_photo_content_type,
 )
 from .handover_lock import protocol_mutation
+from .handover_photos import (
+    PHOTO_SAVE_ERROR,
+    HandoverPhotoStorageError,
+    delete_handover_photo,
+    handover_photo_upload,
+    save_handover_photo,
+)
 from .models import (
     ApartmentPhoto,
+    ApplicationProof,
+    ApplicationProofCategory,
+    ApplicationProofCleanup,
     Bewerbung,
     BewerbungStatus,
     Merkmal,
@@ -84,16 +99,21 @@ from .models import (
     WohnungStatus,
     calculate_photo_checksum,
 )
-
-logger = logging.getLogger(__name__)
+from .upload_limits import upload_too_large_response
 
 PROTOCOL_STATUS_LABELS = {
     ProtokollStatus.OPEN: "In Bearbeitung",
     ProtokollStatus.SIGNED: "Bestätigt",
     ProtokollStatus.BLOCKED: "Gesperrt",
 }
+logger = logging.getLogger(__name__)
 
 DRAFT_MAXIMUM_SIZE = 512_000
+APPLICATION_PROOF_GROUPS = (
+    (ApplicationProofCategory.INCOME, "income_proof", "Gehaltsnachweise"),
+    (ApplicationProofCategory.IDENTITY, "identity_proof", "Identitätsnachweis"),
+    (ApplicationProofCategory.CREDIT_REPORT, "credit_report_proof", "SCHUFA-Unterlage"),
+)
 
 
 def _can_manage_handover_photos(request: HttpRequest) -> bool:
@@ -429,14 +449,485 @@ def pre_application_list(request: HttpRequest) -> HttpResponse:
     )
 
 
+def _stored_file_size_display(file_field) -> str:
+    try:
+        size = file_field.size
+    except (NotImplementedError, OSError):
+        return "Größe nicht verfügbar"
+
+    if size < 1024:
+        return f"{size} B"
+    if size < 1024 * 1024:
+        return f"{size / 1024:.1f} KiB"
+    return f"{size / (1024 * 1024):.1f} MiB"
+
+
+def _application_proof_groups(
+    application: Bewerbung,
+    *,
+    employee: bool = False,
+) -> list[dict]:
+    legacy_download_view = (
+        "wohnungsverwaltung:employee_application_document"
+        if employee
+        else "wohnungsverwaltung:applicant_application_document"
+    )
+    proof_download_view = (
+        "wohnungsverwaltung:employee_application_proof_download"
+        if employee
+        else "wohnungsverwaltung:applicant_application_proof_download"
+    )
+    uploaded_by_category = {
+        category: [] for category, _field_name, _label in APPLICATION_PROOF_GROUPS
+    }
+    for proof in application.proof_files.all():
+        uploaded_by_category[proof.category].append(proof)
+
+    groups = []
+    for category, legacy_field, label in APPLICATION_PROOF_GROUPS:
+        documents = []
+        legacy_file = getattr(application, legacy_field)
+        if legacy_file:
+            original_name = getattr(application, f"{legacy_field}_original_name")
+            documents.append(
+                {
+                    "name": original_name or "Dateiname dieses älteren Uploads nicht erfasst",
+                    "size_display": _stored_file_size_display(legacy_file),
+                    "delete_id": f"legacy:{legacy_field}",
+                    "download_url": reverse(
+                        legacy_download_view,
+                        args=(application.pk, legacy_field),
+                    ),
+                    "can_remove": application.submitted_at is None,
+                }
+            )
+
+        for proof in uploaded_by_category[category]:
+            documents.append(
+                {
+                    "name": proof.original_name,
+                    "size_display": _stored_file_size_display(proof.file),
+                    "delete_id": str(proof.pk),
+                    "download_url": reverse(
+                        proof_download_view,
+                        args=(application.pk, proof.pk),
+                    ),
+                    "can_remove": application.submitted_at is None,
+                }
+            )
+
+        groups.append(
+            {
+                "field_name": legacy_field,
+                "label": label,
+                "documents": documents,
+            }
+        )
+    return groups
+
+
+def _application_proof_count(application: Bewerbung, category: str, legacy_field: str) -> int:
+    return (
+        int(bool(getattr(application, legacy_field)))
+        + application.proof_files.filter(category=category).count()
+    )
+
+
+def _remove_application_proof(
+    request: HttpRequest,
+    application: Bewerbung,
+    application_id: UUID,
+) -> HttpResponse:
+    reference = request.POST.get("remove_proof", "")
+    if reference.startswith("legacy:"):
+        legacy_field = reference.removeprefix("legacy:")
+        category = next(
+            (
+                category
+                for category, field_name, _label in APPLICATION_PROOF_GROUPS
+                if field_name == legacy_field
+            ),
+            None,
+        )
+        if category is None:
+            raise Http404("Dieser Nachweis existiert nicht.")
+
+        proof_file = getattr(application, legacy_field)
+        if not proof_file:
+            raise Http404("Dieser Nachweis wurde bereits entfernt.")
+        if (
+            application.submitted_at is not None
+            and _application_proof_count(application, category, legacy_field) <= 1
+        ):
+            messages.error(
+                request,
+                "Nach der Einreichung muss pro Kategorie mindestens ein Nachweis vorliegen. "
+                "Laden Sie zuerst eine Ersatzdatei hoch.",
+            )
+            return redirect(
+                "wohnungsverwaltung:main_application_status", application_id=application_id
+            )
+
+        storage, stored_name = proof_file.storage, proof_file.name
+        original_name_field = f"{legacy_field}_original_name"
+        with transaction.atomic():
+            setattr(application, legacy_field, "")
+            setattr(application, original_name_field, "")
+            application.save(update_fields=(legacy_field, original_name_field, "updated_at"))
+            _queue_application_proof_deletion(storage, stored_name)
+    else:
+        try:
+            proof_id = UUID(reference)
+        except ValueError as error:
+            raise Http404("Dieser Nachweis existiert nicht.") from error
+        proof = get_object_or_404(
+            ApplicationProof.objects.filter(application=application),
+            pk=proof_id,
+        )
+        if (
+            application.submitted_at is not None
+            and _application_proof_count(
+                application,
+                proof.category,
+                next(
+                    field_name
+                    for category, field_name, _label in APPLICATION_PROOF_GROUPS
+                    if category == proof.category
+                ),
+            )
+            <= 1
+        ):
+            messages.error(
+                request,
+                "Nach der Einreichung muss pro Kategorie mindestens ein Nachweis vorliegen. "
+                "Laden Sie zuerst eine Ersatzdatei hoch.",
+            )
+            return redirect(
+                "wohnungsverwaltung:main_application_status", application_id=application_id
+            )
+
+        storage, stored_name = proof.file.storage, proof.file.name
+        with transaction.atomic():
+            proof.delete()
+            _queue_application_proof_deletion(storage, stored_name)
+
+    return redirect("wohnungsverwaltung:main_application_status", application_id=application_id)
+
+
+def _queue_application_proof_deletion(storage, stored_name: str) -> None:
+    """Persist deletion intent together with removal of the document reference."""
+    cleanup, _created = ApplicationProofCleanup.objects.get_or_create(storage_name=stored_name)
+
+    def delete_after_commit():
+        try:
+            storage.delete(stored_name)
+            cleanup.delete()
+        except Exception as error:
+            logger.error(
+                "Could not delete stored application proof %s (%s); cleanup remains queued.",
+                stored_name,
+                type(error).__name__,
+            )
+
+    transaction.on_commit(delete_after_commit)
+
+
 @applicant_required
 def main_application_status(request: HttpRequest, application_id: UUID) -> HttpResponse:
+    if request.method not in {"GET", "POST"}:
+        return HttpResponseNotAllowed(["GET", "POST"])
+
+    applicant = _applicant_for_user(request)
+    eligible_applications = Bewerbung.objects.filter(
+        person=applicant,
+        status=BewerbungStatus.OPEN,
+        interest_withdrawn_at__isnull=True,
+        main_application_unlocked=True,
+    )
+
+    if request.method == "GET":
+        application = get_object_or_404(
+            eligible_applications.select_related("wohnung"),
+            pk=application_id,
+        )
+        form = MainApplicationForm(instance=application)
+    else:
+        post_data = request.POST
+        uploaded_files = request.FILES
+        upload_error = getattr(request, "_main_application_upload_error", None)
+        form = None
+        application = None
+        action = None
+        form_is_valid = False
+
+        try:
+            with transaction.atomic():
+                # All mutations of this application serialize on the same row. Recheck
+                # access and submission state only after acquiring the lock.
+                application = get_object_or_404(
+                    eligible_applications.select_for_update(),
+                    pk=application_id,
+                )
+                if application.submitted_at is not None:
+                    raise PermissionDenied(
+                        "Eine eingereichte Main-Bewerbung kann nicht mehr geändert werden."
+                    )
+                if upload_error:
+                    return upload_too_large_response(upload_error)
+                if "remove_proof" in post_data:
+                    removal_response = _remove_application_proof(
+                        request, application, application_id
+                    )
+                else:
+                    form = MainApplicationForm(
+                        post_data,
+                        uploaded_files,
+                        instance=application,
+                    )
+                    form_is_valid = form.is_valid()
+                    if form_is_valid:
+                        action = form.cleaned_data["action"]
+                        form.save_uploaded_proofs()
+                        if action == "submit":
+                            application.submitted_at = timezone.now()
+                            application.save(update_fields=("submitted_at", "updated_at"))
+                        else:
+                            application.save(update_fields=("updated_at",))
+            if "remove_proof" in post_data:
+                messages.success(request, "Der Nachweis wurde aus dem Entwurf entfernt.")
+                return removal_response
+
+        except (ApplicationProofStorageError, DatabaseError) as error:
+            if form is None or application is None:
+                if application is not None and "remove_proof" in post_data:
+                    logger.error(
+                        "Main application proof removal failed (%s).", type(error).__name__
+                    )
+                    messages.error(
+                        request,
+                        "Der Nachweis konnte nicht entfernt werden. Bitte versuchen Sie es erneut.",
+                    )
+                    return redirect(
+                        "wohnungsverwaltung:main_application_status", application_id=application_id
+                    )
+                raise
+
+            cleanup_failures = form.cleanup_stored_proof_files()
+            for storage, stored_name in cleanup_failures:
+                try:
+                    ApplicationProofCleanup.objects.get_or_create(storage_name=stored_name)
+                except DatabaseError as cleanup_error:
+                    logger.error(
+                        "Could not persist cleanup job for application proof %s (%s).",
+                        stored_name,
+                        type(cleanup_error).__name__,
+                    )
+            logger.error(
+                "Main application proof persistence failed (%s).",
+                type(error).__name__,
+            )
+            application.refresh_from_db()
+            form.instance = application
+            form.add_error(
+                None,
+                "Dateien konnten nicht sicher gespeichert werden. Bitte versuchen Sie es erneut.",
+            )
+            return render(
+                request,
+                "wohnungsverwaltung/main_application_status.html",
+                {
+                    "application": application,
+                    "form": form,
+                    "proof_groups": _application_proof_groups(application),
+                },
+            )
+
+        if not form_is_valid:
+            return render(
+                request,
+                "wohnungsverwaltung/main_application_status.html",
+                {
+                    "application": application,
+                    "form": form,
+                    "proof_groups": _application_proof_groups(application),
+                },
+            )
+
+        if action == "submit":
+            messages.success(request, "Ihre Main-Bewerbung wurde erfolgreich eingereicht.")
+        else:
+            messages.success(request, "Ihr Entwurf wurde gespeichert.")
+        return redirect(
+            "wohnungsverwaltung:main_application_status",
+            application_id=application.pk,
+        )
+
+    proof_groups = _application_proof_groups(application)
+
+    return render(
+        request,
+        "wohnungsverwaltung/main_application_status.html",
+        {
+            "application": application,
+            "form": form,
+            "proof_groups": proof_groups,
+        },
+    )
+
+
+@never_cache
+@employee_required
+def employee_application_list(request: HttpRequest) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    context = {}
+    if "wohnung" in request.GET:
+        unit_id = _valid_wohnung_id(request.GET.get("wohnung"))
+        if unit_id is None:
+            raise Http404("Diese Wohnung existiert nicht.")
+        unit = get_object_or_404(Wohnung, pk=unit_id)
+        applications = (
+            Bewerbung.objects.filter(wohnung=unit)
+            .select_related("person", "wohnung")
+            .order_by("-created_at", "pk")
+        )
+        page = Paginator(applications, 20).get_page(request.GET.get("page"))
+        context.update(unit=unit, applications=page, page_obj=page)
+    else:
+        context["units"] = Wohnung.objects.annotate(
+            application_count=Count("bewerbungen")
+        ).order_by("gebaeudenummer", "wohnungsnummer", "pk")
+
+    return render(
+        request,
+        "wohnungsverwaltung/employee_application_list.html",
+        context,
+    )
+
+
+@never_cache
+@employee_required
+def employee_application_detail(request: HttpRequest, application_id: UUID) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    application = get_object_or_404(
+        Bewerbung.objects.select_related("person", "wohnung").prefetch_related(
+            "bewerbung_stellplaetze__stellplatz"
+        ),
+        pk=application_id,
+    )
+    return render(
+        request,
+        "wohnungsverwaltung/employee_application_detail.html",
+        {
+            "application": application,
+            "proof_groups": (
+                _application_proof_groups(application, employee=True)
+                if application.submitted_at is not None
+                else []
+            ),
+        },
+    )
+
+
+def _application_document_response(proof_file, download_label: str) -> FileResponse:
+    try:
+        stream = proof_file.open("rb")
+        header = stream.read(8)
+        # Upload validation already checks the full file. Here the signature only
+        # selects the download extension, including for older private proofs.
+        if header.startswith(b"%PDF-"):
+            extension = "pdf"
+        elif header.startswith(b"\x89PNG\r\n\x1a\n"):
+            extension = "png"
+        else:
+            raise Http404("Der gespeicherte Nachweis hat ein ungültiges Dateiformat.")
+        stream.seek(0)
+        # Keep this descriptor open: removing the path concurrently must not
+        # force a second open between checking and streaming the document.
+        response = FileResponse(
+            stream,
+            as_attachment=True,
+            filename=f"{download_label}.{extension}",
+            content_type="application/octet-stream",
+        )
+    except (OSError, ValueError) as error:
+        proof_file.close()
+        raise Http404("Der gespeicherte Nachweis kann nicht geöffnet werden.") from error
+    except Exception:
+        proof_file.close()
+        raise
+
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
+@employee_required
+def employee_application_document(
+    request: HttpRequest,
+    application_id: UUID,
+    document_type: str,
+) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    document_labels = {
+        "income_proof": ("Gehaltsnachweise", "Gehaltsnachweis"),
+        "identity_proof": ("Identitätsnachweis", "Identitaetsnachweis"),
+        "credit_report_proof": ("SCHUFA-Unterlage", "SCHUFA-Unterlage"),
+    }
+    if document_type not in document_labels:
+        raise Http404("Dieser Nachweis existiert nicht.")
+
+    application = get_object_or_404(
+        Bewerbung.objects.filter(submitted_at__isnull=False),
+        pk=application_id,
+    )
+    proof = getattr(application, document_type)
+    if not proof:
+        raise Http404("Dieser Nachweis wurde noch nicht hochgeladen.")
+
+    return _application_document_response(proof, document_labels[document_type][1])
+
+
+@employee_required
+def employee_application_proof_download(
+    request: HttpRequest,
+    application_id: UUID,
+    proof_id: UUID,
+) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    proof = get_object_or_404(
+        ApplicationProof.objects.filter(
+            application__pk=application_id,
+            application__submitted_at__isnull=False,
+        ),
+        pk=proof_id,
+    )
+    download_labels = {
+        ApplicationProofCategory.INCOME: "Gehaltsnachweis",
+        ApplicationProofCategory.IDENTITY: "Identitaetsnachweis",
+        ApplicationProofCategory.CREDIT_REPORT: "SCHUFA-Unterlage",
+    }
+    return _application_document_response(proof.file, download_labels[proof.category])
+
+
+@applicant_required
+def applicant_application_document(
+    request: HttpRequest,
+    application_id: UUID,
+    document_type: str,
+) -> HttpResponse:
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
 
     applicant = _applicant_for_user(request)
     application = get_object_or_404(
-        Bewerbung.objects.select_related("wohnung").filter(
+        Bewerbung.objects.filter(
             person=applicant,
             status=BewerbungStatus.OPEN,
             interest_withdrawn_at__isnull=True,
@@ -444,11 +935,47 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
         ),
         pk=application_id,
     )
-    return render(
-        request,
-        "wohnungsverwaltung/main_application_status.html",
-        {"application": application},
+    document_labels = {
+        "income_proof": ("Gehaltsnachweise", "Gehaltsnachweis"),
+        "identity_proof": ("Identitätsnachweis", "Identitaetsnachweis"),
+        "credit_report_proof": ("SCHUFA-Unterlage", "SCHUFA-Unterlage"),
+    }
+    if document_type not in document_labels:
+        raise Http404("Dieser Nachweis existiert nicht.")
+
+    proof_file = getattr(application, document_type)
+    if not proof_file:
+        raise Http404("Dieser Nachweis wurde nicht hochgeladen.")
+
+    return _application_document_response(proof_file, document_labels[document_type][1])
+
+
+@applicant_required
+def applicant_application_proof_download(
+    request: HttpRequest,
+    application_id: UUID,
+    proof_id: UUID,
+) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
+    applicant = _applicant_for_user(request)
+    application = get_object_or_404(
+        Bewerbung.objects.filter(
+            person=applicant,
+            status=BewerbungStatus.OPEN,
+            interest_withdrawn_at__isnull=True,
+            main_application_unlocked=True,
+        ),
+        pk=application_id,
     )
+    proof = get_object_or_404(application.proof_files.all(), pk=proof_id)
+    download_labels = {
+        ApplicationProofCategory.INCOME: "Gehaltsnachweis",
+        ApplicationProofCategory.IDENTITY: "Identitaetsnachweis",
+        ApplicationProofCategory.CREDIT_REPORT: "SCHUFA-Unterlage",
+    }
+    return _application_document_response(proof.file, download_labels[proof.category])
 
 
 @applicant_required
@@ -595,6 +1122,22 @@ def _draft_overview_entries(request: HttpRequest) -> list[dict[str, object]]:
     return entries
 
 
+def _validate_draft_storage_values(payload):
+    # PostgreSQL JSONB cannot store nonfinite numbers, null characters or
+    # unpaired Unicode surrogates. Validate before touching an existing draft.
+    json.dumps(payload, allow_nan=False, ensure_ascii=False).encode("utf-8")
+    pending = [payload]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            pending.extend(value.keys())
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
+        elif isinstance(value, str) and "\x00" in value:
+            raise ValueError("JSONB does not support null characters.")
+
+
 @employee_required
 def handover_protocol_draft_save(request: HttpRequest) -> JsonResponse | HttpResponse:
     if request.method != "POST":
@@ -602,8 +1145,9 @@ def handover_protocol_draft_save(request: HttpRequest) -> JsonResponse | HttpRes
     if len(request.body) > DRAFT_MAXIMUM_SIZE:
         return JsonResponse({"error": "Der Entwurf ist zu groß."}, status=400)
     try:
-        payload = json.loads(request.body)
-    except json.JSONDecodeError:
+        payload = json.loads(request.body.decode("utf-8"))
+        _validate_draft_storage_values(payload)
+    except (ValueError, RecursionError):
         return JsonResponse({"error": "Ungültige Entwurfsdaten."}, status=400)
 
     draft_scope = payload.get("scope") if isinstance(payload, dict) else None
@@ -705,13 +1249,26 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
         and room_formset.is_valid()
         and key_formset.is_valid()
     ):
-        with transaction.atomic():
-            protocol = form.save()
-            _save_inline_protocol_entries(protocol, room_formset, key_formset)
-        _delete_draft(request, draft_scope)
-        request.session["handover_protocol_draft_key_to_clear"] = "handover-protocol-draft:create"
-        messages.success(request, "Das Übergabeprotokoll wurde angelegt.")
-        return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
+        try:
+            with handover_photo_upload() as stored_photo_files:
+                protocol = form.save()
+                _save_inline_protocol_entries(
+                    protocol,
+                    room_formset,
+                    key_formset,
+                    stored_photo_files,
+                    removed_rooms=form.cleaned_data["removed_rooms"],
+                )
+                _delete_draft(request, draft_scope)
+        except (HandoverPhotoStorageError, DatabaseError) as error:
+            logger.error("Protocol creation failed (%s).", type(error).__name__)
+            form.add_error(None, PHOTO_SAVE_ERROR)
+        else:
+            request.session["handover_protocol_draft_key_to_clear"] = (
+                "handover-protocol-draft:create"
+            )
+            messages.success(request, "Das Übergabeprotokoll wurde angelegt.")
+            return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
     return render(
         request,
@@ -721,7 +1278,9 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
             "page_title": "Übergabeprotokoll anlegen",
             "submit_label": "Protokoll anlegen",
             "room_formset": room_formset,
-            "room_form_groups": _room_form_groups(room_formset),
+            "room_form_groups": _room_form_groups(
+                room_formset, request.POST.getlist("removed_rooms")
+            ),
             "key_formset": key_formset,
             "move_in_reference": move_in_reference,
             "meter_comparison_rows": _meter_comparison_rows(form, move_in_reference),
@@ -731,6 +1290,39 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
             **_draft_form_context(server_draft),
         },
     )
+
+
+def _archived_assignment_label(protocol, label):
+    if protocol.status != ProtokollStatus.SIGNED or not isinstance(protocol.export_snapshot, dict):
+        return ""
+    sections = protocol.export_snapshot.get("sections")
+    if not isinstance(sections, list):
+        return ""
+    for section in sections:
+        if not isinstance(section, dict) or section.get("title") != "Zuordnung":
+            continue
+        rows = section.get("rows")
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if (
+                isinstance(row, list)
+                and len(row) == 2
+                and row[0] == label
+                and isinstance(row[1], str)
+                and row[1].strip()
+            ):
+                return row[1]
+    return ""
+
+
+def _archived_tenant_name(protocol):
+    if protocol.status != ProtokollStatus.SIGNED or not isinstance(protocol.export_snapshot, dict):
+        return ""
+    name = protocol.export_snapshot.get("tenant")
+    if isinstance(name, str) and name.strip():
+        return name
+    return _archived_assignment_label(protocol, "Mieter")
 
 
 @employee_required
@@ -747,6 +1339,15 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
     move_in_reference = None
     if can_manage_handover_photos:
         move_in_reference = _attach_move_in_photo_references(protocol, protocol.raeume.all())
+    archived_snapshot = None
+    if (
+        protocol.status == ProtokollStatus.SIGNED
+        and isinstance(protocol.export_snapshot, dict)
+        and isinstance(protocol.export_snapshot.get("rooms"), list)
+    ):
+        archived_snapshot = protocol.export_snapshot
+    archived_apartment_label = _archived_assignment_label(protocol, "Wohnung")
+    archived_tenant_name = _archived_tenant_name(protocol)
     return render(
         request,
         "wohnungsverwaltung/handover_protocol_detail.html",
@@ -757,6 +1358,13 @@ def handover_protocol_detail(request: HttpRequest, protocol_id) -> HttpResponse:
             "handover_status_label": HANDOVER_STATUS_LABELS[protocol.uebergabe_status],
             "acceptance_status_label": ACCEPTANCE_STATUS_LABELS[protocol.abnahme_status],
             "protocol_status_label": PROTOCOL_STATUS_LABELS[protocol.status],
+            "archived_snapshot": archived_snapshot,
+            "apartment_label": archived_apartment_label or str(protocol.wohnung),
+            "uses_current_apartment_label": protocol.status == ProtokollStatus.SIGNED
+            and not archived_apartment_label,
+            "tenant_name": archived_tenant_name or str(protocol.person),
+            "uses_current_tenant_name": protocol.status == ProtokollStatus.SIGNED
+            and not archived_tenant_name,
             "can_manage_handover_photos": can_manage_handover_photos,
             "move_in_reference": move_in_reference,
             **_move_in_reference_context(move_in_reference),
@@ -786,6 +1394,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         employee=request.user,
     )
     _set_selected_person_initial(form, selected_person_id)
+    form_valid = request.method == "POST" and form.is_valid()
     can_manage_handover_photos = _can_manage_handover_photos(request)
     room_formset = InlineRoomChecklistFormSet(
         data=request.POST or None,
@@ -796,6 +1405,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
             "wohnung_id": _valid_wohnung_id(selected_wohnung_id or protocol.wohnung_id),
             "allow_photo_upload": can_manage_handover_photos,
             "protocol": protocol,
+            "removed_rooms": getattr(form, "cleaned_data", {}).get("removed_rooms", ()),
         },
     )
     key_formset = HandoverKeyFormSet(
@@ -812,19 +1422,31 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         )
     if (
         request.method == "POST"
-        and form.is_valid()
+        and form_valid
         and room_formset.is_valid()
         and key_formset.is_valid()
     ):
-        with transaction.atomic():
-            protocol = form.save()
-            _save_inline_protocol_entries(protocol, room_formset, key_formset)
-        _delete_draft(request, draft_scope)
-        request.session["handover_protocol_draft_key_to_clear"] = (
-            f"handover-protocol-draft:edit:{protocol.pk}"
-        )
-        messages.success(request, "Das Übergabeprotokoll wurde aktualisiert.")
-        return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
+        try:
+            with handover_photo_upload() as stored_photo_files:
+                protocol = form.save()
+                _save_inline_protocol_entries(
+                    protocol,
+                    room_formset,
+                    key_formset,
+                    stored_photo_files,
+                    removed_rooms=form.cleaned_data["removed_rooms"],
+                )
+                _delete_draft(request, draft_scope)
+        except (HandoverPhotoStorageError, DatabaseError) as error:
+            logger.error("Protocol edit failed (%s).", type(error).__name__)
+            protocol.refresh_from_db()
+            form.add_error(None, PHOTO_SAVE_ERROR)
+        else:
+            request.session["handover_protocol_draft_key_to_clear"] = (
+                f"handover-protocol-draft:edit:{protocol.pk}"
+            )
+            messages.success(request, "Das Übergabeprotokoll wurde aktualisiert.")
+            return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
 
     return render(
         request,
@@ -835,7 +1457,9 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
             "submit_label": "Änderungen speichern",
             "protocol": protocol,
             "room_formset": room_formset,
-            "room_form_groups": _room_form_groups(room_formset),
+            "room_form_groups": _room_form_groups(
+                room_formset, request.POST.getlist("removed_rooms")
+            ),
             "key_formset": key_formset,
             "move_in_reference": move_in_reference,
             "meter_comparison_rows": _meter_comparison_rows(form, move_in_reference),
@@ -981,7 +1605,7 @@ def handover_protocol_checklist_item_photo_upload(
     form = RoomChecklistPhotoUploadForm(
         request.POST,
         request.FILES,
-        existing_photo_count=checklist_item.fotos.count(),
+        existing_photos=checklist_item.fotos.all(),
     )
     if not form.is_valid():
         for errors in form.errors.values():
@@ -989,34 +1613,32 @@ def handover_protocol_checklist_item_photo_upload(
                 messages.error(request, error)
         return redirect(_photo_return_url(request, protocol, room, checklist_item))
 
-    existing_checksums = {
-        photo.inhalt_hash_sha256 or calculate_photo_checksum(photo.datei)
-        for photo in checklist_item.fotos.all()
-    }
-    photos_to_save = []
-    for photo in form.cleaned_data["fotos"]:
-        checksum = calculate_photo_checksum(photo)
-        if checksum in existing_checksums:
-            continue
-        existing_checksums.add(checksum)
-        photos_to_save.append((photo, checksum))
+    photos_to_save = [
+        (photo, calculate_photo_checksum(photo)) for photo in form.cleaned_data["fotos"]
+    ]
 
     if not photos_to_save:
         messages.info(request, "Dieses Foto ist für den Prüfpunkt bereits gespeichert.")
         return redirect(_photo_return_url(request, protocol, room, checklist_item))
 
     try:
-        with transaction.atomic():
+        with handover_photo_upload() as stored_photo_files:
             for photo, checksum in photos_to_save:
-                RaumMerkmalFoto.objects.create(
-                    raum_merkmal=checklist_item,
-                    datei=photo,
-                    content_type=verified_photo_content_type(photo),
-                    dateigroesse=photo.size,
-                    inhalt_hash_sha256=checksum,
+                save_handover_photo(
+                    RaumMerkmalFoto(
+                        raum_merkmal=checklist_item,
+                        datei=photo,
+                        content_type=verified_photo_content_type(photo),
+                        dateigroesse=photo.size,
+                        inhalt_hash_sha256=checksum,
+                    ),
+                    stored_photo_files,
                 )
     except IntegrityError:
         messages.info(request, "Dieses Foto ist für den Prüfpunkt bereits gespeichert.")
+    except (HandoverPhotoStorageError, DatabaseError) as error:
+        logger.error("Protocol photo upload failed (%s).", type(error).__name__)
+        messages.error(request, PHOTO_SAVE_ERROR)
     else:
         messages.success(request, "Die Fotos wurden am Prüfpunkt gespeichert.")
     return redirect(_photo_return_url(request, protocol, room, checklist_item))
@@ -1062,13 +1684,7 @@ def handover_protocol_checklist_item_photo_delete(
 
 def _delete_checklist_photos(photos) -> None:
     for photo in list(photos):
-        storage = photo.datei.storage
-        stored_name = photo.datei.name
-        photo.delete()
-        if stored_name:
-            transaction.on_commit(
-                lambda storage=storage, stored_name=stored_name: storage.delete(stored_name)
-            )
+        delete_handover_photo(photo)
 
 
 def _photo_return_url(
@@ -1314,20 +1930,32 @@ def _key_form_initial(wohnung) -> list[dict[str, object]]:
     ]
 
 
-def _save_inline_protocol_entries(protocol, room_formset, key_formset) -> None:
+def _save_inline_protocol_entries(
+    protocol, room_formset, key_formset, stored_photo_files, *, removed_rooms=()
+) -> None:
+    removed_rooms = list(removed_rooms)
+    removed_ids = {room.pk for room in removed_rooms}
+    for room in removed_rooms:
+        _delete_checklist_photos(RaumMerkmalFoto.objects.filter(raum_merkmal__raumprotokoll=room))
+        room.delete()
+    for room_form in room_formset.deleted_forms:
+        item = room_form.cleaned_data.get("pruefpunkt")
+        if item is not None and item.raumprotokoll_id not in removed_ids:
+            _delete_checklist_photos(item.fotos.all())
+            item.delete()
     for room_form in room_formset:
-        if room_form.cleaned_data.get("DELETE"):
-            item = room_form.cleaned_data.get("pruefpunkt")
-            if item is not None:
-                _delete_checklist_photos(item.fotos.all())
-                item.delete()
+        source_room = room_form.cleaned_data.get("raumprotokoll")
+        item = room_form.cleaned_data.get("pruefpunkt")
+        if (source_room is not None and source_room.pk in removed_ids) or (
+            item is not None and item.raumprotokoll_id in removed_ids
+        ):
             continue
         if (
             room_form.cleaned_data
             and not room_form.cleaned_data.get("DELETE")
             and room_form.has_entry()
         ):
-            room_form.save(protocol)
+            room_form.save(protocol, stored_photo_files)
 
     for key_form in key_formset:
         if key_form.cleaned_data.get("DELETE"):
@@ -1347,11 +1975,12 @@ def _protocol_room_initial(protocol):
     for room in protocol.raeume.prefetch_related("raum_merkmale__merkmal").order_by("name", "pk"):
         items = list(room.raum_merkmale.all())
         if not items:
-            values.append({"raum": room.raum_id})
+            values.append({"raum": room.raum_id, "raumprotokoll": room.pk})
         for item in items:
             value = item.wert if isinstance(item.wert, dict) else {}
             values.append(
                 {
+                    "raumprotokoll": room.pk,
                     "pruefpunkt": item.pk,
                     "raum": room.raum_id,
                     "bereich": item.merkmal.bereich,
@@ -1371,14 +2000,26 @@ def _protocol_key_initial(protocol):
     ]
 
 
-def _room_form_groups(room_formset) -> list[dict[str, object]]:
+def _room_form_groups(room_formset, removed_rooms=()) -> list[dict[str, object]]:
     groups: list[dict[str, object]] = []
+    removed_ids = set(removed_rooms)
     for room_form in room_formset:
         cleaned_data = getattr(room_form, "cleaned_data", {})
         room_name = cleaned_data.get("raum") or room_form["raum"].value() or ""
-        if not groups or groups[-1]["name"] != room_name:
+        room_protocol_id = str(room_form["raumprotokoll"].value() or "")
+        if (
+            not groups
+            or groups[-1]["name"] != room_name
+            or groups[-1]["room_protocol_id"] != room_protocol_id
+        ):
             groups.append(
-                {"name": room_name, "room_form": room_form, "checklist_forms": [room_form]}
+                {
+                    "name": room_name,
+                    "room_form": room_form,
+                    "checklist_forms": [room_form],
+                    "room_protocol_id": room_protocol_id,
+                    "remove_room": room_protocol_id in removed_ids,
+                }
             )
             continue
         groups[-1]["checklist_forms"].append(room_form)
@@ -1560,17 +2201,34 @@ def _stellplatz_form(request: HttpRequest, stellplatz: Stellplatz, title: str) -
         form = StellplatzForm(request.POST, instance=stellplatz)
         zuordnung_form = StellplatzZuordnungForm(request.POST, instance=zuordnung)
         if form.is_valid() and zuordnung_form.is_valid():
-            with transaction.atomic():
-                stellplatz = form.save()
-                if zuordnung_form.cleaned_data["wohnung"] is None:
-                    if not zuordnung._state.adding:
-                        zuordnung.delete()
-                else:
-                    zuordnung = zuordnung_form.save(commit=False)
-                    zuordnung.stellplatz = stellplatz
-                    zuordnung.save()
-            messages.success(request, "Der Stellplatz und seine Zuordnung wurden gespeichert.")
-            return redirect("verwaltung:stellplatz_edit", stellplatz_id=stellplatz.pk)
+            try:
+                with transaction.atomic():
+                    if not stellplatz._state.adding:
+                        get_object_or_404(Stellplatz.objects.select_for_update(), pk=stellplatz.pk)
+                        # The relation may have changed while these forms were validated.
+                        zuordnung = StellplatzZuordnung.objects.filter(
+                            stellplatz=stellplatz
+                        ).first()
+                        if zuordnung is None:
+                            zuordnung = StellplatzZuordnung(stellplatz=stellplatz)
+                    stellplatz = form.save()
+                    selected_unit = zuordnung_form.cleaned_data["wohnung"]
+                    if selected_unit is None:
+                        if not zuordnung._state.adding:
+                            zuordnung.delete()
+                    else:
+                        zuordnung.stellplatz = stellplatz
+                        zuordnung.wohnung = selected_unit
+                        zuordnung.save()
+            except IntegrityError:
+                zuordnung_form.add_error(
+                    "wohnung",
+                    "Die Stellplatzzuordnung konnte nicht gespeichert werden. "
+                    "Bitte prüfen Sie die aktuelle Zuordnung und versuchen Sie es erneut.",
+                )
+            else:
+                messages.success(request, "Der Stellplatz und seine Zuordnung wurden gespeichert.")
+                return redirect("verwaltung:stellplatz_edit", stellplatz_id=stellplatz.pk)
     else:
         form = StellplatzForm(instance=stellplatz)
         zuordnung_form = StellplatzZuordnungForm(instance=zuordnung)

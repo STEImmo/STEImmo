@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Bewerbung ansehen – STEImmo{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <p>
+            <a class="uk-button uk-button-text"
+               href="{% url 'wohnungsverwaltung:employee_application_list' %}?wohnung={{ application.wohnung.pk }}">
+                Zurück zu den Bewerbungen dieser Wohnung
+            </a>
+        </p>
+        <article class="uk-card uk-card-default uk-card-body uk-text-break">
+            <span class="uk-label">{{ application.get_applicant_status_display }}</span>
+            <h1 class="uk-card-title">{{ application.person }} – {{ application.wohnung }}</h1>
+            <h2 class="uk-h3">Pre-Bewerbung</h2>
+            <p>Pre-Eingang: {{ application.created_at|date:"d.m.Y, H:i" }} Uhr</p>
+            <dl class="uk-description-list">
+                <dt>Titel</dt>
+                <dd>{{ application.person.titel|default:"Nicht angegeben" }}</dd>
+                <dt>Geburtsdatum</dt>
+                <dd>{{ application.person.geburtsdatum|date:"d.m.Y"|default:"Nicht angegeben" }}</dd>
+                <dt>Geschlecht</dt>
+                <dd>{% if application.person.geschlecht == "male" %}Männlich{% elif application.person.geschlecht == "female" %}Weiblich{% elif application.person.geschlecht == "divers" %}Divers{% else %}Nicht angegeben{% endif %}</dd>
+                <dt>E-Mail</dt>
+                <dd>{{ application.person.email }}</dd>
+                <dt>Telefon</dt>
+                <dd>{{ application.person.telefonnummer|default:"Keine Telefonnummer hinterlegt" }}</dd>
+                <dt>Personen im Haushalt</dt>
+                <dd>{{ application.personenanzahl }}</dd>
+                <dt>Haustiere</dt>
+                <dd>{{ application.haustiere|yesno:"Ja,Nein" }}</dd>
+                <dt>Barrierefreiheit benötigt</dt>
+                <dd>{{ application.barrierefreiheit_benoetigt|yesno:"Ja,Nein" }}</dd>
+                <dt>Alternative Wohnung akzeptiert</dt>
+                <dd>{{ application.alternative_wohnung_akzeptiert|yesno:"Ja,Nein" }}</dd>
+                {% if application.bewerbung_stellplaetze.all %}
+                    <dt>Gewünschte Stellplätze</dt>
+                    <dd>{% for assignment in application.bewerbung_stellplaetze.all %}{{ assignment.stellplatz }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd>
+                {% endif %}
+                <dt>Über mich</dt>
+                <dd>{{ application.ueber_mich|linebreaksbr }}</dd>
+            </dl>
+        </article>
+
+        <article class="uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
+            <h2 class="uk-card-title">Main-Bewerbung</h2>
+            {% if application.submitted_at %}
+                <p>Main-Eingang: {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr</p>
+                <h3 class="uk-h4">Nachweise</h3>
+                {% for group in proof_groups %}
+                    <h4 class="uk-h5">{{ group.label }}</h4>
+                    {% if group.documents %}
+                        <ul class="uk-list uk-list-divider">
+                            {% for document in group.documents %}
+                                <li class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
+                                    <span>
+                                        <span>{{ document.name }}</span>
+                                        <span class="uk-text-meta">({{ document.size_display }})</span>
+                                    </span>
+                                    <a class="uk-button uk-button-default uk-button-small"
+                                       href="{{ document.download_url }}">
+                                        Sicher herunterladen
+                                    </a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="uk-text-danger">Nicht vorhanden</p>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <p>Noch nicht eingereicht. Main-Nachweise sind erst nach der Einreichung verfügbar.</p>
+            {% endif %}
+        </article>
+    </div>
+</section>
+{% endblock %}

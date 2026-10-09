@@ -71,6 +71,27 @@ class RegistrationViewTests(TestCase):
         self.assertTrue(user.is_active)
         self.assertFalse(RegistrationVerification.objects.filter(user=user).exists())
 
+    def test_registration_verification_does_not_log_in_a_newly_privileged_account(self):
+        self.client.post(reverse("register"), self.registration_data())
+        code = re.search(r"\b[0-9]{6}\b", mail.outbox[0].body).group()
+        account = get_user_model().objects.get(username="lina.lang@example.test")
+        account.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
+        response = self.client.post(
+            reverse("register_verify"), {"email": account.email, "code": code}
+        )
+        self.assertRedirects(response, reverse("login"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertEqual(
+            self.client.get(reverse("wohnungsverwaltung:employee_application_list")).status_code,
+            302,
+        )
+        self.assertRedirects(
+            self.client.post(
+                reverse("login"), {"username": account.email, "password": "FjordTanne!4826"}
+            ),
+            reverse("employee_mfa_verify"),
+        )
+
     def test_expired_verification_code_does_not_activate_the_account(self) -> None:
         self.client.post(reverse("register"), self.registration_data())
         verification = RegistrationVerification.objects.get()
@@ -216,6 +237,27 @@ class AccessControlTests(TestCase):
         self.assertTrue(self.applicant.has_perm(APPLICANT_ACCESS_PERMISSION))
         self.assertTrue(self.applicant.groups.filter(name=ROLE_APPLICANT).exists())
         self.assertTrue(self.applicant.groups.filter(name=ROLE_TENANT).exists())
+
+    def test_employee_navigation_hides_public_applicant_links(self) -> None:
+        direct_user = self.create_user("navigation-direct@example.test")
+        direct_user.user_permissions.add(Permission.objects.get(codename="access_employee_area"))
+        for user in (self.employee, self.account_manager, direct_user):
+            with self.subTest(user=user.username):
+                self.client.force_login(user)
+                response = self.client.get(reverse("home"))
+                self.assertNotContains(response, ">Wohnungen finden<")
+                self.assertNotContains(response, ">Bewerbungsvorschau<")
+                self.assertContains(response, ">Verwaltung<")
+
+    def test_public_and_applicant_navigation_keeps_apartment_links(self) -> None:
+        for user in (None, self.applicant):
+            with self.subTest(user=user):
+                self.client.logout()
+                if user is not None:
+                    self.client.force_login(user)
+                response = self.client.get(reverse("home"))
+                self.assertContains(response, ">Wohnungen finden<")
+                self.assertContains(response, ">Bewerbungsvorschau<")
 
     def test_navigation_only_shows_authorized_sections(self) -> None:
         self.client.force_login(self.applicant)
@@ -540,6 +582,108 @@ class UserAccountManagementTests(TestCase):
         payload.update(overrides)
         return payload
 
+    def test_new_employee_permissions_require_existing_applicant_sessions_to_log_in_again(self):
+        for direct_permission in (False, True):
+            with self.subTest(direct_permission=direct_permission):
+                email = f"upgrade-{direct_permission}@example.test"
+                account = self.user_model.objects.create_user(
+                    username=email, email=email, password="FjordTanne!4826"
+                )
+                person = Person.objects.create(
+                    user=account, vorname="Rollen", nachname="Test", email=email
+                )
+                account.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+                applicant_client = Client()
+                applicant_client.post(
+                    reverse("login"), {"username": email, "password": "FjordTanne!4826"}
+                )
+                self.assertEqual(
+                    applicant_client.get(
+                        reverse("wohnungsverwaltung:pre_application_list")
+                    ).status_code,
+                    200,
+                )
+                employee_group = Group.objects.get(name=ROLE_EMPLOYEE)
+                employee_permission = Permission.objects.get(codename="access_employee_area")
+                response = self.client.post(
+                    reverse("verwaltung:user_account_edit", args=[account.pk]),
+                    self.account_payload(
+                        person=str(person.pk),
+                        vorname="",
+                        nachname="",
+                        email="",
+                        password1="",
+                        password2="",
+                        roles=[str(Group.objects.get(name=ROLE_APPLICANT).pk)]
+                        + ([] if direct_permission else [str(employee_group.pk)]),
+                        direct_permissions=[str(employee_permission.pk)]
+                        if direct_permission
+                        else [],
+                    ),
+                )
+                self.assertEqual(response.status_code, 302)
+                dashboard = applicant_client.get(
+                    reverse("wohnungsverwaltung:employee_application_list")
+                )
+                self.assertRedirects(
+                    dashboard,
+                    reverse("login")
+                    + "?next="
+                    + reverse("wohnungsverwaltung:employee_application_list"),
+                )
+                login_response = applicant_client.post(
+                    reverse("login"), {"username": email, "password": "FjordTanne!4826"}
+                )
+                self.assertRedirects(login_response, reverse("employee_mfa_verify"))
+                self.assertEqual(
+                    applicant_client.get(
+                        reverse("wohnungsverwaltung:employee_application_list")
+                    ).status_code,
+                    302,
+                )
+                code = re.search(r"\b[0-9]{6}\b", mail.outbox[-1].body).group()
+                self.assertEqual(
+                    applicant_client.post(
+                        reverse("employee_mfa_verify"), {"code": code}
+                    ).status_code,
+                    302,
+                )
+                self.assertEqual(
+                    applicant_client.get(
+                        reverse("wohnungsverwaltung:employee_application_list")
+                    ).status_code,
+                    200,
+                )
+                self.assertEqual(
+                    self.client.get(reverse("verwaltung:user_account_list")).status_code, 200
+                )
+
+    def test_edit_without_privilege_elevation_preserves_existing_session(self):
+        account = self.user_model.objects.create_user(
+            username="unchanged@example.test",
+            email="unchanged@example.test",
+            password="FjordTanne!4826",
+        )
+        person = Person.objects.create(
+            user=account, vorname="Unverändert", nachname="Test", email=account.email
+        )
+        account.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+        form_response = self.client.get(reverse("verwaltung:user_account_edit", args=[account.pk]))
+        self.assertNotContains(form_response, "Offene Registrierung widerrufen")
+        applicant_client = Client()
+        applicant_client.force_login(account)
+        response = self.client.post(
+            reverse("verwaltung:user_account_edit", args=[account.pk]),
+            self.account_payload(
+                person=str(person.pk), vorname="", nachname="", email="", password1="", password2=""
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            applicant_client.get(reverse("wohnungsverwaltung:pre_application_list")).status_code,
+            200,
+        )
+
     def test_account_manager_can_create_a_linked_account_and_assign_tenant_role(self) -> None:
         roles = [
             str(Group.objects.get(name=ROLE_APPLICANT).pk),
@@ -608,6 +752,124 @@ class UserAccountManagementTests(TestCase):
         account.refresh_from_db()
         self.assertFalse(account.is_active)
         self.assertEqual(Person.objects.get(pk=person.pk).user, account)
+
+    def test_password_reset_invalidates_a_pending_employee_login_code(self):
+        pending_client = Client()
+        pending_client.post(
+            reverse("login"), {"username": self.manager.username, "password": "FjordTanne!4826"}
+        )
+        code = re.search(r"\b[0-9]{6}\b", mail.outbox[-1].body).group()
+        response = self.client.post(
+            reverse("verwaltung:user_account_edit", args=[self.manager.pk]),
+            self.account_payload(
+                person=str(self.manager.person_profile.pk),
+                vorname="",
+                nachname="",
+                email="",
+                roles=[str(Group.objects.get(name=ROLE_USER_MANAGEMENT).pk)],
+                password1="BirkenHafen!5927",
+                password2="BirkenHafen!5927",
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(EmployeeLoginVerification.objects.filter(user=self.manager).exists())
+        pending_client.post(reverse("employee_mfa_verify"), {"code": code})
+        self.assertNotIn("_auth_user_id", pending_client.session)
+        self.assertEqual(
+            pending_client.get(reverse("wohnungsverwaltung:employee_application_list")).status_code,
+            302,
+        )
+
+    def test_administratively_disabled_registration_cannot_reactivate_with_old_code(self):
+        pending_client = Client()
+        pending_client.post(reverse("register"), RegistrationViewTests().registration_data())
+        account = self.user_model.objects.get(username="lina.lang@example.test")
+        code = re.search(r"\b[0-9]{6}\b", mail.outbox[-1].body).group()
+        form_response = self.client.get(reverse("verwaltung:user_account_edit", args=[account.pk]))
+        self.assertContains(form_response, "Offene Registrierung widerrufen")
+        response = self.client.post(
+            reverse("verwaltung:user_account_edit", args=[account.pk]),
+            self.account_payload(
+                person=str(account.person_profile.pk),
+                vorname="",
+                nachname="",
+                email="",
+                password1="",
+                password2="",
+                is_active="",
+                revoke_registration="on",
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(RegistrationVerification.objects.filter(user=account).exists())
+        pending_client.post(reverse("register_verify"), {"email": account.email, "code": code})
+        account.refresh_from_db()
+        self.assertFalse(account.is_active)
+        self.assertNotIn("_auth_user_id", pending_client.session)
+
+    def test_reassigning_an_account_to_another_person_requires_a_new_password(self):
+        account = self.user_model.objects.create_user(
+            username="previous@example.test",
+            email="previous@example.test",
+            password="FjordTanne!4826",
+        )
+        previous = Person.objects.create(
+            user=account, vorname="Vorher", nachname="Test", email=account.email
+        )
+        target = Person.objects.create(
+            vorname="Andere", nachname="Person", email="target@example.test"
+        )
+        response = self.client.post(
+            reverse("verwaltung:user_account_edit", args=[account.pk]),
+            self.account_payload(
+                person=str(target.pk), vorname="", nachname="", email="", password1="", password2=""
+            ),
+        )
+        self.assertEqual(response.status_code, 200)
+        account.refresh_from_db()
+        self.assertEqual(account.person_profile.pk, previous.pk)
+        self.assertContains(
+            response, "Bei einem Personenwechsel muss ein neues Passwort vergeben werden."
+        )
+
+        response = self.client.post(
+            reverse("verwaltung:user_account_edit", args=[account.pk]),
+            self.account_payload(
+                person=str(target.pk),
+                vorname="",
+                nachname="",
+                email="",
+                password1="FjordTanne!4826",
+                password2="FjordTanne!4826",
+            ),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, "Bei einem Personenwechsel muss ein neues Passwort vergeben werden."
+        )
+
+        previous_client = Client()
+        previous_client.force_login(account)
+        response = self.client.post(
+            reverse("verwaltung:user_account_edit", args=[account.pk]),
+            self.account_payload(
+                person=str(target.pk),
+                vorname="",
+                nachname="",
+                email="",
+                password1="BirkenHafen!5927",
+                password2="BirkenHafen!5927",
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        account.refresh_from_db()
+        previous.refresh_from_db()
+        self.assertIsNone(previous.user_id)
+        self.assertEqual(account.person_profile.pk, target.pk)
+        self.assertEqual(account.email, target.email)
+        self.assertFalse(account.check_password("FjordTanne!4826"))
+        self.assertTrue(account.check_password("BirkenHafen!5927"))
+        self.assertNotIn("_auth_user_id", previous_client.session)
 
     def test_last_account_manager_cannot_remove_their_own_management_role(self) -> None:
         person = self.manager.person_profile

@@ -1,5 +1,7 @@
 import ipaddress
+import logging
 from datetime import timedelta
+from smtplib import SMTPException
 
 from django.conf import settings
 from django.contrib import messages
@@ -9,12 +11,13 @@ from django.contrib.auth.views import LoginView
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.db import IntegrityError, connection, transaction
+from django.db.models import Q
 from django.db.utils import OperationalError
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.crypto import salted_hmac
+from django.utils.crypto import constant_time_compare, salted_hmac
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from wohnungsverwaltung.access import (
@@ -38,7 +41,37 @@ from wohnungsverwaltung.models import (
 
 EMPLOYEE_MFA_USER_SESSION_KEY = "employee_mfa_user_id"
 EMPLOYEE_MFA_REDIRECT_SESSION_KEY = "employee_mfa_redirect_url"
+EMPLOYEE_MFA_CHALLENGE_SESSION_KEY = "employee_mfa_challenge"
 LOGIN_FAILURE_MESSAGE = "Bitte überprüfen Sie Ihre Zugangsdaten und versuchen Sie es später erneut."
+logger = logging.getLogger(__name__)
+
+
+def _deliver_verification_code(sender, email: str, code: str) -> bool:
+    try:
+        delivered = sender(email, code)
+    except (SMTPException, OSError) as error:
+        # Do not log recipient addresses, codes or server error details.
+        logger.warning("Verification email delivery failed (%s).", type(error).__name__)
+        return False
+    if not delivered:
+        logger.warning("Verification email delivery failed (no delivery).")
+    return bool(delivered)
+
+
+def _discard_employee_code_after_delivery_failure(user_id: int, challenge: str) -> None:
+    with transaction.atomic():
+        user = get_user_model().objects.select_for_update().filter(pk=user_id).first()
+        if user is not None:
+            EmployeeLoginVerification.objects.filter(user=user, code_hash=challenge).delete()
+
+
+def _clear_pending_employee_login(request: HttpRequest) -> None:
+    for key in (
+        EMPLOYEE_MFA_USER_SESSION_KEY,
+        EMPLOYEE_MFA_REDIRECT_SESSION_KEY,
+        EMPLOYEE_MFA_CHALLENGE_SESSION_KEY,
+    ):
+        request.session.pop(key, None)
 
 
 def _login_lockout_duration() -> timedelta:
@@ -71,10 +104,21 @@ def _client_ip_fingerprint(request: HttpRequest) -> str | None:
 
 def _account_for_login_identifier(identifier: str):
     user_model = get_user_model()
+    lookup = user_model.USERNAME_FIELD
+    identifiers = Q(**{lookup: identifier})
+    if "@" in identifier:
+        lookup += "__iexact"
+        # Registration uses Python's Unicode lowercase mapping. Keep the raw
+        # spelling as well so legacy addresses remain usable and ambiguous
+        # canonical/legacy pairs are rejected together.
+        identifiers |= Q(**{lookup: identifier}) | Q(**{lookup: identifier.lower()})
     try:
-        return user_model._default_manager.get_by_natural_key(identifier)
+        return user_model._default_manager.select_for_update().get(identifiers)
     except user_model.DoesNotExist:
         return None
+    except user_model.MultipleObjectsReturned:
+        # Do not choose an owner for ambiguous legacy email spellings.
+        raise ValidationError(LOGIN_FAILURE_MESSAGE, code="invalid_login") from None
 
 
 def _clear_expired_account_throttle(user, now) -> bool:
@@ -117,6 +161,9 @@ def _record_failed_login(user, ip_fingerprint: str | None) -> None:
     now = timezone.now()
     with transaction.atomic():
         if user is not None:
+            # Keep the same lock order as password authentication, including
+            # throttle creation (whose user foreign key also needs a row lock).
+            get_user_model().objects.select_for_update().get(pk=user.pk)
             throttle, _created = AccountLoginThrottle.objects.get_or_create(user=user)
             throttle = AccountLoginThrottle.objects.select_for_update().get(pk=throttle.pk)
             if throttle.locked_until is None or throttle.locked_until <= now:
@@ -164,12 +211,19 @@ class ThrottledAuthenticationForm(AuthenticationForm):
     def clean(self):
         username = self.cleaned_data.get("username")
         password = self.cleaned_data.get("password")
-        if username and password:
-            self.login_user = _account_for_login_identifier(username)
-            if _is_login_throttled(self.login_user, self.ip_fingerprint):
-                self.login_was_throttled = True
-                raise self.get_invalid_login_error()
-        return super().clean()
+        with transaction.atomic():
+            if username and password:
+                self.login_user = _account_for_login_identifier(username)
+                if self.login_user is not None:
+                    # Authenticate the exact account locked above, including
+                    # legacy Person email addresses containing uppercase letters.
+                    self.cleaned_data["username"] = self.login_user.get_username()
+                if _is_login_throttled(self.login_user, self.ip_fingerprint):
+                    self.login_was_throttled = True
+                    raise self.get_invalid_login_error()
+            # Django may write an upgraded password hash during authentication.
+            # The user lock prevents that write from overwriting a password reset.
+            return super().clean()
 
     def get_invalid_login_error(self):
         return ValidationError(LOGIN_FAILURE_MESSAGE, code="invalid_login")
@@ -205,10 +259,32 @@ class RoleAwareLoginView(LoginView):
         return super().form_invalid(form)
 
     def form_valid(self, form):
-        user = form.get_user()
-        _clear_account_login_throttle(user)
-        if user.has_perm(EMPLOYEE_ACCESS_PERMISSION) or user.has_perm(USER_MANAGEMENT_PERMISSION):
-            with transaction.atomic():
+        authenticated_user = form.get_user()
+        with transaction.atomic():
+            user = (
+                get_user_model()
+                .objects.select_for_update()
+                .filter(pk=authenticated_user.pk)
+                .first()
+            )
+            if (
+                user is None
+                or not user.is_active
+                or any(
+                    getattr(user, field) != getattr(authenticated_user, field)
+                    for field in ("password", "username", "email")
+                )
+            ):
+                form.add_error(None, form.get_invalid_login_error())
+                return super().form_invalid(form)
+            # Authentication checked this credential snapshot. Rights must be read
+            # afresh while account changes are excluded by the same user-row lock.
+            user.backend = authenticated_user.backend
+            form.user_cache = user
+            _clear_account_login_throttle(user)
+            if user.has_perm(EMPLOYEE_ACCESS_PERMISSION) or user.has_perm(
+                USER_MANAGEMENT_PERMISSION
+            ):
                 verification, _created = (
                     EmployeeLoginVerification.objects.select_for_update().get_or_create(
                         user=user,
@@ -217,14 +293,30 @@ class RoleAwareLoginView(LoginView):
                 )
                 code = verification.issue_code()
                 verification.save()
-            send_employee_mfa_code(user.email, code)
-            self.request.session[EMPLOYEE_MFA_USER_SESSION_KEY] = user.pk
-            self.request.session[EMPLOYEE_MFA_REDIRECT_SESSION_KEY] = (
-                self.get_redirect_url() or self.get_default_redirect_url_for_user(user)
+                self.request.session[EMPLOYEE_MFA_USER_SESSION_KEY] = user.pk
+                self.request.session[EMPLOYEE_MFA_CHALLENGE_SESSION_KEY] = verification.code_hash
+                self.request.session[EMPLOYEE_MFA_REDIRECT_SESSION_KEY] = (
+                    self.get_redirect_url() or self.get_default_redirect_url_for_user(user)
+                )
+            else:
+                response = super().form_valid(form)
+                # SessionMiddleware runs after this transaction. Persist now so a
+                # subsequent account change can revoke even this unfinished response.
+                self.request.session.save()
+                return response
+        # SMTP must not hold a database lock. A concurrent account change can
+        # invalidate the issued code even if delivery has not completed yet.
+        if not _deliver_verification_code(send_employee_mfa_code, user.email, code):
+            _discard_employee_code_after_delivery_failure(user.pk, verification.code_hash)
+            _clear_pending_employee_login(self.request)
+            form.add_error(
+                None,
+                "Der Einmalcode konnte nicht gesendet werden. "
+                "Bitte versuchen Sie die Anmeldung erneut.",
             )
-            messages.success(self.request, "Wir haben Ihnen einen Einmalcode gesendet.")
-            return redirect("employee_mfa_verify")
-        return super().form_valid(form)
+            return super().form_invalid(form)
+        messages.success(self.request, "Wir haben Ihnen einen Einmalcode gesendet.")
+        return redirect("employee_mfa_verify")
 
     def get_default_redirect_url_for_user(self, user) -> str:
         if user.has_perm(EMPLOYEE_ACCESS_PERMISSION):
@@ -251,38 +343,51 @@ def register(request: HttpRequest) -> HttpResponse:
         except IntegrityError:
             form.add_error("email", ACCOUNT_CREATION_ERROR)
         else:
-            send_registration_code(user.email, code)
             request.session["registration_verification_email"] = user.email
-            messages.success(request, "Wir haben Ihnen einen Bestätigungscode gesendet.")
+            if _deliver_verification_code(send_registration_code, user.email, code):
+                messages.success(request, "Wir haben Ihnen einen Bestätigungscode gesendet.")
+            else:
+                messages.error(
+                    request,
+                    "Der Bestätigungscode konnte nicht gesendet werden. "
+                    "Sie können ihn frühestens eine Minute nach dem letzten "
+                    "Versandversuch erneut anfordern.",
+                )
             return redirect("register_verify")
     return render(request, "registration/register.html", {"form": form})
 
 
-def send_registration_code(email: str, code: str) -> None:
-    send_mail(
-        subject="STEImmo: Bestätigungscode für Ihre Registrierung",
-        message=(
-            "Ihr Bestätigungscode lautet: "
-            f"{code}\n\n"
-            "Der Code ist 15 Minuten gültig. Falls Sie kein Konto angelegt haben, "
-            "können Sie diese E-Mail ignorieren."
-        ),
-        from_email=None,
-        recipient_list=[email],
+def send_registration_code(email: str, code: str) -> bool:
+    return (
+        send_mail(
+            subject="STEImmo: Bestätigungscode für Ihre Registrierung",
+            message=(
+                "Ihr Bestätigungscode lautet: "
+                f"{code}\n\n"
+                "Der Code ist 15 Minuten gültig. Falls Sie kein Konto angelegt haben, "
+                "können Sie diese E-Mail ignorieren."
+            ),
+            from_email=None,
+            recipient_list=[email],
+        )
+        == 1
     )
 
 
-def send_employee_mfa_code(email: str, code: str) -> None:
-    send_mail(
-        subject="STEImmo: Einmalcode für die Mitarbeiteranmeldung",
-        message=(
-            "Ihr Einmalcode lautet: "
-            f"{code}\n\n"
-            "Der Code ist 15 Minuten gültig. Falls Sie diese Anmeldung nicht gestartet haben, "
-            "ignorieren Sie diese E-Mail."
-        ),
-        from_email=None,
-        recipient_list=[email],
+def send_employee_mfa_code(email: str, code: str) -> bool:
+    return (
+        send_mail(
+            subject="STEImmo: Einmalcode für die Mitarbeiteranmeldung",
+            message=(
+                "Ihr Einmalcode lautet: "
+                f"{code}\n\n"
+                "Der Code ist 15 Minuten gültig. Falls Sie diese Anmeldung nicht gestartet haben, "
+                "ignorieren Sie diese E-Mail."
+            ),
+            from_email=None,
+            recipient_list=[email],
+        )
+        == 1
     )
 
 
@@ -293,31 +398,36 @@ def register_verify(request: HttpRequest) -> HttpResponse:
     if request.method == "POST" and form.is_valid():
         try:
             with transaction.atomic():
-                verification = (
-                    RegistrationVerification.objects.select_for_update()
-                    .select_related("user")
-                    .get(
-                        user__email__iexact=form.cleaned_data["email"],
-                        user__is_active=False,
-                    )
+                user = (
+                    get_user_model()
+                    .objects.select_for_update()
+                    .get(email__iexact=form.cleaned_data["email"], is_active=False)
                 )
+                verification = RegistrationVerification.objects.select_for_update().get(user=user)
                 if verification.matches(form.cleaned_data["code"]):
-                    user = verification.user
                     user.is_active = True
                     user.save(update_fields=["is_active"])
                     verification.delete()
+                    request.session.pop("registration_verification_email", None)
+                    if user.has_perm(EMPLOYEE_ACCESS_PERMISSION) or user.has_perm(
+                        USER_MANAGEMENT_PERMISSION
+                    ):
+                        messages.success(
+                            request,
+                            "Ihr Konto wurde bestätigt. Bitte melden Sie sich mit Passwort und "
+                            "Mitarbeiter-Einmalcode an.",
+                        )
+                        return redirect("login")
+                    login(request, user)
+                    request.session.save()
+                    messages.success(request, "Ihr Konto wurde bestätigt.")
+                    return redirect("wohnungsverwaltung:pre_application_list")
                 else:
                     verification.attempts += 1
                     verification.save(update_fields=["attempts"])
-                    user = None
-        except RegistrationVerification.DoesNotExist:
+        except (RegistrationVerification.DoesNotExist, get_user_model().DoesNotExist):
             form.add_error(None, "Der Code konnte nicht bestätigt werden.")
         else:
-            if user is not None:
-                login(request, user)
-                request.session.pop("registration_verification_email", None)
-                messages.success(request, "Ihr Konto wurde bestätigt.")
-                return redirect("wohnungsverwaltung:pre_application_list")
             form.add_error(None, "Der Code konnte nicht bestätigt werden.")
     return render(
         request,
@@ -334,14 +444,12 @@ def resend_registration_code(request: HttpRequest) -> HttpResponse:
     if form.is_valid():
         try:
             with transaction.atomic():
-                verification = (
-                    RegistrationVerification.objects.select_for_update()
-                    .select_related("user")
-                    .get(
-                        user__email__iexact=form.cleaned_data["email"],
-                        user__is_active=False,
-                    )
+                user = (
+                    get_user_model()
+                    .objects.select_for_update()
+                    .get(email__iexact=form.cleaned_data["email"], is_active=False)
                 )
+                verification = RegistrationVerification.objects.select_for_update().get(user=user)
                 if verification.can_resend():
                     code = verification.issue_code()
                     verification.save(
@@ -349,55 +457,61 @@ def resend_registration_code(request: HttpRequest) -> HttpResponse:
                     )
                 else:
                     code = None
-        except RegistrationVerification.DoesNotExist:
+        except (RegistrationVerification.DoesNotExist, get_user_model().DoesNotExist):
             code = None
         else:
             if code is not None:
-                send_registration_code(verification.user.email, code)
+                _deliver_verification_code(send_registration_code, user.email, code)
         request.session["registration_verification_email"] = form.cleaned_data["email"]
     messages.success(
         request,
-        "Falls eine offene Registrierung vorliegt, wurde ein neuer Bestätigungscode gesendet.",
+        "Falls eine offene Registrierung vorliegt und der Versand möglich ist, "
+        "erhalten Sie einen neuen Bestätigungscode. "
+        "Wenn keine E-Mail ankommt, können Sie den Code frühestens eine Minute "
+        "nach dem letzten Versandversuch erneut anfordern.",
     )
     return redirect("register_verify")
 
 
 def employee_mfa_verify(request: HttpRequest) -> HttpResponse:
     pending_user_id = request.session.get(EMPLOYEE_MFA_USER_SESSION_KEY)
-    if pending_user_id is None:
+    pending_challenge = request.session.get(EMPLOYEE_MFA_CHALLENGE_SESSION_KEY, "")
+    if pending_user_id is None or not pending_challenge:
         return redirect("login")
 
     form = EmployeeMfaCodeForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         try:
             with transaction.atomic():
-                verification = (
-                    EmployeeLoginVerification.objects.select_for_update()
-                    .select_related("user")
-                    .get(user_id=pending_user_id, user__is_active=True)
+                user = (
+                    get_user_model()
+                    .objects.select_for_update()
+                    .get(pk=pending_user_id, is_active=True)
                 )
+                verification = EmployeeLoginVerification.objects.select_for_update().get(user=user)
+                if not constant_time_compare(pending_challenge, verification.code_hash):
+                    raise EmployeeLoginVerification.DoesNotExist
                 if verification.matches(form.cleaned_data["code"]):
-                    user = verification.user
                     verification.delete()
+                    redirect_url = request.session.pop(EMPLOYEE_MFA_REDIRECT_SESSION_KEY, "")
+                    # Switching accounts flushes the old session, so capture the
+                    # checked destination before login() changes the session.
+                    login(request, user)
+                    _clear_pending_employee_login(request)
+                    request.session.save()
+                    if url_has_allowed_host_and_scheme(
+                        url=redirect_url,
+                        allowed_hosts={request.get_host()},
+                        require_https=request.is_secure(),
+                    ):
+                        return redirect(redirect_url)
+                    return redirect(RoleAwareLoginView().get_default_redirect_url_for_user(user))
                 else:
                     verification.attempts += 1
                     verification.save(update_fields=["attempts"])
-                    user = None
-        except EmployeeLoginVerification.DoesNotExist:
-            request.session.pop(EMPLOYEE_MFA_USER_SESSION_KEY, None)
-            request.session.pop(EMPLOYEE_MFA_REDIRECT_SESSION_KEY, None)
+        except (EmployeeLoginVerification.DoesNotExist, get_user_model().DoesNotExist):
+            _clear_pending_employee_login(request)
             return redirect("login")
         else:
-            if user is not None:
-                login(request, user)
-                redirect_url = request.session.pop(EMPLOYEE_MFA_REDIRECT_SESSION_KEY, "")
-                request.session.pop(EMPLOYEE_MFA_USER_SESSION_KEY, None)
-                if url_has_allowed_host_and_scheme(
-                    url=redirect_url,
-                    allowed_hosts={request.get_host()},
-                    require_https=request.is_secure(),
-                ):
-                    return redirect(redirect_url)
-                return redirect("verwaltung:wohnung_list")
             form.add_error(None, "Der Code konnte nicht bestätigt werden.")
     return render(request, "registration/employee_mfa_verify.html", {"form": form})

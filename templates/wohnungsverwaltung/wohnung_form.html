@@ -49,40 +49,6 @@
             </section>
 
             <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
-                <div class="uk-flex uk-flex-between uk-flex-middle">
-                    <h2 class="uk-h3">Räume</h2>
-                    {% if wohnung.pk %}
-                        <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:raum_create' wohnung.pk %}">Raum hinzufügen</a>
-                    {% endif %}
-                </div>
-                {% if wohnung.pk %}
-                    {% if raeume %}
-                        <table class="uk-table uk-table-divider uk-table-small uk-margin-top">
-                            <thead><tr><th>Name</th><th><span class="uk-hidden">Aktion</span></th></tr></thead>
-                            <tbody>
-                                {% for raum in raeume %}
-                                    <tr>
-                                        <td>{{ raum.name }}</td>
-                                        <td class="uk-text-right">
-                                            <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:raum_edit' wohnung.pk raum.pk %}">Bearbeiten</a>
-                                            <form class="uk-display-inline" method="post" action="{% url 'verwaltung:raum_delete' wohnung.pk raum.pk %}">
-                                                {% csrf_token %}
-                                                <button class="uk-button uk-button-danger uk-button-small" type="submit">Löschen</button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    {% else %}
-                        <p class="uk-text-muted uk-margin-top">Noch keine Räume angelegt.</p>
-                    {% endif %}
-                {% else %}
-                    <p class="uk-text-muted">Speichern Sie die Wohnung zuerst, um Räume zu pflegen.</p>
-                {% endif %}
-            </section>
-
-            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
                 <h2 class="uk-h3">Miete</h2>
                 <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.kaltmiete %}</div>
@@ -124,6 +90,40 @@
 
             <button class="uk-button uk-button-primary" type="submit">Speichern</button>
         </form>
+
+        <section class="uk-card uk-card-default uk-card-body uk-margin-top">
+            <div class="uk-flex uk-flex-between uk-flex-middle">
+                <h2 class="uk-h3">Räume</h2>
+                {% if wohnung.pk %}
+                    <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:raum_create' wohnung.pk %}">Raum hinzufügen</a>
+                {% endif %}
+            </div>
+            {% if wohnung.pk %}
+                {% if raeume %}
+                    <table class="uk-table uk-table-divider uk-table-small uk-margin-top">
+                        <thead><tr><th>Name</th><th><span class="uk-hidden">Aktion</span></th></tr></thead>
+                        <tbody>
+                            {% for raum in raeume %}
+                                <tr>
+                                    <td>{{ raum.name }}</td>
+                                    <td class="uk-text-right">
+                                        <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:raum_edit' wohnung.pk raum.pk %}">Bearbeiten</a>
+                                        <form class="uk-display-inline" method="post" action="{% url 'verwaltung:raum_delete' wohnung.pk raum.pk %}">
+                                            {% csrf_token %}
+                                            <button class="uk-button uk-button-danger uk-button-small" type="submit">Löschen</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="uk-text-muted uk-margin-top">Noch keine Räume angelegt.</p>
+                {% endif %}
+            {% else %}
+                <p class="uk-text-muted">Speichern Sie die Wohnung zuerst, um Räume zu pflegen.</p>
+            {% endif %}
+        </section>
     </div>
 </section>
 {% endblock %}

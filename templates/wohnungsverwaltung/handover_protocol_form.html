@@ -239,6 +239,11 @@
                 input.value = roomId;
                 input.setAttribute("value", roomId);
             });
+            const roomProtocolId = card.querySelector("[data-room-removal]")?.value || "";
+            card.querySelectorAll('input[name$="-raumprotokoll"]').forEach((input) => {
+                input.value = roomProtocolId;
+                input.setAttribute("value", roomProtocolId);
+            });
             const title = card.querySelector("[data-room-title]");
             if (title) {
                 title.textContent = roomName ? `Raum: ${roomName}` : "Raum";
@@ -299,6 +304,10 @@
             const removeRoomButton = event.target.closest("[data-remove-room]");
             if (removeRoomButton) {
                 const roomCard = removeRoomButton.closest("[data-room-card]");
+                const removal = roomCard?.querySelector("[data-room-removal]");
+                if (removal) {
+                    removal.checked = true;
+                }
                 roomCard?.querySelectorAll('input[name$="-DELETE"]').forEach((input) => {
                     input.checked = true;
                 });
@@ -379,7 +388,7 @@
             "nachbesserung_bis",
             "nachbesserung_beschreibung",
         ];
-        const checklistFieldNames = ["pruefpunkt", "bereich", "merkmal", "wert", "zusatzangaben", "DELETE"];
+        const checklistFieldNames = ["raumprotokoll", "pruefpunkt", "bereich", "merkmal", "wert", "zusatzangaben", "DELETE"];
         const keyFieldNames = [
             "schluessel",
             "DELETE",
@@ -430,6 +439,8 @@
             rooms: Array.from(document.querySelectorAll("[data-room-card]"))
                 .map((card) => ({
                     raum: card.querySelector("[data-room-source]")?.value || "",
+                    raumprotokoll: card.querySelector("[data-room-removal]")?.value || "",
+                    removed: Boolean(card.querySelector("[data-room-removal]")?.checked),
                     items: Array.from(card.querySelectorAll("[data-room-checklist-form]"))
                         .map((item) => serializeFields(item, checklistFieldNames)),
                 })),
@@ -517,11 +528,15 @@
             }
             (rooms || []).forEach((savedRoom) => {
                 let card = Array.from(target.querySelectorAll("[data-room-card]")).find((existing) => (
-                    existing.querySelector("[data-room-source]")?.value === savedRoom.raum
+                    savedRoom.raumprotokoll
+                        ? existing.querySelector("[data-room-removal]")?.value === savedRoom.raumprotokoll
+                        : (!("raumprotokoll" in savedRoom) || !existing.querySelector("[data-room-removal]"))
+                            && existing.querySelector("[data-room-source]")?.value === savedRoom.raum
                 ));
                 if (!card) {
                     card = Array.from(target.querySelectorAll("[data-room-card]")).find((existing) => (
-                        !existing.querySelector("[data-room-source]")?.value
+                        !existing.querySelector("[data-room-removal]")
+                            && !existing.querySelector("[data-room-source]")?.value
                     ));
                 }
                 if (!card) {
@@ -563,7 +578,12 @@
                     item.hidden = Boolean(savedItem.DELETE?.checked);
                     filterFeatureNames(item);
                 });
-                card.hidden = Array.from(card.querySelectorAll("[data-room-checklist-form]")).every((item) => item.hidden);
+                const removal = card.querySelector("[data-room-removal]");
+                if (removal) {
+                    removal.checked = Boolean(savedRoom.removed);
+                }
+                card.hidden = Boolean(savedRoom.removed)
+                    || Array.from(card.querySelectorAll("[data-room-checklist-form]")).every((item) => item.hidden);
                 synchronizeRoomCard(card);
             });
         };

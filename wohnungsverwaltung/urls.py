@@ -37,9 +37,39 @@ urlpatterns = [
         name="main_application_status",
     ),
     path(
+        "bewerbung/<uuid:application_id>/nachweise/<str:document_type>/",
+        views.applicant_application_document,
+        name="applicant_application_document",
+    ),
+    path(
+        "bewerbung/<uuid:application_id>/nachweise/datei/<uuid:proof_id>/",
+        views.applicant_application_proof_download,
+        name="applicant_application_proof_download",
+    ),
+    path(
         "bewerbung/<uuid:application_id>/zurueckziehen/",
         views.application_withdraw,
         name="application_withdraw",
+    ),
+    path(
+        "bewerbungen/mitarbeiter/",
+        views.employee_application_list,
+        name="employee_application_list",
+    ),
+    path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/",
+        views.employee_application_detail,
+        name="employee_application_detail",
+    ),
+    path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/nachweise/<str:document_type>/",
+        views.employee_application_document,
+        name="employee_application_document",
+    ),
+    path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/nachweise/datei/<uuid:proof_id>/",
+        views.employee_application_proof_download,
+        name="employee_application_proof_download",
     ),
     path("", views.handover_protocol_list, name="handover_protocol_list"),
     path("neu/", views.handover_protocol_create, name="handover_protocol_create"),

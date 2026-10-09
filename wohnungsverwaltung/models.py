@@ -19,6 +19,34 @@ def handover_photo_upload_path(instance, _filename: str) -> str:
     return f"u/{protocol_id.hex}/{checklist_item.pk.hex}/{uuid.uuid4().hex}"
 
 
+def _application_proof_upload_path(instance, category: str) -> str:
+    return f"bewerbungen/{instance.pk.hex}/{category}/{uuid.uuid4().hex}"
+
+
+def income_proof_upload_path(instance, _filename: str) -> str:
+    return _application_proof_upload_path(instance, "einkommen")
+
+
+def identity_proof_upload_path(instance, _filename: str) -> str:
+    return _application_proof_upload_path(instance, "identitaet")
+
+
+def credit_report_proof_upload_path(instance, _filename: str) -> str:
+    return _application_proof_upload_path(instance, "bonitaet")
+
+
+def application_proof_upload_path(instance, _filename: str) -> str:
+    category_directories = {
+        ApplicationProofCategory.INCOME: "einkommen",
+        ApplicationProofCategory.IDENTITY: "identitaet",
+        ApplicationProofCategory.CREDIT_REPORT: "bonitaet",
+    }
+    return _application_proof_upload_path(
+        instance.application,
+        category_directories[instance.category],
+    )
+
+
 def calculate_photo_checksum(photo) -> str:
     """Return the SHA-256 checksum while preserving the current file position."""
     position = photo.tell()
@@ -48,6 +76,12 @@ class BewerbungStatus(models.TextChoices):
     OPEN = "open", "open"
     DECLINED = "declined", "declined"
     BLOCKED = "blocked", "blocked"
+
+
+class ApplicationProofCategory(models.TextChoices):
+    INCOME = "income", "Gehaltsnachweise"
+    IDENTITY = "identity", "Identitätsnachweis"
+    CREDIT_REPORT = "credit_report", "SCHUFA-Unterlage"
 
 
 class StellplatzTyp(models.TextChoices):
@@ -376,6 +410,16 @@ class Bewerbung(models.Model):
         ),
     )
     interest_withdrawn_at = models.DateTimeField(blank=True, null=True, editable=False)
+    income_proof = models.FileField(upload_to=income_proof_upload_path, blank=True)
+    income_proof_original_name = models.CharField(max_length=255, blank=True, default="")
+    identity_proof = models.FileField(upload_to=identity_proof_upload_path, blank=True)
+    identity_proof_original_name = models.CharField(max_length=255, blank=True, default="")
+    credit_report_proof = models.FileField(
+        upload_to=credit_report_proof_upload_path,
+        blank=True,
+    )
+    credit_report_proof_original_name = models.CharField(max_length=255, blank=True, default="")
+    submitted_at = models.DateTimeField(blank=True, null=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -414,6 +458,8 @@ class Bewerbung(models.Model):
             return "Abgelehnt"
         if self.status == BewerbungStatus.BLOCKED:
             return "Gesperrt"
+        if self.submitted_at is not None:
+            return "Main-Bewerbung eingereicht"
         if self.main_application_unlocked:
             return "Main-Bewerbung freigeschaltet"
         return "In Bearbeitung"
@@ -425,9 +471,41 @@ class Bewerbung(models.Model):
             return "Die Bewerbung wurde beendet."
         if self.status == BewerbungStatus.BLOCKED:
             return "Die Bewerbung ist derzeit gesperrt."
+        if self.submitted_at is not None:
+            return "Bitte warten Sie auf die Rückmeldung des Mitarbeiters."
         if self.main_application_unlocked:
-            return "Ihre Main-Bewerbung ist freigeschaltet."
+            return "Bitte reichen Sie die Main-Bewerbung mit allen drei Nachweisen ein."
         return "Warten Sie auf die nächste Rückmeldung zu Ihrer Bewerbung."
+
+
+class ApplicationProof(models.Model):
+    proof_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    application = models.ForeignKey(
+        Bewerbung,
+        on_delete=models.CASCADE,
+        related_name="proof_files",
+    )
+    category = models.CharField(max_length=32, choices=ApplicationProofCategory.choices)
+    file = models.FileField(upload_to=application_proof_upload_path)
+    original_name = models.CharField(max_length=255)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "application_proof"
+        ordering = ("uploaded_at", "proof_id")
+        indexes = [
+            models.Index(fields=("application", "category"), name="app_proof_category_idx"),
+        ]
+
+
+class ApplicationProofCleanup(models.Model):
+    cleanup_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    storage_name = models.CharField(max_length=512, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "application_proof_cleanup"
+        ordering = ("created_at", "cleanup_id")
 
 
 class Stellplatz(models.Model):
@@ -723,6 +801,26 @@ class RaumMerkmalFoto(models.Model):
                 name="raum_merkmal_foto_hash_eindeutig",
             )
         ]
+
+
+class HandoverPhotoCleanup(models.Model):
+    cleanup_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    storage_name = models.CharField(max_length=512, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "handover_photo_cleanup"
+        ordering = ("created_at", "cleanup_id")
+
+
+class HandoverArchiveCleanup(models.Model):
+    cleanup_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    storage_name = models.CharField(max_length=512, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "handover_archive_cleanup"
+        ordering = ("created_at", "cleanup_id")
 
 
 class ProtokollSchluessel(models.Model):

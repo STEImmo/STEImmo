@@ -22,11 +22,21 @@
                 <dt>Datum und Uhrzeit</dt>
                 <dd>{{ protocol.uebergabe_zeitpunkt|date:"d.m.Y H:i" }}</dd>
                 <dt>Wohnung</dt>
-                <dd>Gebäude {{ protocol.wohnung.gebaeudenummer }}, Wohnung {{ protocol.wohnung.wohnungsnummer }}</dd>
+                <dd>
+                    {{ apartment_label }}
+                    {% if uses_current_apartment_label %}
+                        <div class="uk-text-meta">Historische Wohnungsbezeichnung nicht gesichert. Aktuelle Bezeichnung aus dem Wohnungsstamm.</div>
+                    {% endif %}
+                </dd>
                 <dt>Vertretung des Unternehmens</dt>
                 <dd>{{ representative_name }}</dd>
                 <dt>Beteiligte Person</dt>
-                <dd>{{ protocol.person.vorname }} {{ protocol.person.nachname }}</dd>
+                <dd>
+                    {{ tenant_name }}
+                    {% if uses_current_tenant_name %}
+                        <div class="uk-text-meta">Historischer Name nicht gesichert. Aktueller Name aus dem Personenstamm.</div>
+                    {% endif %}
+                </dd>
                 <dt>Kontakt der beteiligten Person</dt>
                 <dd>{{ protocol.person.email }}{% if protocol.person.telefonnummer %}, {{ protocol.person.telefonnummer }}{% endif %}</dd>
                 {% if protocol.protokoll_typ == "move_out" %}
@@ -125,6 +135,12 @@
                 <div class="uk-width-expand"><h2 class="uk-heading-divider uk-margin-remove">Räume und Prüfpunkte</h2></div>
                 {% if protocol.status == "open" %}<div class="uk-width-auto"><a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:handover_protocol_room_create' protocol.pk %}">Raum hinzufügen</a></div>{% endif %}
             </div>
+            {% if archived_snapshot %}
+                {% include "wohnungsverwaltung/_handover_snapshot_rooms.html" with snapshot=archived_snapshot card_class="uk-card-muted" archive_detail=True only %}
+            {% else %}
+            {% if protocol.status == "signed" %}
+                <p class="uk-text-meta uk-margin-top">Für dieses Altprotokoll liegen keine gesicherten Prüfpunktbezeichnungen vor. Die Anzeige verwendet aktuelle Vorlagen.</p>
+            {% endif %}
             {% if protocol.raeume.all %}
                 <div class="uk-child-width-1-1 uk-grid-small uk-margin-top" uk-grid>
                     {% for room in protocol.raeume.all %}
@@ -190,6 +206,7 @@
                 </div>
             {% else %}
                 <p class="uk-text-danger uk-margin-top">Für die Bestätigung muss mindestens ein Raum mit Prüfpunkten erfasst sein.</p>
+            {% endif %}
             {% endif %}
         </div>
 

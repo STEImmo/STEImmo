@@ -4,6 +4,7 @@ from io import BytesIO
 from django.contrib import messages
 from django.core.files.storage import default_storage
 from django.db import transaction
+from django.db.models import Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -18,6 +19,7 @@ from .access import (
     tenant_required,
 )
 from .export_forms import ProtocolSigningForm
+from .handover_archive_files import cleanup_archive_files
 from .handover_export import (
     ExportLimitExceeded,
     archive_protocol,
@@ -28,7 +30,7 @@ from .handover_export import (
     load_protocol,
     token_matches,
 )
-from .models import Protokoll, ProtokollStatus
+from .models import Protokoll, ProtokollStatus, ProtokollTyp, Wohnung, WohnungStatus
 
 logger = logging.getLogger(__name__)
 
@@ -78,14 +80,6 @@ def handover_protocol_finalize(request, protocol_id):
     )
 
 
-def _cleanup(paths):
-    for path in paths:
-        try:
-            default_storage.delete(path)
-        except OSError:
-            logger.error("Temporäre Exportdatei konnte nicht bereinigt werden.")
-
-
 @employee_required
 @never_cache
 @require_POST
@@ -132,6 +126,23 @@ def handover_protocol_confirm(request, protocol_id):
                     "name": snapshot["tenant"],
                     "data": form.cleaned_data["mieter"],
                 }
+            # Serialize different protocols for this apartment before comparing chronology.
+            Wohnung.objects.select_for_update().get(pk=protocol.wohnung_id)
+            later_handover = Q(uebergabe_zeitpunkt__gt=protocol.uebergabe_zeitpunkt)
+            if protocol.protokoll_typ == ProtokollTyp.MOVE_OUT:
+                # At equal timestamps, move-out precedes move-in regardless of confirmation order.
+                later_handover |= Q(
+                    uebergabe_zeitpunkt=protocol.uebergabe_zeitpunkt,
+                    protokoll_typ=ProtokollTyp.MOVE_IN,
+                )
+            if not Protokoll.objects.filter(
+                later_handover, wohnung_id=protocol.wohnung_id, status=ProtokollStatus.SIGNED
+            ).exists():
+                Wohnung.objects.filter(pk=protocol.wohnung_id).update(
+                    status=WohnungStatus.TAKEN
+                    if protocol.protokoll_typ == ProtokollTyp.MOVE_IN
+                    else WohnungStatus.FREE
+                )
             archive_protocol(
                 protocol,
                 snapshot,
@@ -142,10 +153,10 @@ def handover_protocol_confirm(request, protocol_id):
                 user=request.user,
             )
     except ExportLimitExceeded as error:
-        _cleanup(stored)
+        cleanup_archive_files(stored)
         return JsonResponse({"error": str(error)}, status=413)
     except (OSError, ValueError):
-        _cleanup(stored)
+        cleanup_archive_files(stored)
         logger.error("Übergabeabschluss wegen Export- oder Speicherfehler abgebrochen.")
         return JsonResponse(
             {
@@ -157,7 +168,7 @@ def handover_protocol_confirm(request, protocol_id):
             status=503,
         )
     except Exception:
-        _cleanup(stored)
+        cleanup_archive_files(stored)
         raise
     return JsonResponse({"redirect": _detail_url(protocol.pk)})
 
@@ -224,13 +235,13 @@ def handover_protocol_pdf_create(request, protocol_id):
                     protocol, build_snapshot(protocol), {}, timezone.now(), stored, legacy=True
                 )
     except ExportLimitExceeded as error:
-        _cleanup(stored)
+        cleanup_archive_files(stored)
         messages.error(request, str(error))
         return render(request, "wohnungsverwaltung/handover_export_error.html", status=413)
     except (OSError, ValueError):
-        _cleanup(stored)
+        cleanup_archive_files(stored)
         return render(request, "wohnungsverwaltung/handover_export_error.html", status=503)
     except Exception:
-        _cleanup(stored)
+        cleanup_archive_files(stored)
         raise
     return redirect("wohnungsverwaltung:handover_protocol_pdf", protocol_id=protocol_id)
