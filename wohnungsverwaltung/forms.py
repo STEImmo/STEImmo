@@ -1641,7 +1641,7 @@ class InlineRoomChecklistForm(forms.Form):
             self.add_error("fotos", "Nur die Verwaltung darf Fotos hochladen.")
         return cleaned_data
 
-    def validate_room_assignment(self) -> None:
+    def validate_room_assignment(self, *, removed_item_ids=()) -> None:
         """Validate the checkpoint after the formset has resolved its room."""
         cleaned_data = self.cleaned_data
         room = cleaned_data.get("raum")
@@ -1649,18 +1649,18 @@ class InlineRoomChecklistForm(forms.Form):
         if room is None or feature is None:
             return
         existing = cleaned_data.get("pruefpunkt")
-        if existing is None and self.protocol:
-            existing = (
-                self.fields["pruefpunkt"]
-                .queryset.filter(raumprotokoll__raum=room, merkmal=feature)
-                .first()
+        if existing is not None and existing.pk in removed_item_ids:
+            self.add_error(
+                "pruefpunkt", "Ein Prüfpunkt kann nicht gleichzeitig entfernt und geändert werden."
             )
+            return
+        remaining_items = self.fields["pruefpunkt"].queryset.exclude(pk__in=removed_item_ids)
+        if existing is None and self.protocol:
+            existing = remaining_items.filter(raumprotokoll__raum=room, merkmal=feature).first()
         if existing:
             self.existing_item = existing
-            collision = (
-                self.fields["pruefpunkt"]
-                .queryset.filter(raumprotokoll__raum=room, merkmal=feature)
-                .exclude(pk=existing.pk)
+            collision = remaining_items.filter(raumprotokoll__raum=room, merkmal=feature).exclude(
+                pk=existing.pk
             )
             if collision.exists():
                 self.add_error("merkmal", "Dieser Prüfpunkt ist in diesem Raum bereits erfasst.")
@@ -1726,6 +1726,11 @@ class InlineRoomChecklistForm(forms.Form):
 class RoomChecklistFormSet(BaseFormSet):
     def clean(self) -> None:
         super().clean()
+        removed_item_ids = {
+            form.cleaned_data["pruefpunkt"].pk
+            for form in self.forms
+            if form.cleaned_data.get("DELETE") and form.cleaned_data.get("pruefpunkt") is not None
+        }
         current_room = None
         checklist_entries = []
         for room_form in self.forms:
@@ -1748,7 +1753,7 @@ class RoomChecklistFormSet(BaseFormSet):
                 continue
             if room_form.errors:
                 continue
-            room_form.validate_room_assignment()
+            room_form.validate_room_assignment(removed_item_ids=removed_item_ids)
             if room_form.errors:
                 continue
             checklist_entries.append(room_form)

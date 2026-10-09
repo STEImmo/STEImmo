@@ -1,6 +1,7 @@
 from django.test import TestCase
 
 from . import test_protocol_edit as fixtures
+from .models import calculate_photo_checksum
 
 
 class CheckpointPhotoReplacementTests(TestCase):
@@ -11,6 +12,8 @@ class CheckpointPhotoReplacementTests(TestCase):
     payload = fixtures.ProtocolEditPreservationTests.payload
 
     def test_reselected_identical_photo_survives_checkpoint_replacement(self):
+        self.photo.inhalt_hash_sha256 = calculate_photo_checksum(self.photo.datei)
+        self.photo.save(update_fields=["inhalt_hash_sha256"])
         data = self.payload()
         data["rooms-TOTAL_FORMS"] = "2"
         data["rooms-0-raumprotokoll"] = str(self.room.pk)
