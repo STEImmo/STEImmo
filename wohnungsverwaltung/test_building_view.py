@@ -15,11 +15,95 @@ from django.urls import reverse
 from PIL import Image
 
 from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
-from .building_plans import APARTMENTS
+from .forms import WohnungForm
+from .management.commands.seed_standard_data import APARTMENTS
 from .models import ApartmentPhoto, Person, Wohnung, WohnungStatus
 
 
 class BuildingViewTests(TestCase):
+    def test_default_numeric_values_are_not_advertised_as_apartment_facts(self):
+        unit = Wohnung.objects.create(
+            gebaeudenummer="1",
+            wohnungsnummer="1",
+            groesse_qm=Decimal("25.27"),
+            status=WohnungStatus.FREE,
+        )
+        response = self.client.get(
+            reverse("wohnungsverwaltung_public:apartment_detail_placeholder", args=[unit.pk])
+        )
+        self.assertContains(response, "Noch nicht angegeben", count=9)
+        self.assertNotContains(response, "0,00 €")
+        floor = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[0]))
+        self.assertContains(floor, "Zimmerzahl noch nicht angegeben")
+        self.assertContains(floor, "Kaltmiete noch nicht angegeben")
+        search_url = reverse("wohnungsverwaltung_public:apartment_search")
+        self.assertContains(self.client.get(search_url), "Noch nicht angegeben", count=2)
+        for filters in ({"zimmer_max": "1"}, {"kaltmiete_max": "500"}):
+            with self.subTest(filters=filters):
+                self.assertFalse(self.client.get(search_url, filters).context["wohnungen"].exists())
+
+    def test_management_requires_a_valid_availability_status(self):
+        data = {
+            "gebaeudenummer": "1",
+            "wohnungsnummer": "1",
+            "etage": "0",
+            "groesse_qm": "25.27",
+            "zimmeranzahl": "0",
+            "kaltmiete": "0",
+            "warmmiete": "0",
+            "kaution": "0",
+            "status": "",
+        }
+        form = WohnungForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("status", form.errors)
+        data["status"] = WohnungStatus.BLOCKED
+        form = WohnungForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+        unit = form.save()
+        self.assertFalse(Wohnung.objects.available().filter(pk=unit.pk).exists())
+
+    def test_public_pages_use_updated_database_facts_without_reloading_static_inventory(self):
+        unit = self.create_unit("201", 2)
+        unit.groesse_qm = Decimal("53.21")
+        unit.zimmeranzahl = Decimal("3.50")
+        unit.kaltmiete = Decimal("654.32")
+        unit.description = "Beschreibung aus der Datenbank"
+        unit.save()
+        detail_url = reverse(
+            "wohnungsverwaltung_public:apartment_detail_placeholder", args=[unit.pk]
+        )
+        floor_url = reverse("wohnungsverwaltung_public:floor_view", args=[2])
+        search_url = reverse("wohnungsverwaltung_public:apartment_search")
+        for url in (detail_url, floor_url, search_url):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertContains(response, "53,21")
+                self.assertContains(response, "3,50")
+                self.assertContains(response, "654,32")
+        self.assertContains(self.client.get(detail_url), "Beschreibung aus der Datenbank")
+        filtered = self.client.get(search_url, {"zimmer_min": "3", "groesse_min": "50"})
+        self.assertEqual(list(filtered.context["wohnungen"]), [unit])
+
+        unit.status = WohnungStatus.TAKEN
+        unit.save(update_fields=["status"])
+        building = self.client.get(reverse("wohnungsverwaltung_public:building_view"))
+        self.assertEqual(building.context["total_available"], 0)
+        self.assertContains(self.client.get(floor_url), "Nicht verfügbar")
+        self.assertFalse(self.client.get(search_url).context["wohnungen"].exists())
+        self.assertEqual(self.client.get(detail_url).status_code, 404)
+
+    def test_floor_labels_use_saved_area_even_for_a_known_inventory_number(self):
+        unit = self.create_unit("401", 4)
+        response = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[4]))
+        self.assertContains(response, "42,50 m²")
+        self.assertNotContains(response, "92,94")
+        unit.groesse_qm = Decimal("93.17")
+        unit.save(update_fields=["groesse_qm"])
+        updated = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[4]))
+        self.assertContains(updated, "93,17 m²")
+        self.assertNotContains(updated, "42,50 m²")
+
     def test_detail_shows_each_missing_optional_information(self):
         unit = self.create_unit("1", 0)
         response = self.client.get(
@@ -254,7 +338,9 @@ class BuildingViewTests(TestCase):
 
 class ViewingRequestEntryTests(TestCase):
     def setUp(self):
-        self.unit = Wohnung.objects.create(wohnungsnummer="1", gebaeudenummer="1")
+        self.unit = Wohnung.objects.create(
+            wohnungsnummer="1", gebaeudenummer="1", status=WohnungStatus.FREE
+        )
         self.url = reverse("wohnungsverwaltung_public:viewing_request", args=[self.unit.pk])
         self.user = get_user_model().objects.create_user(username="viewing-entry-test")
 
@@ -343,7 +429,11 @@ class ApartmentPhotoTests(TestCase):
         gallery_html = gallery_html.split("</div>", 1)[0]
         self.assertEqual(gallery_html.count("<img "), 3)
         self.assertContains(response, 'data-type="image"', count=4)
-        self.assertContains(response, 'uk-lightbox="animation: fade"', count=1)
+        self.assertContains(
+            response,
+            'uk-lightbox="animation: fade; sel-panel: .uk-lightbox-items; bg-close: false"',
+            count=1,
+        )
         for photo in self.unit.photos.all():
             self.assertContains(
                 response, reverse("wohnungsverwaltung_public:apartment_photo", args=[photo.pk])
@@ -355,7 +445,9 @@ class ApartmentPhotoTests(TestCase):
         self.settings_override = override_settings(MEDIA_ROOT=self.media.name)
         self.settings_override.enable()
         self.addCleanup(self.settings_override.disable)
-        self.unit = Wohnung.objects.create(wohnungsnummer="1.01", gebaeudenummer="1")
+        self.unit = Wohnung.objects.create(
+            wohnungsnummer="1.01", gebaeudenummer="1", status=WohnungStatus.FREE
+        )
         self.employee = get_user_model().objects.create_user(username="employee-photo-test")
         self.employee.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
         self.url = reverse("verwaltung:apartment_photos", args=[self.unit.pk])
@@ -503,6 +595,41 @@ class ApartmentPhotoTests(TestCase):
 
 
 class BuildingInventoryTests(TestCase):
+    def test_setup_keeps_unconfirmed_numbers_at_default_and_preserves_saved_facts(self):
+        call_command("seed_standard_data", verbosity=0)
+        for unit in Wohnung.objects.all():
+            for field in ("zimmeranzahl", "kaltmiete", "warmmiete", "kaution"):
+                self.assertEqual(getattr(unit, field), Decimal("0"))
+            self.assertEqual(unit.status, WohnungStatus.BLOCKED)
+        unit = Wohnung.objects.get(wohnungsnummer="401")
+        unit.groesse_qm = Decimal("93.17")
+        unit.zimmeranzahl = Decimal("3.50")
+        unit.kaltmiete = Decimal("654.32")
+        unit.status = WohnungStatus.FREE
+        unit.save()
+        call_command("seed_standard_data", verbosity=0)
+        unit.refresh_from_db()
+        self.assertEqual(unit.groesse_qm, Decimal("93.17"))
+        self.assertEqual(unit.zimmeranzahl, Decimal("3.50"))
+        self.assertEqual(unit.kaltmiete, Decimal("654.32"))
+        self.assertEqual(unit.status, WohnungStatus.FREE)
+
+    @override_settings(DEBUG=True)
+    def test_current_inventory_sync_preserves_database_edits(self):
+        call_command("seed_standard_data", verbosity=0)
+        unit = Wohnung.objects.get(wohnungsnummer="401")
+        unit.groesse_qm = Decimal("93.17")
+        unit.zimmeranzahl = Decimal("3.50")
+        unit.kaltmiete = Decimal("654.32")
+        unit.status = WohnungStatus.TAKEN
+        unit.save()
+        call_command("sync_building_inventory", apply=True)
+        unit.refresh_from_db()
+        self.assertEqual(unit.groesse_qm, Decimal("93.17"))
+        self.assertEqual(unit.zimmeranzahl, Decimal("3.50"))
+        self.assertEqual(unit.kaltmiete, Decimal("654.32"))
+        self.assertEqual(unit.status, WohnungStatus.TAKEN)
+
     @override_settings(DEBUG=True)
     def test_inventory_update_preserves_ids_and_corrects_distribution(self):
         for legacy, _number, _floor, _area in APARTMENTS:

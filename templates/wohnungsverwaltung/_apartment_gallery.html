@@ -1,5 +1,6 @@
 {% if photos %}
-<div class="apartment-gallery uk-margin-medium-bottom" data-apartment-gallery uk-lightbox="animation: fade">
+{# UIkit 3.25.24 needs a transition panel; navigation controls sit outside that panel. #}
+<div class="apartment-gallery uk-margin-medium-bottom" data-apartment-gallery uk-lightbox="animation: fade; sel-panel: .uk-lightbox-items; bg-close: false">
     {% for photo in photos %}
     {# Escape for UIkit's HTML caption and again for the enclosing HTML attribute. #}
     <a class="{% if forloop.counter <= 3 %}apartment-gallery-photo{% if forloop.first %} apartment-gallery-main{% endif %}{% if forloop.counter == 3 and photos|length > 3 %} apartment-gallery-stack{% endif %}{% else %}uk-hidden{% endif %}" href="{% url 'wohnungsverwaltung_public:apartment_photo' photo.pk %}" data-type="image" data-caption="{{ photo.caption|default:'Wohnungsfoto'|force_escape|force_escape }}"{% if forloop.counter > 3 %} tabindex="-1" aria-hidden="true"{% endif %}>

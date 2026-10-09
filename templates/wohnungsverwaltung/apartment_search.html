@@ -38,9 +38,9 @@
                                 <dt>Wohnfläche</dt>
                                 <dd>{{ wohnung.groesse_qm }} m²</dd>
                                 <dt>Zimmer</dt>
-                                <dd>{{ wohnung.zimmeranzahl }}</dd>
+                                <dd>{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl }}{% else %}Noch nicht angegeben{% endif %}</dd>
                                 <dt>Kaltmiete</dt>
-                                <dd>{{ wohnung.kaltmiete }} €</dd>
+                                <dd>{% if wohnung.kaltmiete > 0 %}{{ wohnung.kaltmiete }} €{% else %}Noch nicht angegeben{% endif %}</dd>
                             </dl>
                             <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' wohnung.pk %}">
                                 Details ansehen

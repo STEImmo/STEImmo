@@ -1,33 +1,4 @@
-"""Single-building inventory and approximate outlines from the supplied project plans."""
-
-# Legacy identifiers refer only to the original local development fixtures.
-APARTMENTS = (
-    ("1.01", "1", 0, "25.27"),
-    ("1.02", "2", 0, "39.51"),
-    ("1.03", "3", 0, "45.70"),
-    ("1.04", "4", 0, "59.56"),
-    ("1.05", "5", 0, "40.14"),
-    ("2.01", "101", 1, "27.95"),
-    ("2.02", "102", 1, "30.74"),
-    ("2.03", "103", 1, "44.11"),
-    ("2.04", "104", 1, "46.23"),
-    ("2.05", "105", 1, "60.18"),
-    ("5.03", "106", 1, "44.21"),
-    ("3.01", "201", 2, "28.01"),
-    ("3.02", "202", 2, "30.74"),
-    ("3.03", "203", 2, "44.04"),
-    ("3.04", "204", 2, "45.93"),
-    ("3.05", "205", 2, "59.72"),
-    ("5.04", "206", 2, "44.11"),
-    ("4.01", "301", 3, "27.77"),
-    ("4.02", "302", 3, "30.51"),
-    ("4.03", "303", 3, "44.09"),
-    ("4.04", "304", 3, "46.14"),
-    ("4.05", "305", 3, "60.46"),
-    ("5.05", "306", 3, "43.96"),
-    ("5.01", "401", 4, "92.94"),
-    ("5.02", "402", 4, "64.90"),
-)
+"""Drawing coordinates and labels for the single building; apartment facts live in the database."""
 
 # Ground geometry regularizes the user's sketch into aligned architectural lines.
 # Provisional user assignment: 1 upper middle, 2 right, 3 lower middle,

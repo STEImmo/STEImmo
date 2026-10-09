@@ -154,13 +154,22 @@ def apartment_search(request: HttpRequest) -> HttpResponse:
             if form.cleaned_data[field_name] not in (None, "")
         }
         wohnungen = wohnungen.filter(**filters)
+        if any(form.cleaned_data[field] is not None for field in ("zimmer_min", "zimmer_max")):
+            wohnungen = wohnungen.filter(zimmeranzahl__gt=0)
+        if any(
+            form.cleaned_data[field] is not None for field in ("kaltmiete_min", "kaltmiete_max")
+        ):
+            wohnungen = wohnungen.filter(kaltmiete__gt=0)
     else:
         wohnungen = wohnungen.none()
 
     return render(
         request,
         "wohnungsverwaltung/apartment_search.html",
-        {"form": form, "wohnungen": wohnungen.order_by("etage", "wohnungsnummer")},
+        {
+            "form": form,
+            "wohnungen": wohnungen.order_by("etage", "wohnungsnummer"),
+        },
     )
 
 

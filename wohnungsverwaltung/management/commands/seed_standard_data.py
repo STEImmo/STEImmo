@@ -5,7 +5,6 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
-from wohnungsverwaltung.building_plans import APARTMENTS
 from wohnungsverwaltung.models import (
     AbnahmeStatus,
     Geschlecht,
@@ -26,6 +25,35 @@ from wohnungsverwaltung.models import (
     WohnungStatus,
 )
 
+# Confirmed Excel input for explicit local setup only; public views read the database.
+# Legacy identifiers refer only to the original local development fixtures.
+APARTMENTS = (
+    ("1.01", "1", 0, "25.27"),
+    ("1.02", "2", 0, "39.51"),
+    ("1.03", "3", 0, "45.70"),
+    ("1.04", "4", 0, "59.56"),
+    ("1.05", "5", 0, "40.14"),
+    ("2.01", "101", 1, "27.95"),
+    ("2.02", "102", 1, "30.74"),
+    ("2.03", "103", 1, "44.11"),
+    ("2.04", "104", 1, "46.23"),
+    ("2.05", "105", 1, "60.18"),
+    ("5.03", "106", 1, "44.21"),
+    ("3.01", "201", 2, "28.01"),
+    ("3.02", "202", 2, "30.74"),
+    ("3.03", "203", 2, "44.04"),
+    ("3.04", "204", 2, "45.93"),
+    ("3.05", "205", 2, "59.72"),
+    ("5.04", "206", 2, "44.11"),
+    ("4.01", "301", 3, "27.77"),
+    ("4.02", "302", 3, "30.51"),
+    ("4.03", "303", 3, "44.09"),
+    ("4.04", "304", 3, "46.14"),
+    ("4.05", "305", 3, "60.46"),
+    ("5.05", "306", 3, "43.96"),
+    ("5.01", "401", 4, "92.94"),
+    ("5.02", "402", 4, "64.90"),
+)
 STANDARD_PEOPLE = [
     {
         "vorname": "Nora",
@@ -170,27 +198,13 @@ class Command(BaseCommand):
         units = {}
         for number, (legacy_number, unit_number, floor, area) in enumerate(APARTMENTS, start=1):
             size = Decimal(area)
-            rooms = Decimal("1.50") + Decimal((number - 1) % 4) * Decimal("0.50")
-            rent = Decimal("720.00") + Decimal(number * 18)
-            status = (
-                WohnungStatus.BLOCKED
-                if number == 25
-                else WohnungStatus.TAKEN
-                if number % 3 == 0
-                else WohnungStatus.FREE
-            )
-            unit, _ = Wohnung.objects.update_or_create(
+            unit, _ = Wohnung.objects.get_or_create(
                 gebaeudenummer="1",
                 wohnungsnummer=unit_number,
                 defaults={
                     "etage": floor,
                     "groesse_qm": size,
-                    "zimmeranzahl": rooms,
-                    "kaltmiete": rent,
-                    "warmmiete": rent + Decimal("170.00"),
-                    "kaution": rent * 3,
-                    "barrierefrei": number in {1, 6, 11, 16, 21},
-                    "status": status,
+                    "status": WohnungStatus.BLOCKED,
                     "zaehlernummer_wasser_kalt": f"KW-1-{number:02d}",
                     "zaehlernummer_wasser_warm": f"WW-1-{number:02d}",
                     "zaehlernummer_heizung": f"HZ-1-{number:02d}",

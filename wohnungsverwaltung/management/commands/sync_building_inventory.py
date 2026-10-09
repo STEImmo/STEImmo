@@ -4,14 +4,12 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from wohnungsverwaltung.building_plans import APARTMENTS
+from wohnungsverwaltung.management.commands.seed_standard_data import APARTMENTS
 from wohnungsverwaltung.models import Wohnung
 
 
 class Command(BaseCommand):
-    help = (
-        "Align local development apartment numbers, floors and areas with the supplied inventory."
-    )
+    help = "Convert legacy development apartments once; preserve current database values."
 
     def add_arguments(self, parser):
         parser.add_argument("--apply", action="store_true")
@@ -29,8 +27,11 @@ class Command(BaseCommand):
                 "Erwartet werden genau die 25 alten oder bereits abgeglichenen Wohnungen."
             )
         old_inventory = set(by_number) == legacy
+        if not old_inventory:
+            self.stdout.write("25 Wohnungen bereits umgestellt; gepflegte Daten unverändert.")
+            return
         for old_number, number, floor, area in APARTMENTS:
-            unit = by_number[old_number if old_inventory else number]
+            unit = by_number[old_number]
             if options["apply"]:
                 unit.wohnungsnummer = number
                 unit.etage = floor
