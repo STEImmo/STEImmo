@@ -151,7 +151,7 @@ class BuildingViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual([floor["number"] for floor in response.context["floors"]], [4, 2])
         self.assertEqual(response.context["total_available"], 2)
-        self.assertContains(response, "Das Haus auf einen Blick")
+        self.assertContains(response, "Das Gebäude auf einen Blick")
         self.assertNotContains(response, "Wohnung A-17")
         self.assertContains(response, "Westfassade")
         self.assertContains(response, "1 frei")
