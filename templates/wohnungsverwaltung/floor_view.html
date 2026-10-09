@@ -13,6 +13,7 @@
             <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:building_view' %}">Zur Gebäudeansicht</a>
         </div>
         <p class="uk-text-meta uk-hidden@m">Auf kleinen Bildschirmen können Sie den Grundriss seitlich verschieben.</p>
+        {% if has_unmapped_units %}<div class="uk-alert-warning" uk-alert>Für einzelne Wohnungen liegt keine eindeutige Zuordnung im Grundriss vor. Bitte nutzen Sie die Wohnungsliste.</div>{% endif %}
         <div class="floor-plan-frame uk-margin-medium-top" tabindex="0" role="region" aria-label="Grundriss {{ floor_label }} – seitlich scrollbar">{% include "wohnungsverwaltung/_floor_plan.html" %}</div>
         <p class="uk-text-meta uk-text-center">Vereinfachter Grundriss nach der Vorlage · nicht maßstabsgetreu.</p>
         <h2 class="uk-h3 uk-margin-medium-top">Wohnungen auf dieser Etage</h2>

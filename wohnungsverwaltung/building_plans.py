@@ -58,6 +58,17 @@ ATTIC_SHAPES = (
     ),
     ("80,109 340,109 340,230 454,230 454,289 497,289 497,480 80,480", 365, 385),
 )
+# Bind each published identifier to its position, never to database row order.
+FLOOR_SHAPES = {
+    0: {f"{number:03d}": shape for number, shape in enumerate(GROUND_SHAPES, start=1)},
+    **{
+        floor: {
+            str(floor * 100 + number): shape for number, shape in enumerate(REGULAR_SHAPES, start=1)
+        }
+        for floor in (1, 2, 3)
+    },
+    4: {str(400 + number): shape for number, shape in enumerate(ATTIC_SHAPES, start=1)},
+}
 PLAN_REFERENCES = {
     "regular": {
         "width": 358,

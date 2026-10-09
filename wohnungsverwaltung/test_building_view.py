@@ -1,11 +1,15 @@
 from decimal import Decimal
+from html import escape, unescape
+from html.parser import HTMLParser
 from io import BytesIO
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.db import DatabaseError
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
@@ -56,9 +60,9 @@ class BuildingViewTests(TestCase):
         )
 
     def test_building_links_to_separate_floor_pages(self):
-        free = self.create_unit("A-17", 2)
-        taken = self.create_unit("A-18", 2, WohnungStatus.TAKEN)
-        self.create_unit("D-01", 4)
+        free = self.create_unit("201", 2)
+        taken = self.create_unit("202", 2, WohnungStatus.TAKEN)
+        self.create_unit("401", 4)
         response = self.client.get(reverse("wohnungsverwaltung_public:building_view"))
         self.assertEqual(response.status_code, 200)
         self.assertEqual([floor["number"] for floor in response.context["floors"]], [4, 2])
@@ -102,6 +106,61 @@ class BuildingViewTests(TestCase):
     def test_unknown_floor_returns_404(self):
         response = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[9]))
         self.assertEqual(response.status_code, 404)
+
+    def test_unsupported_floor_is_rejected_even_when_it_has_units(self):
+        self.create_unit("901", 9)
+        self.create_unit("101", 1)
+        response = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[9]))
+        self.assertEqual(response.status_code, 404)
+        floor = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[1]))
+        self.assertNotIn(9, [number for number, _label in floor.context["floor_numbers"]])
+        building = self.client.get(reverse("wohnungsverwaltung_public:building_view"))
+        self.assertNotIn(9, [item["number"] for item in building.context["floors"]])
+
+    def test_missing_apartment_does_not_move_other_apartments_on_any_floor(self):
+        for floor, count in ((0, 5), (1, 6), (2, 6), (3, 6), (4, 2)):
+            with self.subTest(floor=floor):
+                units = [self.create_unit(str(floor * 100 + n), floor) for n in range(1, count + 1)]
+                url = reverse("wohnungsverwaltung_public:floor_view", args=[floor])
+                before = self.client.get(url)
+                positions = {
+                    item["unit"].pk: (item["points"], item["x"], item["y"])
+                    for item in before.context["plan_units"]
+                }
+                units[0].delete()
+                after = self.client.get(url)
+                self.assertEqual(len(after.context["plan_units"]), count - 1)
+                for item in after.context["plan_units"]:
+                    self.assertEqual(
+                        (item["points"], item["x"], item["y"]), positions[item["unit"].pk]
+                    )
+
+    def test_extra_apartment_is_listed_without_taking_another_plan_position(self):
+        units = [self.create_unit(str(n), 1) for n in range(101, 107)]
+        url = reverse("wohnungsverwaltung_public:floor_view", args=[1])
+        before = self.client.get(url)
+        positions = [(item["unit"].pk, item["points"]) for item in before.context["plan_units"]]
+        extra = self.create_unit("100", 1)
+        after = self.client.get(url)
+        self.assertEqual(len(after.context["units"]), len(units) + 1)
+        self.assertEqual(
+            [(item["unit"].pk, item["points"]) for item in after.context["plan_units"]], positions
+        )
+        self.assertContains(after, "Wohnung 100")
+        self.assertNotContains(after, "Whg. 100")
+        self.assertContains(after, "Bitte nutzen Sie die Wohnungsliste.")
+        self.assertContains(
+            after,
+            reverse("wohnungsverwaltung_public:apartment_detail_placeholder", args=[extra.pk]),
+        )
+
+    def test_ambiguous_ground_numbers_are_not_assigned_to_the_same_plan_area(self):
+        self.create_unit("1", 0)
+        self.create_unit("001", 0)
+        second = self.create_unit("2", 0)
+        response = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[0]))
+        self.assertEqual([item["unit"].pk for item in response.context["plan_units"]], [second.pk])
+        self.assertContains(response, "Bitte nutzen Sie die Wohnungsliste.")
 
     def test_ground_floor_displays_three_digit_numbers_without_changing_stored_numbers(self):
         units = [self.create_unit(str(number), 0) for number in range(1, 6)]
@@ -236,6 +295,41 @@ class ViewingRequestEntryTests(TestCase):
 
 
 class ApartmentPhotoTests(TestCase):
+    def test_lightbox_caption_remains_text_after_attribute_decoding(self):
+        class CaptionReader(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.captions = []
+
+            def handle_starttag(self, tag, attrs):
+                values = dict(attrs)
+                if tag == "a" and "data-caption" in values:
+                    self.captions.append(values["data-caption"])
+
+        self.upload()
+        photo = ApartmentPhoto.objects.get()
+        for caption in (
+            '<img src=x onerror="alert(1)">',
+            '<svg onload="alert(1)"></svg>',
+            'Küche & "Balkon"',
+            "&lt;img src=x&gt;",
+        ):
+            with self.subTest(caption=caption):
+                photo.caption = caption
+                photo.save(update_fields=["caption"])
+                response = self.client.get(
+                    reverse(
+                        "wohnungsverwaltung_public:apartment_detail_placeholder",
+                        args=[self.unit.pk],
+                    )
+                )
+                reader = CaptionReader()
+                reader.feed(response.content.decode())
+                self.assertEqual(len(reader.captions), 1)
+                self.assertEqual(reader.captions[0], escape(caption, quote=True))
+                self.assertNotIn("<", reader.captions[0])
+                self.assertEqual(unescape(reader.captions[0]), caption)
+
     def test_gallery_stacks_extra_photos_and_explicitly_identifies_images(self):
         for _ in range(4):
             self.upload()
@@ -342,6 +436,45 @@ class ApartmentPhotoTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("image", response.context["form"].errors)
         self.assertEqual(ApartmentPhoto.objects.count(), 1)
+
+    def test_storage_delete_failure_keeps_photo_and_allows_retry(self):
+        self.upload()
+        photo = ApartmentPhoto.objects.get()
+        storage, name = photo.image.storage, photo.image.name
+        url = reverse("verwaltung:apartment_photo_delete", args=[self.unit.pk, photo.pk])
+        with patch.object(storage, "delete", side_effect=OSError("simulated failure")):
+            response = self.client.post(url, follow=True)
+        self.assertContains(response, "Das Foto konnte nicht entfernt werden.")
+        self.assertTrue(ApartmentPhoto.objects.filter(pk=photo.pk).exists())
+        self.assertTrue(storage.exists(name))
+        self.assertRedirects(self.client.post(url), self.url)
+        self.assertFalse(ApartmentPhoto.objects.filter(pk=photo.pk).exists())
+        self.assertFalse(storage.exists(name))
+
+    def test_database_delete_failure_does_not_remove_file(self):
+        self.upload()
+        photo = ApartmentPhoto.objects.get()
+        storage, name = photo.image.storage, photo.image.name
+        url = reverse("verwaltung:apartment_photo_delete", args=[self.unit.pk, photo.pk])
+        with patch.object(ApartmentPhoto, "delete", side_effect=DatabaseError("simulated failure")):
+            response = self.client.post(url, follow=True)
+        self.assertContains(response, "Das Foto konnte nicht entfernt werden.")
+        self.assertTrue(ApartmentPhoto.objects.filter(pk=photo.pk).exists())
+        self.assertTrue(storage.exists(name))
+
+    def test_delete_requires_employee_permission_and_csrf(self):
+        self.upload()
+        photo = ApartmentPhoto.objects.get()
+        url = reverse("verwaltung:apartment_photo_delete", args=[self.unit.pk, photo.pk])
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.employee)
+        self.assertEqual(client.post(url).status_code, 403)
+        self.client.logout()
+        self.assertEqual(self.client.post(url).status_code, 302)
+        applicant = get_user_model().objects.create_user(username="photo-delete-applicant")
+        self.client.force_login(applicant)
+        self.assertEqual(self.client.post(url).status_code, 403)
+        self.assertTrue(ApartmentPhoto.objects.filter(pk=photo.pk).exists())
 
     def test_gif_is_rejected_even_when_it_is_a_valid_image(self):
         self.client.force_login(self.employee)

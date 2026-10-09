@@ -1,4 +1,6 @@
 import json
+import logging
+from collections import Counter
 from uuid import UUID
 
 from django.conf import settings
@@ -6,7 +8,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import IntegrityError, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from django.http import (
     FileResponse,
@@ -30,10 +32,8 @@ from .access import (
     user_management_required,
 )
 from .building_plans import (
-    ATTIC_SHAPES,
-    GROUND_SHAPES,
+    FLOOR_SHAPES,
     PLAN_REFERENCES,
-    REGULAR_SHAPES,
     floor_label,
 )
 from .forms import (
@@ -84,6 +84,8 @@ from .models import (
     WohnungStatus,
     calculate_photo_checksum,
 )
+
+logger = logging.getLogger(__name__)
 
 PROTOCOL_STATUS_LABELS = {
     ProtokollStatus.OPEN: "In Bearbeitung",
@@ -166,7 +168,7 @@ def building_view(request: HttpRequest) -> HttpResponse:
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
     floors_by_number = {}
-    for unit in Wohnung.objects.order_by("-etage", "wohnungsnummer"):
+    for unit in Wohnung.objects.filter(etage__in=FLOOR_SHAPES).order_by("-etage", "wohnungsnummer"):
         floor = floors_by_number.setdefault(
             unit.etage,
             {
@@ -194,18 +196,19 @@ def building_view(request: HttpRequest) -> HttpResponse:
 def floor_view(request: HttpRequest, floor_number: int) -> HttpResponse:
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
+    if floor_number not in FLOOR_SHAPES:
+        raise Http404("Diese Etage ist nicht vorhanden.")
     units = list(Wohnung.objects.filter(etage=floor_number).order_by("wohnungsnummer"))
     if not units:
         raise Http404("Diese Etage ist nicht vorhanden.")
-    shapes = (
-        GROUND_SHAPES
-        if floor_number == 0
-        else ATTIC_SHAPES
-        if floor_number == 4
-        else REGULAR_SHAPES
-    )
+    shapes = FLOOR_SHAPES[floor_number]
+    number_counts = Counter(unit.display_number for unit in units)
     plan_units = []
-    for unit, (points, x, y) in zip(units, shapes, strict=False):
+    for unit in units:
+        shape = shapes.get(unit.display_number)
+        if shape is None or number_counts[unit.display_number] != 1:
+            continue
+        points, x, y = shape
         plan_units.append({"unit": unit, "points": points, "x": x, "y": y})
     return render(
         request,
@@ -215,12 +218,14 @@ def floor_view(request: HttpRequest, floor_number: int) -> HttpResponse:
             "floor_label": floor_label(floor_number),
             "floor_numbers": [
                 (number, floor_label(number))
-                for number in Wohnung.objects.order_by("etage")
+                for number in Wohnung.objects.filter(etage__in=FLOOR_SHAPES)
+                .order_by("etage")
                 .values_list("etage", flat=True)
                 .distinct()
             ],
             "units": units,
             "plan_units": plan_units,
+            "has_unmapped_units": len(plan_units) != len(units),
             "plan_reference": PLAN_REFERENCES[
                 "ground" if floor_number == 0 else "attic" if floor_number == 4 else "regular"
             ],
@@ -297,11 +302,22 @@ def apartment_photos(request: HttpRequest, wohnung_id: UUID) -> HttpResponse:
 def apartment_photo_delete(request: HttpRequest, wohnung_id: UUID, photo_id: UUID) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    photo = get_object_or_404(ApartmentPhoto, pk=photo_id, apartment_id=wohnung_id)
-    storage, name = photo.image.storage, photo.image.name
-    photo.delete()
-    storage.delete(name)
-    messages.success(request, "Das Wohnungsfoto wurde entfernt.")
+    try:
+        with transaction.atomic():
+            photo = get_object_or_404(
+                ApartmentPhoto.objects.select_for_update(), pk=photo_id, apartment_id=wohnung_id
+            )
+            storage, name = photo.image.storage, photo.image.name
+            photo.delete()
+            # A failed file deletion rolls back the row deletion, keeping it retryable.
+            storage.delete(name)
+    except (OSError, DatabaseError):
+        logger.warning("Wohnungsfoto konnte nicht entfernt werden.")
+        messages.error(
+            request, "Das Foto konnte nicht entfernt werden. Bitte versuchen Sie es erneut."
+        )
+    else:
+        messages.success(request, "Das Wohnungsfoto wurde entfernt.")
     return redirect("verwaltung:apartment_photos", wohnung_id=wohnung_id)
 
 
