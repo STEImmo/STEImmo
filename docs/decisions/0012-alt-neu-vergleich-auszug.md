@@ -31,6 +31,12 @@ Prüfpunkte ohne Gegenstück bleiben sichtbar, werden aber ausdrücklich als
 fehlendes Gegenstück gekennzeichnet. Sie werden nicht mit einem beliebigen
 anderen Prüfpunkt zusammengeführt.
 
+Beim dynamischen Nachladen nach Änderungen an Wohnung, Person oder
+Übergabezeitpunkt darf nur die neueste Anfrage den Vergleich aktualisieren.
+Nach dem vollständigen Laden der Antwort wird zusätzlich geprüft, ob die
+angefragte Auswahl noch den aktuellen Eingaben entspricht. Verspätete Antworten
+werden verworfen, damit Referenz und Differenzen zum sichtbaren Formular passen.
+
 ## Konsequenzen
 
 - Fotos, Text und Zusatzangaben bleiben fachlich korrekt zugeordnet.
