@@ -23,6 +23,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.crypto import salted_hmac
 from django.views.decorators.cache import never_cache
 from PIL import Image
 
@@ -1029,6 +1030,13 @@ def _draft_session_key(request: HttpRequest) -> str:
     return request.session.session_key
 
 
+def _draft_storage_key(request: HttpRequest, draft_scope: str) -> str:
+    namespace = salted_hmac(
+        "wohnungsverwaltung.handover_draft", _draft_session_key(request)
+    ).hexdigest()
+    return f"handover-protocol-draft:{namespace}:{draft_scope}"
+
+
 def _protocol_id_from_draft_scope(draft_scope: str) -> UUID | None:
     if not draft_scope.startswith("edit:"):
         return None
@@ -1273,8 +1281,8 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
             logger.error("Protocol creation failed (%s).", type(error).__name__)
             form.add_error(None, PHOTO_SAVE_ERROR)
         else:
-            request.session["handover_protocol_draft_key_to_clear"] = (
-                "handover-protocol-draft:create"
+            request.session["handover_protocol_draft_key_to_clear"] = _draft_storage_key(
+                request, draft_scope
             )
             messages.success(request, "Das Übergabeprotokoll wurde angelegt.")
             return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
@@ -1296,6 +1304,7 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
             "can_manage_handover_photos": can_manage_handover_photos,
             **_move_in_reference_context(move_in_reference),
             "draft_scope": draft_scope,
+            "draft_storage_key": _draft_storage_key(request, draft_scope),
             **_draft_form_context(server_draft),
         },
     )
@@ -1451,8 +1460,8 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
             protocol.refresh_from_db()
             form.add_error(None, PHOTO_SAVE_ERROR)
         else:
-            request.session["handover_protocol_draft_key_to_clear"] = (
-                f"handover-protocol-draft:edit:{protocol.pk}"
+            request.session["handover_protocol_draft_key_to_clear"] = _draft_storage_key(
+                request, draft_scope
             )
             messages.success(request, "Das Übergabeprotokoll wurde aktualisiert.")
             return redirect("wohnungsverwaltung:handover_protocol_detail", protocol_id=protocol.pk)
@@ -1475,6 +1484,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
             "can_manage_handover_photos": can_manage_handover_photos,
             **_move_in_reference_context(move_in_reference),
             "draft_scope": draft_scope,
+            "draft_storage_key": _draft_storage_key(request, draft_scope),
             **_draft_form_context(server_draft),
         },
     )
@@ -2076,7 +2086,8 @@ def _wohnung_form(request: HttpRequest, wohnung: Wohnung, title: str) -> HttpRes
         "wohnungsverwaltung/wohnung_form.html",
         {
             "form": form,
-            "raeume": wohnung.raeume.order_by("name") if wohnung.pk else (),
+            "raeume": wohnung.raeume.order_by("name") if not wohnung._state.adding else (),
+            "apartment_is_saved": not wohnung._state.adding,
             "schluessel_formset": schluessel_formset,
             "title": title,
             "wohnung": wohnung,

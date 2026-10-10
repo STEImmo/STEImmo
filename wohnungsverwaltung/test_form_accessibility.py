@@ -9,6 +9,7 @@ from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
 from .forms import (
+    METER_READING_FIELDS,
     BewerbungForm,
     EmployeeMfaCodeForm,
     HandoverKeyForm,
@@ -22,6 +23,7 @@ from .forms import (
     UserAccountForm,
 )
 from .models import Bewerbung, Person, Protokoll, Raumprotokoll, RegistrationVerification, Wohnung
+from .views import _meter_comparison_rows
 
 
 class FormMarkup(HTMLParser):
@@ -273,6 +275,49 @@ class ManualFormAccessibilityTests(FormAccessibilityAssertions, TestCase):
         self.assert_field_error_linked(markup, form["zaehlerstand_wasser_kalt"])
         self.assert_field_error_linked(markup, room_form["raum"])
         self.assert_field_error_linked(markup, key_form["anzahl"])
+
+    def test_shared_handover_meter_inputs_have_unique_linked_feedback(self):
+        for protocol_type in ("move_in", "move_out"):
+            for prefix in (None, "handover"):
+                with self.subTest(protocol_type=protocol_type, prefix=prefix):
+                    form = HandoverProtocolForm(data={}, prefix=prefix)
+                    data = {form.add_prefix("protokoll_typ"): protocol_type}
+                    field_names = [name for name, _number, _label in METER_READING_FIELDS]
+                    for name in [*field_names, "heizungsablesungen"]:
+                        data[form.add_prefix(name)] = "ungültig"
+                        form.fields[name].help_text = f"Hinweis zu {form.fields[name].label}"
+                    form.data = data
+                    form.is_valid()
+                    for field in form.meter_reading_fields:
+                        form.add_error(field.name, "Bitte prüfen Sie die Ablesung.")
+                    markup = FormMarkup(
+                        render_to_string(
+                            "wohnungsverwaltung/_handover_protocol_fields.html",
+                            {
+                                "form": form,
+                                "meter_comparison_rows": _meter_comparison_rows(form, None),
+                            },
+                        )
+                    )
+                    self.assert_descriptions_resolve(markup)
+                    for field in form.meter_reading_fields:
+                        inputs = markup.with_id(field.auto_id)
+                        self.assertEqual(len(inputs), 1)
+                        self.assertEqual(inputs[0]["attrs"]["value"], "ungültig")
+                        self.assertNotIn("disabled", inputs[0]["attrs"])
+                        self.assert_field_error_linked(markup, field)
+                        self.assertEqual(
+                            markup.with_id(f"{field.auto_id}_helptext")[0]["text"].strip(),
+                            field.help_text,
+                        )
+                        labels = [
+                            element
+                            for element in markup.elements
+                            if element["tag"] == "label"
+                            and element["attrs"].get("for") == field.id_for_label
+                        ]
+                        self.assertEqual(len(labels), 1)
+                        self.assertTrue(labels[0]["text"].strip())
 
     def test_management_help_text_resolves_in_shared_partial(self):
         form = MerkmalForm()

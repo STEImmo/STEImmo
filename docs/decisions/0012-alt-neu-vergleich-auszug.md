@@ -19,6 +19,14 @@ des passenden Einzugs neben den neuen Eingabefeldern angezeigt. Die Differenz
 berechnet. Die gespeicherten Werte bleiben unverändert; die Differenz ist nur
 eine Eingabehilfe.
 
+Die vier Zählerstände und Zusatzablesungen der Heizung haben im Formular
+jeweils genau ein Eingabefeld für beide Übergabearten. Beim Auszug werden
+die Vergleichsspalten eingeblendet. Doppelte Felder je Übergabeart werden
+vermieden, weil sie Pflichtfeldvalidierung, Übertragung und
+Entwurfswiederherstellung mehrdeutig machen können (Issue #110).
+Eingaben ausschließlich für die inaktive Übergabeart werden ausgeblendet
+und deaktiviert; die fachliche Validierung bleibt im Django-Formular.
+
 Prüfpunkte ohne Gegenstück bleiben sichtbar, werden aber ausdrücklich als
 fehlendes Gegenstück gekennzeichnet. Sie werden nicht mit einem beliebigen
 anderen Prüfpunkt zusammengeführt.

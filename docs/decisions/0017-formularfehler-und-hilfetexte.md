@@ -14,9 +14,11 @@ Container unter `<auto_id>_error`. Präfixe von Formularen und Formsets bleiben
 dadurch Bestandteil der Kennung. Feldgruppen erhalten den Beschreibungsverweis
 am Fieldset, entsprechend dem Django-Verhalten für Radio- und Checkboxgruppen.
 
-Die Zählerfelder des Übergabeformulars erscheinen in zwei umschaltbaren
-Ansichten. Ihre Fehlerausgabe steht deshalb einmal unter beiden Ansichten,
-damit beide Eingaben auf denselben sichtbaren Fehlercontainer verweisen.
+Die Zählerfelder des Übergabeformulars erscheinen für Einzug und Auszug in
+einer gemeinsamen Tabelle. Fehler und Hilfetexte stehen direkt am
+jeweiligen Feld, einschließlich der Zusatzablesungen der Heizung. Eingaben
+und Beschreibungscontainer werden jeweils nur einmal ausgegeben und bleiben
+beim Wechsel des Protokolltyps erhalten.
 
 ## Konsequenzen
 

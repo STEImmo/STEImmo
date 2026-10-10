@@ -38,28 +38,9 @@
     <p class="uk-text-meta">Die Zählernummern werden aus den Wohnungsstammdaten übernommen und können hier nicht geändert werden.</p>
 
     <div data-protocol-types="move_in">
-        {% if form.meter_numbers %}
-            <div class="uk-overflow-auto">
-                <table class="uk-table uk-table-divider uk-table-small">
-                    <thead><tr><th>Zähler</th><th>Zählernummer aus den Stammdaten</th></tr></thead>
-                    <tbody>
-                        {% for label, number in form.meter_numbers %}<tr><td>{{ label }}</td><td>{{ number }}</td></tr>{% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
+        {% if not form.meter_numbers %}
             <p class="uk-text-meta">Bitte wählen Sie zuerst eine Wohnung.</p>
         {% endif %}
-        <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
-            {% for field in form.meter_reading_fields %}
-                <div>
-                    <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    <div class="uk-form-controls">
-                        {{ field }}
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
     </div>
 
     <div data-protocol-types="move_out">
@@ -68,37 +49,38 @@
         {% else %}
             <p class="uk-text-meta">Für die gewählte Wohnung und Person liegt noch kein bestätigter Einzug als Vergleich vor.</p>
         {% endif %}
-        <div class="uk-overflow-auto">
-            <table class="uk-table uk-table-divider uk-table-small" data-meter-comparison>
-                <thead><tr><th>Zähler</th><th>Zählernummer</th><th>Einzug (alt)</th><th>Auszug (neu)</th><th>Differenz (neu − alt)</th></tr></thead>
-                <tbody>
-                    {% for row in meter_comparison_rows %}
-                        <tr data-meter-comparison-row data-old-meter-reading="{{ row.old_reading|default_if_none:'' }}">
-                            <td>{{ row.label }}</td>
-                            <td>{{ row.number|default:"Nicht gepflegt" }}</td>
-                            <td>{% if row.old_reading is not None %}{{ row.old_reading|floatformat:2 }}{% else %}—{% endif %}</td>
-                            <td>{{ row.field }}</td>
-                            <td><output data-meter-difference>—</output></td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        <div class="uk-margin-small-top">
-            <label class="uk-form-label" for="{{ form.heizungsablesungen.id_for_label }}">{{ form.heizungsablesungen.label }}</label>
-            <div class="uk-form-controls">
-                {{ form.heizungsablesungen }}
-            </div>
+    </div>
+    <div class="uk-overflow-auto">
+        <table class="uk-table uk-table-divider uk-table-small" data-meter-comparison>
+            <thead>
+                <tr>
+                    <th>Zähler</th>
+                    <th>Zählernummer aus den Stammdaten</th>
+                    <th data-protocol-types="move_out">Einzug (alt)</th>
+                    <th><span data-protocol-types="move_in">Zählerstand</span><span data-protocol-types="move_out">Auszug (neu)</span></th>
+                    <th data-protocol-types="move_out">Differenz (neu − alt)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in meter_comparison_rows %}
+                    <tr data-meter-comparison-row data-old-meter-reading="{{ row.old_reading|default_if_none:'' }}">
+                        <td><label for="{{ row.field.id_for_label }}">{{ row.label }}</label></td>
+                        <td>{{ row.number|default:"Nicht gepflegt" }}</td>
+                        <td data-protocol-types="move_out">{% if row.old_reading is not None %}{{ row.old_reading|floatformat:2 }}{% else %}—{% endif %}</td>
+                        <td>{{ row.field }}{% include "wohnungsverwaltung/_form_field_feedback.html" with field=row.field only %}</td>
+                        <td data-protocol-types="move_out"><output data-meter-difference>—</output></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="uk-margin-small-top">
+        <label class="uk-form-label" for="{{ form.heizungsablesungen.id_for_label }}">{{ form.heizungsablesungen.label }}</label>
+        <div class="uk-form-controls">
+            {{ form.heizungsablesungen }}
+            {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.heizungsablesungen only %}
         </div>
     </div>
-    {% for field in form.meter_reading_fields %}
-        {% if field.errors or field.help_text %}
-            <div class="uk-margin-small-top">
-                <span class="uk-form-label">{{ field.label }}</span>
-                {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
-            </div>
-        {% endif %}
-    {% endfor %}
 </section>
 
 <section class="uk-margin-large-top" data-protocol-types="move_in">
@@ -186,7 +168,7 @@
                                                     {% endif %}
                                                     {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
                                                 </div>
-                                                {% if field.name == "fotos" %}<p class="uk-text-meta uk-margin-small-top">JPEG, PNG oder WebP, maximal 8 MiB je Bild. Die Fotos werden erst beim Speichern des Protokolls übertragen und nicht im Entwurf zwischengespeichert.</p>{% endif %}
+                                                {% if field.name == "fotos" %}{% include "wohnungsverwaltung/_handover_photo_upload_hint.html" only %}{% endif %}
                                             </div>
                                         {% endif %}
                                     {% endfor %}
@@ -233,7 +215,7 @@
                                                 {{ field }}
                                             {% endif %}
                                         </div>
-                                        {% if field.name == "fotos" %}<p class="uk-text-meta uk-margin-small-top">JPEG, PNG oder WebP, maximal 8 MiB je Bild. Die Fotos werden erst beim Speichern des Protokolls übertragen und nicht im Entwurf zwischengespeichert.</p>{% endif %}
+                                        {% if field.name == "fotos" %}{% include "wohnungsverwaltung/_handover_photo_upload_hint.html" only %}{% endif %}
                                     </div>
                                 {% endif %}
                             {% endfor %}
@@ -264,7 +246,7 @@
                                     {{ field }}
                                 {% endif %}
                             </div>
-                            {% if field.name == "fotos" %}<p class="uk-text-meta uk-margin-small-top">JPEG, PNG oder WebP, maximal 8 MiB je Bild. Die Fotos werden erst beim Speichern des Protokolls übertragen und nicht im Entwurf zwischengespeichert.</p>{% endif %}
+                            {% if field.name == "fotos" %}{% include "wohnungsverwaltung/_handover_photo_upload_hint.html" only %}{% endif %}
                         </div>
                     {% endif %}
                 {% endfor %}
@@ -276,7 +258,7 @@
 </section>
 
 <section class="uk-margin-large-top">
-    <div class="uk-flex uk-flex-between uk-flex-middle">
+    <div class="uk-flex uk-flex-between uk-flex-middle handover-section-header">
         <h2 class="uk-heading-divider uk-margin-remove">Schlüsselübergabe</h2>
         <button class="uk-button uk-button-default uk-button-small" type="button" data-add-form data-prefix="keys" data-target="key-formset" data-template="key-empty-form">Schlüsselposition hinzufügen</button>
     </div>
