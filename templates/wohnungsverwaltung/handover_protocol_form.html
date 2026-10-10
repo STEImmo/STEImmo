@@ -59,23 +59,26 @@
 
         const apartmentSelect = document.getElementById("id_wohnung");
         let loadedApartmentId = apartmentSelect?.value || "";
+        let apartmentFieldsRequestId = 0;
         const updateApartmentDependentFields = async () => {
             if (!apartmentSelect) {
                 return false;
             }
+            const requestId = ++apartmentFieldsRequestId;
+            const apartmentId = apartmentSelect.value;
+            const personId = document.getElementById("id_person")?.value || "";
+            const handoverTime = document.getElementById("id_uebergabe_zeitpunkt")?.value || "";
             const url = new URL(window.location.href);
-            if (apartmentSelect.value) {
-                url.searchParams.set("wohnung", apartmentSelect.value);
+            if (apartmentId) {
+                url.searchParams.set("wohnung", apartmentId);
             } else {
                 url.searchParams.delete("wohnung");
             }
-            const personSelect = document.getElementById("id_person");
-            if (personSelect?.value) {
-                url.searchParams.set("person", personSelect.value);
+            if (personId) {
+                url.searchParams.set("person", personId);
             } else {
                 url.searchParams.delete("person");
             }
-            const handoverTime = document.getElementById("id_uebergabe_zeitpunkt")?.value;
             if (handoverTime) {
                 url.searchParams.set("uebergabe_zeitpunkt", handoverTime);
             } else {
@@ -85,8 +88,18 @@
             if (!response.ok) {
                 return false;
             }
-            const updatedPage = new DOMParser().parseFromString(await response.text(), "text/html");
-            const apartmentChanged = loadedApartmentId !== apartmentSelect.value;
+            const responseText = await response.text();
+            // A late response must not overwrite a newer request or the current selection.
+            if (
+                requestId !== apartmentFieldsRequestId
+                || apartmentId !== apartmentSelect.value
+                || personId !== (document.getElementById("id_person")?.value || "")
+                || handoverTime !== (document.getElementById("id_uebergabe_zeitpunkt")?.value || "")
+            ) {
+                return false;
+            }
+            const updatedPage = new DOMParser().parseFromString(responseText, "text/html");
+            const apartmentChanged = loadedApartmentId !== apartmentId;
             const meterValues = new Map(Array.from(document.querySelectorAll(
                 '#meter-reading-section input[name]:not(:disabled)',
             )).map((field) => [field.name, field.value]));
@@ -112,7 +125,7 @@
                     field.value = meterValues.get(field.name);
                 }
             });
-            loadedApartmentId = apartmentSelect.value;
+            loadedApartmentId = apartmentId;
             document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
             document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
             window.history.replaceState(null, "", url);
