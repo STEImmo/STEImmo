@@ -6,7 +6,7 @@
 <section class="uk-section">
     <div class="uk-container uk-container-small">
         <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Zur Übersicht</a>
-        <h1 class="uk-heading-medium">{{ page_title }}</h1>
+        <h1 class="uk-heading-medium uk-text-break">{{ page_title }}</h1>
         <p class="uk-text-lead">Wählen Sie zuerst die Wohnung. Anschließend stehen nur die dieser Wohnung direkt zugeordneten Personen zur Auswahl.</p>
 
         <form method="post" enctype="multipart/form-data" class="uk-card uk-card-default uk-card-body uk-margin-top" id="handover-protocol-form" data-draft-scope="{{ draft_scope }}" data-draft-storage-key="{{ draft_storage_key }}" data-draft-save-url="{% url 'wohnungsverwaltung:handover_protocol_draft_save' %}" data-draft-delete-url="{{ server_draft_delete_url }}">
