@@ -1878,7 +1878,8 @@ def _wohnung_form(request: HttpRequest, wohnung: Wohnung, title: str) -> HttpRes
         "wohnungsverwaltung/wohnung_form.html",
         {
             "form": form,
-            "raeume": wohnung.raeume.order_by("name") if wohnung.pk else (),
+            "raeume": wohnung.raeume.order_by("name") if not wohnung._state.adding else (),
+            "apartment_is_saved": not wohnung._state.adding,
             "schluessel_formset": schluessel_formset,
             "title": title,
             "wohnung": wohnung,

@@ -8,7 +8,7 @@
         <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
             <div>
                 <h1 class="uk-heading-small uk-margin-remove-bottom">{{ title }}</h1>
-                {% if wohnung.pk %}
+                {% if apartment_is_saved %}
                     <p class="uk-text-muted uk-margin-small-top">Status:
                         {% if wohnung.status == "free" %}Verfügbar{% elif wohnung.status == "taken" %}Vermietet{% else %}Gesperrt{% endif %}
                     </p>
@@ -81,11 +81,11 @@
         <section class="uk-card uk-card-default uk-card-body uk-margin-top">
             <div class="uk-flex uk-flex-between uk-flex-middle">
                 <h2 class="uk-h3">Räume</h2>
-                {% if wohnung.pk %}
+                {% if apartment_is_saved %}
                     <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:raum_create' wohnung.pk %}">Raum hinzufügen</a>
                 {% endif %}
             </div>
-            {% if wohnung.pk %}
+            {% if apartment_is_saved %}
                 {% if raeume %}
                     <table class="uk-table uk-table-divider uk-table-small uk-margin-top">
                         <thead><tr><th>Name</th><th><span class="uk-hidden">Aktion</span></th></tr></thead>
