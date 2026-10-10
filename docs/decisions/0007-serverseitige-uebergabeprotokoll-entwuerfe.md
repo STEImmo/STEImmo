@@ -19,6 +19,13 @@ Browser-Sitzung zugeordnet, damit in der Übersicht nur die eigenen, noch nicht
 abgeschlossenen Entwürfe erscheinen. Die Übersicht bietet „Entwurf fortsetzen"
 und „Entwurf löschen".
 
+Auch der lokale Browserentwurf verwendet eine sitzungsbezogene Kennung. Sie
+wird mit Django `salted_hmac` aus dem Sitzungsschlüssel abgeleitet; der echte
+Sitzungsschlüssel wird nicht an JavaScript ausgegeben. Anlegen, Bearbeiten und
+Löschen verwenden dieselbe Kennung. Nach Abmeldung oder Kontowechsel werden
+Entwürfe der früheren Sitzung nicht angeboten. Alte globale Browserentwürfe
+ohne nachweisbare Sitzungszuordnung werden nicht automatisch übernommen (#109).
+
 Unvollständige Daten bleiben ausschließlich im Entwurf und erzeugen kein
 fachlich wirksames `Protokoll`. Nach dem erfolgreichen Speichern wird der
 zugehörige Entwurf server- und browserseitig gelöscht.

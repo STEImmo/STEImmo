@@ -540,6 +540,8 @@ class HandoverProtocolViewsTests(TestCase):
         self.assertFalse(ProtokollEntwurf.objects.exists())
 
     def test_successful_creation_clears_local_and_server_drafts(self) -> None:
+        form_response = self.client.get(reverse("wohnungsverwaltung:handover_protocol_create"))
+        draft_storage_key = form_response.context["draft_storage_key"]
         self.client.post(
             reverse("wohnungsverwaltung:handover_protocol_draft_save"),
             data=json.dumps({"scope": "create", "draft": self.draft_data()}),
@@ -563,7 +565,7 @@ class HandoverProtocolViewsTests(TestCase):
 
         self.assertContains(
             response,
-            'data-draft-key-to-clear="handover-protocol-draft:create"',
+            f'data-draft-key-to-clear="{draft_storage_key}"',
         )
 
     def test_room_checklist_uses_a_large_finding_field_and_supports_deletion(self) -> None:

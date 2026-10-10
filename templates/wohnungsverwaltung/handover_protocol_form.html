@@ -9,7 +9,7 @@
         <h1 class="uk-heading-medium">{{ page_title }}</h1>
         <p class="uk-text-lead">Wählen Sie zuerst die Wohnung. Anschließend stehen nur die dieser Wohnung direkt zugeordneten Personen zur Auswahl.</p>
 
-        <form method="post" enctype="multipart/form-data" class="uk-card uk-card-default uk-card-body uk-margin-top" id="handover-protocol-form" data-draft-scope="{{ draft_scope }}" data-draft-save-url="{% url 'wohnungsverwaltung:handover_protocol_draft_save' %}" data-draft-delete-url="{{ server_draft_delete_url }}">
+        <form method="post" enctype="multipart/form-data" class="uk-card uk-card-default uk-card-body uk-margin-top" id="handover-protocol-form" data-draft-scope="{{ draft_scope }}" data-draft-storage-key="{{ draft_storage_key }}" data-draft-save-url="{% url 'wohnungsverwaltung:handover_protocol_draft_save' %}" data-draft-delete-url="{{ server_draft_delete_url }}">
             {% csrf_token %}
             <div class="uk-alert-warning" hidden data-protocol-draft-notice>
                 <p>Ein Entwurf vom <span data-protocol-draft-time></span> ist verfügbar.</p>
@@ -34,7 +34,7 @@
     document.addEventListener("DOMContentLoaded", () => {
         const protocolForm = document.getElementById("handover-protocol-form");
         const draftScope = protocolForm?.dataset.draftScope;
-        const draftStorageKey = draftScope ? `handover-protocol-draft:${draftScope}` : null;
+        const draftStorageKey = protocolForm?.dataset.draftStorageKey || null;
         const draftSaveUrl = protocolForm?.dataset.draftSaveUrl;
         let serverDraftDeleteUrl = protocolForm?.dataset.draftDeleteUrl || "";
         const draftMaximumAge = 7 * 24 * 60 * 60 * 1000;
