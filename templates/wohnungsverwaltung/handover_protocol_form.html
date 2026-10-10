@@ -75,6 +75,12 @@
             } else {
                 url.searchParams.delete("person");
             }
+            const handoverTime = document.getElementById("id_uebergabe_zeitpunkt")?.value;
+            if (handoverTime) {
+                url.searchParams.set("uebergabe_zeitpunkt", handoverTime);
+            } else {
+                url.searchParams.delete("uebergabe_zeitpunkt");
+            }
             const response = await fetch(url);
             if (!response.ok) {
                 return false;
@@ -122,7 +128,7 @@
             });
         }
         document.addEventListener("change", async (event) => {
-            if (event.target.id !== "id_person") {
+            if (!["id_person", "id_uebergabe_zeitpunkt"].includes(event.target.id)) {
                 return;
             }
             saveDraft(true);
@@ -625,11 +631,15 @@
                 if (apartmentSelect && savedApartment && apartmentSelect.value !== savedApartment) {
                     apartmentSelect.value = savedApartment;
                     await updateApartmentDependentFields();
+                    updateTypeSpecificSections();
                 }
                 restoreFields(protocolForm, draft.fields);
                 updateTypeSpecificSections();
                 restoreRooms(draft.rooms);
                 restoreKeys(draft.keys);
+                await updateApartmentDependentFields();
+                updateTypeSpecificSections();
+                updateMeterDifferences();
                 document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
                 document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
                 if (draftNotice) {
