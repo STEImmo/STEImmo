@@ -1127,7 +1127,7 @@ class HandoverProtocolForm(forms.ModelForm):
         self.fields["abnahme_status"].choices = ACCEPTANCE_STATUS_LABELS.items()
         for field_name, _number_field, label in METER_READING_FIELDS:
             self.fields[field_name].widget.attrs["data-meter-reading"] = ""
-            self.fields[field_name].widget.attrs["aria-label"] = f"{label}, Auszug neu"
+            self.fields[field_name].widget.attrs["aria-label"] = f"{label}, aktueller Zählerstand"
 
     def clean(self) -> dict:
         cleaned_data = super().clean()

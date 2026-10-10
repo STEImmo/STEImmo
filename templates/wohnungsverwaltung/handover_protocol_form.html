@@ -137,24 +137,10 @@
             if (!protocolType) {
                 return;
             }
-            // Repeated meter fields must retain their values when switching type.
-            const activeValues = new Map();
-            document.querySelectorAll("[data-protocol-types]").forEach((section) => {
-                if (!section.hidden) {
-                    section.querySelectorAll("input[name], select[name], textarea[name]").forEach((field) => {
-                        if (!field.disabled && field.type !== "checkbox") {
-                            activeValues.set(field.name, field.value);
-                        }
-                    });
-                }
-            });
             document.querySelectorAll("[data-protocol-types]").forEach((section) => {
                 section.hidden = !section.dataset.protocolTypes.split(" ").includes(protocolType.value);
                 section.querySelectorAll("input, select, textarea").forEach((field) => {
-                    if (activeValues.has(field.name)) {
-                        field.value = activeValues.get(field.name);
-                    }
-                    // Hidden required controls must neither block nor duplicate submission.
+                    // Inactive controls must not block validation or be submitted.
                     field.disabled = section.hidden;
                 });
             });
