@@ -7,6 +7,7 @@
     <div class="uk-container">
         <h1 class="uk-heading-medium">Wohnungen finden</h1>
         <p class="uk-text-lead">Filtern Sie die verfügbaren Wohnungen nach Ihren Wünschen.</p>
+        <a class="uk-button uk-button-default uk-margin-bottom" href="{% url 'wohnungsverwaltung_public:building_view' %}">Gebäude und Etagen erkunden</a>
 
         <form method="get" action="{% url 'wohnungsverwaltung_public:apartment_search' %}" class="uk-card uk-card-default uk-card-body uk-margin-large-bottom" novalidate>
             <div class="uk-grid-small uk-child-width-1-2@s uk-child-width-1-4@m" uk-grid>
@@ -28,18 +29,18 @@
                         <div class="uk-card uk-card-default uk-card-body">
                             {% include "wohnungsverwaltung/_apartment_image_placeholder.html" with wohnung=wohnung %}
                             <div class="uk-flex uk-flex-between uk-flex-middle">
-                                <h3 class="uk-card-title">Wohnung {{ wohnung.wohnungsnummer }}</h3>
+                                <h3 class="uk-card-title">Wohnung {{ wohnung.display_number }}</h3>
                                 <span class="uk-label uk-label-success">Verfügbar</span>
                             </div>
                             <dl class="uk-description-list uk-description-list-divider">
                                 <dt>Gebäude und Etage</dt>
                                 <dd>{{ wohnung.gebaeudenummer }}, {% if wohnung.etage == 0 %}Erdgeschoss{% else %}Etage {{ wohnung.etage }}{% endif %}</dd>
                                 <dt>Wohnfläche</dt>
-                                <dd>{{ wohnung.groesse_qm }} m²</dd>
+                                <dd>{% if wohnung.groesse_qm > 0 %}{{ wohnung.groesse_qm }} m²{% else %}Wohnfläche noch nicht angegeben{% endif %}</dd>
                                 <dt>Zimmer</dt>
-                                <dd>{{ wohnung.zimmeranzahl }}</dd>
+                                <dd>{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl }}{% else %}Noch nicht angegeben{% endif %}</dd>
                                 <dt>Kaltmiete</dt>
-                                <dd>{{ wohnung.kaltmiete }} €</dd>
+                                <dd>{% if wohnung.kaltmiete > 0 %}{{ wohnung.kaltmiete }} €{% else %}Noch nicht angegeben{% endif %}</dd>
                             </dl>
                             <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' wohnung.pk %}">
                                 Details ansehen

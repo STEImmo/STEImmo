@@ -5,6 +5,12 @@ from . import views
 app_name = "verwaltung"
 
 urlpatterns = [
+    path("wohnungen/<uuid:wohnung_id>/fotos/", views.apartment_photos, name="apartment_photos"),
+    path(
+        "wohnungen/<uuid:wohnung_id>/fotos/<uuid:photo_id>/loeschen/",
+        views.apartment_photo_delete,
+        name="apartment_photo_delete",
+    ),
     path("benutzer/", views.user_account_list, name="user_account_list"),
     path("benutzer/neu/", views.user_account_create, name="user_account_create"),
     path("benutzer/<int:user_id>/", views.user_account_edit, name="user_account_edit"),

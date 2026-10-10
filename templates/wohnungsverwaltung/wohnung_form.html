@@ -18,6 +18,7 @@
         </div>
 
         <form method="post">
+            {% if wohnung.pk %}<a class="uk-button uk-button-default uk-margin-bottom" href="{% url 'verwaltung:apartment_photos' wohnung.pk %}">Wohnungsfotos verwalten</a>{% endif %}
             {% csrf_token %}
             {% for error in form.non_field_errors %}
                 <div class="uk-alert-danger" uk-alert><p>{{ error }}</p></div>
@@ -33,6 +34,18 @@
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.zimmeranzahl %}</div>
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.status %}</div>
                 </div>
+            </section>
+
+            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+                <h2 class="uk-h3">Öffentliche Detailangaben</h2>
+                <p class="uk-text-meta">Diese Angaben erscheinen auf der Wohnungsdetailseite. Alle Felder sind optional; fehlende Informationen werden dort als „Noch nicht angegeben“ angezeigt.</p>
+                <div class="uk-margin">{% include "wohnungsverwaltung/_form_field.html" with field=form.description %}</div>
+                <div class="uk-margin">{% include "wohnungsverwaltung/_form_field.html" with field=form.equipment %}</div>
+                <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.heating_type %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.planned_move_in %}</div>
+                </div>
+                <div class="uk-margin">{% include "wohnungsverwaltung/_form_field.html" with field=form.energy_information %}</div>
             </section>
 
             <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Wohnungsfotos verwalten – STEImmo{% endblock %}
+{% block content %}
+<section class="uk-section uk-section-default"><div class="uk-container">
+    <ul class="uk-breadcrumb"><li><a href="{% url 'verwaltung:wohnung_list' %}">Wohnungen</a></li><li><a href="{% url 'verwaltung:wohnung_edit' wohnung.pk %}">Wohnung {{ wohnung.display_number }}</a></li><li><span>Fotos</span></li></ul>
+    <h1 class="uk-heading-small">Fotos für Wohnung {{ wohnung.display_number }}</h1>
+    <p>Diese Fotos erscheinen öffentlich bei einer verfügbaren Wohnung. Das erste hochgeladene Foto wird als großes Titelbild verwendet.</p>
+    <form method="post" enctype="multipart/form-data" class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {% for field in form %}<div class="uk-margin">{% include "wohnungsverwaltung/_form_field.html" with field=field %}</div>{% endfor %}
+        <p class="uk-text-meta">JPEG, PNG oder WebP · höchstens 8 MiB und 25 Megapixel pro Bild · maximal 12 Fotos</p>
+        <button class="uk-button uk-button-primary" type="submit">Foto hochladen</button>
+    </form>
+    <div class="uk-grid-medium uk-child-width-1-2@s uk-child-width-1-3@m" uk-grid>
+        {% for photo in photos %}<div><article class="uk-card uk-card-default">
+            <div class="uk-card-media-top"><img class="apartment-photo-thumbnail" src="{% url 'wohnungsverwaltung_public:apartment_photo' photo.pk %}" alt="{{ photo.caption|default:'Wohnungsfoto' }}"></div>
+            <div class="uk-card-body"><p>{{ photo.caption|default:'Wohnungsfoto' }}{% if forloop.first %} · Titelbild{% endif %}</p><form method="post" action="{% url 'verwaltung:apartment_photo_delete' wohnung.pk photo.pk %}">{% csrf_token %}<button class="uk-button uk-button-danger uk-button-small" type="submit">Foto entfernen</button></form></div>
+        </article></div>{% empty %}<p class="uk-text-muted">Noch keine Wohnungsfotos hochgeladen.</p>{% endfor %}
+    </div>
+</div></section>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Gebäude erkunden – STEImmo{% endblock %}
+{% block content %}
+<section class="uk-section uk-section-default">
+    <div class="uk-container">
+        <h1 class="uk-heading-small uk-margin-small-bottom">Ihr Zuhause beginnt hier.</h1>
+        <p class="uk-text-lead">{{ total_units }} Wohnungen in einem Gebäude. Wählen Sie ein Stockwerk.</p>
+        {% if floors %}
+        <div class="uk-grid-large uk-flex-middle" uk-grid>
+            <div class="uk-width-2-3@m">
+                {% include "wohnungsverwaltung/_building_facade.html" %}
+                <p class="uk-text-meta uk-text-center">Westfassade · vereinfachte Darstellung nach der Gebäudeansicht</p>
+            </div>
+            <div class="uk-width-1-3@m">
+                <aside class="uk-card uk-card-default uk-card-body" aria-labelledby="building-overview-title">
+                    <h2 id="building-overview-title" class="uk-card-title">Das Gebäude auf einen Blick</h2>
+                    <dl class="uk-description-list uk-description-list-divider">
+                        <dt>Wohnungen insgesamt</dt><dd class="uk-text-large">{{ total_units }}</dd>
+                        <dt>Etagen</dt><dd class="uk-text-large">{{ floors|length }}</dd>
+                        <dt>Aktuell verfügbar</dt><dd class="uk-text-large">{{ total_available }} Wohnung{% if total_available != 1 %}en{% endif %}</dd>
+                    </dl>
+                    <p>Wählen Sie ein Stockwerk oder suchen Sie direkt nach einer freien Wohnung.</p>
+                    <a class="uk-button uk-button-primary uk-width-1-1" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Freie Wohnungen finden</a>
+                </aside>
+            </div>
+        </div>
+        {% else %}<p>Noch keine Wohnungen vorhanden.</p>{% endif %}
+    </div>
+</section>
+{% endblock %}

@@ -1,9 +1,12 @@
 import json
 import logging
+from collections import Counter
 from uuid import UUID
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import DatabaseError, IntegrityError, transaction
@@ -24,17 +27,24 @@ from django.views.decorators.cache import never_cache
 from PIL import Image
 
 from .access import (
+    APPLICANT_ACCESS_PERMISSION,
     EMPLOYEE_ACCESS_PERMISSION,
     applicant_required,
     employee_required,
     has_permission,
     user_management_required,
 )
+from .building_plans import (
+    FLOOR_SHAPES,
+    PLAN_REFERENCES,
+    floor_label,
+)
 from .forms import (
     ACCEPTANCE_STATUS_LABELS,
     HANDOVER_STATUS_LABELS,
     HANDOVER_TYPE_LABELS,
     METER_READING_FIELDS,
+    ApartmentPhotoForm,
     ApartmentSearchForm,
     ApplicationProofStorageError,
     BewerbungForm,
@@ -61,11 +71,15 @@ from .handover_lock import protocol_mutation
 from .handover_photos import (
     PHOTO_SAVE_ERROR,
     HandoverPhotoStorageError,
+    delete_apartment_photo,
     delete_handover_photo,
     handover_photo_upload,
+    photo_upload,
+    save_apartment_photo,
     save_handover_photo,
 )
 from .models import (
+    ApartmentPhoto,
     ApplicationProof,
     ApplicationProofCategory,
     ApplicationProofCleanup,
@@ -85,6 +99,7 @@ from .models import (
     Stellplatz,
     StellplatzZuordnung,
     Wohnung,
+    WohnungStatus,
     calculate_photo_checksum,
 )
 from .upload_limits import upload_too_large_response
@@ -162,13 +177,91 @@ def apartment_search(request: HttpRequest) -> HttpResponse:
             if form.cleaned_data[field_name] not in (None, "")
         }
         wohnungen = wohnungen.filter(**filters)
+        if any(form.cleaned_data[field] is not None for field in ("zimmer_min", "zimmer_max")):
+            wohnungen = wohnungen.filter(zimmeranzahl__gt=0)
+        if any(
+            form.cleaned_data[field] is not None for field in ("kaltmiete_min", "kaltmiete_max")
+        ):
+            wohnungen = wohnungen.filter(kaltmiete__gt=0)
     else:
         wohnungen = wohnungen.none()
 
     return render(
         request,
         "wohnungsverwaltung/apartment_search.html",
-        {"form": form, "wohnungen": wohnungen.order_by("etage", "wohnungsnummer")},
+        {
+            "form": form,
+            "wohnungen": wohnungen.order_by("etage", "wohnungsnummer"),
+        },
+    )
+
+
+def building_view(request: HttpRequest) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    floors_by_number = {}
+    for unit in Wohnung.objects.filter(etage__in=FLOOR_SHAPES).order_by("-etage", "wohnungsnummer"):
+        floor = floors_by_number.setdefault(
+            unit.etage,
+            {
+                "number": unit.etage,
+                "label": floor_label(unit.etage),
+                "units": [],
+                "available_count": 0,
+                "facade_y": 244 + (3 - unit.etage) * 112,
+            },
+        )
+        floor["units"].append(unit)
+        if unit.status == WohnungStatus.FREE:
+            floor["available_count"] += 1
+    return render(
+        request,
+        "wohnungsverwaltung/building_view.html",
+        {
+            "floors": list(floors_by_number.values()),
+            "total_units": sum(len(f["units"]) for f in floors_by_number.values()),
+            "total_available": sum(f["available_count"] for f in floors_by_number.values()),
+        },
+    )
+
+
+def floor_view(request: HttpRequest, floor_number: int) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    if floor_number not in FLOOR_SHAPES:
+        raise Http404("Diese Etage ist nicht vorhanden.")
+    units = list(Wohnung.objects.filter(etage=floor_number).order_by("wohnungsnummer"))
+    if not units:
+        raise Http404("Diese Etage ist nicht vorhanden.")
+    shapes = FLOOR_SHAPES[floor_number]
+    number_counts = Counter(unit.display_number for unit in units)
+    plan_units = []
+    for unit in units:
+        shape = shapes.get(unit.display_number)
+        if shape is None or number_counts[unit.display_number] != 1:
+            continue
+        points, x, y = shape
+        plan_units.append({"unit": unit, "points": points, "x": x, "y": y})
+    return render(
+        request,
+        "wohnungsverwaltung/floor_view.html",
+        {
+            "floor_number": floor_number,
+            "floor_label": floor_label(floor_number),
+            "floor_numbers": [
+                (number, floor_label(number))
+                for number in Wohnung.objects.filter(etage__in=FLOOR_SHAPES)
+                .order_by("etage")
+                .values_list("etage", flat=True)
+                .distinct()
+            ],
+            "units": units,
+            "plan_units": plan_units,
+            "has_unmapped_units": len(plan_units) != len(units),
+            "plan_reference": PLAN_REFERENCES[
+                "ground" if floor_number == 0 else "attic" if floor_number == 4 else "regular"
+            ],
+        },
     )
 
 
@@ -180,8 +273,90 @@ def apartment_detail_placeholder(request: HttpRequest, unit_id: UUID) -> HttpRes
     return render(
         request,
         "wohnungsverwaltung/apartment_detail_placeholder.html",
-        {"wohnung": wohnung},
+        {
+            "wohnung": wohnung,
+            "photos": list(wohnung.photos.all()),
+            "floor_label": floor_label(wohnung.etage),
+            "has_floor_plan": wohnung.etage in FLOOR_SHAPES,
+        },
     )
+
+
+def apartment_photo(request: HttpRequest, photo_id: UUID) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    photos = ApartmentPhoto.objects.select_related("apartment")
+    if not has_permission(request, EMPLOYEE_ACCESS_PERMISSION):
+        photos = photos.filter(apartment__status=WohnungStatus.FREE)
+    photo = get_object_or_404(photos, pk=photo_id)
+    try:
+        response = FileResponse(photo.image.open("rb"), content_type="image/jpeg")
+    except OSError as error:
+        raise Http404("Foto nicht verfügbar.") from error
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@employee_required
+def apartment_photos(request: HttpRequest, wohnung_id: UUID) -> HttpResponse:
+    if request.method not in {"GET", "POST"}:
+        return HttpResponseNotAllowed(["GET", "POST"])
+    apartment = get_object_or_404(Wohnung, pk=wohnung_id)
+    form = ApartmentPhotoForm(request.POST or None, request.FILES or None)
+    upload_error = getattr(request, "_apartment_photo_upload_error", None)
+    if upload_error:
+        return upload_too_large_response(upload_error)
+    if request.method == "POST" and form.is_valid():
+        saved = False
+        try:
+            with photo_upload() as stored_files:
+                apartment = Wohnung.objects.select_for_update().get(pk=wohnung_id)
+                if apartment.photos.count() >= settings.APARTMENT_PHOTO_MAX_COUNT:
+                    form.add_error("image", "Pro Wohnung sind höchstens 12 Fotos erlaubt.")
+                else:
+                    photo = form.save(commit=False)
+                    photo.apartment = apartment
+                    save_apartment_photo(photo, stored_files)
+                    saved = True
+        except (HandoverPhotoStorageError, DatabaseError):
+            logger.warning("Wohnungsfoto konnte nicht gespeichert werden.")
+            form.add_error(
+                "image", "Das Wohnungsfoto konnte nicht gespeichert werden. Bitte erneut auswählen."
+            )
+        else:
+            if saved:
+                messages.success(request, "Das Wohnungsfoto wurde gespeichert.")
+                return redirect("verwaltung:apartment_photos", wohnung_id=apartment.pk)
+    return render(
+        request,
+        "wohnungsverwaltung/apartment_photos.html",
+        {
+            "wohnung": apartment,
+            "form": form,
+            "photos": apartment.photos.all(),
+        },
+    )
+
+
+@employee_required
+def apartment_photo_delete(request: HttpRequest, wohnung_id: UUID, photo_id: UUID) -> HttpResponse:
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    try:
+        with transaction.atomic():
+            photo = get_object_or_404(
+                ApartmentPhoto.objects.select_for_update(), pk=photo_id, apartment_id=wohnung_id
+            )
+            delete_apartment_photo(photo)
+    except (OSError, DatabaseError):
+        logger.warning("Wohnungsfoto konnte nicht entfernt werden.")
+        messages.error(
+            request, "Das Foto konnte nicht entfernt werden. Bitte versuchen Sie es erneut."
+        )
+    else:
+        messages.success(request, "Das Wohnungsfoto wurde entfernt.")
+    return redirect("verwaltung:apartment_photos", wohnung_id=wohnung_id)
 
 
 def pre_application_preview(request: HttpRequest) -> HttpResponse:
@@ -191,6 +366,24 @@ def pre_application_preview(request: HttpRequest) -> HttpResponse:
         request,
         "wohnungsverwaltung/pre_application_preview.html",
         {"form": BewerbungForm(applicant=Person())},
+    )
+
+
+@login_required
+def viewing_request(request: HttpRequest, unit_id: UUID) -> HttpResponse:
+    unit = get_object_or_404(Wohnung.objects.available(), pk=unit_id)
+    if (
+        request.user.has_perm(APPLICANT_ACCESS_PERMISSION)
+        and getattr(request.user, "person_profile", None) is not None
+    ):
+        return redirect("wohnungsverwaltung:pre_application_create_for_unit", unit_id=unit.pk)
+    return render(
+        request,
+        "wohnungsverwaltung/viewing_request_unavailable.html",
+        {
+            "wohnung": unit,
+            "missing_profile": request.user.has_perm(APPLICANT_ACCESS_PERMISSION),
+        },
     )
 
 
@@ -231,7 +424,12 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
                 "Sie haben bereits eine offene Pre-Bewerbung. Bitte warten Sie deren Abschluss ab.",
             )
         if application_created:
-            messages.success(request, "Ihre Pre-Bewerbung wurde erfolgreich gespeichert.")
+            messages.success(
+                request,
+                "Ihre Besichtigungsanfrage wurde gespeichert. Ein Termin wird separat bestätigt."
+                if unit is not None
+                else "Ihre Pre-Bewerbung wurde erfolgreich gespeichert.",
+            )
             return redirect("wohnungsverwaltung:pre_application_list")
 
     return render(
