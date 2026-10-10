@@ -33,6 +33,11 @@ lokale und serverseitige Entwurf enthält diese Angaben mit der neu ausgewählte
 Person. Auch beim Wiederherstellen wird die Referenz zur gespeicherten Person
 aktualisiert und die Zählerdifferenz neu berechnet.
 
+Bei überlappenden Wohnungs- oder Personenwechseln wird nur die neueste Antwort
+übernommen, deren Auswahl noch mit dem Formular übereinstimmt. Diese Prüfung
+erfolgt nach dem vollständigen Empfang der Antwort. Überholte Antworten verändern
+weder Formularbereiche noch URL und lösen keine weitere Entwurfsspeicherung aus.
+
 Ein Wohnungswechsel lädt weiterhin die zugeordneten Personen, Räume,
 Zählernummern und Stammschlüssel neu. Ein vollständiger Neuaufbau dieser
 Bereiche bei jedem Personenwechsel wurde verworfen, weil deren Eingaben zur

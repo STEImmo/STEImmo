@@ -59,19 +59,22 @@
 
         const apartmentSelect = document.getElementById("id_wohnung");
         let loadedApartmentId = apartmentSelect?.value || "";
+        let dependentFieldsRequestId = 0;
         const updateApartmentDependentFields = async () => {
             if (!apartmentSelect) {
                 return false;
             }
+            const requestId = ++dependentFieldsRequestId;
+            const requestedApartmentId = apartmentSelect.value;
+            const requestedPersonId = document.getElementById("id_person")?.value || "";
             const url = new URL(window.location.href);
-            if (apartmentSelect.value) {
-                url.searchParams.set("wohnung", apartmentSelect.value);
+            if (requestedApartmentId) {
+                url.searchParams.set("wohnung", requestedApartmentId);
             } else {
                 url.searchParams.delete("wohnung");
             }
-            const personSelect = document.getElementById("id_person");
-            if (personSelect?.value) {
-                url.searchParams.set("person", personSelect.value);
+            if (requestedPersonId) {
+                url.searchParams.set("person", requestedPersonId);
             } else {
                 url.searchParams.delete("person");
             }
@@ -79,8 +82,17 @@
             if (!response.ok) {
                 return false;
             }
-            const updatedPage = new DOMParser().parseFromString(await response.text(), "text/html");
-            const apartmentChanged = loadedApartmentId !== apartmentSelect.value;
+            const responseText = await response.text();
+            // The selection may change while fetching headers or the response body.
+            if (
+                requestId !== dependentFieldsRequestId
+                || requestedApartmentId !== apartmentSelect.value
+                || requestedPersonId !== (document.getElementById("id_person")?.value || "")
+            ) {
+                return false;
+            }
+            const updatedPage = new DOMParser().parseFromString(responseText, "text/html");
+            const apartmentChanged = loadedApartmentId !== requestedApartmentId;
             const meterValues = new Map(Array.from(document.querySelectorAll(
                 '#meter-reading-section input[name]:not(:disabled)',
             )).map((field) => [field.name, field.value]));
@@ -123,7 +135,7 @@
                     }
                 });
             }
-            loadedApartmentId = apartmentSelect.value;
+            loadedApartmentId = requestedApartmentId;
             document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
             document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
             window.history.replaceState(null, "", url);
@@ -132,7 +144,9 @@
         if (apartmentSelect) {
             apartmentSelect.addEventListener("change", async () => {
                 saveDraft(true);
-                await updateApartmentDependentFields();
+                if (!await updateApartmentDependentFields()) {
+                    return;
+                }
                 updateTypeSpecificSections();
                 updateMeterDifferences();
                 saveDraft(true);
@@ -143,7 +157,9 @@
                 return;
             }
             saveDraft(true);
-            await updateApartmentDependentFields();
+            if (!await updateApartmentDependentFields()) {
+                return;
+            }
             updateTypeSpecificSections();
             updateMeterDifferences();
             saveDraft(true);
@@ -641,10 +657,14 @@
                 const savedApartment = draft.fields?.wohnung?.value;
                 if (apartmentSelect && savedApartment && apartmentSelect.value !== savedApartment) {
                     apartmentSelect.value = savedApartment;
-                    await updateApartmentDependentFields();
+                    if (!await updateApartmentDependentFields()) {
+                        return;
+                    }
                 }
                 restoreFields(protocolForm, draft.fields);
-                await updateApartmentDependentFields();
+                if (!await updateApartmentDependentFields()) {
+                    return;
+                }
                 updateTypeSpecificSections();
                 updateMeterDifferences();
                 restoreRooms(draft.rooms);
