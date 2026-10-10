@@ -181,7 +181,7 @@
                                                     {% endif %}
                                                     {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
                                                 </div>
-                                                {% if field.name == "fotos" %}<p class="uk-text-meta uk-margin-small-top">JPEG, PNG oder WebP, maximal 8 MiB je Bild. Die Fotos werden erst beim Speichern des Protokolls übertragen und nicht im Entwurf zwischengespeichert.</p>{% endif %}
+                                                {% if field.name == "fotos" %}{% include "wohnungsverwaltung/_handover_photo_upload_hint.html" only %}{% endif %}
                                             </div>
                                         {% endif %}
                                     {% endfor %}
@@ -228,7 +228,7 @@
                                                 {{ field }}
                                             {% endif %}
                                         </div>
-                                        {% if field.name == "fotos" %}<p class="uk-text-meta uk-margin-small-top">JPEG, PNG oder WebP, maximal 8 MiB je Bild. Die Fotos werden erst beim Speichern des Protokolls übertragen und nicht im Entwurf zwischengespeichert.</p>{% endif %}
+                                        {% if field.name == "fotos" %}{% include "wohnungsverwaltung/_handover_photo_upload_hint.html" only %}{% endif %}
                                     </div>
                                 {% endif %}
                             {% endfor %}
@@ -259,7 +259,7 @@
                                     {{ field }}
                                 {% endif %}
                             </div>
-                            {% if field.name == "fotos" %}<p class="uk-text-meta uk-margin-small-top">JPEG, PNG oder WebP, maximal 8 MiB je Bild. Die Fotos werden erst beim Speichern des Protokolls übertragen und nicht im Entwurf zwischengespeichert.</p>{% endif %}
+                            {% if field.name == "fotos" %}{% include "wohnungsverwaltung/_handover_photo_upload_hint.html" only %}{% endif %}
                         </div>
                     {% endif %}
                 {% endfor %}
