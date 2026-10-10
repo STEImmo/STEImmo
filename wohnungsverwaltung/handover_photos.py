@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from django.core.files.storage import Storage
 from django.db import DatabaseError, transaction
 
-from .models import HandoverPhotoCleanup, RaumMerkmalFoto, calculate_photo_checksum
+from .models import ApartmentPhoto, HandoverPhotoCleanup, RaumMerkmalFoto, calculate_photo_checksum
 
 logger = logging.getLogger(__name__)
 PHOTO_SAVE_ERROR = (
@@ -44,7 +44,10 @@ def existing_photo_checksums(photos) -> set[str]:
 
 def _cleanup_removed_photo_file(storage: Storage, name: str, cleanup_id) -> None:
     try:
-        if RaumMerkmalFoto.objects.filter(datei=name).exists():
+        if (
+            RaumMerkmalFoto.objects.filter(datei=name).exists()
+            or ApartmentPhoto.objects.filter(image=name).exists()
+        ):
             raise ValueError("Photo is still referenced.")
         storage.delete(name)
         HandoverPhotoCleanup.objects.filter(pk=cleanup_id).delete()
@@ -54,9 +57,18 @@ def _cleanup_removed_photo_file(storage: Storage, name: str, cleanup_id) -> None
 
 
 def delete_handover_photo(photo: RaumMerkmalFoto) -> None:
+    _delete_photo(photo, "datei")
+
+
+def delete_apartment_photo(photo: ApartmentPhoto) -> None:
+    _delete_photo(photo, "image")
+
+
+def _delete_photo(photo, field_name) -> None:
     with transaction.atomic():
-        storage = photo.datei.storage
-        name = photo.datei.name
+        image = getattr(photo, field_name)
+        storage = image.storage
+        name = image.name
         cleanup = None
         if name:
             cleanup, _created = HandoverPhotoCleanup.objects.get_or_create(storage_name=name)
@@ -66,9 +78,17 @@ def delete_handover_photo(photo: RaumMerkmalFoto) -> None:
 
 
 def save_handover_photo(photo: RaumMerkmalFoto, stored_files: list[tuple[Storage, str]]) -> None:
-    field = photo._meta.get_field("datei")
+    _save_photo(photo, "datei", stored_files)
+
+
+def save_apartment_photo(photo: ApartmentPhoto, stored_files: list[tuple[Storage, str]]) -> None:
+    _save_photo(photo, "image", stored_files)
+
+
+def _save_photo(photo, field_name, stored_files) -> None:
+    field = photo._meta.get_field(field_name)
     storage = field.storage
-    upload = photo.datei.file
+    upload = getattr(photo, field_name).file
     try:
         name = field.generate_filename(photo, upload.name)
         while storage.exists(name):
@@ -81,7 +101,7 @@ def save_handover_photo(photo: RaumMerkmalFoto, stored_files: list[tuple[Storage
         raise HandoverPhotoStorageError from error
     if saved_name != name:
         stored_files.append((storage, saved_name))
-    photo.datei = saved_name
+    setattr(photo, field_name, saved_name)
     photo.save()
 
 
@@ -105,7 +125,7 @@ def _cleanup_new_photo_files(stored_files: list[tuple[Storage, str]]) -> None:
 
 
 @contextmanager
-def handover_photo_upload():
+def photo_upload():
     stored_files = []
     try:
         with transaction.atomic():
@@ -114,3 +134,7 @@ def handover_photo_upload():
         # The savepoint has rolled back before cleanup jobs are persisted.
         _cleanup_new_photo_files(stored_files)
         raise
+
+
+# Preserve the existing handover API while sharing the same storage and recovery queue.
+handover_photo_upload = photo_upload

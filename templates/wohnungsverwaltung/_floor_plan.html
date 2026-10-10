@@ -1,0 +1,44 @@
+{% load static %}
+<svg class="floor-plan{% if floor_number == 0 %} is-ground{% elif floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %} is-regular{% endif %}" viewBox="{{ plan_reference.viewbox }}" role="group" aria-labelledby="plan-title plan-description">
+    <title id="plan-title">{{ floor_label }}: Wohnungen auswählen</title>
+    <desc id="plan-description">Vereinfachter Vektorgrundriss nach den Vorlagen, nicht maßstabsgetreu.</desc>
+    <defs>
+        <pattern id="plan-unavailable-hatch" width="12" height="12" patternUnits="userSpaceOnUse">
+            <rect width="12" height="12" fill="#e1e2df"/>
+            <path d="M-3 3L3 -3M0 12L12 0M9 15L15 9" stroke="#b4b8b0" stroke-width="1"/>
+        </pattern>
+        <pattern id="plan-step-vertical" width="6" height="40" patternUnits="userSpaceOnUse"><rect width="6" height="40" fill="#fff"/><path d="M0 0V40" stroke="#adb1ab" stroke-width=".7"/></pattern>
+        <pattern id="plan-step-horizontal" width="60" height="8" patternUnits="userSpaceOnUse"><rect width="60" height="8" fill="#fff"/><path d="M0 0H60" stroke="#adb1ab" stroke-width="1"/></pattern>
+        <g id="plan-bed"><rect width="20" height="30" rx="1"/><path d="M0 8H20M10 0V8"/></g>
+        <g id="plan-sofa"><rect width="26" height="12" rx="2"/><path d="M4 0V12M22 0V12M4 4H22"/></g>
+        <g id="plan-bath"><rect width="12" height="23" rx="3"/></g>
+        <g id="plan-table"><rect width="23" height="15" rx="1"/><path d="M3 -3H9M14 -3H20M3 18H9M14 18H20"/></g>
+    </defs>
+    <g transform="{{ plan_reference.transform }}">
+        <g pointer-events="none" aria-hidden="true">{% include "wohnungsverwaltung/_floor_plan_architecture.html" with layer="shell" %}</g>
+        {% for item in plan_units %}
+            {% if item.unit.status == 'free' %}<a class="plan-apartment" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' item.unit.pk %}" aria-label="Wohnung {{ item.unit.display_number }}, {% if item.unit.groesse_qm > 0 %}{{ item.unit.groesse_qm }} Quadratmeter{% else %}Wohnfläche noch nicht angegeben{% endif %}, verfügbar">
+            {% else %}<g class="plan-apartment is-unavailable" role="img" aria-label="Wohnung {{ item.unit.display_number }}, nicht verfügbar">{% endif %}
+                <title>Wohnung {{ item.unit.display_number }} · {% if item.unit.groesse_qm > 0 %}{{ item.unit.groesse_qm }} m²{% else %}Wohnfläche noch nicht angegeben{% endif %} · {% if item.unit.status == 'free' %}Verfügbar{% else %}Nicht verfügbar{% endif %}</title>
+                <polygon points="{{ item.points }}" class="plan-apartment-shape"/>
+            {% if item.unit.status == 'free' %}</a>{% else %}</g>{% endif %}
+        {% endfor %}
+        <g class="plan-linework" fill="none" pointer-events="none" aria-hidden="true">{% include "wohnungsverwaltung/_floor_plan_architecture.html" with layer="details" %}</g>
+        <g class="plan-annotations" pointer-events="none" aria-hidden="true">
+            {% for item in plan_units %}
+            {% if item.unit.status == 'free' %}
+            <g class="plan-caption" transform="translate({{ item.x }} {{ item.y }}) rotate({{ plan_reference.label_rotation }})">
+                {% if floor_number == 0 or floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %}<rect x="-45" y="-18" width="90" height="38" rx="2"/>{% else %}<rect x="-27" y="-12" width="54" height="27" rx="2"/>{% endif %}
+                <text text-anchor="middle" y="{% if floor_number == 0 or floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %}-3{% else %}-1{% endif %}" class="plan-number">Whg. {{ item.unit.display_number }}</text>
+                <text text-anchor="middle" y="{% if floor_number == 0 or floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %}14{% else %}10{% endif %}" class="plan-area">{% if item.unit.groesse_qm > 0 %}{{ item.unit.groesse_qm }} m²{% else %}Fläche offen{% endif %}</text>
+            </g>
+            {% else %}
+            <g class="plan-unavailable-caption" transform="translate({{ item.x }} {{ item.y }}) rotate({{ plan_reference.label_rotation }})">
+                <rect x="-49" y="-12" width="98" height="24" rx="3"/>
+                <text text-anchor="middle" y="4">Nicht verfügbar</text>
+            </g>
+            {% endif %}
+            {% endfor %}
+        </g>
+    </g>
+</svg>

@@ -16,6 +16,7 @@ class UnsavedApartmentRoomTests(TestCase):
 
         self.assertContains(response, "Speichern Sie die Wohnung zuerst")
         self.assertNotContains(response, "Raum hinzufügen")
+        self.assertNotContains(response, "Wohnungsfotos verwalten")
         self.assertFalse(
             '<p class="uk-text-muted uk-margin-small-top">Status:' in response.content.decode(),
             "An unsaved apartment must not display a persisted status.",
@@ -30,6 +31,7 @@ class UnsavedApartmentRoomTests(TestCase):
 
         self.assertContains(response, "Speichern Sie die Wohnung zuerst")
         self.assertNotContains(response, "Raum hinzufügen")
+        self.assertNotContains(response, "Wohnungsfotos verwalten")
         self.assertFalse(
             '<p class="uk-text-muted uk-margin-small-top">Status:' in response.content.decode(),
             "An invalid creation must not display a persisted status.",
@@ -45,7 +47,10 @@ class UnsavedApartmentRoomTests(TestCase):
 
         apartment = Wohnung.objects.get()
         destination = reverse("verwaltung:raum_create", args=[apartment.pk])
+        photos_destination = reverse("verwaltung:apartment_photos", args=[apartment.pk])
         self.assertContains(response, f'href="{destination}"')
+        self.assertContains(response, f'href="{photos_destination}"')
         self.assertContains(response, '<p class="uk-text-muted uk-margin-small-top">Status:')
         self.assertNotContains(response, "Speichern Sie die Wohnung zuerst")
         self.assertEqual(self.client.get(destination).status_code, 200)
+        self.assertEqual(self.client.get(photos_destination).status_code, 200)

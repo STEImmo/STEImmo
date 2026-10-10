@@ -96,7 +96,7 @@ class ApartmentSearchViewTests(TestCase):
             ),
         )
 
-    def test_apartment_detail_placeholder_says_details_will_follow(self) -> None:
+    def test_apartment_detail_shows_photo_placeholder(self) -> None:
         unit = self.create_unit("1.01")
 
         response = self.client.get(
@@ -108,7 +108,7 @@ class ApartmentSearchViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, unit.wohnungsnummer)
-        self.assertContains(response, "Wohnungsdetails folgen")
+        self.assertContains(response, "Wohnungsfoto folgt")
 
     def test_apartment_detail_placeholder_returns_404_for_unavailable_units(self) -> None:
         unavailable_units = (
@@ -1872,6 +1872,20 @@ class HandoverProtocolViewsTests(TestCase):
 
 
 class SeedStandardDataCommandTests(TestCase):
+    def test_seed_supplies_sourced_description_without_overwriting_edited_details(self):
+        call_command("seed_standard_data")
+        unit = Wohnung.objects.get(wohnungsnummer="1")
+        self.assertIn("Bestandsgebäudes in Würzburg", unit.description)
+        self.assertEqual(unit.planned_move_in, "Voraussichtlich März 2027")
+        self.assertEqual(unit.heating_type, "")
+        unit.description = "Individuell gepflegte Beschreibung"
+        unit.planned_move_in = "Nach Vereinbarung"
+        unit.save()
+        call_command("seed_standard_data")
+        unit.refresh_from_db()
+        self.assertEqual(unit.description, "Individuell gepflegte Beschreibung")
+        self.assertEqual(unit.planned_move_in, "Nach Vereinbarung")
+
     def test_command_creates_25_units_and_is_idempotent(self) -> None:
         call_command("seed_standard_data")
 
@@ -2150,6 +2164,24 @@ class PreApplicationAuthenticationTests(TestCase):
         application = Bewerbung.objects.get()
         self.assertEqual(application.person, self.applicant)
         self.assertEqual(application.wohnung, self.free_unit)
+
+    def test_viewing_request_keeps_selected_unit_and_main_application_locked(self) -> None:
+        self.client.force_login(self.user)
+        url = reverse(
+            "wohnungsverwaltung:pre_application_create_for_unit", args=[self.free_unit.pk]
+        )
+        form_response = self.client.get(url)
+        self.assertContains(form_response, "Zur Besichtigung anmelden")
+        self.assertContains(form_response, "Besichtigungsanfrage senden")
+        response = self.client.post(url, self.valid_form_data(), follow=True)
+        self.assertContains(response, "Ihre Besichtigungsanfrage wurde gespeichert.")
+        application = Bewerbung.objects.get()
+        self.assertEqual(application.wohnung, self.free_unit)
+        self.assertFalse(application.main_application_accessible)
+        main_response = self.client.get(
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
+        )
+        self.assertEqual(main_response.status_code, 404)
 
     def test_linked_user_cannot_submit_for_a_unit_that_became_unavailable(self) -> None:
         self.assertTrue(self.client.login(username=self.user.username, password="FjordTanne!4826"))
