@@ -1318,7 +1318,7 @@ def _clean_additional_details(raw_value: str, feature: Merkmal | None) -> dict[s
         return {}
     try:
         details = json.loads(raw_value)
-    except json.JSONDecodeError as error:
+    except (ValueError, RecursionError) as error:
         raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.") from error
     if not isinstance(details, dict):
         raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.")
@@ -1332,6 +1332,12 @@ def _clean_additional_details(raw_value: str, feature: Merkmal | None) -> dict[s
             )
         if not isinstance(value, str):
             raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.")
+        if "\x00" in value:
+            raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.") from error
         if cleaned_value := value.strip():
             cleaned_details[label] = cleaned_value
     return cleaned_details
