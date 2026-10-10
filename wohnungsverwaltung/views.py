@@ -304,6 +304,9 @@ def apartment_photos(request: HttpRequest, wohnung_id: UUID) -> HttpResponse:
         return HttpResponseNotAllowed(["GET", "POST"])
     apartment = get_object_or_404(Wohnung, pk=wohnung_id)
     form = ApartmentPhotoForm(request.POST or None, request.FILES or None)
+    upload_error = getattr(request, "_apartment_photo_upload_error", None)
+    if upload_error:
+        return upload_too_large_response(upload_error)
     if request.method == "POST" and form.is_valid():
         saved = False
         try:

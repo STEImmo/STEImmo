@@ -36,7 +36,7 @@
                                 <dt>Gebäude und Etage</dt>
                                 <dd>{{ wohnung.gebaeudenummer }}, {% if wohnung.etage == 0 %}Erdgeschoss{% else %}Etage {{ wohnung.etage }}{% endif %}</dd>
                                 <dt>Wohnfläche</dt>
-                                <dd>{{ wohnung.groesse_qm }} m²</dd>
+                                <dd>{% if wohnung.groesse_qm > 0 %}{{ wohnung.groesse_qm }} m²{% else %}Wohnfläche noch nicht angegeben{% endif %}</dd>
                                 <dt>Zimmer</dt>
                                 <dd>{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl }}{% else %}Noch nicht angegeben{% endif %}</dd>
                                 <dt>Kaltmiete</dt>

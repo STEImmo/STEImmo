@@ -1,5 +1,46 @@
 # Gebäude- und Wohnungsansicht (US-02, #16)
 
+## Review-Nacharbeit vom 10. Oktober 2026
+
+Die ausgewählte Wohnungsroute bleibt beim Wechsel vom Login zur Registrierung und
+bis zur erfolgreichen E-Mail-Bestätigung erhalten. Das Weiterleitungsziel wird vor
+dem Speichern und vor der Weiterleitung auf denselben Host und das erforderliche
+HTTPS-Schema geprüft; externe Ziele werden verworfen. Ohne Ziel bleibt die bisherige
+Weiterleitung zur Bewerbungsübersicht erhalten.
+
+Wohnungsfotos werden bereits vor der CSRF-/Formularverarbeitung auf Request-Größe
+begrenzt (Fotolimit plus 64 KiB für Multipart-Metadaten). Ein vorgeschalteter
+Uploadhandler begrenzt zusätzlich die gesamten Dateibytes beim Einlesen und gibt
+überschreitende Blöcke nicht an den temporären Dateihandler weiter. Überschreitungen
+liefern HTTP 413 und speichern kein Foto. Die vorhandene Bildvalidierung und
+Bereinigungsqueue bleiben bestehen.
+
+Fehlende Wohnflächen erscheinen in Etagenliste, Plan und Suche als fehlend statt
+als 0 m². Genau zwei Galeriefotos bilden zwei gleich breite Vorschauen ohne leeres
+Rasterfeld. Die rechte Fassadenfläche schließt an Oberkante und Fundament an und
+ist als schmale Seitenwand dargestellt. Die Treppenflächen sind in allen Etagen
+von den seitlichen Wandlinien eingerückt, damit diese ihre volle Stärke behalten.
+Im EG zeigen zwei Treppenläufe den Weg nach oben und nach unten zum vorhandenen
+Keller. Ein eigener Kellergrundriss ist damit nicht ergänzt.
+
+Der EG-Hauseingang besitzt gemäß dem nachgereichten Planausschnitt eine mittige
+Tür. Die Stufen beginnen hinter ihrem Schwenkbereich. Überschneidungen geöffneter
+Türblätter mit Wänden bei Wohnung 001, der rechten EG-Wohnung und am DG-Treppenraum
+sind durch passende Öffnungsrichtungen korrigiert. Ein versetzter DG-Türanschluss
+ist auf die zugehörige Wand ausgerichtet. Alle einflügeligen Türen haben einheitlich
+38 Zeichnungseinheiten Breite, entsprechend dem Zugang zu 103. Ihre Wandöffnungen
+sind angepasst und ihre Schwenkbögen echte Viertelkreise. Die zweiflügeligen
+DG-Balkontüren behalten zwei 33 Einheiten breite Flügel. Der Zugang zu 002 ist
+links angeschlagen und hält Abstand zur seitlichen Innenwand. Die bisher fehlende
+Eingangstür zu 106/206/306 ist neben der Treppe ergänzt.
+Im 3. OG enden die Balkonbegrenzungen einschließlich der drei gebogenen Anschlüsse
+an der Außenkante der Fassadenlinie statt auf deren Mitte. Die halben Strichstärken
+von Wand und Balkonbegrenzung sind beim Anschluss berücksichtigt.
+Die geometrische Prüfung aller 19
+EG-Türzeichnungen, 22 Türzeichnungen der gemeinsamen OG-Vorlage und 17
+DG-Türzeichnungen findet keine Wandkreuzungen in Türöffnungen oder Schwenkbereichen;
+die vorgesehenen Anschlüsse an den Türenden sind dabei ausgenommen.
+
 ## Aktueller Datenstand und Vereinfachung vom 9. Oktober 2026
 
 Die aktuelle Excel-Wohnungsliste des Nutzers ist die maßgebliche Flächenquelle. Alle 25 gespeicherten Nummern, Etagen und Flächen stimmen damit überein, einschließlich DG 401 mit 92,94 m² und 402 mit 64,90 m². Wohnungsangaben, Fotos, Suchfilter und Verfügbarkeitszahlen kommen zur Laufzeit ausschließlich aus der Datenbank. Änderungen über die Mitarbeiterverwaltung erscheinen beim nächsten Seitenaufruf ohne Codeänderung.

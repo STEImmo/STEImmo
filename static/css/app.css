@@ -160,6 +160,9 @@ a.plan-apartment:focus-visible .plan-apartment-shape { fill: #d1e6f7; stroke: #1
 .apartment-gallery { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
 .apartment-gallery-main { grid-row: span 2; }
 .apartment-gallery-main:only-child { grid-column: 1 / -1; }
+.apartment-gallery-pair { grid-template-columns: 1fr 1fr; }
+.apartment-gallery-pair .apartment-gallery-main { grid-row: auto; grid-column: auto; }
+.apartment-gallery-pair .apartment-gallery-photo.apartment-gallery-main img { min-height: 0; }
 .apartment-gallery-photo { display: block; position: relative; min-height: 180px; overflow: hidden; }
 .apartment-gallery-photo img { width: 100%; height: 100%; max-height: 650px; object-fit: cover; aspect-ratio: 4 / 3; }
 .apartment-gallery-photo.apartment-gallery-main img { min-height: 420px; }

@@ -4,13 +4,15 @@ from html.parser import HTMLParser
 from io import BytesIO
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+from urllib.parse import urlencode
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files.uploadhandler import StopUpload, TemporaryFileUploadHandler
 from django.core.management import call_command
 from django.db import DatabaseError
-from django.test import Client, TestCase, override_settings
+from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
 
@@ -21,6 +23,24 @@ from .models import ApartmentPhoto, HandoverPhotoCleanup, Person, Wohnung, Wohnu
 
 
 class BuildingViewTests(TestCase):
+    def test_missing_area_is_not_advertised_on_public_pages(self):
+        for status in (WohnungStatus.FREE, WohnungStatus.TAKEN):
+            with self.subTest(status=status):
+                unit = self.create_unit("1", 0, status)
+                unit.groesse_qm = 0
+                unit.save(update_fields=["groesse_qm"])
+                response = self.client.get(
+                    reverse("wohnungsverwaltung_public:floor_view", args=[0])
+                )
+                self.assertContains(response, "Wohnfläche noch nicht angegeben")
+                self.assertNotContains(response, "0,00 m²")
+                self.assertNotContains(response, "0 m²")
+                if status == WohnungStatus.FREE:
+                    search = self.client.get(reverse("wohnungsverwaltung_public:apartment_search"))
+                    self.assertContains(search, "Wohnfläche noch nicht angegeben")
+                    self.assertNotContains(search, "0,00 m²")
+                unit.delete()
+
     def test_default_numeric_values_are_not_advertised_as_apartment_facts(self):
         unit = Wohnung.objects.create(
             gebaeudenummer="1",
@@ -350,6 +370,65 @@ class BuildingViewTests(TestCase):
 
 
 class ViewingRequestEntryTests(TestCase):
+    def test_registration_retains_selected_unit_through_confirmation_and_resend(self):
+        login_page = self.client.get(reverse("login"), {"next": self.url})
+        self.assertContains(login_page, reverse("register") + "?" + urlencode({"next": self.url}))
+        registration_page = self.client.get(reverse("register"), {"next": self.url})
+        self.assertContains(registration_page, f'name="next" value="{self.url}"')
+        with patch("core.views.send_registration_code", return_value=True) as sender:
+            response = self.client.post(
+                reverse("register"),
+                {
+                    "vorname": "Test",
+                    "nachname": "Bewerber",
+                    "email": "new@example.test",
+                    "password1": "ExampleRegistration!4826",
+                    "password2": "ExampleRegistration!4826",
+                    "next": self.url,
+                },
+            )
+        self.assertRedirects(response, reverse("register_verify"))
+        code = sender.call_args.args[1]
+        wrong_code = "000000" if code != "000000" else "111111"
+        invalid = self.client.post(
+            reverse("register_verify"), {"email": "new@example.test", "code": wrong_code}
+        )
+        self.assertEqual(invalid.status_code, 200)
+        self.client.post(reverse("resend_registration_code"), {"email": "new@example.test"})
+        response = self.client.post(
+            reverse("register_verify"), {"email": "new@example.test", "code": code}
+        )
+        self.assertRedirects(response, self.url, fetch_redirect_response=False)
+        self.assertRedirects(
+            self.client.get(self.url),
+            reverse("wohnungsverwaltung:pre_application_create_for_unit", args=[self.unit.pk]),
+        )
+        self.assertNotIn("registration_redirect_url", self.client.session)
+
+    def test_registration_rejects_external_redirect_targets(self):
+        for index, target in enumerate(
+            ("https://evil.example/", "//evil.example/", "javascript:alert(1)")
+        ):
+            with self.subTest(target=target):
+                self.client.logout()
+                email = f"safe-{index}@example.test"
+                with patch("core.views.send_registration_code", return_value=True) as sender:
+                    self.client.post(
+                        reverse("register"),
+                        {
+                            "vorname": "Test",
+                            "nachname": "Bewerber",
+                            "email": email,
+                            "password1": "ExampleRegistration!4826",
+                            "password2": "ExampleRegistration!4826",
+                            "next": target,
+                        },
+                    )
+                response = self.client.post(
+                    reverse("register_verify"), {"email": email, "code": sender.call_args.args[1]}
+                )
+                self.assertRedirects(response, reverse("wohnungsverwaltung:pre_application_list"))
+
     def setUp(self):
         self.unit = Wohnung.objects.create(
             wohnungsnummer="1", gebaeudenummer="1", status=WohnungStatus.FREE
@@ -394,6 +473,40 @@ class ViewingRequestEntryTests(TestCase):
 
 
 class ApartmentPhotoTests(TestCase):
+    @override_settings(APARTMENT_PHOTO_MAX_SIZE=1024)
+    def test_stream_limit_prevents_saving_an_earlier_valid_photo(self):
+        self.client.force_login(self.employee)
+        response = self.client.post(
+            self.url,
+            {
+                "image": self.photo(),
+                "extra": SimpleUploadedFile("extra.png", b"x" * 2048, content_type="image/png"),
+            },
+        )
+        self.assertEqual(response.status_code, 413)
+        self.assertFalse(ApartmentPhoto.objects.exists())
+
+    @override_settings(APARTMENT_PHOTO_MAX_SIZE=1024)
+    def test_oversized_photo_is_rejected_before_temporary_file_processing(self):
+        self.client.force_login(self.employee)
+        upload = SimpleUploadedFile("large.png", b"x" * 100_000, content_type="image/png")
+        with patch.object(TemporaryFileUploadHandler, "receive_data_chunk") as receiver:
+            response = self.client.post(self.url, {"image": upload})
+        self.assertEqual(response.status_code, 413)
+        receiver.assert_not_called()
+        self.assertFalse(ApartmentPhoto.objects.exists())
+
+    @override_settings(APARTMENT_PHOTO_MAX_SIZE=1024)
+    def test_photo_stream_stops_before_forwarding_chunk_over_file_limit(self):
+        from .upload_limits import ApartmentPhotoUploadHandler
+
+        request = RequestFactory().post(self.url)
+        handler = ApartmentPhotoUploadHandler(request)
+        handler.new_file("image", "large.png", "image/png", None)
+        self.assertEqual(handler.receive_data_chunk(b"x" * 1024, 0), b"x" * 1024)
+        with self.assertRaises(StopUpload):
+            handler.receive_data_chunk(b"x", 1024)
+
     def test_lightbox_caption_remains_text_after_attribute_decoding(self):
         class CaptionReader(HTMLParser):
             def __init__(self):
@@ -510,7 +623,7 @@ class ApartmentPhotoTests(TestCase):
         self.assertFalse(ApartmentPhoto.objects.exists())
         with override_settings(APARTMENT_PHOTO_MAX_SIZE=10):
             response = self.client.post(self.url, {"image": self.photo()})
-        self.assertContains(response, "Datei ist zu groß")
+            self.assertContains(response, "Datei ist zu groß", status_code=413)
         self.assertFalse(ApartmentPhoto.objects.exists())
 
     def test_photo_of_unavailable_apartment_is_hidden_from_public(self):

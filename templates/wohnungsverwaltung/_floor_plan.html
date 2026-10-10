@@ -17,9 +17,9 @@
     <g transform="{{ plan_reference.transform }}">
         <g pointer-events="none" aria-hidden="true">{% include "wohnungsverwaltung/_floor_plan_architecture.html" with layer="shell" %}</g>
         {% for item in plan_units %}
-            {% if item.unit.status == 'free' %}<a class="plan-apartment" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' item.unit.pk %}" aria-label="Wohnung {{ item.unit.display_number }}, {{ item.unit.groesse_qm }} Quadratmeter, verfügbar">
+            {% if item.unit.status == 'free' %}<a class="plan-apartment" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' item.unit.pk %}" aria-label="Wohnung {{ item.unit.display_number }}, {% if item.unit.groesse_qm > 0 %}{{ item.unit.groesse_qm }} Quadratmeter{% else %}Wohnfläche noch nicht angegeben{% endif %}, verfügbar">
             {% else %}<g class="plan-apartment is-unavailable" role="img" aria-label="Wohnung {{ item.unit.display_number }}, nicht verfügbar">{% endif %}
-                <title>Wohnung {{ item.unit.display_number }} · {{ item.unit.groesse_qm }} m² · {% if item.unit.status == 'free' %}Verfügbar{% else %}Nicht verfügbar{% endif %}</title>
+                <title>Wohnung {{ item.unit.display_number }} · {% if item.unit.groesse_qm > 0 %}{{ item.unit.groesse_qm }} m²{% else %}Wohnfläche noch nicht angegeben{% endif %} · {% if item.unit.status == 'free' %}Verfügbar{% else %}Nicht verfügbar{% endif %}</title>
                 <polygon points="{{ item.points }}" class="plan-apartment-shape"/>
             {% if item.unit.status == 'free' %}</a>{% else %}</g>{% endif %}
         {% endfor %}
@@ -30,7 +30,7 @@
             <g class="plan-caption" transform="translate({{ item.x }} {{ item.y }}) rotate({{ plan_reference.label_rotation }})">
                 {% if floor_number == 0 or floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %}<rect x="-45" y="-18" width="90" height="38" rx="2"/>{% else %}<rect x="-27" y="-12" width="54" height="27" rx="2"/>{% endif %}
                 <text text-anchor="middle" y="{% if floor_number == 0 or floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %}-3{% else %}-1{% endif %}" class="plan-number">Whg. {{ item.unit.display_number }}</text>
-                <text text-anchor="middle" y="{% if floor_number == 0 or floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %}14{% else %}10{% endif %}" class="plan-area">{{ item.unit.groesse_qm }} m²</text>
+                <text text-anchor="middle" y="{% if floor_number == 0 or floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %}14{% else %}10{% endif %}" class="plan-area">{% if item.unit.groesse_qm > 0 %}{{ item.unit.groesse_qm }} m²{% else %}Fläche offen{% endif %}</text>
             </g>
             {% else %}
             <g class="plan-unavailable-caption" transform="translate({{ item.x }} {{ item.y }}) rotate({{ plan_reference.label_rotation }})">
