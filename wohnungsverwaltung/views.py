@@ -1030,7 +1030,12 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
         or (_draft_field_value(server_draft, "person") if server_draft else None)
     )
     form = HandoverProtocolForm(
-        request.POST or None, wohnung_id=selected_wohnung_id, employee=request.user
+        request.POST or None,
+        wohnung_id=selected_wohnung_id,
+        employee=request.user,
+        initial={"uebergabe_zeitpunkt": request.GET["uebergabe_zeitpunkt"]}
+        if "uebergabe_zeitpunkt" in request.GET
+        else None,
     )
     _set_selected_person_initial(form, selected_person_id)
     can_manage_handover_photos = _can_manage_handover_photos(request)
@@ -1052,6 +1057,7 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
     if can_manage_handover_photos:
         move_in_reference = _move_in_reference_for_apartment(
             _valid_wohnung_id(selected_wohnung_id),
+            before=_handover_time_for_form(form),
             person_id=_valid_person_id(selected_person_id),
         )
     if (
@@ -1203,6 +1209,9 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         instance=protocol,
         wohnung_id=selected_wohnung_id or protocol.wohnung_id,
         employee=request.user,
+        initial={"uebergabe_zeitpunkt": request.GET["uebergabe_zeitpunkt"]}
+        if "uebergabe_zeitpunkt" in request.GET
+        else None,
     )
     _set_selected_person_initial(form, selected_person_id)
     form_valid = request.method == "POST" and form.is_valid()
@@ -1229,6 +1238,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
     if can_manage_handover_photos:
         move_in_reference = _move_in_reference_for_apartment(
             _valid_wohnung_id(selected_wohnung_id or protocol.wohnung_id),
+            before=_handover_time_for_form(form),
             person_id=_valid_person_id(selected_person_id),
         )
     if (
@@ -1511,6 +1521,13 @@ def _photo_return_url(
         "wohnungsverwaltung:handover_protocol_room_detail",
         kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
     )
+
+
+def _handover_time_for_form(form: HandoverProtocolForm):
+    try:
+        return form.fields["uebergabe_zeitpunkt"].clean(form["uebergabe_zeitpunkt"].value())
+    except ValidationError:
+        return None
 
 
 def _move_in_reference_for_apartment(
