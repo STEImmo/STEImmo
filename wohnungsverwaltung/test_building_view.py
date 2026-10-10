@@ -17,7 +17,7 @@ from PIL import Image
 from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
 from .forms import WohnungForm
 from .management.commands.seed_standard_data import APARTMENTS
-from .models import ApartmentPhoto, Person, Wohnung, WohnungStatus
+from .models import ApartmentPhoto, HandoverPhotoCleanup, Person, Wohnung, WohnungStatus
 
 
 class BuildingViewTests(TestCase):
@@ -190,6 +190,19 @@ class BuildingViewTests(TestCase):
     def test_unknown_floor_returns_404(self):
         response = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[9]))
         self.assertEqual(response.status_code, 404)
+
+    def test_detail_of_a_stored_floor_without_plan_remains_usable(self):
+        for floor in (-1, 5):
+            with self.subTest(floor=floor):
+                unit = self.create_unit(f"extra-{floor}", floor)
+                response = self.client.get(
+                    reverse(
+                        "wohnungsverwaltung_public:apartment_detail_placeholder", args=[unit.pk]
+                    )
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "Zur Besichtigung anmelden")
+                self.assertNotContains(response, "Etagenplan ansehen")
 
     def test_unsupported_floor_is_rejected_even_when_it_has_units(self):
         self.create_unit("901", 9)
@@ -517,7 +530,8 @@ class ApartmentPhotoTests(TestCase):
         storage, name = photo.image.storage, photo.image.name
         url = reverse("verwaltung:apartment_photo_delete", args=[self.unit.pk, photo.pk])
         self.assertEqual(self.client.get(url).status_code, 405)
-        self.assertRedirects(self.client.post(url), self.url)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertRedirects(self.client.post(url), self.url)
         self.assertFalse(ApartmentPhoto.objects.exists())
         self.assertFalse(storage.exists(name))
 
@@ -529,19 +543,24 @@ class ApartmentPhotoTests(TestCase):
         self.assertIn("image", response.context["form"].errors)
         self.assertEqual(ApartmentPhoto.objects.count(), 1)
 
-    def test_storage_delete_failure_keeps_photo_and_allows_retry(self):
+    def test_storage_delete_failure_keeps_cleanup_job_and_allows_retry(self):
         self.upload()
         photo = ApartmentPhoto.objects.get()
         storage, name = photo.image.storage, photo.image.name
         url = reverse("verwaltung:apartment_photo_delete", args=[self.unit.pk, photo.pk])
-        with patch.object(storage, "delete", side_effect=OSError("simulated failure")):
+        with (
+            patch.object(storage, "delete", side_effect=OSError("simulated failure")),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             response = self.client.post(url, follow=True)
-        self.assertContains(response, "Das Foto konnte nicht entfernt werden.")
-        self.assertTrue(ApartmentPhoto.objects.filter(pk=photo.pk).exists())
+        self.assertContains(response, "Das Wohnungsfoto wurde entfernt.")
+        self.assertFalse(ApartmentPhoto.objects.filter(pk=photo.pk).exists())
+        self.assertEqual(HandoverPhotoCleanup.objects.get().storage_name, name)
         self.assertTrue(storage.exists(name))
-        self.assertRedirects(self.client.post(url), self.url)
+        call_command("retry_handover_photo_cleanup")
         self.assertFalse(ApartmentPhoto.objects.filter(pk=photo.pk).exists())
         self.assertFalse(storage.exists(name))
+        self.assertFalse(HandoverPhotoCleanup.objects.exists())
 
     def test_database_delete_failure_does_not_remove_file(self):
         self.upload()

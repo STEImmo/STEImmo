@@ -6,7 +6,7 @@
 {% block content %}
 <section class="uk-section uk-section-default">
     <div class="uk-container">
-        <ul class="uk-breadcrumb"><li><a href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Wohnungen finden</a></li><li><a href="{% url 'wohnungsverwaltung_public:floor_view' wohnung.etage %}#etagenplan">{{ floor_label }}</a></li><li><span>Wohnung {{ wohnung.display_number }}</span></li></ul>
+        <ul class="uk-breadcrumb"><li><a href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Wohnungen finden</a></li><li>{% if has_floor_plan %}<a href="{% url 'wohnungsverwaltung_public:floor_view' wohnung.etage %}#etagenplan">{{ floor_label }}</a>{% else %}<span>{{ floor_label }}</span>{% endif %}</li><li><span>Wohnung {{ wohnung.display_number }}</span></li></ul>
         <h1 class="uk-heading-medium">Wohnung {{ wohnung.display_number }}</h1>
         <p class="uk-text-lead">Gebäude {{ wohnung.gebaeudenummer }} · {{ floor_label }}</p>
         {% include "wohnungsverwaltung/_apartment_gallery.html" %}
@@ -27,8 +27,10 @@
                     <dt>Energieangaben</dt><dd>{% if wohnung.energy_information %}{{ wohnung.energy_information|linebreaksbr }}{% else %}<span class="uk-text-muted">Noch nicht angegeben</span>{% endif %}</dd>
                     <dt>Geplanter Einzug</dt><dd>{% if wohnung.planned_move_in %}{{ wohnung.planned_move_in }}{% else %}<span class="uk-text-muted">Noch nicht angegeben</span>{% endif %}</dd>
                 </dl>
+                {% if has_floor_plan %}
                 <h2 class="uk-h3">Lage auf der Etage</h2>
                 <p><a href="{% url 'wohnungsverwaltung_public:floor_view' wohnung.etage %}#etagenplan">Etagenplan ansehen</a></p>
+                {% endif %}
             </div>
             <div class="uk-width-1-3@m"><aside class="uk-card uk-card-default uk-card-body">
                 <h2 class="uk-card-title">Kosten</h2>

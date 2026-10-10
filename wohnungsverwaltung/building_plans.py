@@ -66,4 +66,10 @@ PLAN_REFERENCES = {
 
 
 def floor_label(number):
-    return {0: "Erdgeschoss", 4: "Dachgeschoss"}.get(number, f"{number}. Obergeschoss")
+    if number == 0:
+        return "Erdgeschoss"
+    if number == 4:
+        return "Dachgeschoss"
+    if number in FLOOR_SHAPES:
+        return f"{number}. Obergeschoss"
+    return f"Etage {number}"

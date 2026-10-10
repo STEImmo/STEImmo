@@ -71,8 +71,11 @@ from .handover_lock import protocol_mutation
 from .handover_photos import (
     PHOTO_SAVE_ERROR,
     HandoverPhotoStorageError,
+    delete_apartment_photo,
     delete_handover_photo,
     handover_photo_upload,
+    photo_upload,
+    save_apartment_photo,
     save_handover_photo,
 )
 from .models import (
@@ -274,6 +277,7 @@ def apartment_detail_placeholder(request: HttpRequest, unit_id: UUID) -> HttpRes
             "wohnung": wohnung,
             "photos": list(wohnung.photos.all()),
             "floor_label": floor_label(wohnung.etage),
+            "has_floor_plan": wohnung.etage in FLOOR_SHAPES,
         },
     )
 
@@ -301,19 +305,24 @@ def apartment_photos(request: HttpRequest, wohnung_id: UUID) -> HttpResponse:
     apartment = get_object_or_404(Wohnung, pk=wohnung_id)
     form = ApartmentPhotoForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
-        with transaction.atomic():
-            apartment = Wohnung.objects.select_for_update().get(pk=wohnung_id)
-            if apartment.photos.count() >= settings.APARTMENT_PHOTO_MAX_COUNT:
-                form.add_error("image", "Pro Wohnung sind höchstens 12 Fotos erlaubt.")
-            else:
-                photo = form.save(commit=False)
-                photo.apartment = apartment
-                try:
-                    photo.save()
-                except Exception:
-                    if photo.image.name and photo.image._committed:
-                        photo.image.delete(save=False)
-                    raise
+        saved = False
+        try:
+            with photo_upload() as stored_files:
+                apartment = Wohnung.objects.select_for_update().get(pk=wohnung_id)
+                if apartment.photos.count() >= settings.APARTMENT_PHOTO_MAX_COUNT:
+                    form.add_error("image", "Pro Wohnung sind höchstens 12 Fotos erlaubt.")
+                else:
+                    photo = form.save(commit=False)
+                    photo.apartment = apartment
+                    save_apartment_photo(photo, stored_files)
+                    saved = True
+        except (HandoverPhotoStorageError, DatabaseError):
+            logger.warning("Wohnungsfoto konnte nicht gespeichert werden.")
+            form.add_error(
+                "image", "Das Wohnungsfoto konnte nicht gespeichert werden. Bitte erneut auswählen."
+            )
+        else:
+            if saved:
                 messages.success(request, "Das Wohnungsfoto wurde gespeichert.")
                 return redirect("verwaltung:apartment_photos", wohnung_id=apartment.pk)
     return render(
@@ -336,10 +345,7 @@ def apartment_photo_delete(request: HttpRequest, wohnung_id: UUID, photo_id: UUI
             photo = get_object_or_404(
                 ApartmentPhoto.objects.select_for_update(), pk=photo_id, apartment_id=wohnung_id
             )
-            storage, name = photo.image.storage, photo.image.name
-            photo.delete()
-            # A failed file deletion rolls back the row deletion, keeping it retryable.
-            storage.delete(name)
+            delete_apartment_photo(photo)
     except (OSError, DatabaseError):
         logger.warning("Wohnungsfoto konnte nicht entfernt werden.")
         messages.error(

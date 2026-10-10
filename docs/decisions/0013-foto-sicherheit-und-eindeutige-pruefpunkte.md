@@ -63,6 +63,23 @@ Bei einem Rollback bleiben Datei und Fotoeintrag erhalten; der Lösch-Callback
 wird verworfen. Noch referenzierte Dateien werden auch beim sofortigen
 Bereinigungsversuch geschützt. Es ist keine neue Tabelle oder Abhängigkeit nötig.
 
+### Gemeinsame Dateibereinigung für Wohnungsfotos (PR #104)
+
+Wohnungs- und Protokollfotos verwenden denselben privaten Datei-Storage und
+dieselbe vorhandene Bereinigungsqueue. Die bisherigen Namen
+`HandoverPhotoCleanup` und `retry_handover_photo_cleanup` bleiben erhalten;
+der Wiederholungsbefehl berücksichtigt nun auch Wohnungsfotos. Es wird keine
+zusätzliche Tabelle oder Hintergrundverarbeitung eingeführt.
+
+Neue Wohnungsfotos werden vor dem ersten Schreibversuch über ihren zufälligen
+Zielnamen verfolgt. Schlägt das Schreiben oder der Datenbankabschluss fehl,
+werden die neuen Dateien erst nach dem Rollback bereinigt. Speicherfehler
+werden als Formularfehler angezeigt. Beim Entfernen eines Wohnungsfotos
+erfolgen Fotoentfernung und Bereinigungsauftrag in derselben Transaktion;
+die Datei wird ausschließlich nach erfolgreichem Commit gelöscht. Scheitert
+die Dateilöschung, bleibt der Auftrag wiederholbar. Die sofortige Bereinigung
+und der Wiederholungsbefehl schützen noch referenzierte Dateien beider Fototypen.
+
 ### Validierung nach endgültiger Raumzuordnung (Issue #66)
 
 Mehrere Prüfpunktzeilen dürfen den Raum aus der vorherigen Zeile übernehmen.
