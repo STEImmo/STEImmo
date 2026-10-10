@@ -27,12 +27,16 @@ class CheckpointDetailsValidationTests(TestCase):
         )
         self.second_room_feature.optionen = ["Anzahl"]
         self.second_room_feature.save()
+        self.original_protocol = Protokoll.objects.values().get(pk=self.protocol.pk)
+        self.original_room = Raumprotokoll.objects.values().get(pk=self.room.pk)
+        self.original_item = RaumMerkmal.objects.values().get(pk=self.item.pk)
         self.client.raise_request_exception = False
 
     def invalid_details(self):
         return {
             "null_character": json.dumps({"Anzahl": "x\x00y"}),
-            "unpaired_surrogate": json.dumps({"Anzahl": "\ud800"}),
+            "unpaired_high_surrogate": json.dumps({"Anzahl": "\ud800"}),
+            "unpaired_low_surrogate": json.dumps({"Anzahl": "\udfff"}),
             "excessive_nesting": "[" * 10000 + "0" + "]" * 10000,
             "oversized_integer": '{"Anzahl":' + "1" * 4301 + "}",
         }
@@ -55,13 +59,13 @@ class CheckpointDetailsValidationTests(TestCase):
         return payload
 
     def assert_stored_data_unchanged(self):
-        self.item.refresh_from_db()
-        self.protocol.refresh_from_db()
         self.assertEqual(
-            self.item.wert, {"text": "Gespeicherte Feststellung", "angaben": {"Anzahl": "2"}}
+            Protokoll.objects.values().get(pk=self.protocol.pk), self.original_protocol
         )
-        self.assertEqual(str(self.protocol.zaehlerstand_strom), "87.25")
+        self.assertEqual(Raumprotokoll.objects.values().get(pk=self.room.pk), self.original_room)
+        self.assertEqual(RaumMerkmal.objects.values().get(pk=self.item.pk), self.original_item)
         self.assertEqual(Protokoll.objects.count(), 1)
+        self.assertEqual(Raumprotokoll.objects.count(), 1)
         self.assertEqual(RaumMerkmal.objects.count(), 1)
 
     def test_inline_creation_rejects_invalid_details_without_creating_protocol(self):
@@ -73,6 +77,7 @@ class CheckpointDetailsValidationTests(TestCase):
                 )
                 self.assertEqual(response.status_code, 200)
                 self.assertIn("zusatzangaben", response.context["room_formset"].forms[0].errors)
+                self.assertContains(response, "Die zusätzlichen Angaben sind ungültig.")
                 self.assert_stored_data_unchanged()
 
     def test_inline_edit_rejects_invalid_details_and_preserves_protocol(self):
@@ -84,6 +89,7 @@ class CheckpointDetailsValidationTests(TestCase):
                 )
                 self.assertEqual(response.status_code, 200)
                 self.assertIn("zusatzangaben", response.context["room_formset"].forms[0].errors)
+                self.assertContains(response, "Die zusätzlichen Angaben sind ungültig.")
                 self.assert_stored_data_unchanged()
 
     def test_room_form_rejects_invalid_details_without_changing_checkpoints(self):
@@ -103,6 +109,7 @@ class CheckpointDetailsValidationTests(TestCase):
                 )
                 self.assertEqual(response.status_code, 200)
                 self.assertIn("zusatzangaben", response.context["form"].errors)
+                self.assertContains(response, "Die zusätzlichen Angaben sind ungültig.")
                 self.assert_stored_data_unchanged()
 
     def test_valid_unicode_and_literal_escapes_are_preserved_on_all_routes(self):
