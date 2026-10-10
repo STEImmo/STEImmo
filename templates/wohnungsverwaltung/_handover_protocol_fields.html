@@ -39,29 +39,9 @@
     <p class="uk-text-meta">Die Zählernummern werden aus den Wohnungsstammdaten übernommen und können hier nicht geändert werden.</p>
 
     <div data-protocol-types="move_in">
-        {% if form.meter_numbers %}
-            <div class="uk-overflow-auto">
-                <table class="uk-table uk-table-divider uk-table-small">
-                    <thead><tr><th>Zähler</th><th>Zählernummer aus den Stammdaten</th></tr></thead>
-                    <tbody>
-                        {% for label, number in form.meter_numbers %}<tr><td>{{ label }}</td><td>{{ number }}</td></tr>{% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
+        {% if not form.meter_numbers %}
             <p class="uk-text-meta">Bitte wählen Sie zuerst eine Wohnung.</p>
         {% endif %}
-        <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
-            {% for field in form.meter_reading_fields %}
-                <div>
-                    <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    <div class="uk-form-controls">
-                        {{ field }}
-                        {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
     </div>
 
     <div data-protocol-types="move_out">
@@ -70,28 +50,36 @@
         {% else %}
             <p class="uk-text-meta">Für die gewählte Wohnung und Person liegt noch kein bestätigter Einzug als Vergleich vor.</p>
         {% endif %}
-        <div class="uk-overflow-auto">
-            <table class="uk-table uk-table-divider uk-table-small" data-meter-comparison>
-                <thead><tr><th>Zähler</th><th>Zählernummer</th><th>Einzug (alt)</th><th>Auszug (neu)</th><th>Differenz (neu − alt)</th></tr></thead>
-                <tbody>
-                    {% for row in meter_comparison_rows %}
-                        <tr data-meter-comparison-row data-old-meter-reading="{{ row.old_reading|default_if_none:'' }}">
-                            <td>{{ row.label }}</td>
-                            <td>{{ row.number|default:"Nicht gepflegt" }}</td>
-                            <td>{% if row.old_reading is not None %}{{ row.old_reading|floatformat:2 }}{% else %}—{% endif %}</td>
-                            <td>{{ row.field }}{% for error in row.field.errors %}<p class="uk-text-danger uk-margin-remove">{{ error }}</p>{% endfor %}</td>
-                            <td><output data-meter-difference>—</output></td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        <div class="uk-margin-small-top">
-            <label class="uk-form-label" for="{{ form.heizungsablesungen.id_for_label }}">{{ form.heizungsablesungen.label }}</label>
-            <div class="uk-form-controls">
-                {{ form.heizungsablesungen }}
-                {% for error in form.heizungsablesungen.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
-            </div>
+    </div>
+    <div class="uk-overflow-auto">
+        <table class="uk-table uk-table-divider uk-table-small" data-meter-comparison>
+            <thead>
+                <tr>
+                    <th>Zähler</th>
+                    <th>Zählernummer aus den Stammdaten</th>
+                    <th data-protocol-types="move_out">Einzug (alt)</th>
+                    <th><span data-protocol-types="move_in">Zählerstand</span><span data-protocol-types="move_out">Auszug (neu)</span></th>
+                    <th data-protocol-types="move_out">Differenz (neu − alt)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in meter_comparison_rows %}
+                    <tr data-meter-comparison-row data-old-meter-reading="{{ row.old_reading|default_if_none:'' }}">
+                        <td><label for="{{ row.field.id_for_label }}">{{ row.label }}</label></td>
+                        <td>{{ row.number|default:"Nicht gepflegt" }}</td>
+                        <td data-protocol-types="move_out">{% if row.old_reading is not None %}{{ row.old_reading|floatformat:2 }}{% else %}—{% endif %}</td>
+                        <td>{{ row.field }}{% for error in row.field.errors %}<p class="uk-text-danger uk-margin-remove">{{ error }}</p>{% endfor %}</td>
+                        <td data-protocol-types="move_out"><output data-meter-difference>—</output></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="uk-margin-small-top">
+        <label class="uk-form-label" for="{{ form.heizungsablesungen.id_for_label }}">{{ form.heizungsablesungen.label }}</label>
+        <div class="uk-form-controls">
+            {{ form.heizungsablesungen }}
+            {% for error in form.heizungsablesungen.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
         </div>
     </div>
 </section>
