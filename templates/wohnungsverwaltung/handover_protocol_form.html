@@ -631,11 +631,15 @@
                 if (apartmentSelect && savedApartment && apartmentSelect.value !== savedApartment) {
                     apartmentSelect.value = savedApartment;
                     await updateApartmentDependentFields();
+                    updateTypeSpecificSections();
                 }
                 restoreFields(protocolForm, draft.fields);
                 updateTypeSpecificSections();
                 restoreRooms(draft.rooms);
                 restoreKeys(draft.keys);
+                await updateApartmentDependentFields();
+                updateTypeSpecificSections();
+                updateMeterDifferences();
                 document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
                 document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
                 if (draftNotice) {
