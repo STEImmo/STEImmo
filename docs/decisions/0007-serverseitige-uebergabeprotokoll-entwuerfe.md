@@ -23,6 +23,21 @@ Unvollständige Daten bleiben ausschließlich im Entwurf und erzeugen kein
 fachlich wirksames `Protokoll`. Nach dem erfolgreichen Speichern wird der
 zugehörige Entwurf server- und browserseitig gelöscht.
 
+Ein Personenwechsel innerhalb derselben Wohnung erhält die laufenden Zähler-,
+Raum-, Prüfpunkt- und Schlüsselangaben. Nur die personenbezogene Einzugsreferenz
+und deren Vergleichswerte werden aktualisiert; die vorhandenen Zählereingaben
+werden als bestehende Formularfelder in den aktualisierten Vergleich übernommen.
+Räume und Schlüssel bleiben in der Maske bestehen, damit auch dynamische
+Positionen und noch nicht übertragene Fotoauswahlen erhalten bleiben. Der nächste
+lokale und serverseitige Entwurf enthält diese Angaben mit der neu ausgewählten
+Person. Auch beim Wiederherstellen wird die Referenz zur gespeicherten Person
+aktualisiert und die Zählerdifferenz neu berechnet.
+
+Ein Wohnungswechsel lädt weiterhin die zugeordneten Personen, Räume,
+Zählernummern und Stammschlüssel neu. Ein vollständiger Neuaufbau dieser
+Bereiche bei jedem Personenwechsel wurde verworfen, weil deren Eingaben zur
+Wohnung gehören und sonst ohne fachlichen Grund verloren gehen.
+
 Entwurfsanfragen verwenden UTF-8 und speicherbares JSON. Vor einer Änderung
 werden JSON-Serialisierbarkeit, endliche Zahlen und gültige Unicode-Zeichen
 geprüft; insbesondere werden Nullzeichen und ungepaarte Surrogate abgewiesen.

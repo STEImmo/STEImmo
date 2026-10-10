@@ -92,20 +92,37 @@
                 "room-formset-section",
                 "move-in-reference",
             ].forEach((id) => {
-                if (!apartmentChanged && ["key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
+                if (!apartmentChanged && ["id_person", "key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
                     return;
                 }
                 const currentElement = document.getElementById(id);
                 const updatedElement = updatedPage.getElementById(id);
                 if (currentElement && updatedElement) {
+                    if (!apartmentChanged && id === "meter-reading-section") {
+                        // Keep live inputs, including edits made while the request was pending.
+                        const currentFields = new Map();
+                        currentElement.querySelectorAll("input[name], textarea[name]").forEach((field) => {
+                            const fields = currentFields.get(field.name) || [];
+                            fields.push(field);
+                            currentFields.set(field.name, fields);
+                        });
+                        updatedElement.querySelectorAll("input[name], textarea[name]").forEach((field) => {
+                            const currentField = currentFields.get(field.name)?.shift();
+                            if (currentField) {
+                                field.replaceWith(currentField);
+                            }
+                        });
+                    }
                     currentElement.replaceWith(updatedElement);
                 }
             });
-            document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
-                if (meterValues.has(field.name)) {
-                    field.value = meterValues.get(field.name);
-                }
-            });
+            if (apartmentChanged) {
+                document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
+                    if (meterValues.has(field.name)) {
+                        field.value = meterValues.get(field.name);
+                    }
+                });
+            }
             loadedApartmentId = apartmentSelect.value;
             document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
             document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
@@ -627,7 +644,9 @@
                     await updateApartmentDependentFields();
                 }
                 restoreFields(protocolForm, draft.fields);
+                await updateApartmentDependentFields();
                 updateTypeSpecificSections();
+                updateMeterDifferences();
                 restoreRooms(draft.rooms);
                 restoreKeys(draft.keys);
                 document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
