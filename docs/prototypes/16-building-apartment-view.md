@@ -17,8 +17,11 @@ Bereinigungsqueue bleiben bestehen.
 
 Fehlende Wohnflächen erscheinen in Etagenliste, Plan und Suche als fehlend statt
 als 0 m². Genau zwei Galeriefotos bilden zwei gleich breite Vorschauen ohne leeres
-Rasterfeld. Die rechte Fassadenfläche schließt an Oberkante und Fundament an und
-ist als schmale Seitenwand dargestellt. Die Treppenflächen sind in allen Etagen
+Rasterfeld. Die schräge rechte Seitenfläche ist auf Nutzerwunsch entfernt; die
+Gebäudefront endet mit einer geraden Kante am Fundament. Die rechte Fensterachse
+neben dem letzten Balkon ist entsprechend der Fassadenvorlage ergänzt; vier kleine
+Fensterachsen und drei Balkonachsen verteilen sich gleichmäßig über die Front.
+Die Treppenflächen sind in allen Etagen
 von den seitlichen Wandlinien eingerückt, damit diese ihre volle Stärke behalten.
 Im EG zeigen zwei Treppenläufe den Weg nach oben und nach unten zum vorhandenen
 Keller. Ein eigener Kellergrundriss ist damit nicht ergänzt.
