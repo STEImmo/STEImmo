@@ -15,6 +15,16 @@ Studierende können verfügbare Einheiten suchen, filtern, ansehen und sich dara
 
 ## Projektstatus
 
+Die Gebäudeansicht ist lokal unter [Gebäude erkunden](http://localhost:8000/wohnungen/gebaeude/)
+erreichbar: Gebäude → Etagenplan → Wohnungsdetails. Öffentliche Wohnungsfotos können im
+Mitarbeiterbereich unter **Wohnung bearbeiten → Wohnungsfotos verwalten** gepflegt werden.
+Die Etagenpläne sind vereinfachte Vektorgrafiken nach den Vorlagen. Von den Wohnungsdetails
+führt **Zur Besichtigung anmelden** zur wohnungsbezogenen Voranfrage; die Hauptbewerbung
+wird später freigeschaltet.
+Die Einrichtung, der Abgleich älterer Beispielwohnungen und die noch vorläufige räumliche
+Zuordnung sind in der [Dokumentation zu US-02](docs/prototypes/16-building-apartment-view.md)
+beschrieben.
+
 Der Stack ist festgelegt. Die Foundation ist umgesetzt; die fachlichen MVP-Vertical-Slices folgen.
 
 Statussymbole:
@@ -102,14 +112,15 @@ Offene Aufträge müssen betrieblich regelmäßig mit
 `python manage.py retry_application_proof_cleanup` wiederholt werden; der Befehl
 liefert bei fehlgeschlagenen Löschungen einen Fehlerstatus.
 
-Nach einem fehlgeschlagenen Protokollfoto-Upload werden neu geschriebene Dateien
-bereinigt. Scheitert diese Bereinigung, bleibt ein Auftrag erhalten. Offene
-Foto-Aufträge werden mit `python manage.py retry_handover_photo_cleanup`
+Nach einem fehlgeschlagenen Wohnungs- oder Protokollfoto-Upload werden neu
+geschriebene Dateien bereinigt. Scheitert diese Bereinigung, bleibt ein Auftrag
+erhalten. Offene Foto-Aufträge werden mit `python manage.py retry_handover_photo_cleanup`
 wiederholt; fehlgeschlagene Löschungen liefern einen Fehlerstatus. Bereits
 referenzierte Fotos werden dabei geschützt.
 
-Beim Entfernen eines Protokollfotos wird derselbe Bereinigungsauftrag zusammen
-mit der Datenbankreferenz geändert. Erst nach dem Commit wird die Datei gelöscht.
+Beim Entfernen eines Wohnungs- oder Protokollfotos wird derselbe Bereinigungsauftrag
+zusammen mit der Datenbankreferenz geändert. Erst nach dem Commit wird die Datei
+gelöscht.
 Scheitert die Löschung oder endet der Prozess vorher, bleibt der Auftrag für
 den Wiederholungsbefehl erhalten. Dies gilt auch beim Entfernen eines Prüfpunkts
 oder eines Protokollraums.

@@ -2,6 +2,7 @@ import json
 import unicodedata
 import warnings
 from copy import copy
+from io import BytesIO
 from uuid import UUID
 
 from django import forms
@@ -13,12 +14,13 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.models import Session
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.storage import Storage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.db.models import Q
 from django.forms.formsets import BaseFormSet
 from django.forms.models import inlineformset_factory
 from django.utils import timezone
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from pypdf import PdfReader
 from pypdf.errors import DependencyError, PyPdfError
 
@@ -37,6 +39,7 @@ from .handover_photos import (
 )
 from .models import (
     AbnahmeStatus,
+    ApartmentPhoto,
     ApplicationProof,
     ApplicationProofCategory,
     Bewerbung,
@@ -1124,7 +1127,7 @@ class HandoverProtocolForm(forms.ModelForm):
         self.fields["abnahme_status"].choices = ACCEPTANCE_STATUS_LABELS.items()
         for field_name, _number_field, label in METER_READING_FIELDS:
             self.fields[field_name].widget.attrs["data-meter-reading"] = ""
-            self.fields[field_name].widget.attrs["aria-label"] = f"{label}, Auszug neu"
+            self.fields[field_name].widget.attrs["aria-label"] = f"{label}, aktueller Zählerstand"
 
     def clean(self) -> dict:
         cleaned_data = super().clean()
@@ -1315,7 +1318,7 @@ def _clean_additional_details(raw_value: str, feature: Merkmal | None) -> dict[s
         return {}
     try:
         details = json.loads(raw_value)
-    except json.JSONDecodeError as error:
+    except (ValueError, RecursionError) as error:
         raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.") from error
     if not isinstance(details, dict):
         raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.")
@@ -1329,6 +1332,12 @@ def _clean_additional_details(raw_value: str, feature: Merkmal | None) -> dict[s
             )
         if not isinstance(value, str):
             raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.")
+        if "\x00" in value:
+            raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.") from error
         if cleaned_value := value.strip():
             cleaned_details[label] = cleaned_value
     return cleaned_details
@@ -1392,6 +1401,43 @@ class RoomChecklistItemForm(forms.Form):
             merkmal=self.cleaned_data["merkmal"],
             wert=_finding_value(self.cleaned_data["wert"], self.cleaned_data["zusatzangaben"]),
         )
+
+
+class ApartmentPhotoForm(forms.ModelForm):
+    class Meta:
+        model = ApartmentPhoto
+        fields = ("image", "caption")
+        labels = {"image": "Wohnungsfoto", "caption": "Bildbeschreibung"}
+        widgets = {
+            "image": forms.FileInput(
+                attrs={"class": "uk-input", "accept": "image/jpeg,image/png,image/webp"}
+            ),
+            "caption": forms.TextInput(
+                attrs={"class": "uk-input", "placeholder": "Zum Beispiel: Wohnbereich"}
+            ),
+        }
+
+    def clean_image(self):
+        upload = self.cleaned_data["image"]
+        if upload.size > settings.APARTMENT_PHOTO_MAX_SIZE:
+            raise forms.ValidationError("Die Datei ist zu groß. Erlaubt sind höchstens 8 MiB.")
+        try:
+            upload.seek(0)
+            with Image.open(upload) as source:
+                if source.format not in {"JPEG", "PNG", "WEBP"}:
+                    raise forms.ValidationError("Erlaubt sind JPEG, PNG und WebP.")
+                if source.width * source.height > 25_000_000:
+                    raise forms.ValidationError("Das Bild darf höchstens 25 Megapixel haben.")
+                image = ImageOps.exif_transpose(source).convert("RGB")
+                image.thumbnail((2400, 2400))
+                # Encode pixels into a new file; discard EXIF/location and other metadata.
+                output = BytesIO()
+                clean_image = Image.new("RGB", image.size)
+                clean_image.paste(image)
+                clean_image.save(output, "JPEG", quality=88)
+        except (OSError, ValueError, Image.DecompressionBombError) as error:
+            raise forms.ValidationError("Das Bild konnte nicht verarbeitet werden.") from error
+        return SimpleUploadedFile("photo.jpg", output.getvalue(), content_type="image/jpeg")
 
 
 class MultiplePhotoInput(forms.ClearableFileInput):
@@ -1828,6 +1874,11 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "zaehlernummer_wasser_warm",
             "zaehlernummer_heizung",
             "zaehlernummer_strom",
+            "description",
+            "equipment",
+            "heating_type",
+            "energy_information",
+            "planned_move_in",
         ]
         labels = {
             "gebaeudenummer": "Gebäudenummer",
@@ -1842,6 +1893,25 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "zaehlernummer_wasser_warm": "Zählernummer Warmwasser",
             "zaehlernummer_heizung": "Zählernummer Heizung",
             "zaehlernummer_strom": "Zählernummer Strom",
+            "description": "Beschreibung",
+            "equipment": "Ausstattung",
+            "heating_type": "Heizungstyp",
+            "energy_information": "Energieangaben",
+            "planned_move_in": "Geplanter Einzug",
+        }
+        widgets = {
+            "description": forms.Textarea(attrs={"class": "uk-textarea", "rows": 4}),
+            "equipment": forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
+            "energy_information": forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
+        }
+        help_texts = {
+            "description": "Nur belegte Informationen zur Wohnung eintragen.",
+            "equipment": "Zum Beispiel bestätigte Ausstattung, ein Merkmal pro Zeile.",
+            "heating_type": "Leer lassen, solange der Heizungstyp nicht bestätigt ist.",
+            "energy_information": "Nur bestätigte Angaben aus dem Energieausweis übernehmen.",
+            "planned_move_in": (
+                "Auch ungefähre Angaben sind möglich, zum Beispiel: Voraussichtlich März 2027."
+            ),
         }
 
 

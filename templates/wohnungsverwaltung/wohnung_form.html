@@ -8,7 +8,7 @@
         <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
             <div>
                 <h1 class="uk-heading-small uk-margin-remove-bottom">{{ title }}</h1>
-                {% if wohnung.pk %}
+                {% if apartment_is_saved %}
                     <p class="uk-text-muted uk-margin-small-top">Status:
                         {% if wohnung.status == "free" %}Verfügbar{% elif wohnung.status == "taken" %}Vermietet{% else %}Gesperrt{% endif %}
                     </p>
@@ -18,6 +18,7 @@
         </div>
 
         <form method="post">
+            {% if apartment_is_saved %}<a class="uk-button uk-button-default uk-margin-bottom" href="{% url 'verwaltung:apartment_photos' wohnung.pk %}">Wohnungsfotos verwalten</a>{% endif %}
             {% csrf_token %}
             {% for error in form.non_field_errors %}
                 <div class="uk-alert-danger" uk-alert><p>{{ error }}</p></div>
@@ -33,6 +34,18 @@
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.zimmeranzahl %}</div>
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.status %}</div>
                 </div>
+            </section>
+
+            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+                <h2 class="uk-h3">Öffentliche Detailangaben</h2>
+                <p class="uk-text-meta">Diese Angaben erscheinen auf der Wohnungsdetailseite. Alle Felder sind optional; fehlende Informationen werden dort als „Noch nicht angegeben“ angezeigt.</p>
+                <div class="uk-margin">{% include "wohnungsverwaltung/_form_field.html" with field=form.description %}</div>
+                <div class="uk-margin">{% include "wohnungsverwaltung/_form_field.html" with field=form.equipment %}</div>
+                <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.heating_type %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.planned_move_in %}</div>
+                </div>
+                <div class="uk-margin">{% include "wohnungsverwaltung/_form_field.html" with field=form.energy_information %}</div>
             </section>
 
             <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
@@ -81,11 +94,11 @@
         <section class="uk-card uk-card-default uk-card-body uk-margin-top">
             <div class="uk-flex uk-flex-between uk-flex-middle">
                 <h2 class="uk-h3">Räume</h2>
-                {% if wohnung.pk %}
+                {% if apartment_is_saved %}
                     <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:raum_create' wohnung.pk %}">Raum hinzufügen</a>
                 {% endif %}
             </div>
-            {% if wohnung.pk %}
+            {% if apartment_is_saved %}
                 {% if raeume %}
                     <table class="uk-table uk-table-divider uk-table-small uk-margin-top">
                         <thead><tr><th>Name</th><th><span class="uk-hidden">Aktion</span></th></tr></thead>

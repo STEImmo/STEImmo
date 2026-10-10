@@ -331,7 +331,18 @@ class RoleAwareLoginView(LoginView):
         return self.get_default_redirect_url_for_user(self.request.user)
 
 
+def _registration_redirect_url(request: HttpRequest, target: str) -> str:
+    if url_has_allowed_host_and_scheme(
+        target, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return target
+    return ""
+
+
 def register(request: HttpRequest) -> HttpResponse:
+    next_url = _registration_redirect_url(
+        request, request.POST.get("next", request.GET.get("next", ""))
+    )
     form = RegistrationForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         try:
@@ -344,6 +355,7 @@ def register(request: HttpRequest) -> HttpResponse:
             form.add_error("email", ACCOUNT_CREATION_ERROR)
         else:
             request.session["registration_verification_email"] = user.email
+            request.session["registration_redirect_url"] = next_url
             if _deliver_verification_code(send_registration_code, user.email, code):
                 messages.success(request, "Wir haben Ihnen einen Bestätigungscode gesendet.")
             else:
@@ -354,7 +366,7 @@ def register(request: HttpRequest) -> HttpResponse:
                     "Versandversuch erneut anfordern.",
                 )
             return redirect("register_verify")
-    return render(request, "registration/register.html", {"form": form})
+    return render(request, "registration/register.html", {"form": form, "next": next_url})
 
 
 def send_registration_code(email: str, code: str) -> bool:
@@ -409,6 +421,9 @@ def register_verify(request: HttpRequest) -> HttpResponse:
                     user.save(update_fields=["is_active"])
                     verification.delete()
                     request.session.pop("registration_verification_email", None)
+                    next_url = _registration_redirect_url(
+                        request, request.session.pop("registration_redirect_url", "")
+                    )
                     if user.has_perm(EMPLOYEE_ACCESS_PERMISSION) or user.has_perm(
                         USER_MANAGEMENT_PERMISSION
                     ):
@@ -421,7 +436,7 @@ def register_verify(request: HttpRequest) -> HttpResponse:
                     login(request, user)
                     request.session.save()
                     messages.success(request, "Ihr Konto wurde bestätigt.")
-                    return redirect("wohnungsverwaltung:pre_application_list")
+                    return redirect(next_url or "wohnungsverwaltung:pre_application_list")
                 else:
                     verification.attempts += 1
                     verification.save(update_fields=["attempts"])
