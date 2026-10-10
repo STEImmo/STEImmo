@@ -1,0 +1,23 @@
+{% with route=request.resolver_match.url_name namespace=request.resolver_match.namespace %}
+    {% if not perms.immobilien.access_employee_area %}
+        <li><a href="{% url 'wohnungsverwaltung_public:apartment_search' %}"{% if namespace == "wohnungsverwaltung_public" and route != "building_view" and route != "floor_view" %} aria-current="{% if route == 'apartment_search' %}page{% else %}true{% endif %}"{% endif %}>Wohnungen finden</a></li>
+        {% url 'wohnungsverwaltung_public:building_view' as building_url %}
+        <li><a href="{% if building_url %}{{ building_url }}{% else %}{% url 'building_view_pending' %}{% endif %}"{% if route == "building_view" or route == "building_view_pending" %} aria-current="page"{% elif route == "floor_view" %} aria-current="true"{% endif %}>Gebäudeansicht</a></li>
+    {% endif %}
+    {% if user.is_authenticated %}
+        {% if perms.immobilien.access_tenant_area %}
+            <li><a href="{% url 'wohnungsverwaltung:handover_protocol_mine' %}"{% if route == "handover_protocol_mine" %} aria-current="page"{% elif not perms.immobilien.access_employee_area and 'handover_protocol' in route %} aria-current="true"{% endif %}>Meine Übergabeprotokolle</a></li>
+        {% endif %}
+        {% if perms.immobilien.access_applicant_area %}
+            <li><a href="{% url 'wohnungsverwaltung:pre_application_list' %}"{% if route == "pre_application_list" %} aria-current="page"{% elif route != "pre_application_preview" and 'pre_application' in route or 'main_application' in route or 'applicant_application' in route or route == "application_withdraw" %} aria-current="true"{% endif %}>Meine Bewerbungen</a></li>
+        {% endif %}
+        {% if perms.immobilien.access_employee_area %}
+            <li><a href="{% url 'verwaltung:wohnung_list' %}"{% if namespace == "verwaltung" and 'user_account' not in route %} aria-current="{% if route == 'wohnung_list' %}page{% else %}true{% endif %}"{% endif %}>Verwaltung</a></li>
+            <li><a href="{% url 'wohnungsverwaltung:handover_protocol_list' %}"{% if 'handover_protocol' in route and route != "handover_protocol_mine" %} aria-current="{% if route == 'handover_protocol_list' %}page{% else %}true{% endif %}"{% endif %}>Übergaben</a></li>
+            <li><a href="{% url 'wohnungsverwaltung:employee_application_list' %}"{% if 'employee_application' in route %} aria-current="{% if route == 'employee_application_list' %}page{% else %}true{% endif %}"{% endif %}>Bewerbungen</a></li>
+        {% endif %}
+        {% if perms.immobilien.manage_user_accounts %}
+            <li><a href="{% url 'verwaltung:user_account_list' %}"{% if namespace == "verwaltung" and 'user_account' in route %} aria-current="{% if route == 'user_account_list' %}page{% else %}true{% endif %}"{% endif %}>Benutzer</a></li>
+        {% endif %}
+    {% endif %}
+{% endwith %}

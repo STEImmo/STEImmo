@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Gebäudeansicht – STE Immobilien eGbR{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <h1>Gebäudeansicht</h1>
+        <div class="uk-card uk-card-default uk-card-body">
+            <h2 class="uk-card-title">Entdecken Sie unser Gebäude</h2>
+            <p>Die Gebäude- und Etagenansicht steht Ihnen bald zur Verfügung.</p>
+            <p>Unsere Wohnungen finden Sie bereits in der Wohnungssuche.</p>
+            <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Wohnungen finden</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

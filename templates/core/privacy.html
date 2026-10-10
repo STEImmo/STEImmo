@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Datenschutz – STE Immobilien eGbR{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <a class="uk-button uk-button-text" href="{% url 'home' %}">Zur Startseite</a>
+        <h1>Datenschutz</h1>
+        {% include "core/_legal_draft_notice.html" %}
+        <div class="uk-card uk-card-default uk-card-body uk-margin-top">
+            <h2 class="uk-card-title">Verantwortlicher und Kontakt</h2>
+            <p>STE Immobilien eGbR</p>
+            <p class="uk-text-meta">Angaben folgen: vollständige Kontaktdaten des Verantwortlichen und gegebenenfalls des Datenschutzbeauftragten.</p>
+            <h2 class="uk-card-title">Besuch der Website</h2>
+            <p class="uk-text-meta">Angaben folgen: Hosting, Serverprotokolle, technisch notwendige Cookies und gegebenenfalls weitere eingesetzte Dienste.</p>
+            <h2 class="uk-card-title">Konto, Besichtigungsanfragen und Bewerbungen</h2>
+            <p class="uk-text-meta">Angaben folgen: verarbeitete Daten und Dokumente, Zwecke, Rechtsgrundlagen und Pflichtangaben.</p>
+            <h2 class="uk-card-title">Mietverhältnis und Übergabeprotokolle</h2>
+            <p class="uk-text-meta">Angaben folgen: Verarbeitung von Mieterdaten, Übergabeprotokollen, Fotos und Unterschriften.</p>
+            <h2 class="uk-card-title">Empfänger und Speicherfristen</h2>
+            <p class="uk-text-meta">Angaben folgen: Empfänger, Dienstleister, gegebenenfalls Übermittlungen in Drittländer sowie Löschfristen oder deren Kriterien.</p>
+            <h2 class="uk-card-title">Ihre Rechte</h2>
+            <p class="uk-text-meta">Angaben folgen: Betroffenenrechte, Kontakt zur Ausübung dieser Rechte und zuständige Datenschutzaufsicht.</p>
+        </div>
+    </div>
+</section>
+{% endblock %}

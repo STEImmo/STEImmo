@@ -1,0 +1,25 @@
+<footer class="site-footer">
+    <div class="uk-container">
+        <div class="site-footer-top">
+            <div>
+                <strong class="site-footer-brand">STE Immobilien eGbR</strong>
+                <p class="site-footer-description">Wohnungsvermietung in Würzburg.</p>
+            </div>
+            <nav aria-label="Footernavigation">
+                <p class="site-footer-heading">Navigation</p>
+                <ul class="uk-list site-footer-links">{% include "partials/_navigation_links.html" %}</ul>
+            </nav>
+            <nav aria-label="Rechtliche Informationen">
+                <p class="site-footer-heading">Rechtliches</p>
+                <ul class="uk-list site-footer-links site-footer-legal">
+                    <li><a href="{% url 'imprint' %}"{% if request.resolver_match.url_name == "imprint" %} aria-current="page"{% endif %}>Impressum</a></li>
+                    <li><a href="{% url 'privacy' %}"{% if request.resolver_match.url_name == "privacy" %} aria-current="page"{% endif %}>Datenschutz</a></li>
+                </ul>
+            </nav>
+        </div>
+        <div class="site-footer-bottom">
+            <span>© {% now "Y" %} STE Immobilien eGbR</span>
+            <a href="#main-content">Zum Seiteninhalt</a>
+        </div>
+    </div>
+</footer>

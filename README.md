@@ -2,6 +2,11 @@
 
 STE Immobilien eGbR
 
+STEImmo ist der interne Projektname. Der sichtbare Auftritt verwendet den
+Firmennamen **STE Immobilien eGbR**. Header, mobile Navigation und Footer bauen
+auf dem UIkit-Theme aus US-17 auf; Aufbau und Quellen stehen in den
+[UI-Mustern für US-18](docs/ui-muster.md).
+
 ## Projektziel
 
 STEImmo ist eine serverseitig gerenderte Webanwendung für die Verwaltung und Vermarktung einer Immobilie mit 25 Wohneinheiten.
@@ -179,7 +184,9 @@ Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfigu
 
 ## Bewerbungen im Betreiberbereich
 
-Die Mitarbeiternavigation blendet **Wohnungen finden** und **Bewerbungsvorschau** aus.
+Die Mitarbeiternavigation blendet **Wohnungen finden** und **Gebäudeansicht** aus.
+Besichtigungsanfragen werden aus dem Kontext der jeweiligen Wohnung gestartet;
+die technische Bewerbungsvorschau ist kein Navigationspunkt der Website.
 
 Unter **Bewerbungen** sehen berechtigte Mitarbeiter alle Wohnungen mit der Anzahl
 zugeordneter Bewerbungen. Nach Auswahl einer Wohnung erscheint eine Tabelle mit

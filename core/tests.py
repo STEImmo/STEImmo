@@ -7,7 +7,7 @@ class FoundationViewTests(TestCase):
         response = self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "STEImmo")
+        self.assertContains(response, "STE Immobilien eGbR")
 
     def test_health_endpoint_checks_database_connection(self) -> None:
         response = self.client.get(reverse("health"))

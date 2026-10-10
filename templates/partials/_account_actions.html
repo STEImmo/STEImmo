@@ -1,0 +1,10 @@
+{% if user.is_authenticated %}
+    <p class="site-account-name uk-text-small">{{ user.get_username }}</p>
+    <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button class="uk-button uk-button-default" type="submit">Abmelden</button>
+    </form>
+{% else %}
+    <a class="site-login-link" href="{% url 'login' %}"{% if request.resolver_match.url_name == "login" %} aria-current="page"{% endif %}>Anmelden</a>
+    <a class="uk-button uk-button-primary" href="{% url 'register' %}"{% if request.resolver_match.url_name == "register" or request.resolver_match.url_name == "register_verify" %} aria-current="{% if request.resolver_match.url_name == 'register' %}page{% else %}true{% endif %}"{% endif %}>Registrieren</a>
+{% endif %}

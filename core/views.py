@@ -360,7 +360,7 @@ def register(request: HttpRequest) -> HttpResponse:
 def send_registration_code(email: str, code: str) -> bool:
     return (
         send_mail(
-            subject="STEImmo: Bestätigungscode für Ihre Registrierung",
+            subject="STE Immobilien eGbR: Bestätigungscode für Ihre Registrierung",
             message=(
                 "Ihr Bestätigungscode lautet: "
                 f"{code}\n\n"
@@ -377,7 +377,7 @@ def send_registration_code(email: str, code: str) -> bool:
 def send_employee_mfa_code(email: str, code: str) -> bool:
     return (
         send_mail(
-            subject="STEImmo: Einmalcode für die Mitarbeiteranmeldung",
+            subject="STE Immobilien eGbR: Einmalcode für die Mitarbeiteranmeldung",
             message=(
                 "Ihr Einmalcode lautet: "
                 f"{code}\n\n"

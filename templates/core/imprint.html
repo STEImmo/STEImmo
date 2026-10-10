@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Impressum – STE Immobilien eGbR{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <a class="uk-button uk-button-text" href="{% url 'home' %}">Zur Startseite</a>
+        <h1>Impressum</h1>
+        {% include "core/_legal_draft_notice.html" %}
+        <div class="uk-card uk-card-default uk-card-body uk-margin-top">
+            <h2 class="uk-card-title">Anbieter und Anschrift</h2>
+            <p>STE Immobilien eGbR</p>
+            <p class="uk-text-meta">Angaben folgen: vollständige Geschäftsanschrift und vertretungsberechtigte Personen.</p>
+            <h2 class="uk-card-title">Kontakt</h2>
+            <p class="uk-text-meta">Angaben folgen: geschäftliche E-Mail-Adresse und weitere Kontaktmöglichkeit.</p>
+            <h2 class="uk-card-title">Register und weitere Pflichtangaben</h2>
+            <p class="uk-text-meta">Angaben folgen: zuständiges Register, Registernummer sowie weitere für das Unternehmen zutreffende Pflichtangaben.</p>
+        </div>
+    </div>
+</section>
+{% endblock %}

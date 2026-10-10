@@ -247,6 +247,7 @@ class AccessControlTests(TestCase):
                 response = self.client.get(reverse("home"))
                 self.assertNotContains(response, ">Wohnungen finden<")
                 self.assertNotContains(response, ">Bewerbungsvorschau<")
+                self.assertNotContains(response, ">Gebäudeansicht<")
                 self.assertContains(response, ">Verwaltung<")
 
     def test_public_and_applicant_navigation_keeps_apartment_links(self) -> None:
@@ -257,7 +258,8 @@ class AccessControlTests(TestCase):
                     self.client.force_login(user)
                 response = self.client.get(reverse("home"))
                 self.assertContains(response, ">Wohnungen finden<")
-                self.assertContains(response, ">Bewerbungsvorschau<")
+                self.assertNotContains(response, ">Bewerbungsvorschau<")
+                self.assertContains(response, ">Gebäudeansicht<")
 
     def test_navigation_only_shows_authorized_sections(self) -> None:
         self.client.force_login(self.applicant)
