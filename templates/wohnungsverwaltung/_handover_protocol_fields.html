@@ -9,8 +9,7 @@
             <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
             <div class="uk-form-controls">
                 {{ field }}
-                {% if field.help_text %}<p class="uk-text-meta">{{ field.help_text }}</p>{% endif %}
-                {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
             </div>
         </div>
     {% endfor %}
@@ -20,7 +19,7 @@
     <label class="uk-form-label" for="{{ form.mieter_zukuenftige_anschrift.id_for_label }}">{{ form.mieter_zukuenftige_anschrift.label }}</label>
     <div class="uk-form-controls">
         {{ form.mieter_zukuenftige_anschrift }}
-        {% for error in form.mieter_zukuenftige_anschrift.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+        {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.mieter_zukuenftige_anschrift only %}
     </div>
 </div>
 
@@ -57,7 +56,6 @@
                     <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                     <div class="uk-form-controls">
                         {{ field }}
-                        {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
                     </div>
                 </div>
             {% endfor %}
@@ -79,7 +77,7 @@
                             <td>{{ row.label }}</td>
                             <td>{{ row.number|default:"Nicht gepflegt" }}</td>
                             <td>{% if row.old_reading is not None %}{{ row.old_reading|floatformat:2 }}{% else %}—{% endif %}</td>
-                            <td>{{ row.field }}{% for error in row.field.errors %}<p class="uk-text-danger uk-margin-remove">{{ error }}</p>{% endfor %}</td>
+                            <td>{{ row.field }}</td>
                             <td><output data-meter-difference>—</output></td>
                         </tr>
                     {% endfor %}
@@ -90,10 +88,17 @@
             <label class="uk-form-label" for="{{ form.heizungsablesungen.id_for_label }}">{{ form.heizungsablesungen.label }}</label>
             <div class="uk-form-controls">
                 {{ form.heizungsablesungen }}
-                {% for error in form.heizungsablesungen.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
             </div>
         </div>
     </div>
+    {% for field in form.meter_reading_fields %}
+        {% if field.errors or field.help_text %}
+            <div class="uk-margin-small-top">
+                <span class="uk-form-label">{{ field.label }}</span>
+                {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
+            </div>
+        {% endif %}
+    {% endfor %}
 </section>
 
 <section class="uk-margin-large-top" data-protocol-types="move_in">
@@ -102,7 +107,7 @@
         {% for field in form.move_in_fields %}
             <div>
                 <label>{{ field }} {{ field.label }}</label>
-                {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
             </div>
         {% endfor %}
     </div>
@@ -117,7 +122,7 @@
                 <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 <div class="uk-form-controls">
                     {{ field }}
-                    {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                    {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
                 </div>
             </div>
         {% endfor %}
@@ -131,7 +136,7 @@
     </div>
     <p class="uk-text-meta">Wählen Sie einen Raum aus den Stammdaten der gewählten Wohnung.</p>
     {{ room_formset.management_form }}
-    {% for error in form.removed_rooms.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+    {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.removed_rooms only %}
     {% if room_formset.non_form_errors %}<div class="uk-alert-danger" role="alert">{{ room_formset.non_form_errors }}</div>{% endif %}
     <div id="room-formset">
         {% for group in room_form_groups %}
@@ -148,7 +153,7 @@
                         <label class="uk-form-label" for="{{ group.room_form.raum.id_for_label }}">{{ group.room_form.raum.label }}</label>
                         <div class="uk-form-controls">
                             {{ group.room_form.raum }}
-                            {% for error in group.room_form.raum.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                            {% include "wohnungsverwaltung/_form_field_feedback.html" with field=group.room_form.raum only %}
                         </div>
                     </div>
                 </header>
@@ -158,9 +163,9 @@
                         {% for checklist_form in group.checklist_forms %}
                             <div class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-room-checklist-form>
                                 {{ checklist_form.raumprotokoll }}
-                                {% for error in checklist_form.raumprotokoll.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                                {% include "wohnungsverwaltung/_form_field_feedback.html" with field=checklist_form.raumprotokoll only %}
                                 {{ checklist_form.pruefpunkt }}
-                                {% for error in checklist_form.pruefpunkt.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                                {% include "wohnungsverwaltung/_form_field_feedback.html" with field=checklist_form.pruefpunkt only %}
                                 {% if checklist_form.existing_item %}
                                     {% include "wohnungsverwaltung/_protocol_saved_photos.html" with item=checklist_form.existing_item %}
                                 {% endif %}
@@ -179,7 +184,7 @@
                                                     {% else %}
                                                         {{ field }}
                                                     {% endif %}
-                                                    {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                                                    {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
                                                 </div>
                                                 {% if field.name == "fotos" %}<p class="uk-text-meta uk-margin-small-top">JPEG, PNG oder WebP, maximal 8 MiB je Bild. Die Fotos werden erst beim Speichern des Protokolls übertragen und nicht im Entwurf zwischengespeichert.</p>{% endif %}
                                             </div>
@@ -187,7 +192,7 @@
                                     {% endfor %}
                                 </div>
                                 {{ checklist_form.zusatzangaben }}
-                                {% for error in checklist_form.zusatzangaben.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                                {% include "wohnungsverwaltung/_form_field_feedback.html" with field=checklist_form.zusatzangaben only %}
                                 <button class="uk-button uk-button-danger uk-button-small uk-margin-small-top" type="button" data-remove-room-checklist>Prüfpunkt entfernen</button>
                             </div>
                         {% endfor %}
@@ -280,13 +285,13 @@
     <div id="key-formset">
         {% for inline_form in key_formset %}
             <article class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-formset-row data-key-formset-row>
-                {% for hidden in inline_form.hidden_fields %}{{ hidden }}{% for error in hidden.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}{% endfor %}
+                {% for hidden in inline_form.hidden_fields %}{{ hidden }}{% include "wohnungsverwaltung/_form_field_feedback.html" with field=hidden only %}{% endfor %}
                 <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
                     {% for field in inline_form.visible_fields %}
                         {% if field.name != "DELETE" %}
                             <div>
                                 <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                                <div class="uk-form-controls">{{ field }}{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>
+                                <div class="uk-form-controls">{{ field }}{% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}</div>
                             </div>
                         {% endif %}
                     {% endfor %}

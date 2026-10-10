@@ -1,0 +1,10 @@
+{% if field.help_text %}
+    <div{% if field.auto_id %} id="{{ field.auto_id }}_helptext"{% endif %} class="uk-text-meta uk-text-small">{{ field.help_text }}</div>
+{% endif %}
+{% if field.errors %}
+    <div{% if field.auto_id %} id="{{ field.auto_id }}_error"{% endif %} class="uk-text-danger uk-text-small">
+        {% for error in field.errors %}
+            <p class="uk-margin-remove">{{ error }}</p>
+        {% endfor %}
+    </div>
+{% endif %}
