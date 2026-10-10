@@ -155,14 +155,7 @@
                                         </div>
                                     {% endif %}
                                 {% endfor %}
-                                {% if field.help_text %}
-                                    <p class="uk-text-meta uk-text-small">{{ field.help_text }}</p>
-                                {% endif %}
-                                {% if field.errors %}
-                                    <ul class="uk-text-danger uk-text-small">
-                                        {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
-                                    </ul>
-                                {% endif %}
+                                {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
                             </div>
                         </div>
                     {% endif %}

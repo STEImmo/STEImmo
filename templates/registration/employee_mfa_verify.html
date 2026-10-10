@@ -15,7 +15,7 @@
             <div class="uk-margin">
                 <label class="uk-form-label" for="{{ form.code.id_for_label }}">{{ form.code.label }}</label>
                 <div class="uk-form-controls">{{ form.code }}</div>
-                {% for error in form.code.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.code only %}
             </div>
             <div class="uk-margin-large-top uk-flex uk-flex-between">
                 <a class="uk-button uk-button-default" href="{% url 'login' %}">Zurück zur Anmeldung</a>

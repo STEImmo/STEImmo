@@ -1,6 +1,6 @@
 {% for field in form %}
     {% if field.name == "haustiere" %}
-        <fieldset class="uk-fieldset uk-margin">
+        <fieldset class="uk-fieldset uk-margin"{% if field.aria_describedby %} aria-describedby="{{ field.aria_describedby }}"{% endif %}>
             <legend class="uk-form-label">{{ field.label }}</legend>
             <div class="uk-margin-small-top">
                 {% for choice in field %}
@@ -10,7 +10,7 @@
                     </label>
                 {% endfor %}
             </div>
-            {% for error in field.errors %}<div class="uk-text-danger">{{ error }}</div>{% endfor %}
+            {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
         </fieldset>
     {% else %}
         <div class="uk-margin">
@@ -18,8 +18,7 @@
             <div class="uk-margin-small-top">
                 {{ field }}
             </div>
-            {% if field.help_text %}<div class="uk-text-meta">{{ field.help_text }}</div>{% endif %}
-            {% for error in field.errors %}<div class="uk-text-danger">{{ error }}</div>{% endfor %}
+            {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
         </div>
     {% endif %}
 {% endfor %}
