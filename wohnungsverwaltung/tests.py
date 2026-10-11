@@ -332,6 +332,81 @@ class HandoverProtocolViewsTests(TestCase):
             content_type=content_type,
         )
 
+    def assert_unique_meter_fields(self, response) -> None:
+        for field_name in (
+            "zaehlerstand_wasser_kalt",
+            "zaehlerstand_wasser_warm",
+            "zaehlerstand_heizung",
+            "zaehlerstand_strom",
+            "heizungsablesungen",
+        ):
+            with self.subTest(field=field_name):
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.content.count(f'name="{field_name}"'.encode()), 1)
+                self.assertEqual(response.content.count(f'id="id_{field_name}"'.encode()), 1)
+
+    def test_create_page_renders_each_meter_reading_once(self) -> None:
+        url = reverse("wohnungsverwaltung:handover_protocol_create")
+        for query in ({}, {"wohnung": self.wohnung.pk}):
+            with self.subTest(query=query):
+                self.assert_unique_meter_fields(self.client.get(url, query))
+
+    def test_draft_recovery_page_renders_each_meter_reading_once(self) -> None:
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_draft_save"),
+            data=json.dumps({"scope": "create", "draft": self.draft_data()}),
+            content_type="application/json",
+        )
+        draft = ProtokollEntwurf.objects.get()
+        response = self.client.get(
+            reverse("wohnungsverwaltung:handover_protocol_create"), {"draft": draft.pk}
+        )
+
+        self.assertContains(response, 'id="server-protocol-draft"')
+        self.assert_unique_meter_fields(response)
+
+    def test_edit_page_renders_each_meter_reading_once_for_both_types(self) -> None:
+        for handover_type in (ProtokollTyp.MOVE_IN, ProtokollTyp.MOVE_OUT):
+            with self.subTest(handover_type=handover_type):
+                data = self.valid_form_data()
+                data.update(
+                    protokoll_typ=handover_type,
+                    mieter_zukuenftige_anschrift="Beispielweg 110",
+                )
+                self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
+                protocol = Protokoll.objects.get(protokoll_typ=handover_type)
+                response = self.client.get(
+                    reverse("wohnungsverwaltung:handover_protocol_edit", args=[protocol.pk])
+                )
+                self.assert_unique_meter_fields(response)
+
+    def test_both_types_require_every_meter_reading_without_duplicate_inputs(self) -> None:
+        for handover_type in (ProtokollTyp.MOVE_IN, ProtokollTyp.MOVE_OUT):
+            for field_name in (
+                "zaehlerstand_wasser_kalt",
+                "zaehlerstand_wasser_warm",
+                "zaehlerstand_heizung",
+                "zaehlerstand_strom",
+                "heizungsablesungen",
+            ):
+                with self.subTest(handover_type=handover_type, field=field_name):
+                    data = self.valid_form_data()
+                    data.update(
+                        protokoll_typ=handover_type,
+                        mieter_zukuenftige_anschrift="Beispielweg 110",
+                    )
+                    data.pop(field_name)
+                    response = self.client.post(
+                        reverse("wohnungsverwaltung:handover_protocol_create"), data
+                    )
+                    self.assertFormError(
+                        response.context["form"],
+                        field_name,
+                        "Dieses Feld ist zwingend erforderlich.",
+                    )
+                    self.assert_unique_meter_fields(response)
+                    self.assertFalse(Protokoll.objects.exists())
+
     def test_create_page_shows_required_handover_fields(self) -> None:
         response = self.client.get(
             reverse("wohnungsverwaltung:handover_protocol_create"),
@@ -540,6 +615,8 @@ class HandoverProtocolViewsTests(TestCase):
         self.assertFalse(ProtokollEntwurf.objects.exists())
 
     def test_successful_creation_clears_local_and_server_drafts(self) -> None:
+        form_response = self.client.get(reverse("wohnungsverwaltung:handover_protocol_create"))
+        draft_storage_key = form_response.context["draft_storage_key"]
         self.client.post(
             reverse("wohnungsverwaltung:handover_protocol_draft_save"),
             data=json.dumps({"scope": "create", "draft": self.draft_data()}),
@@ -563,7 +640,7 @@ class HandoverProtocolViewsTests(TestCase):
 
         self.assertContains(
             response,
-            'data-draft-key-to-clear="handover-protocol-draft:create"',
+            f'data-draft-key-to-clear="{draft_storage_key}"',
         )
 
     def test_room_checklist_uses_a_large_finding_field_and_supports_deletion(self) -> None:

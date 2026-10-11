@@ -14,7 +14,7 @@
             {% for field in form.visible_fields %}
                 <div class="uk-margin">
                     <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    <div class="uk-form-controls">{{ field }}{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>
+                    <div class="uk-form-controls">{{ field }}{% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}</div>
                 </div>
             {% endfor %}
             <div class="uk-flex uk-flex-right">
