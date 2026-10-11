@@ -19,34 +19,33 @@
                     <div class="uk-margin">
                         <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                         <div class="uk-form-controls">{{ field }}</div>
-                        {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                        {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
                     </div>
                 {% endif %}
             {% endfor %}
             <h2 class="uk-heading-divider uk-margin-large-top">Zugriff</h2>
             {% for field in form %}
                 {% if field.name == "roles" or field.name == "direct_permissions" %}
-                    <div class="uk-margin">
-                        <span class="uk-form-label">{{ field.label }}</span>
+                    <fieldset class="uk-fieldset uk-margin"{% if field.aria_describedby %} aria-describedby="{{ field.aria_describedby }}"{% endif %}>
+                        <legend class="uk-form-label">{{ field.label }}</legend>
                         <div class="uk-form-controls uk-margin-small-top">
                             {% for choice in field %}
                                 <label class="uk-display-block uk-margin-small-bottom">{{ choice.tag }} {{ choice.choice_label }}</label>
                             {% endfor %}
                         </div>
-                        {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
-                    </div>
+                        {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
+                    </fieldset>
                 {% endif %}
             {% endfor %}
             <h2 class="uk-heading-divider uk-margin-large-top">Kontostatus</h2>
             <div class="uk-margin">
                 <label>{{ form.is_active }} {{ form.is_active.label }}</label>
-                {% for error in form.is_active.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.is_active only %}
             </div>
             {% if form.revoke_registration %}
                 <div class="uk-margin">
                     <label>{{ form.revoke_registration }} {{ form.revoke_registration.label }}</label>
-                    <p class="uk-text-meta">{{ form.revoke_registration.help_text }}</p>
-                    {% for error in form.revoke_registration.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                    {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.revoke_registration only %}
                 </div>
             {% endif %}
             <p class="uk-text-meta">{% if account %}Leer lassen, um das bestehende Passwort beizubehalten.{% else %}Für neue Konten ist ein Passwort erforderlich.{% endif %}</p>
@@ -55,7 +54,7 @@
                     <div class="uk-margin">
                         <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                         <div class="uk-form-controls">{{ field }}</div>
-                        {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                        {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
                     </div>
                 {% endif %}
             {% endfor %}
