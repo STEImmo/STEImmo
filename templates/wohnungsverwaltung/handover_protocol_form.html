@@ -59,19 +59,22 @@
 
         const apartmentSelect = document.getElementById("id_wohnung");
         let loadedApartmentId = apartmentSelect?.value || "";
+        let dependentFieldsRequestId = 0;
         const updateApartmentDependentFields = async () => {
             if (!apartmentSelect) {
                 return false;
             }
+            const requestId = ++dependentFieldsRequestId;
+            const requestedApartmentId = apartmentSelect.value;
+            const requestedPersonId = document.getElementById("id_person")?.value || "";
             const url = new URL(window.location.href);
-            if (apartmentSelect.value) {
-                url.searchParams.set("wohnung", apartmentSelect.value);
+            if (requestedApartmentId) {
+                url.searchParams.set("wohnung", requestedApartmentId);
             } else {
                 url.searchParams.delete("wohnung");
             }
-            const personSelect = document.getElementById("id_person");
-            if (personSelect?.value) {
-                url.searchParams.set("person", personSelect.value);
+            if (requestedPersonId) {
+                url.searchParams.set("person", requestedPersonId);
             } else {
                 url.searchParams.delete("person");
             }
@@ -79,8 +82,17 @@
             if (!response.ok) {
                 return false;
             }
-            const updatedPage = new DOMParser().parseFromString(await response.text(), "text/html");
-            const apartmentChanged = loadedApartmentId !== apartmentSelect.value;
+            const responseText = await response.text();
+            // The selection may change while fetching headers or the response body.
+            if (
+                requestId !== dependentFieldsRequestId
+                || requestedApartmentId !== apartmentSelect.value
+                || requestedPersonId !== (document.getElementById("id_person")?.value || "")
+            ) {
+                return false;
+            }
+            const updatedPage = new DOMParser().parseFromString(responseText, "text/html");
+            const apartmentChanged = loadedApartmentId !== requestedApartmentId;
             const meterValues = new Map(Array.from(document.querySelectorAll(
                 '#meter-reading-section input[name]:not(:disabled)',
             )).map((field) => [field.name, field.value]));
@@ -92,21 +104,38 @@
                 "room-formset-section",
                 "move-in-reference",
             ].forEach((id) => {
-                if (!apartmentChanged && ["key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
+                if (!apartmentChanged && ["id_person", "key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
                     return;
                 }
                 const currentElement = document.getElementById(id);
                 const updatedElement = updatedPage.getElementById(id);
                 if (currentElement && updatedElement) {
+                    if (!apartmentChanged && id === "meter-reading-section") {
+                        // Keep live inputs, including edits made while the request was pending.
+                        const currentFields = new Map();
+                        currentElement.querySelectorAll("input[name], textarea[name]").forEach((field) => {
+                            const fields = currentFields.get(field.name) || [];
+                            fields.push(field);
+                            currentFields.set(field.name, fields);
+                        });
+                        updatedElement.querySelectorAll("input[name], textarea[name]").forEach((field) => {
+                            const currentField = currentFields.get(field.name)?.shift();
+                            if (currentField) {
+                                field.replaceWith(currentField);
+                            }
+                        });
+                    }
                     currentElement.replaceWith(updatedElement);
                 }
             });
-            document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
-                if (meterValues.has(field.name)) {
-                    field.value = meterValues.get(field.name);
-                }
-            });
-            loadedApartmentId = apartmentSelect.value;
+            if (apartmentChanged) {
+                document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
+                    if (meterValues.has(field.name)) {
+                        field.value = meterValues.get(field.name);
+                    }
+                });
+            }
+            loadedApartmentId = requestedApartmentId;
             document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
             document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
             window.history.replaceState(null, "", url);
@@ -115,7 +144,9 @@
         if (apartmentSelect) {
             apartmentSelect.addEventListener("change", async () => {
                 saveDraft(true);
-                await updateApartmentDependentFields();
+                if (!await updateApartmentDependentFields()) {
+                    return;
+                }
                 updateTypeSpecificSections();
                 updateMeterDifferences();
                 saveDraft(true);
@@ -126,7 +157,9 @@
                 return;
             }
             saveDraft(true);
-            await updateApartmentDependentFields();
+            if (!await updateApartmentDependentFields()) {
+                return;
+            }
             updateTypeSpecificSections();
             updateMeterDifferences();
             saveDraft(true);
@@ -610,10 +643,16 @@
                 const savedApartment = draft.fields?.wohnung?.value;
                 if (apartmentSelect && savedApartment && apartmentSelect.value !== savedApartment) {
                     apartmentSelect.value = savedApartment;
-                    await updateApartmentDependentFields();
+                    if (!await updateApartmentDependentFields()) {
+                        return;
+                    }
                 }
                 restoreFields(protocolForm, draft.fields);
+                if (!await updateApartmentDependentFields()) {
+                    return;
+                }
                 updateTypeSpecificSections();
+                updateMeterDifferences();
                 restoreRooms(draft.rooms);
                 restoreKeys(draft.keys);
                 document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
