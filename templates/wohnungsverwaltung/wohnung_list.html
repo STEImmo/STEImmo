@@ -35,7 +35,7 @@
                             <td>{{ wohnung.wohnungsnummer }}</td>
                             <td>{{ wohnung.etage }}</td>
                             <td>{{ wohnung.groesse_qm }} m²</td>
-                            <td>{{ wohnung.zimmeranzahl }}</td>
+                            <td>{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl }}{% else %}Noch nicht angegeben{% endif %}</td>
                             <td>
                                 <span class="uk-label">
                                     {% if wohnung.status == "free" %}Verfügbar{% elif wohnung.status == "taken" %}Vermietet{% else %}Gesperrt{% endif %}

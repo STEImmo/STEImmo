@@ -1,0 +1,20 @@
+{% if photos %}
+{# UIkit 3.25.24 needs a transition panel; navigation controls sit outside that panel. #}
+<div class="apartment-gallery{% if photos|length == 2 %} apartment-gallery-pair{% endif %} uk-margin-medium-bottom" data-apartment-gallery uk-lightbox="animation: fade; sel-panel: .uk-lightbox-items; bg-close: false">
+    {% for photo in photos %}
+    {# Escape for UIkit's HTML caption and again for the enclosing HTML attribute. #}
+    <a class="{% if forloop.counter <= 3 %}apartment-gallery-photo{% if forloop.first %} apartment-gallery-main{% endif %}{% if forloop.counter == 3 and photos|length > 3 %} apartment-gallery-stack{% endif %}{% else %}uk-hidden{% endif %}" href="{% url 'wohnungsverwaltung_public:apartment_photo' photo.pk %}" data-type="image" data-caption="{{ photo.caption|default:'Wohnungsfoto'|force_escape|force_escape }}"{% if forloop.counter > 3 %} tabindex="-1" aria-hidden="true"{% endif %}>
+        {% if forloop.counter <= 3 %}
+        <img src="{% url 'wohnungsverwaltung_public:apartment_photo' photo.pk %}" alt="{{ photo.caption|default:'Foto der Wohnung' }}"{% if not forloop.first %} loading="lazy"{% endif %}>
+        {% if forloop.counter == 3 and photos|length > 3 %}<span class="apartment-gallery-more"><span uk-icon="icon: image; ratio: 1.4" aria-hidden="true"></span><span>+{{ photos|length|add:"-3" }} Foto{{ photos|length|add:"-3"|pluralize }}</span></span>{% endif %}
+        {% endif %}
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="apartment-gallery uk-margin-medium-bottom">
+    <div class="apartment-gallery-main">{% include "wohnungsverwaltung/_apartment_image_placeholder.html" %}</div>
+    <div>{% include "wohnungsverwaltung/_apartment_image_placeholder.html" %}</div>
+    <div>{% include "wohnungsverwaltung/_apartment_image_placeholder.html" %}</div>
+</div>
+{% endif %}

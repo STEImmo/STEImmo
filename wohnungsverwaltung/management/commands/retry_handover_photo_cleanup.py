@@ -1,16 +1,16 @@
-"""Retry cleanup of files from failed uploads or removed protocol photos."""
+"""Retry cleanup of apartment and protocol photo files."""
 
 import logging
 
 from django.core.management.base import BaseCommand, CommandError
 
-from wohnungsverwaltung.models import HandoverPhotoCleanup, RaumMerkmalFoto
+from wohnungsverwaltung.models import ApartmentPhoto, HandoverPhotoCleanup, RaumMerkmalFoto
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Retry deletion of protocol photo files after failed uploads or photo removal."
+    help = "Retry deletion of apartment and protocol photo files after failed uploads or removal."
 
     def handle(self, *args, **options):
         storage = RaumMerkmalFoto._meta.get_field("datei").storage
@@ -18,7 +18,10 @@ class Command(BaseCommand):
         failed = 0
         for cleanup in HandoverPhotoCleanup.objects.iterator():
             try:
-                if RaumMerkmalFoto.objects.filter(datei=cleanup.storage_name).exists():
+                if (
+                    RaumMerkmalFoto.objects.filter(datei=cleanup.storage_name).exists()
+                    or ApartmentPhoto.objects.filter(image=cleanup.storage_name).exists()
+                ):
                     raise ValueError("Photo is still referenced.")
                 storage.delete(cleanup.storage_name)
                 cleanup.delete()

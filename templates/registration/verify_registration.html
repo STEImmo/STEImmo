@@ -16,7 +16,7 @@
                 <div class="uk-margin">
                     <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                     <div class="uk-form-controls">{{ field }}</div>
-                    {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                    {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
                 </div>
             {% endfor %}
             <div class="uk-margin-large-top uk-flex uk-flex-right">
@@ -30,7 +30,7 @@
                 <div class="uk-width-expand">{{ resend_form.email }}</div>
                 <div class="uk-width-auto"><button class="uk-button uk-button-default" type="submit">Code erneut senden</button></div>
             </div>
-            {% for error in resend_form.email.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+            {% include "wohnungsverwaltung/_form_field_feedback.html" with field=resend_form.email only %}
         </form>
     </div>
 </section>

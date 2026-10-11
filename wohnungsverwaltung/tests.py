@@ -96,7 +96,7 @@ class ApartmentSearchViewTests(TestCase):
             ),
         )
 
-    def test_apartment_detail_placeholder_says_details_will_follow(self) -> None:
+    def test_apartment_detail_shows_photo_placeholder(self) -> None:
         unit = self.create_unit("1.01")
 
         response = self.client.get(
@@ -108,7 +108,7 @@ class ApartmentSearchViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, unit.wohnungsnummer)
-        self.assertContains(response, "Wohnungsdetails folgen")
+        self.assertContains(response, "Wohnungsfoto folgt")
 
     def test_apartment_detail_placeholder_returns_404_for_unavailable_units(self) -> None:
         unavailable_units = (
@@ -332,6 +332,81 @@ class HandoverProtocolViewsTests(TestCase):
             content_type=content_type,
         )
 
+    def assert_unique_meter_fields(self, response) -> None:
+        for field_name in (
+            "zaehlerstand_wasser_kalt",
+            "zaehlerstand_wasser_warm",
+            "zaehlerstand_heizung",
+            "zaehlerstand_strom",
+            "heizungsablesungen",
+        ):
+            with self.subTest(field=field_name):
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.content.count(f'name="{field_name}"'.encode()), 1)
+                self.assertEqual(response.content.count(f'id="id_{field_name}"'.encode()), 1)
+
+    def test_create_page_renders_each_meter_reading_once(self) -> None:
+        url = reverse("wohnungsverwaltung:handover_protocol_create")
+        for query in ({}, {"wohnung": self.wohnung.pk}):
+            with self.subTest(query=query):
+                self.assert_unique_meter_fields(self.client.get(url, query))
+
+    def test_draft_recovery_page_renders_each_meter_reading_once(self) -> None:
+        self.client.post(
+            reverse("wohnungsverwaltung:handover_protocol_draft_save"),
+            data=json.dumps({"scope": "create", "draft": self.draft_data()}),
+            content_type="application/json",
+        )
+        draft = ProtokollEntwurf.objects.get()
+        response = self.client.get(
+            reverse("wohnungsverwaltung:handover_protocol_create"), {"draft": draft.pk}
+        )
+
+        self.assertContains(response, 'id="server-protocol-draft"')
+        self.assert_unique_meter_fields(response)
+
+    def test_edit_page_renders_each_meter_reading_once_for_both_types(self) -> None:
+        for handover_type in (ProtokollTyp.MOVE_IN, ProtokollTyp.MOVE_OUT):
+            with self.subTest(handover_type=handover_type):
+                data = self.valid_form_data()
+                data.update(
+                    protokoll_typ=handover_type,
+                    mieter_zukuenftige_anschrift="Beispielweg 110",
+                )
+                self.client.post(reverse("wohnungsverwaltung:handover_protocol_create"), data)
+                protocol = Protokoll.objects.get(protokoll_typ=handover_type)
+                response = self.client.get(
+                    reverse("wohnungsverwaltung:handover_protocol_edit", args=[protocol.pk])
+                )
+                self.assert_unique_meter_fields(response)
+
+    def test_both_types_require_every_meter_reading_without_duplicate_inputs(self) -> None:
+        for handover_type in (ProtokollTyp.MOVE_IN, ProtokollTyp.MOVE_OUT):
+            for field_name in (
+                "zaehlerstand_wasser_kalt",
+                "zaehlerstand_wasser_warm",
+                "zaehlerstand_heizung",
+                "zaehlerstand_strom",
+                "heizungsablesungen",
+            ):
+                with self.subTest(handover_type=handover_type, field=field_name):
+                    data = self.valid_form_data()
+                    data.update(
+                        protokoll_typ=handover_type,
+                        mieter_zukuenftige_anschrift="Beispielweg 110",
+                    )
+                    data.pop(field_name)
+                    response = self.client.post(
+                        reverse("wohnungsverwaltung:handover_protocol_create"), data
+                    )
+                    self.assertFormError(
+                        response.context["form"],
+                        field_name,
+                        "Dieses Feld ist zwingend erforderlich.",
+                    )
+                    self.assert_unique_meter_fields(response)
+                    self.assertFalse(Protokoll.objects.exists())
+
     def test_create_page_shows_required_handover_fields(self) -> None:
         response = self.client.get(
             reverse("wohnungsverwaltung:handover_protocol_create"),
@@ -540,6 +615,8 @@ class HandoverProtocolViewsTests(TestCase):
         self.assertFalse(ProtokollEntwurf.objects.exists())
 
     def test_successful_creation_clears_local_and_server_drafts(self) -> None:
+        form_response = self.client.get(reverse("wohnungsverwaltung:handover_protocol_create"))
+        draft_storage_key = form_response.context["draft_storage_key"]
         self.client.post(
             reverse("wohnungsverwaltung:handover_protocol_draft_save"),
             data=json.dumps({"scope": "create", "draft": self.draft_data()}),
@@ -563,7 +640,7 @@ class HandoverProtocolViewsTests(TestCase):
 
         self.assertContains(
             response,
-            'data-draft-key-to-clear="handover-protocol-draft:create"',
+            f'data-draft-key-to-clear="{draft_storage_key}"',
         )
 
     def test_room_checklist_uses_a_large_finding_field_and_supports_deletion(self) -> None:
@@ -1872,6 +1949,20 @@ class HandoverProtocolViewsTests(TestCase):
 
 
 class SeedStandardDataCommandTests(TestCase):
+    def test_seed_supplies_sourced_description_without_overwriting_edited_details(self):
+        call_command("seed_standard_data")
+        unit = Wohnung.objects.get(wohnungsnummer="1")
+        self.assertIn("Bestandsgebäudes in Würzburg", unit.description)
+        self.assertEqual(unit.planned_move_in, "Voraussichtlich März 2027")
+        self.assertEqual(unit.heating_type, "")
+        unit.description = "Individuell gepflegte Beschreibung"
+        unit.planned_move_in = "Nach Vereinbarung"
+        unit.save()
+        call_command("seed_standard_data")
+        unit.refresh_from_db()
+        self.assertEqual(unit.description, "Individuell gepflegte Beschreibung")
+        self.assertEqual(unit.planned_move_in, "Nach Vereinbarung")
+
     def test_command_creates_25_units_and_is_idempotent(self) -> None:
         call_command("seed_standard_data")
 
@@ -2150,6 +2241,24 @@ class PreApplicationAuthenticationTests(TestCase):
         application = Bewerbung.objects.get()
         self.assertEqual(application.person, self.applicant)
         self.assertEqual(application.wohnung, self.free_unit)
+
+    def test_viewing_request_keeps_selected_unit_and_main_application_locked(self) -> None:
+        self.client.force_login(self.user)
+        url = reverse(
+            "wohnungsverwaltung:pre_application_create_for_unit", args=[self.free_unit.pk]
+        )
+        form_response = self.client.get(url)
+        self.assertContains(form_response, "Zur Besichtigung anmelden")
+        self.assertContains(form_response, "Besichtigungsanfrage senden")
+        response = self.client.post(url, self.valid_form_data(), follow=True)
+        self.assertContains(response, "Ihre Besichtigungsanfrage wurde gespeichert.")
+        application = Bewerbung.objects.get()
+        self.assertEqual(application.wohnung, self.free_unit)
+        self.assertFalse(application.main_application_accessible)
+        main_response = self.client.get(
+            reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
+        )
+        self.assertEqual(main_response.status_code, 404)
 
     def test_linked_user_cannot_submit_for_a_unit_that_became_unavailable(self) -> None:
         self.assertTrue(self.client.login(username=self.user.username, password="FjordTanne!4826"))

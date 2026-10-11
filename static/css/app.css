@@ -93,6 +93,95 @@ body {
     line-height: var(--steimmo-line-height-base);
 }
 
+/* Project-specific architectural diagrams; surrounding controls remain UIkit. */
+.building-facade,
+.floor-plan {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.facade-floor { cursor: pointer; }
+.facade-hit { fill: transparent; stroke: transparent; stroke-width: 3; transition: fill .15s; }
+.facade-floor-label rect { fill: #fff; stroke: #ddd; }
+.facade-floor-label text { fill: #555; font: 15px Arial, sans-serif; }
+.facade-floor-label .facade-floor-summary { font-size: 11px; fill: #777; }
+.facade-floor-label path { stroke: #aaa; }
+.facade-floor:hover .facade-hit,
+.facade-floor:focus-visible .facade-hit { fill: #1e87f033; stroke: #1e87f0; }
+.facade-floor:hover .facade-floor-label rect,
+.facade-floor:focus-visible .facade-floor-label rect { stroke: #1e87f0; stroke-width: 2; }
+.floor-navigation { scroll-margin-top: 18px; }
+.floor-plan-frame { max-width: 1100px; margin-left: auto; margin-right: auto; overflow-x: auto; }
+.floor-plan { min-width: 680px; }
+.floor-plan-frame:focus-visible { outline: 2px solid #1e87f0; outline-offset: 4px; }
+/* Simplified architecture traced in the source coordinate system. */
+.plan-shell { fill: #f6f5f1; stroke: #535a55; stroke-width: 3; stroke-linejoin: round; }
+.plan-shared { fill: #f5f3ee; }
+.plan-roof { fill: #edeae3; stroke: #b1aea6; stroke-width: 1; }
+.plan-roof-lines { fill: none; stroke: #c1beb6; stroke-width: 1; }
+.plan-apartment-shape { fill: #edf3e8; stroke: #596254; stroke-width: 2; stroke-linejoin: round; transition: fill .15s, stroke .15s; }
+a.plan-apartment { cursor: pointer; }
+a.plan-apartment:hover .plan-apartment-shape,
+a.plan-apartment:focus-visible .plan-apartment-shape { fill: #d1e6f7; stroke: #1e87f0; }
+.is-unavailable .plan-apartment-shape { fill: url(#plan-unavailable-hatch); stroke: #999e96; }
+.plan-unavailable-caption rect { fill: #f2f2ef; stroke: #b4b8b0; stroke-width: 1; }
+.plan-unavailable-caption text { fill: #5e645a; font: 12px Arial, sans-serif; }
+.plan-linework { pointer-events: none; }
+.plan-walls { stroke: #8a9285; stroke-width: 1.5; }
+.plan-door-gap { stroke: #f6f6f2; stroke-width: 3; }
+.plan-doors { stroke: #a5ad9e; stroke-width: .7; }
+.plan-lines { fill: none; stroke: #b2b6af; stroke-width: .6; }
+.plan-stair-outline { stroke: #a5aaa1; stroke-width: .7; }
+.plan-lift { fill: white; stroke: #656e60; stroke-width: 1.5; }
+.plan-room-label { fill: #687260; text-anchor: middle; font: 6px Arial, sans-serif; }
+.plan-furniture { stroke: #b1baaa; stroke-width: .7; }
+.plan-balconies { stroke: #a5ada0; stroke-width: 1; }
+.plan-windows { stroke: #b5cddd; stroke-width: 3; }
+.plan-annotations { pointer-events: none; }
+.plan-caption { font: 9px Arial, sans-serif; fill: #26352a; }
+.plan-caption rect { fill: #fff; fill-opacity: .96; stroke: #bac5b5; stroke-width: .6; }
+.plan-caption .plan-number { font-weight: 700; }
+.plan-caption .plan-area { font-size: 8px; }
+:is(.is-ground, .is-regular) .plan-caption { font-size: 14px; }
+:is(.is-ground, .is-regular) .plan-caption .plan-area { font-size: 12px; }
+:is(.is-ground, .is-regular) .plan-room-label { font-size: 14px; }
+:is(.is-ground, .is-regular) .plan-apartment-shape { stroke: none; }
+:is(.is-ground, .is-regular) .plan-walls { stroke: #596254; stroke-width: 3; stroke-linecap: butt; stroke-linejoin: miter; }
+:is(.is-ground, .is-regular) .plan-windows { stroke: #b5cddd; stroke-width: 4; }
+:is(.is-ground, .is-regular) .plan-balconies { stroke: #a5ada0; stroke-width: 1.5; }
+:is(.is-ground, .is-regular) .plan-doors { stroke-width: 1; }
+:is(.is-ground, .is-regular) .plan-lift-label { font-size: 10px; }
+.plan-balcony-area { fill: #edf5ec; }
+.plan-caption.is-unavailable { fill: #666; }
+.plan-caption.is-unavailable rect { stroke: #aaa; }
+.apartment-list-link:hover { text-decoration: none; }
+.apartment-list-link:focus-visible { outline: 3px solid #1e87f0; }
+.apartment-gallery { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+.apartment-gallery-main { grid-row: span 2; }
+.apartment-gallery-main:only-child { grid-column: 1 / -1; }
+.apartment-gallery-pair { grid-template-columns: 1fr 1fr; }
+.apartment-gallery-pair .apartment-gallery-main { grid-row: auto; grid-column: auto; }
+.apartment-gallery-pair .apartment-gallery-photo.apartment-gallery-main img { min-height: 0; }
+.apartment-gallery-photo { display: block; position: relative; min-height: 180px; overflow: hidden; }
+.apartment-gallery-photo img { width: 100%; height: 100%; max-height: 650px; object-fit: cover; aspect-ratio: 4 / 3; }
+.apartment-gallery-photo.apartment-gallery-main img { min-height: 420px; }
+.apartment-gallery-more { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: #18221a99; color: #fff; font-size: 20px; }
+.apartment-gallery-stack .apartment-gallery-more::before { content: ""; position: absolute; inset: 12px; border: 1px solid #ffffff99; border-radius: 3px; box-shadow: 0 0 0 4px #ffffff33; }
+.apartment-gallery-photo:focus-visible { outline: 3px solid #1e87f0; outline-offset: 3px; }
+.apartment-gallery .uk-cover-container { margin: 0 !important; height: 100%; min-height: 180px; }
+.apartment-gallery .apartment-gallery-main .uk-cover-container { min-height: 420px; }
+.apartment-photo-thumbnail { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+
+@media (max-width: 639px) {
+    .apartment-gallery { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .apartment-gallery-main { grid-column: 1 / -1; grid-row: auto; }
+    .apartment-gallery-photo.apartment-gallery-main img,
+    .apartment-gallery .apartment-gallery-main .uk-cover-container { min-height: 250px; }
+    .apartment-gallery-photo,
+    .apartment-gallery .uk-cover-container { min-height: 120px; }
+}
+
 .handover-photo-thumbnail {
     display: block;
     width: 100%;

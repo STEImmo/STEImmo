@@ -68,6 +68,35 @@ class ManagementViewTests(TestCase):
 
         self.assertRedirects(response, f"{reverse('login')}?next={url}")
 
+    def test_employee_can_save_optional_public_apartment_details(self):
+        self.client.force_login(self.employee_user)
+        payload = self.wohnung_payload() | {
+            "description": "Wohnung im umgebauten Bestandsgebäude.",
+            "equipment": "Balkon\nAbstellraum",
+            "heating_type": "Fernwärme",
+            "energy_information": "Energieangaben laut vorliegendem Nachweis.",
+            "planned_move_in": "Voraussichtlich März 2027",
+        }
+        response = self.client.post(reverse("verwaltung:wohnung_create"), payload)
+        self.assertEqual(response.status_code, 302)
+        unit = Wohnung.objects.get(wohnungsnummer="17")
+        for name in (
+            "description",
+            "equipment",
+            "heating_type",
+            "energy_information",
+            "planned_move_in",
+        ):
+            self.assertEqual(getattr(unit, name), payload[name])
+
+    def test_optional_public_details_can_be_left_empty(self):
+        self.client.force_login(self.employee_user)
+        response = self.client.post(reverse("verwaltung:wohnung_create"), self.wohnung_payload())
+        self.assertEqual(response.status_code, 302)
+        unit = Wohnung.objects.get(wohnungsnummer="17")
+        self.assertEqual(unit.description, "")
+        self.assertEqual(unit.planned_move_in, "")
+
     def test_anonymous_user_cannot_change_apartment_availability(self) -> None:
         wohnung = Wohnung.objects.create(
             gebaeudenummer="B",

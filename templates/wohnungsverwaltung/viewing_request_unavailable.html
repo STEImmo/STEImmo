@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Besichtigungsanfrage – STEImmo{% endblock %}
+{% block content %}
+<section class="uk-section uk-section-default">
+    <div class="uk-container uk-container-small">
+        <h1 class="uk-heading-small">Besichtigung für Wohnung {{ wohnung.display_number }}</h1>
+        <div class="uk-alert-primary" uk-alert>
+            {% if missing_profile %}
+                <h2 class="uk-h4">Ihr Personenprofil fehlt</h2>
+                <p>Ihr Konto hat Bewerberzugang, aber die persönlichen Angaben sind noch nicht mit dem Konto verknüpft. Bitte lassen Sie die Zuordnung von der Verwaltung prüfen.</p>
+            {% else %}
+                <h2 class="uk-h4">Für diese Anfrage benötigen Sie ein Bewerberkonto</h2>
+                <p>Ihr aktuell angemeldetes Konto hat keinen Bewerberzugang. Melden Sie sich für Ihre eigene Besichtigungsanfrage mit Ihrem registrierten Bewerberkonto an.</p>
+            {% endif %}
+        </div>
+        <p>Eine Anfrage reserviert noch keinen Termin. Die Hauptbewerbung folgt erst nach der Besichtigung und Freigabe durch die Verwaltung.</p>
+        <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' wohnung.pk %}">Zurück zur Wohnung</a>
+    </div>
+</section>
+{% endblock %}
