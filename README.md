@@ -191,6 +191,22 @@ Mit dem Development-Override wird beim Containerstart außerdem ein ausschließl
 
 Der lokale Bootstrap reaktiviert dieses fiktive Konto und setzt sein Passwort bei jedem Entwicklungsstart auf den dokumentierten Wert zurück. Die Zugangsdaten sind absichtlich öffentlich und dürfen niemals außerhalb der lokalen Entwicklungsumgebung verwendet werden.
 
+Für die lokale Bewerberansicht kann ein separates fiktives Konto mit dem bestehenden
+Command angelegt werden:
+
+~~~bash
+docker compose exec web python manage.py create_test_applicant \
+  --email ui-bewerber@example.test \
+  --password 'WaldBlick!4826'
+~~~
+
+Dieses Beispielkonto ist sofort aktiv und hat ausschließlich Bewerberzugriff.
+Es wird nicht automatisch beim Entwicklungsstart angelegt. Über **Wohnungen finden →
+Details → Zur Besichtigung anmelden** kann eine Bewerbung erfasst werden; danach ist
+sie beim Mitarbeiter unter **Bewerbungen → betreffende Wohnung** sichtbar. Eine
+Hauptbewerbung wird erst nach Freigabe im Mitarbeiterbereich zugänglich. Auch diese
+absichtlich öffentlichen Beispielzugangsdaten sind ausschließlich für die lokale Entwicklung.
+
 Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD`, `DJANGO_EMAIL_USE_TLS` und `DJANGO_EMAIL_TIMEOUT`. Der SMTP-Timeout beträgt standardmäßig zehn Sekunden und kann über `DJANGO_EMAIL_TIMEOUT` in Sekunden angepasst werden. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
 
 ## Bewerbungen im Betreiberbereich

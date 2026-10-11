@@ -459,9 +459,9 @@ class Bewerbung(models.Model):
         if self.status == BewerbungStatus.BLOCKED:
             return "Gesperrt"
         if self.submitted_at is not None:
-            return "Main-Bewerbung eingereicht"
+            return "Hauptbewerbung eingereicht"
         if self.main_application_unlocked:
-            return "Main-Bewerbung freigeschaltet"
+            return "Hauptbewerbung freigeschaltet"
         return "In Bearbeitung"
 
     def get_applicant_next_step(self) -> str:
@@ -474,7 +474,7 @@ class Bewerbung(models.Model):
         if self.submitted_at is not None:
             return "Bitte warten Sie auf die Rückmeldung des Mitarbeiters."
         if self.main_application_unlocked:
-            return "Bitte reichen Sie die Main-Bewerbung mit allen drei Nachweisen ein."
+            return "Bitte reichen Sie die Hauptbewerbung mit allen drei Nachweisen ein."
         return "Warten Sie auf die nächste Rückmeldung zu Ihrer Bewerbung."
 
 

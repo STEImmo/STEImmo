@@ -14,8 +14,8 @@
         <article class="uk-card uk-card-default uk-card-body uk-text-break">
             <span class="uk-label">{{ application.get_applicant_status_display }}</span>
             <h1 class="uk-card-title">{{ application.person }} – {{ application.wohnung }}</h1>
-            <h2 class="uk-h3">Pre-Bewerbung</h2>
-            <p>Pre-Eingang: {{ application.created_at|date:"d.m.Y, H:i" }} Uhr</p>
+            <h2 class="uk-h3">Besichtigungsanfrage</h2>
+            <p>Eingang der Besichtigungsanfrage: {{ application.created_at|date:"d.m.Y, H:i" }} Uhr</p>
             <dl class="uk-description-list">
                 <dt>Titel</dt>
                 <dd>{{ application.person.titel|default:"Nicht angegeben" }}</dd>
@@ -45,9 +45,9 @@
         </article>
 
         <article class="uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
-            <h2 class="uk-card-title">Main-Bewerbung</h2>
+            <h2 class="uk-card-title">Hauptbewerbung</h2>
             {% if application.submitted_at %}
-                <p>Main-Eingang: {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr</p>
+                <p>Eingang der Hauptbewerbung: {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr</p>
                 <h3 class="uk-h4">Nachweise</h3>
                 {% for group in proof_groups %}
                     <h4 class="uk-h5">{{ group.label }}</h4>
@@ -71,7 +71,7 @@
                     {% endif %}
                 {% endfor %}
             {% else %}
-                <p>Noch nicht eingereicht. Main-Nachweise sind erst nach der Einreichung verfügbar.</p>
+                <p>Noch nicht eingereicht. Nachweise zur Hauptbewerbung sind erst nach der Einreichung verfügbar.</p>
             {% endif %}
         </article>
     </div>

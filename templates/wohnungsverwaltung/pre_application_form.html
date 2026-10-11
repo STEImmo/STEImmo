@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}{% if unit_is_preselected %}Zur Besichtigung anmelden{% else %}Pre-Bewerbung{% endif %} – STEImmo{% endblock %}
+{% block title %}{% if unit_is_preselected %}Zur Besichtigung anmelden{% else %}Bewerbung{% endif %} – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
 <section class="uk-section">
     <div class="uk-container uk-container-small">
-        <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:pre_application_list' %}">Meine Pre-Bewerbungen</a>
-        <h1 class="uk-heading-medium">{% if unit_is_preselected %}Zur Besichtigung anmelden{% else %}Pre-Bewerbung abgeben{% endif %}</h1>
+        <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:pre_application_list' %}">Meine Bewerbungen</a>
+        <h1 class="uk-heading-medium">{% if unit_is_preselected %}Zur Besichtigung anmelden{% else %}Bewerbung abgeben{% endif %}</h1>
         {% if unit_is_preselected %}
             <div class="uk-alert-primary" uk-alert>
                 <p>Die gewünschte Wohnung ist bereits ausgewählt. Mit diesem Formular stellen Sie eine Besichtigungsanfrage. Ein Termin wird separat bestätigt; die vollständige Bewerbung folgt erst nach Besichtigung und Freigabe.</p>
@@ -19,7 +19,7 @@
             {% endif %}
             {% include "wohnungsverwaltung/_pre_application_fields.html" %}
             <div class="uk-margin-large-top uk-flex uk-flex-right">
-                <button class="uk-button uk-button-primary" type="submit">{% if unit_is_preselected %}Besichtigungsanfrage senden{% else %}Pre-Bewerbung abgeben{% endif %}</button>
+                <button class="uk-button uk-button-primary" type="submit">{% if unit_is_preselected %}Besichtigungsanfrage senden{% else %}Bewerbung abgeben{% endif %}</button>
             </div>
         </form>
     </div>

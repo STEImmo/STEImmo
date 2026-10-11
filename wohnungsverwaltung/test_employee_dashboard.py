@@ -90,7 +90,7 @@ class EmployeeDashboardTests(TestCase):
         self.assertContains(response, "Berta Bewerber")
         self.assertContains(response, "Personenanzahl")
         self.assertContains(response, "Haustiere")
-        self.assertContains(response, "Pre-Eingang")
+        self.assertContains(response, "Anfrage eingegangen")
         self.assertNotContains(response, self.application.person.email)
 
     def test_all_application_statuses_remain_visible(self):
@@ -109,8 +109,8 @@ class EmployeeDashboardTests(TestCase):
             "Abgelehnt",
             "Gesperrt",
             "Zurückgezogen",
-            "Main-Bewerbung freigeschaltet",
-            "Main-Bewerbung eingereicht",
+            "Hauptbewerbung freigeschaltet",
+            "Hauptbewerbung eingereicht",
         ):
             self.assertContains(response, status)
 
@@ -161,8 +161,8 @@ class EmployeeDashboardTests(TestCase):
             original_name="geheimer-entwurf.png",
         )
         response = self.client.get(self.detail_url)
-        self.assertContains(response, "Pre-Bewerbung")
-        self.assertContains(response, "Main-Bewerbung")
+        self.assertContains(response, "Besichtigungsanfrage")
+        self.assertContains(response, "Hauptbewerbung")
         self.assertContains(response, "Noch nicht eingereicht")
         for value in ("Ich studiere Informatik.", "0123456789", "02.01.2000", "Haustiere"):
             self.assertContains(response, value)
@@ -188,7 +188,7 @@ class EmployeeDashboardTests(TestCase):
         self.assertContains(response, "eingereicht.png")
         self.assertContains(response, "Sicher herunterladen")
         self.assertNotContains(response, "/media/")
-        self.assertContains(response, "Main-Eingang")
+        self.assertContains(response, "Eingang der Hauptbewerbung")
 
     def test_unknown_application_returns_404(self):
         self.assertEqual(

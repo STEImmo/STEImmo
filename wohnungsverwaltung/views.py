@@ -422,14 +422,14 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
         except IntegrityError:
             form.add_error(
                 None,
-                "Sie haben bereits eine offene Pre-Bewerbung. Bitte warten Sie deren Abschluss ab.",
+                "Sie haben bereits eine offene Bewerbung. Bitte warten Sie deren Abschluss ab.",
             )
         if application_created:
             messages.success(
                 request,
                 "Ihre Besichtigungsanfrage wurde gespeichert. Ein Termin wird separat bestätigt."
                 if unit is not None
-                else "Ihre Pre-Bewerbung wurde erfolgreich gespeichert.",
+                else "Ihre Bewerbung wurde erfolgreich gespeichert.",
             )
             return redirect("wohnungsverwaltung:pre_application_list")
 
@@ -680,7 +680,7 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
                 )
                 if application.submitted_at is not None:
                     raise PermissionDenied(
-                        "Eine eingereichte Main-Bewerbung kann nicht mehr geändert werden."
+                        "Eine eingereichte Hauptbewerbung kann nicht mehr geändert werden."
                     )
                 if upload_error:
                     return upload_too_large_response(upload_error)
@@ -764,7 +764,7 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
             )
 
         if action == "submit":
-            messages.success(request, "Ihre Main-Bewerbung wurde erfolgreich eingereicht.")
+            messages.success(request, "Ihre Hauptbewerbung wurde erfolgreich eingereicht.")
         else:
             messages.success(request, "Ihr Entwurf wurde gespeichert.")
         return redirect(

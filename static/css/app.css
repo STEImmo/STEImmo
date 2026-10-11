@@ -818,6 +818,7 @@ a:active,
 
 .site-footer-top {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     gap: var(--steimmo-space-xl);
     padding-bottom: var(--steimmo-space-xl);

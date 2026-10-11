@@ -9,10 +9,10 @@
             <div><h1 class="uk-heading-medium">Meine Bewerbungen</h1></div>
             <div>
                 {% if has_open_application %}
-                    <button class="uk-button uk-button-default" type="button" disabled>Neue Pre-Bewerbung</button>
-                    <p class="uk-text-meta uk-margin-small-top">Sie haben bereits eine offene Pre-Bewerbung.</p>
+                    <button class="uk-button uk-button-default" type="button" disabled>Neue Bewerbung</button>
+                    <p class="uk-text-meta uk-margin-small-top">Sie haben bereits eine offene Bewerbung.</p>
                 {% else %}
-                    <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:pre_application_create' %}">Neue Pre-Bewerbung</a>
+                    <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:pre_application_create' %}">Neue Bewerbung</a>
                 {% endif %}
             </div>
         </div>
@@ -25,13 +25,13 @@
                 {% if application.main_application_accessible %}
                     <a class="uk-button uk-button-primary"
                        href="{% url 'wohnungsverwaltung:main_application_status' application.pk %}">
-                        Main-Bewerbung öffnen
+                        Bewerbung vervollständigen
                     </a>
                 {% endif %}
             </article>
         {% empty %}
             <div class="uk-alert-primary uk-margin-top" uk-alert>
-                <p>Sie haben noch keine Pre-Bewerbung abgegeben.</p>
+                <p>Sie haben noch keine Bewerbung abgegeben.</p>
             </div>
         {% endfor %}
     </div>

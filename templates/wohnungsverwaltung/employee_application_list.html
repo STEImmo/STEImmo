@@ -12,7 +12,7 @@
             </ul>
             <h1 class="uk-heading-medium">Bewerbungen</h1>
             <h2 class="uk-h3">{{ unit }}</h2>
-            <p class="uk-text-meta">{{ page_obj.paginator.count }} Bewerbung{{ page_obj.paginator.count|pluralize:"en" }} · Neueste Pre-Bewerbungen zuerst</p>
+            <p class="uk-text-meta">{{ page_obj.paginator.count }} Bewerbung{{ page_obj.paginator.count|pluralize:"en" }} · Neueste Besichtigungsanfragen zuerst</p>
             {% if applications %}
                 <div class="uk-overflow-auto" tabindex="0" role="region" aria-label="Bewerbungstabelle">
                     <table class="uk-table uk-table-divider uk-table-middle">
@@ -23,7 +23,7 @@
                                 <th scope="col">Personenanzahl</th>
                                 <th scope="col">Haustiere</th>
                                 <th scope="col">Bearbeitungsstatus</th>
-                                <th scope="col">Pre-Eingang</th>
+                                <th scope="col">Anfrage eingegangen</th>
                                 <th scope="col">Details</th>
                             </tr>
                         </thead>

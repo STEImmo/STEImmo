@@ -6,7 +6,7 @@
 <section class="uk-section">
     <div class="uk-container uk-container-small">
         <h1 class="uk-heading-medium">Bewerberkonto registrieren</h1>
-        <p class="uk-text-lead">Erstellen Sie ein Konto, um Ihre Pre-Bewerbungen geschützt zu speichern und später wieder aufzurufen.</p>
+        <p class="uk-text-lead">Erstellen Sie ein Konto, um Ihre Bewerbungen geschützt zu speichern und später wieder aufzurufen.</p>
         <form method="post" autocomplete="on" class="uk-card uk-card-default uk-card-body uk-margin-top">
             {% csrf_token %}
             {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}

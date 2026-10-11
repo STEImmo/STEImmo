@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Main-Bewerbung – STE Immobilien eGbR{% endblock %}
+{% block title %}Hauptbewerbung – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
 <section class="uk-section">
@@ -13,8 +13,8 @@
         </p>
         <article class="uk-card uk-card-default uk-card-body">
             <span class="uk-label">{{ application.get_applicant_status_display }}</span>
-            <h1 class="uk-card-title">Main-Bewerbung für {{ application.wohnung }}</h1>
-            <p>Die Main-Bewerbung ist freigeschaltet.</p>
+            <h1 class="uk-card-title">Hauptbewerbung für {{ application.wohnung }}</h1>
+            <p>Die Hauptbewerbung ist freigeschaltet.</p>
             <p>{{ application.get_applicant_next_step }}</p>
             {% if application.submitted_at %}
                 <p class="uk-text-meta">
@@ -182,7 +182,7 @@
                     <div>
                         <button class="uk-button uk-button-primary" type="submit"
                                 name="action" value="submit">
-                            Main-Bewerbung einreichen
+                            Hauptbewerbung einreichen
                         </button>
                     </div>
                 </div>

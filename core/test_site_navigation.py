@@ -74,7 +74,7 @@ class SiteNavigationTests(TestCase):
             response,
             (
                 "wohnungsverwaltung_public:apartment_search",
-                "building_view_pending",
+                "wohnungsverwaltung_public:building_view",
             ),
         )
 
@@ -85,7 +85,7 @@ class SiteNavigationTests(TestCase):
             response,
             (
                 "wohnungsverwaltung_public:apartment_search",
-                "building_view_pending",
+                "wohnungsverwaltung_public:building_view",
                 "wohnungsverwaltung:handover_protocol_mine",
                 "wohnungsverwaltung:pre_application_list",
             ),
@@ -105,12 +105,12 @@ class SiteNavigationTests(TestCase):
         )
 
     def test_current_public_page_is_marked_in_desktop_mobile_and_footer_navigation(self):
-        response = self.client.get(reverse("building_view_pending"))
+        response = self.client.get(reverse("wohnungsverwaltung_public:building_view"))
         for label, links in self.parse_navigation(response).items():
             with self.subTest(navigation=label):
                 self.assertEqual(
                     [(href, current) for href, current in links if current],
-                    [(reverse("building_view_pending"), "page")],
+                    [(reverse("wohnungsverwaltung_public:building_view"), "page")],
                 )
         self.assertEqual(len(self.parse_navigation(response)), 3)
 
@@ -121,9 +121,9 @@ class SiteNavigationTests(TestCase):
         self.assertContains(response, "Wohnungsvermietung in Würzburg")
         self.assertNotContains(response, "Studierendenwohnungen")
 
-    def test_building_link_has_a_working_destination_before_the_other_branch_is_merged(self):
-        self.assertEqual(reverse("building_view_pending"), "/wohnungen/gebaeude/")
-        response = self.client.get(reverse("building_view_pending"))
+    def test_building_link_uses_the_merged_public_view(self):
+        self.assertEqual(reverse("wohnungsverwaltung_public:building_view"), "/wohnungen/gebaeude/")
+        response = self.client.get(reverse("wohnungsverwaltung_public:building_view"))
         self.assertContains(response, "Gebäudeansicht")
         self.assertContains(response, reverse("wohnungsverwaltung_public:apartment_search"))
 
@@ -135,6 +135,11 @@ class SiteNavigationTests(TestCase):
                 self.assertContains(response, "Entwurf")
                 self.assertContains(response, "Angaben folgen")
                 self.assertContains(response, f'href="{reverse(name)}"')
+                self.assertContains(response, f'href="{reverse("imprint")}#kontakt"')
+        self.assertContains(
+            self.client.get(reverse("home")), f'href="{reverse("imprint")}#kontakt"'
+        )
+        self.assertContains(self.client.get(reverse("imprint")), 'id="kontakt"')
 
     def test_management_subpage_marks_its_parent_section(self):
         self.client.force_login(self.manager)

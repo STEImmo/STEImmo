@@ -785,7 +785,7 @@ class MainApplicationForm(forms.Form):
             if has_duplicate_name:
                 self.add_error(
                     field_name,
-                    "Eine Datei mit dieser Bezeichnung wird bereits in dieser Main-Bewerbung "
+                    "Eine Datei mit dieser Bezeichnung wird bereits in dieser Hauptbewerbung "
                     "verwendet. Bitte benennen Sie sie um.",
                 )
 
