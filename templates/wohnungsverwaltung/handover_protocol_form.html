@@ -653,6 +653,7 @@
                     if (!await updateApartmentDependentFields()) {
                         return;
                     }
+                    updateTypeSpecificSections();
                 }
                 restoreFields(protocolForm, draft.fields);
                 if (!await updateApartmentDependentFields()) {
