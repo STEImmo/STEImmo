@@ -11,7 +11,18 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import BooleanField, Case, Count, Exists, OuterRef, Prefetch, Q, Value, When
+from django.db.models import (
+    BooleanField,
+    Case,
+    Count,
+    Exists,
+    OuterRef,
+    Prefetch,
+    Q,
+    Subquery,
+    Value,
+    When,
+)
 from django.db.models.deletion import ProtectedError
 from django.http import (
     FileResponse,
@@ -860,12 +871,24 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
             if unit.max_occupants is not None
             else Value(False, output_field=BooleanField())
         )
+        latest_invitation_status = (
+            ApplicationReviewEvent.objects.filter(
+                application_id=OuterRef("pk"),
+                kind__in=(
+                    ApplicationReviewEvent.Kind.INVITATION_SENT,
+                    ApplicationReviewEvent.Kind.INVITATION_FAILED,
+                ),
+            )
+            .order_by("-created_at", "-review_event_id")
+            .values("kind")[:1]
+        )
         applications = (
             Bewerbung.objects.filter(wohnung=unit)
             .select_related("person", "wohnung")
             .annotate(
                 requires_pet_review=pet_review_expression,
                 occupancy_mismatch=occupancy_mismatch_expression,
+                latest_invitation_status=Subquery(latest_invitation_status),
                 has_current_suitability_approval=Exists(
                     ApplicationReviewEvent.objects.filter(
                         application_id=OuterRef("pk"),
@@ -888,6 +911,8 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
             applications = applications.filter(interest_withdrawn_at__isnull=False)
         elif cleaned_filters.get("status"):
             applications = applications.filter(status=cleaned_filters["status"])
+            if cleaned_filters["status"] == BewerbungStatus.OPEN:
+                applications = applications.filter(interest_withdrawn_at__isnull=True)
         if cleaned_filters.get("main_status") == "pending":
             applications = applications.filter(
                 main_application_unlocked=False, submitted_at__isnull=True
@@ -968,6 +993,10 @@ def employee_application_detail(request: HttpRequest, application_id: UUID) -> H
         {
             "application": application,
             "suitability_flags": application.suitability_review_flags,
+            "can_approve_suitability": (
+                application.status == BewerbungStatus.OPEN
+                and application.interest_withdrawn_at is None
+            ),
             "has_current_suitability_approval": application.review_events.filter(
                 kind=ApplicationReviewEvent.Kind.ELIGIBILITY_APPROVED,
                 requirements_version=application.wohnung.requirements_version,
@@ -1043,7 +1072,15 @@ def employee_application_suitability_approve(
                 .get(pk=application.pk)
             )
             application.wohnung = unit
-            if not application.suitability_review_flags:
+            if (
+                application.status != BewerbungStatus.OPEN
+                or application.interest_withdrawn_at is not None
+            ):
+                messages.info(
+                    request,
+                    "Für eine nicht mehr aktive Bewerbung ist keine Einzelfallfreigabe möglich.",
+                )
+            elif not application.suitability_review_flags:
                 messages.info(request, "Für diese Bewerbung ist keine Einzelfallfreigabe nötig.")
             elif ApplicationReviewEvent.objects.filter(
                 application=application,
@@ -2444,6 +2481,23 @@ def _wohnung_form(request: HttpRequest, wohnung: Wohnung, title: str) -> HttpRes
         )
         if form.is_valid() and schluessel_formset.is_valid():
             with transaction.atomic():
+                if not wohnung._state.adding:
+                    current_requirements_version = (
+                        Wohnung.objects.select_for_update()
+                        .filter(pk=wohnung.pk)
+                        .values_list("requirements_version", flat=True)
+                        .first()
+                    )
+                    if request.POST.get("requirements_version") != str(
+                        current_requirements_version
+                    ):
+                        messages.warning(
+                            request,
+                            "Die Wohnungsanforderungen wurden zwischenzeitlich geändert. "
+                            "Bitte prüfen Sie den aktuellen Stand und speichern Sie Ihre "
+                            "Änderungen erneut.",
+                        )
+                        return redirect("verwaltung:wohnung_edit", wohnung_id=wohnung.pk)
                 wohnung = form.save()
                 schluessel_formset.instance = wohnung
                 schluessel_formset.save()
@@ -2463,6 +2517,11 @@ def _wohnung_form(request: HttpRequest, wohnung: Wohnung, title: str) -> HttpRes
             "schluessel_formset": schluessel_formset,
             "title": title,
             "wohnung": wohnung,
+            "requirements_version": (
+                request.POST.get("requirements_version", "")
+                if request.method == "POST"
+                else wohnung.requirements_version
+            ),
         },
     )
 

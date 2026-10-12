@@ -1868,10 +1868,10 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
         required=False,
         choices=(
             ("", "Noch nicht festgelegt"),
-            ("true", "Ja, Tierhaltungsangaben einzeln prüfen"),
-            ("false", "Nein, keine gesonderte Tierhaltungsprüfung"),
+            (True, "Ja, Tierhaltungsangaben einzeln prüfen"),
+            (False, "Nein, keine gesonderte Tierhaltungsprüfung"),
         ),
-        coerce=lambda value: {"true": True, "false": False}.get(value),
+        coerce=lambda value: {"True": True, "False": False}.get(value),
         empty_value=None,
         label="Gesonderte Tierhaltungsprüfung",
         widget=forms.Select(attrs={"class": "uk-select"}),

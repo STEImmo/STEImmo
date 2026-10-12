@@ -608,6 +608,80 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.assertNotIn(self.pet_exception, matching.context["applications"])
         self.assertIn(self.pet_exception, review.context["applications"])
 
+    def test_declined_application_cannot_receive_a_suitability_approval(self):
+        self.configure_requirements()
+        self.pet_exception.status = BewerbungStatus.DECLINED
+        self.pet_exception.save(update_fields=("status",))
+        approval_url = reverse(
+            "wohnungsverwaltung:employee_application_suitability_approve",
+            args=[self.pet_exception.pk],
+        )
+
+        response = self.client.post(approval_url, {"reason": "Tierhaltung wurde geprüft"})
+        detail = self.client.get(
+            reverse("wohnungsverwaltung:employee_application_detail", args=[self.pet_exception.pk])
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            ApplicationReviewEvent.objects.filter(
+                application=self.pet_exception,
+                kind=ApplicationReviewEvent.Kind.ELIGIBILITY_APPROVED,
+            ).exists()
+        )
+        self.assertNotContains(detail, "Einzelfall begründet freigeben")
+
+    def test_stale_requirement_save_does_not_restore_an_invalidated_approval(self):
+        self.configure_requirements()
+        approved_version = self.unit.requirements_version
+        ApplicationReviewEvent.objects.create(
+            application=self.pet_exception,
+            actor=self.employee,
+            kind=ApplicationReviewEvent.Kind.ELIGIBILITY_APPROVED,
+            to_value="approved",
+            reason="Tierhaltung wurde geprüft",
+            requirements_version=approved_version,
+        )
+        first_edit = Wohnung.objects.get(pk=self.unit.pk)
+        second_edit = Wohnung.objects.get(pk=self.unit.pk)
+        new_reason = "Ergänzte Prüfung der konkreten Tierhaltung"
+        first_edit.pet_review_reason = new_reason
+        second_edit.pet_review_reason = new_reason
+
+        first_edit.save()
+        second_edit.save()
+
+        self.unit.refresh_from_db()
+        matching = self.client.get(self.list_url, {"wohnung": self.unit.pk})
+        review = self.client.get(self.list_url, {"wohnung": self.unit.pk, "segment": "review"})
+        self.assertEqual(self.unit.requirements_version, approved_version + 1)
+        self.assertNotIn(self.pet_exception, matching.context["applications"])
+        self.assertIn(self.pet_exception, review.context["applications"])
+
+    def test_open_status_filter_excludes_withdrawn_applications(self):
+        withdrawn = EmployeeDashboardTests.create_application(self.unit, haustiere=False)
+        withdrawn.interest_withdrawn_at = timezone.now()
+        withdrawn.save(update_fields=("interest_withdrawn_at",))
+
+        open_response = self.client.get(
+            self.list_url,
+            {"wohnung": self.unit.pk, "segment": "all", "status": BewerbungStatus.OPEN},
+        )
+        withdrawn_response = self.client.get(
+            self.list_url,
+            {"wohnung": self.unit.pk, "segment": "all", "status": "withdrawn"},
+        )
+
+        open_ids = {application.pk for application in open_response.context["applications"]}
+        withdrawn_ids = {
+            application.pk for application in withdrawn_response.context["applications"]
+        }
+        self.assertEqual(
+            open_ids,
+            {self.match.pk, self.occupancy_exception.pk, self.pet_exception.pk},
+        )
+        self.assertEqual(withdrawn_ids, {withdrawn.pk})
+
     def test_filters_and_priority_sorting_keep_pagination_parameters(self):
         self.configure_requirements(max_occupants=4, pet_review_required=False)
         self.match.review_priority = Bewerbung.Priority.HIGH
@@ -700,6 +774,11 @@ class EmployeeApplicationSelectionTests(TestCase):
                 kind=ApplicationReviewEvent.Kind.INVITATION_FAILED,
             ).exists()
         )
+        dashboard_response = self.client.get(
+            self.list_url,
+            {"wohnung": self.unit.pk, "segment": "all"},
+        )
+        self.assertContains(dashboard_response, "Einladung fehlgeschlagen")
         resend_url = reverse(
             "wohnungsverwaltung:employee_application_invitation_resend", args=[self.match.pk]
         )
@@ -713,6 +792,12 @@ class EmployeeApplicationSelectionTests(TestCase):
                 kind=ApplicationReviewEvent.Kind.INVITATION_SENT,
             ).exists()
         )
+        dashboard_response = self.client.get(
+            self.list_url,
+            {"wohnung": self.unit.pk, "segment": "all"},
+        )
+        self.assertContains(dashboard_response, "Einladung versendet")
+        self.assertNotContains(dashboard_response, "Einladung fehlgeschlagen")
 
     def test_empty_reasons_and_get_requests_cannot_change_review_state(self):
         self.configure_requirements()

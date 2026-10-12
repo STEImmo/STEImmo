@@ -414,8 +414,10 @@ class Wohnung(models.Model):
                 and "max_occupants" in fields_to_check
                 and self.max_occupants != previous["max_occupants"]
             )
+            if previous:
+                self.requirements_version = previous["requirements_version"]
             if requirements_changed:
-                self.requirements_version = previous["requirements_version"] + 1
+                self.requirements_version += 1
                 if update_fields is not None:
                     kwargs["update_fields"] = {*update_fields, "requirements_version"}
             saved = super().save(*args, **kwargs)

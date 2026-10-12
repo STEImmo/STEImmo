@@ -39,7 +39,7 @@ class ApartmentRoomFormTests(TestCase):
             **{
                 name: value
                 for name, value in self.wohnung_payload().items()
-                if not name.startswith("schluessel-")
+                if not name.startswith("schluessel-") and name != "requirements_version"
             }
         )
 

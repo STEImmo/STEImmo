@@ -20,6 +20,7 @@
         <form method="post">
             {% if apartment_is_saved %}<a class="uk-button uk-button-default uk-margin-bottom" href="{% url 'verwaltung:apartment_photos' wohnung.pk %}">Wohnungsfotos verwalten</a>{% endif %}
             {% csrf_token %}
+            <input type="hidden" name="requirements_version" value="{{ requirements_version }}">
             {% for error in form.non_field_errors %}
                 <div class="uk-alert-danger" uk-alert><p>{{ error }}</p></div>
             {% endfor %}

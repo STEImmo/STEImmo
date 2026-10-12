@@ -57,7 +57,9 @@
             <h3 class="uk-h4">Einzelfallprüfung</h3>
             {% if suitability_flags %}
                 <ul class="uk-list uk-list-bullet">{% for flag in suitability_flags %}<li>{{ flag }}</li>{% endfor %}</ul>
-                {% if has_current_suitability_approval %}
+                {% if not can_approve_suitability %}
+                    <p>Für eine nicht mehr aktive Bewerbung ist keine Einzelfallfreigabe möglich.</p>
+                {% elif has_current_suitability_approval %}
                     <p class="uk-alert-success" uk-alert>Für die aktuellen Wohnungsanforderungen freigegeben.</p>
                 {% else %}
                     <form method="post" action="{% url 'wohnungsverwaltung:employee_application_suitability_approve' application.pk %}" class="uk-form-stacked">
