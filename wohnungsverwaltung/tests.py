@@ -2216,7 +2216,6 @@ class PreApplicationAuthenticationTests(TestCase):
         self.client.force_login(self.user)
         for name, args in (
             ("pre_application_list", []),
-            ("pre_application_create", []),
             ("pre_application_create_for_unit", [self.free_unit.pk]),
         ):
             with self.subTest(page=name):

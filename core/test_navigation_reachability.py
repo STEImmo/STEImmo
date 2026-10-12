@@ -112,7 +112,7 @@ class NavigationReachabilityTests(TestCase):
         self.client.force_login(self.applicant)
         self.assert_click_path(
             reverse("wohnungsverwaltung:pre_application_list"),
-            reverse("wohnungsverwaltung:pre_application_create"),
+            reverse("wohnungsverwaltung_public:apartment_search"),
         )
         self.assert_click_path(
             reverse("wohnungsverwaltung_public:apartment_search"),

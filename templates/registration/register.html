@@ -1,30 +1,19 @@
-{% extends "base.html" %}
-
+{% extends "registration/auth_base.html" %}
 {% block title %}Bewerberkonto registrieren – STE Immobilien eGbR{% endblock %}
-
-{% block content %}
-<section class="uk-section">
-    <div class="uk-container uk-container-small">
-        <h1 class="uk-heading-medium">Bewerberkonto registrieren</h1>
-        <p class="uk-text-lead">Erstellen Sie ein Konto, um Ihre Bewerbungen geschützt zu speichern und später wieder aufzurufen.</p>
-        <form method="post" autocomplete="on" class="uk-card uk-card-default uk-card-body uk-margin-top">
-            {% csrf_token %}
-            {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
-            {% if form.non_field_errors %}
-                <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>
-            {% endif %}
-            {% for field in form %}
-                <div class="uk-margin">
-                    <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    <div class="uk-form-controls">{{ field }}</div>
-                    {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
-                </div>
-            {% endfor %}
-            <div class="uk-margin-large-top uk-flex uk-flex-right">
-                <button class="uk-button uk-button-primary" type="submit">Konto erstellen</button>
-            </div>
-        </form>
-        <p class="uk-text-center uk-margin-top">Bereits registriert? <a href="{% url 'login' %}{% if next %}?next={{ next|urlencode:'' }}{% endif %}">Anmelden</a></p>
+{% block auth_eyebrow %}Ihr Bewerberkonto{% endblock %}
+{% block auth_heading %}Ihr Konto für den nächsten Schritt.{% endblock %}
+{% block auth_intro %}Erstellen Sie ein Konto, um eine Besichtigung anzufragen und Ihre Bewerbungen geschützt zu speichern und später wieder aufzurufen.{% endblock %}
+{% block auth_content %}
+<form method="post" autocomplete="on" class="uk-form-stacked">
+    {% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    {% include "registration/_auth_errors.html" %}
+    <div class="auth-fields">
+        {% for field in form %}{% include "registration/_auth_field.html" %}{% endfor %}
     </div>
-</section>
+    <div class="auth-confirmation"><span uk-icon="mail" aria-hidden="true"></span><p>Anschließend erhalten Sie per E-Mail einen Bestätigungscode für Ihr Konto.</p></div>
+    <button class="uk-button uk-button-primary auth-submit" type="submit">Konto erstellen <span uk-icon="arrow-right" aria-hidden="true"></span></button>
+</form>
+<p class="auth-switch">Bereits registriert? <a href="{% url 'login' %}{% if next %}?next={{ next|urlencode:'' }}{% endif %}">Anmelden</a></p>
+<p class="uk-text-meta auth-privacy">Wie wir Ihre Daten verarbeiten, lesen Sie in unseren <a href="{% url 'privacy' %}">Datenschutzhinweisen</a>.</p>
 {% endblock %}

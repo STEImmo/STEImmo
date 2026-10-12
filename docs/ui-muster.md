@@ -69,6 +69,72 @@ zeigt den Anmeldenamen und die Abmeldung; persönliche Inhalte liegen in den
 rollenabhängigen Bewerbungs- und Übergabebereichen. Eine Kontoübersicht ist als
 mögliche Ergänzung zu klären, nicht Bestandteil dieser Startseitenänderung.
 
+## Kontoseiten: gewähltes Design A
+
+Der Auftraggeber hat A gewählt: helles Einzugsmotiv links, echtes Formular rechts.
+Anmeldung, Registrierung, E-Mail-Bestätigung und Mitarbeiter-Einmalcode verwenden
+`registration/auth_base.html`. Namensfelder stehen auf dem Handy untereinander,
+das Bild kompakt über dem Formular. UIkit und vorhandene Theme-Tokens bleiben die Basis.
+Das Bild ist KI-generiert, als Sinnbild gekennzeichnet und unter Bildnachweise erklärt;
+es zeigt keine tatsächliche Mietwohnung. Quelle/Prompt stehen in `static/images/README.md`.
+
+`registration/_auth_field.html` liefert Labels, Pflichtkennzeichnung, Hilfen und
+feldnahe Fehler. Django verknüpft Hilfen/Fehler über `aria-describedby`; Fehlerfelder
+haben `aria-invalid` und einen roten Rahmen. `registration/_auth_errors.html`
+zeigt allgemeine Meldungen ohne Änderung der vorhandenen Anmeldeschutz-Texte.
+Gebundene Formfelder erhalten Namen/E-Mail bei Fehlern, Passwörter werden nicht
+erneut ausgegeben. Passwort-Hinweise stammen aus den bestehenden Django-Validatoren.
+Minimales Vanilla-JavaScript schaltet Passwörter auf Wunsch sichtbar/verborgen;
+ohne JavaScript bleiben die Passwortfelder vollständig bedienbar.
+
+CSRF, Anmeldung, Bestätigungscodes, Versandabstände, Rollen und Zugriffsschutz
+bleiben bestehen. `next` wird beim Wechsel zwischen Anmeldung/Registrierung
+beibehalten; vorhandene Tests prüfen die Rückkehr zum gewählten Ziel nach Anmeldung
+und Bestätigung. Die beiden E-Mail-Felder auf der Bestätigungsseite haben eigene IDs.
+
+Vergleichsroute `/design/konto/`, Vorschautemplate, Variante B und ungenutzte
+Vorschau-Stile/-Tests sind entfernt. Die Kontoseiten sind regulär unter
+`/accounts/login/`, `/accounts/registrieren/` und den zugehörigen Code-Seiten erreichbar.
+
+## Bewerberbereich: gewähltes Design A
+
+Design A ist in die echten Seiten integriert: Bewerbungsübersicht,
+Besichtigungsanfrage, Hauptbewerbung/Nachweise und Rückzugsbestätigung.
+Der gemeinsame Rahmen liegt in `wohnungsverwaltung/application_base.html`,
+die Ablaufübersicht in `_application_progress.html`. Übersicht und Hauptbewerbung
+markieren die aktuelle Phase anhand der bestehenden Bewerbung, ohne neue Statuswerte.
+Der Hauptinhalt steht auf dem Handy vor der Ablaufleiste.
+
+Die Übersicht zeigt ausschließlich eigene Bewerbungen, Status und nächste Handlung.
+Eine offene Bewerbung verhindert weiterhin eine zweite. Leere Listen bieten die
+Wohnungssuche an. Nach Einreichung führt die Aktion zur Ansicht der Unterlagen.
+Die Anfrage behält die tatsächlichen Felder und serverseitige Wohnungsvorauswahl.
+Labels, Pflichtkennzeichnung und verknüpfte Feldfehler bleiben sichtbar.
+
+„Neue Bewerbung“ führt zuerst zur vorhandenen Wohnungssuche. Auch ein direkter
+GET-Aufruf von `/uebergaben/bewerbung/neu/` führt angemeldete Bewerber dorthin.
+Suche oder Gebäudeansicht → Wohnungsdetails → „Zur Besichtigung anmelden“ übernimmt
+die konkrete Wohnung serverseitig. Das Formular zeigt nur eine Zusammenfassung mit
+öffentlicher Nummer (001–005 im Erdgeschoss), Etage und vorhandener Wohnfläche.
+„Wohnungsdetails ansehen“ und „Andere Wohnung wählen“ bieten nachvollziehbare Rückwege.
+Eine zweite Wohnungsauswahl im Formular entfällt; Radiokarten, zugehörige Widgets und
+Stile sind entfernt. Bereits geöffnete ältere Formulare dürfen weiterhin über die
+bisherige POST-Route absenden; deren Verfügbarkeits-, Rollen- und Datenprüfung bleibt
+erhalten. Vorausgewählte Wohnungen bleiben serverseitig fest gebunden. Gespeicherte
+Kennungen und Bewerbungsabläufe ändern sich nicht.
+
+Nachweise erscheinen in drei getrennten Bereichen mit vorhanden/fehlend-Anzeige.
+Der Zähler erfasst gespeicherte Kategorien, nicht die Anzahl einzelner Dateien.
+Mehrfachauswahl, Uploadgrenzen, Entwurf, endgültige Einreichung, Downloads und
+getrennte Löschformulare bleiben erhalten. Neue Dateiauswahlen sind erst nach
+Speichern Teil des Zählers. Eingereichte Nachweise sind schreibgeschützt.
+Zurückziehen erfordert weiterhin die bestehende Bestätigungsseite.
+
+Die Vergleichsroute `/uebergaben/design/bewerbungen/`, Beispieldaten und Variante B
+sind entfernt. Rollen, CSRF, fachliche Validierung und Speicherlogik bleiben erhalten.
+Response- und bestehende Upload-/Berechtigungstests sichern die Übertragung ab;
+die echten Seiten werden zusätzlich auf localhost auf Desktop und Handy geprüft.
+Weitere öffentliche und interne Seitenmuster von US-18 bleiben offen.
 ## Noch offener Umfang von US-18
 
 Der Seitenrahmen ist ein Teil der Story. Die geplanten 6–8 Stunden gelten für
@@ -80,11 +146,8 @@ Für die restliche Umsetzung gelten folgende konkrete Arbeitspakete:
   auf öffentlichen und internen Seiten einsetzen. Die bestehende Palette aus
   US-17 auch in Inhaltsbereichen erkennbar anwenden.
 - Formularmuster für sichtbare Labels, Pflichtfelder, Hilfen, feldnahe Fehler
-  sowie Speichern und Abbrechen; Anmeldung, Registrierung, Bewerbung und
-  Verwaltungsformulare auf dieses Muster bringen.
-- Bewerberübersicht und Hauptbewerbung mit verständlichen Abschnitten,
-  Bearbeitungsstand und nächster Handlung gestalten; Besichtigungsanfrage,
-  Freigabe und Einreichung bleiben fachlich unverändert.
+  sowie Speichern und Abbrechen; das erprobte Kontomuster auf Bewerbung und
+  Verwaltungsformulare übertragen.
 - Wohnungs- und Bewerbungslisten sowie Mitarbeiterdetails vereinheitlichen;
   Tabellen, Karten, Filter und Aktionen auch auf kleinen Bildschirmen bedienen können.
 - Gemeinsame Muster für leere Listen, Erfolg, Warnungen, Fehler und tatsächlich
@@ -92,11 +155,9 @@ Für die restliche Umsetzung gelten folgende konkrete Arbeitspakete:
 - Relevante Seiten und Zustände mit den vorhandenen Rollen prüfen; Browser,
   Tastatur, Mobilansicht, Response-Tests, Dokumentation und unabhängiges Review abschließen.
 
-Die nächste vollständige Umsetzung umfasst **Meine Bewerbungen → Bewerbung
-erstellen → Hauptbewerbung vervollständigen**, einschließlich leerer Liste,
-offener Bewerbung, Freigabe, Einreichung, Fehlern und Rückwegen. Das dort
-erprobte Seiten-, Formular- und Statusmuster wird anschließend auf die übrigen
-relevanten Seiten übertragen.
+Der Bewerberablauf ist als UI-Teilumsetzung integriert. Als Nächstes werden die
+erprobten Seiten-, Formular- und Statusmuster auf die Wohnungsansichten und die
+relevanten Verwaltungsseiten übertragen.
 
 ## Begriffe in der Oberfläche
 

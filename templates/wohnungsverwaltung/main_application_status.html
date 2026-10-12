@@ -1,45 +1,37 @@
-{% extends "base.html" %}
+{% extends "wohnungsverwaltung/application_base.html" %}
 {% load static %}
 
 {% block title %}Hauptbewerbung – STE Immobilien eGbR{% endblock %}
 
-{% block content %}
-<section class="uk-section">
-    <div class="uk-container uk-container-small">
-        <p>
-            <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:pre_application_list' %}">
-                Zurück zu meinen Bewerbungen
-            </a>
-        </p>
-        <article class="uk-card uk-card-default uk-card-body">
+{% block application_heading %}Ihre Hauptbewerbung{% endblock %}
+{% block application_intro %}Hier sammeln Sie Ihre Nachweise und reichen die Bewerbung ein.{% endblock %}
+{% block application_content %}<article class="uk-card uk-card-default uk-card-body application-summary">
             <span class="uk-label">{{ application.get_applicant_status_display }}</span>
-            <h1 class="uk-card-title">Hauptbewerbung für {{ application.wohnung }}</h1>
-            <p>Die Hauptbewerbung ist freigeschaltet.</p>
-            <p>{{ application.get_applicant_next_step }}</p>
+            <h2 class="uk-card-title">Hauptbewerbung für {{ application.wohnung }}</h2>
+            {% if not application.submitted_at %}<p>Die Hauptbewerbung ist freigeschaltet.</p>{% endif %}
+            <div class="application-next-step"><span uk-icon="arrow-right" aria-hidden="true"></span><div><strong>Ihr nächster Schritt</strong><p>{{ application.get_applicant_next_step }}</p></div></div>
             {% if application.submitted_at %}
                 <p class="uk-text-meta">
                     Eingereicht am {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr.
                     Die Einreichung ist abgeschlossen und kann nicht mehr geändert werden.
                 </p>
             {% endif %}
-            <a class="uk-button uk-button-danger uk-margin-small-top"
-               href="{% url 'wohnungsverwaltung:application_withdraw' application.pk %}">
-                Interesse zurückziehen
-            </a>
+
         </article>
 
         <article class="uk-card uk-card-default uk-card-body uk-margin-top">
-            <h2 class="uk-card-title">Erforderliche Nachweise</h2>
-            <p>
+            <h2 class="uk-card-title">Erforderliche Nachweise</h2><div class="application-proof-count"><strong>{{ proof_count }} / 3</strong><span>Nachweiskategorien vorhanden</span></div>
+            {% if not application.submitted_at %}<p>
                 Reichen Sie alle drei Nachweise ein. Erlaubt sind PNG- und PDF-Dateien mit
                 höchstens 8 MiB je Datei und maximal 10 Dateien pro Kategorie. Pro Speichervorgang
                 gilt ein Gesamtlimit von 25 MiB.
                 Dateinamen müssen innerhalb der Bewerbung eindeutig sein; Groß- und Kleinschreibung
                 wird dabei nicht unterschieden.
-            </p>
+            </p>{% endif %}
             {% if application.submitted_at %}
                 <p class="uk-text-meta">Ihre eingereichten Nachweise können Sie hier ansehen.</p>
                 {% for group in proof_groups %}
+                    <section class="application-proof uk-margin-top">
                     <h3 class="uk-h4">{{ group.label }}</h3>
                     {% if group.documents %}
                         <ul class="uk-list uk-list-divider">
@@ -59,6 +51,7 @@
                     {% else %}
                         <p class="uk-text-danger">Kein Nachweis vorhanden</p>
                     {% endif %}
+                    </section>
                 {% endfor %}
             {% else %}
                 <p class="uk-text-meta">
@@ -93,9 +86,9 @@
 
                 {% for field in form %}
                     {% if field.name != "action" %}
-                        <div class="uk-margin">
+                        <div class="uk-margin application-proof">
                             <label class="uk-form-label" for="{{ field.id_for_label }}">
-                                {{ field.label }} <span class="uk-text-danger">*</span>
+                                {{ field.label }} <span class="uk-text-meta">· erforderlich zur Einreichung</span>
                             </label>
                             <div class="uk-form-controls" data-proof-upload-field>
                                 {{ field }}
@@ -116,6 +109,7 @@
                                 {% for group in proof_groups %}
                                     {% if group.field_name == field.name %}
                                         <div class="uk-margin-small-top">
+                                            <span class="uk-label{% if not group.documents %} uk-label-warning{% endif %}">{% if group.documents %}Vorhanden{% else %}Noch ergänzen{% endif %}</span>
                                             <p class="uk-text-meta uk-margin-small-bottom">
                                                 Bereits hochgeladen ({{ group.label }})
                                             </p>
@@ -156,10 +150,10 @@
                                     {% endif %}
                                 {% endfor %}
                                 {% if field.help_text %}
-                                    <p class="uk-text-meta uk-text-small">{{ field.help_text }}</p>
+                                    <p class="uk-text-meta uk-text-small" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>
                                 {% endif %}
                                 {% if field.errors %}
-                                    <ul class="uk-text-danger uk-text-small">
+                                    <ul class="uk-text-danger uk-text-small" id="{{ field.auto_id }}_error" role="alert">
                                         {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
                                     </ul>
                                 {% endif %}
@@ -200,7 +194,6 @@
                 </div>
                 <script src="{% static 'js/main_application_uploads.js' %}?v=8"></script>
             {% endif %}
+<div class="application-withdraw"><a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:application_withdraw' application.pk %}">Interesse zurückziehen</a></div>
         </article>
-    </div>
-</section>
 {% endblock %}

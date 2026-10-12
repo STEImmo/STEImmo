@@ -368,7 +368,7 @@ class Wohnung(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"Gebäude {self.gebaeudenummer}, Wohnung {self.wohnungsnummer}"
+        return f"Gebäude {self.gebaeudenummer}, Wohnung {self.display_number}"
 
 
 def apartment_photo_upload_path(instance, _filename):

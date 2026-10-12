@@ -1,34 +1,17 @@
-{% extends "base.html" %}
-
+{% extends "registration/auth_base.html" %}
 {% block title %}Anmelden – STE Immobilien eGbR{% endblock %}
-
-{% block content %}
-<section class="uk-section">
-    <div class="uk-container uk-container-small">
-        <h1 class="uk-heading-medium">Anmelden</h1>
-        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top">
-            {% csrf_token %}
-            {% if form.non_field_errors %}
-                <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>
-            {% endif %}
-            <div class="uk-margin">
-                <label class="uk-form-label" for="id_username">E-Mail-Adresse</label>
-                <div class="uk-form-controls">
-                    <input class="uk-input" id="id_username" name="username" type="text" autocomplete="username" required autofocus>
-                </div>
-            </div>
-            <div class="uk-margin">
-                <label class="uk-form-label" for="id_password">Passwort</label>
-                <div class="uk-form-controls">
-                    <input class="uk-input" id="id_password" name="password" type="password" autocomplete="current-password" required>
-                </div>
-            </div>
-            {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
-            <div class="uk-margin-large-top uk-flex uk-flex-right">
-                <button class="uk-button uk-button-primary" type="submit">Anmelden</button>
-            </div>
-        </form>
-        <p class="uk-text-center uk-margin-top">Noch kein Konto? <a href="{% url 'register' %}{% if next %}?next={{ next|urlencode:'' }}{% endif %}">Jetzt registrieren</a></p>
+{% block auth_heading %}Willkommen zurück.{% endblock %}
+{% block auth_intro %}Melden Sie sich an, um Ihre Bewerbungen und freigeschalteten Unterlagen aufzurufen.{% endblock %}
+{% block auth_content %}
+<form method="post" class="uk-form-stacked">
+    {% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    {% include "registration/_auth_errors.html" %}
+    <div class="auth-fields">
+        {% include "registration/_auth_field.html" with field=form.username %}
+        {% include "registration/_auth_field.html" with field=form.password %}
     </div>
-</section>
+    <button class="uk-button uk-button-primary auth-submit" type="submit">Anmelden <span uk-icon="arrow-right" aria-hidden="true"></span></button>
+</form>
+<p class="auth-switch">Noch kein Konto? <a href="{% url 'register' %}{% if next %}?next={{ next|urlencode:'' }}{% endif %}">Konto erstellen</a></p>
 {% endblock %}

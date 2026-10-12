@@ -206,6 +206,10 @@ def _clear_account_login_throttle(user) -> None:
 class ThrottledAuthenticationForm(AuthenticationForm):
     def __init__(self, request=None, *args, **kwargs) -> None:
         super().__init__(request, *args, **kwargs)
+        self.fields["username"].label = "E-Mail-Adresse"
+        self.fields["username"].widget.attrs.pop("autofocus", None)
+        for field in self.fields.values():
+            field.widget.attrs["class"] = "uk-input"
         self.login_user = None
         self.ip_fingerprint = _client_ip_fingerprint(request) if request is not None else None
         self.login_was_throttled = False
@@ -409,7 +413,7 @@ def send_employee_mfa_code(email: str, code: str) -> bool:
 def register_verify(request: HttpRequest) -> HttpResponse:
     initial = {"email": request.session.get("registration_verification_email", "")}
     form = RegistrationVerificationForm(request.POST or None, initial=initial)
-    resend_form = ResendRegistrationCodeForm(initial=initial)
+    resend_form = ResendRegistrationCodeForm(initial=initial, auto_id="id_resend_%s")
     if request.method == "POST" and form.is_valid():
         try:
             with transaction.atomic():

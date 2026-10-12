@@ -380,6 +380,8 @@ def _applicant_for_user(request: HttpRequest) -> Person:
 @applicant_required
 def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) -> HttpResponse:
     applicant = _applicant_for_user(request)
+    if unit_id is None and request.method == "GET":
+        return redirect("wohnungsverwaltung_public:apartment_search")
     unit = None
     if unit_id is not None:
         unit = get_object_or_404(Wohnung.objects.available(), pk=unit_id)
@@ -418,7 +420,12 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
     return render(
         request,
         "wohnungsverwaltung/pre_application_form.html",
-        {"form": form, "unit_is_preselected": unit is not None},
+        {
+            "form": form,
+            "unit_is_preselected": unit is not None,
+            "selected_unit": unit,
+            "selected_floor_label": floor_label(unit.etage) if unit else "",
+        },
     )
 
 
@@ -433,12 +440,22 @@ def pre_application_list(request: HttpRequest) -> HttpResponse:
         "wohnungsverwaltung/pre_application_list.html",
         {
             "applications": applications,
-            "has_open_application": applications.filter(
+            "active_application": applications.filter(
                 status=BewerbungStatus.OPEN,
                 interest_withdrawn_at__isnull=True,
-            ).exists(),
+            ).first(),
         },
     )
+
+
+def _main_application_context(application, form):
+    groups = _application_proof_groups(application)
+    return {
+        "application": application,
+        "form": form,
+        "proof_groups": groups,
+        "proof_count": sum(bool(group["documents"]) for group in groups),
+    }
 
 
 def _stored_file_size_display(file_field) -> str:
@@ -727,22 +744,14 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
             return render(
                 request,
                 "wohnungsverwaltung/main_application_status.html",
-                {
-                    "application": application,
-                    "form": form,
-                    "proof_groups": _application_proof_groups(application),
-                },
+                _main_application_context(application, form),
             )
 
         if not form_is_valid:
             return render(
                 request,
                 "wohnungsverwaltung/main_application_status.html",
-                {
-                    "application": application,
-                    "form": form,
-                    "proof_groups": _application_proof_groups(application),
-                },
+                _main_application_context(application, form),
             )
 
         if action == "submit":
@@ -754,16 +763,10 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
             application_id=application.pk,
         )
 
-    proof_groups = _application_proof_groups(application)
-
     return render(
         request,
         "wohnungsverwaltung/main_application_status.html",
-        {
-            "application": application,
-            "form": form,
-            "proof_groups": proof_groups,
-        },
+        _main_application_context(application, form),
     )
 
 
