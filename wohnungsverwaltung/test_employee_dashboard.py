@@ -549,6 +549,20 @@ class EmployeeApplicationSelectionTests(TestCase):
         )
         self.assertContains(review, "Einzelfallprüfung")
 
+    def test_occupancy_excess_is_not_classified_as_individual_review(self):
+        self.configure_requirements()
+        Bewerbung.objects.filter(pk=self.occupancy_exception.pk).update(status=BewerbungStatus.OPEN)
+
+        matching = self.client.get(self.list_url, {"wohnung": self.unit.pk})
+        review = self.client.get(self.list_url, {"wohnung": self.unit.pk, "segment": "review"})
+        all_applications = self.client.get(
+            self.list_url, {"wohnung": self.unit.pk, "segment": "all"}
+        )
+
+        self.assertNotIn(self.occupancy_exception, matching.context["applications"])
+        self.assertNotIn(self.occupancy_exception, review.context["applications"])
+        self.assertIn(self.occupancy_exception, all_applications.context["applications"])
+
     def test_requirement_changes_keep_already_unlocked_or_submitted_main_applications(self):
         invited = EmployeeDashboardTests.create_application(
             self.unit, personenanzahl=3, haustiere=False, main_application_unlocked=True

@@ -634,25 +634,31 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
         filters = EmployeeApplicationFilterForm(request.GET)
         filters.is_valid()
         cleaned_filters = filters.cleaned_data
-        suitability_mismatch = Q()
-        if unit.max_occupants is not None:
-            suitability_mismatch |= Q(personenanzahl__gt=unit.max_occupants)
-        if unit.pet_review_required is True:
-            suitability_mismatch |= Q(haustiere=True)
-        mismatch_expression = (
+        pet_review_mismatch = Q(haustiere=True) if unit.pet_review_required is True else Q()
+        pet_review_expression = (
             Case(
-                When(suitability_mismatch, then=Value(True)),
+                When(pet_review_mismatch, then=Value(True)),
                 default=Value(False),
                 output_field=BooleanField(),
             )
-            if suitability_mismatch
+            if pet_review_mismatch
+            else Value(False, output_field=BooleanField())
+        )
+        occupancy_mismatch_expression = (
+            Case(
+                When(personenanzahl__gt=unit.max_occupants, then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+            if unit.max_occupants is not None
             else Value(False, output_field=BooleanField())
         )
         applications = (
             Bewerbung.objects.filter(wohnung=unit)
             .select_related("person", "wohnung")
             .annotate(
-                suitability_mismatch=mismatch_expression,
+                requires_pet_review=pet_review_expression,
+                occupancy_mismatch=occupancy_mismatch_expression,
                 has_current_suitability_approval=Exists(
                     ApplicationReviewEvent.objects.filter(
                         application_id=OuterRef("pk"),
@@ -701,12 +707,14 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
             applications = applications.filter(
                 status=BewerbungStatus.OPEN,
                 interest_withdrawn_at__isnull=True,
-            ).filter(Q(suitability_mismatch=False) | Q(has_current_suitability_approval=True))
+                occupancy_mismatch=False,
+            ).filter(Q(requires_pet_review=False) | Q(has_current_suitability_approval=True))
         elif segment == "review":
             applications = applications.filter(
                 status=BewerbungStatus.OPEN,
                 interest_withdrawn_at__isnull=True,
-                suitability_mismatch=True,
+                occupancy_mismatch=False,
+                requires_pet_review=True,
                 has_current_suitability_approval=False,
             )
         if cleaned_filters.get("sort") == "priority":
