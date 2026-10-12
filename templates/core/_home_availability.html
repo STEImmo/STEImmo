@@ -1,0 +1,5 @@
+{% if total_available %}
+<p class="home-availability"><span class="home-status-dot" aria-hidden="true"></span><strong>{{ total_available }} Wohnung{% if total_available != 1 %}en{% endif %} verfügbar</strong></p>
+{% else %}
+<p class="home-availability">Aktuell sind keine Wohnungen verfügbar.</p>
+{% endif %}

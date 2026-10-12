@@ -1,0 +1,7 @@
+{% if floors %}
+<ul class="uk-list home-floor-links" aria-label="Etagen entdecken">
+    {% for floor in floors %}
+    <li><a href="{% url 'wohnungsverwaltung_public:floor_view' floor.number %}#etagenplan"><strong>{{ floor.label }}</strong><span class="home-floor-availability">{{ floor.available_count }} Wohnung{% if floor.available_count != 1 %}en{% endif %} frei</span><span class="home-floor-arrow" uk-icon="arrow-right" aria-hidden="true"></span></a></li>
+    {% endfor %}
+</ul>
+{% endif %}
