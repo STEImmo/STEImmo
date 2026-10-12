@@ -186,7 +186,11 @@ Einzelfallprüfungen und alle Bewerbungen. Mitarbeiter können nach Kontaktdaten
 Personenzahl, Status, Main-Status, Priorität und Eingangsdatum filtern und nach
 Eingang oder Priorität sortieren. Pro Seite erscheinen 20 Bewerbungen.
 Belegungsgrenzen und Tierhaltungsprüfungen müssen für jede Wohnung begründet
-eingerichtet werden. Abweichungen führen nur zu einer Einzelfallprüfung; eine
+eingerichtet werden. Eine Überschreitung der Belegungsgrenze führt direkt zur
+Ablehnung; beim Speichern einer geänderten Grenze werden betroffene offene,
+noch nicht zur Main-Bewerbung freigeschaltete Pre-Bewerbungen ebenfalls abgelehnt.
+Haustierangaben lösen bei aktivierter
+Tierhaltungsprüfung als einzige Abweichung eine Einzelfallprüfung aus. Eine
 begründete Freigabe gilt bis zur nächsten Änderung der Anforderungen.
 Prioritätsänderungen und Freigaben werden intern protokolliert. Eine manuelle
 Main-Freischaltung erfordert die Bestätigung einer positiven Mitarbeiterentscheidung

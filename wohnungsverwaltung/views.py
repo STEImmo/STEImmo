@@ -8,7 +8,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import BooleanField, Case, Count, Exists, OuterRef, Q, Value, When
+from django.db.models import BooleanField, Case, Count, Exists, OuterRef, Prefetch, Q, Value, When
 from django.db.models.deletion import ProtectedError
 from django.http import (
     FileResponse,
@@ -222,7 +222,23 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
                     form.add_error("wohnung", "Die Wohnung ist nicht mehr verfügbar.")
                 else:
                     form.instance.wohnung = selected_unit
-                    form.save()
+                    exceeds_occupancy_limit = (
+                        selected_unit.max_occupants is not None
+                        and form.instance.personenanzahl > selected_unit.max_occupants
+                    )
+                    if exceeds_occupancy_limit:
+                        form.instance.status = BewerbungStatus.DECLINED
+                    application = form.save()
+                    if exceeds_occupancy_limit:
+                        ApplicationReviewEvent.objects.create(
+                            application=application,
+                            kind=ApplicationReviewEvent.Kind.OCCUPANCY_DECLINED,
+                            to_value=BewerbungStatus.DECLINED,
+                            reason=selected_unit.occupancy_decline_reason(
+                                application.personenanzahl
+                            ),
+                            requirements_version=selected_unit.requirements_version,
+                        )
                     application_created = True
         except IntegrityError:
             form.add_error(
@@ -230,7 +246,14 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
                 "Sie haben bereits eine offene Pre-Bewerbung. Bitte warten Sie deren Abschluss ab.",
             )
         if application_created:
-            messages.success(request, "Ihre Pre-Bewerbung wurde erfolgreich gespeichert.")
+            if exceeds_occupancy_limit:
+                messages.warning(
+                    request,
+                    "Ihre Pre-Bewerbung wurde gespeichert und wegen der überschrittenen "
+                    "Personenhöchstzahl abgelehnt.",
+                )
+            else:
+                messages.success(request, "Ihre Pre-Bewerbung wurde erfolgreich gespeichert.")
             return redirect("wohnungsverwaltung:pre_application_list")
 
     return render(
@@ -244,7 +267,18 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
 def pre_application_list(request: HttpRequest) -> HttpResponse:
     applicant = _applicant_for_user(request)
     applications = (
-        Bewerbung.objects.filter(person=applicant).select_related("wohnung").order_by("-created_at")
+        Bewerbung.objects.filter(person=applicant)
+        .select_related("wohnung")
+        .prefetch_related(
+            Prefetch(
+                "review_events",
+                queryset=ApplicationReviewEvent.objects.filter(
+                    kind=ApplicationReviewEvent.Kind.OCCUPANCY_DECLINED
+                ).only("application_id", "reason", "created_at"),
+                to_attr="occupancy_decline_events",
+            )
+        )
+        .order_by("-created_at")
     )
     return render(
         request,
@@ -665,10 +699,13 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
             segment = "matching"
         if segment == "matching":
             applications = applications.filter(
-                Q(suitability_mismatch=False) | Q(has_current_suitability_approval=True)
-            )
+                status=BewerbungStatus.OPEN,
+                interest_withdrawn_at__isnull=True,
+            ).filter(Q(suitability_mismatch=False) | Q(has_current_suitability_approval=True))
         elif segment == "review":
             applications = applications.filter(
+                status=BewerbungStatus.OPEN,
+                interest_withdrawn_at__isnull=True,
                 suitability_mismatch=True,
                 has_current_suitability_approval=False,
             )

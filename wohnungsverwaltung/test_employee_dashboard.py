@@ -104,7 +104,7 @@ class EmployeeDashboardTests(TestCase):
             {"submitted_at": timezone.now()},
         ):
             self.create_application(self.unit, **kwargs)
-        response = self.client.get(self.list_url, {"wohnung": self.unit.pk})
+        response = self.client.get(self.list_url, {"wohnung": self.unit.pk, "segment": "all"})
         self.assertEqual(response.context["page_obj"].paginator.count, 6)
         for status in (
             "In Bearbeitung",
@@ -521,40 +521,78 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.assertContains(response, "Aktueller Status: Abgelehnt")
         self.assertNotContains(response, "Main-Bewerbung freischalten und einladen")
 
-    def test_default_view_shows_only_matching_applications_and_review_tab_keeps_exceptions(self):
+    def test_occupancy_excess_is_declined_and_only_pet_applications_need_review(self):
         self.configure_requirements()
         matching = self.client.get(self.list_url, {"wohnung": self.unit.pk})
         review = self.client.get(self.list_url, {"wohnung": self.unit.pk, "segment": "review"})
+        all_applications = self.client.get(
+            self.list_url, {"wohnung": self.unit.pk, "segment": "all"}
+        )
+
+        self.occupancy_exception.refresh_from_db()
+        self.assertEqual(self.occupancy_exception.status, BewerbungStatus.DECLINED)
+        self.assertEqual(self.occupancy_exception.suitability_review_flags, ())
+        rejection_event = ApplicationReviewEvent.objects.get(
+            application=self.occupancy_exception,
+            kind=ApplicationReviewEvent.Kind.OCCUPANCY_DECLINED,
+        )
+        self.assertIsNone(rejection_event.actor)
+        self.assertIn("Höchstzahl von 2 Personen", rejection_event.reason)
         self.assertEqual([item.pk for item in matching.context["applications"]], [self.match.pk])
         self.assertEqual(
             {item.pk for item in review.context["applications"]},
-            {self.occupancy_exception.pk, self.pet_exception.pk},
+            {self.pet_exception.pk},
+        )
+        self.assertEqual(
+            {item.pk for item in all_applications.context["applications"]},
+            {self.match.pk, self.occupancy_exception.pk, self.pet_exception.pk},
         )
         self.assertContains(review, "Einzelfallprüfung")
+
+    def test_requirement_changes_keep_already_unlocked_or_submitted_main_applications(self):
+        invited = EmployeeDashboardTests.create_application(
+            self.unit, personenanzahl=3, haustiere=False, main_application_unlocked=True
+        )
+        submitted = EmployeeDashboardTests.create_application(
+            self.unit,
+            personenanzahl=3,
+            haustiere=False,
+            main_application_unlocked=True,
+            submitted_at=timezone.now(),
+        )
+
+        self.configure_requirements()
+
+        invited.refresh_from_db()
+        submitted.refresh_from_db()
+        self.assertEqual(invited.status, BewerbungStatus.OPEN)
+        self.assertTrue(invited.main_application_unlocked)
+        self.assertEqual(submitted.status, BewerbungStatus.OPEN)
+        self.assertIsNotNone(submitted.submitted_at)
 
     def test_manual_eligibility_approval_is_reasoned_and_invalidated_by_requirement_changes(self):
         self.configure_requirements()
         approval_url = reverse(
             "wohnungsverwaltung:employee_application_suitability_approve",
-            args=[self.occupancy_exception.pk],
+            args=[self.pet_exception.pk],
         )
-        response = self.client.post(approval_url, {"reason": "Schlafräume sind flexibel nutzbar"})
+        response = self.client.post(approval_url, {"reason": "Tierhaltung wurde geprüft"})
         self.assertEqual(response.status_code, 302)
         event = ApplicationReviewEvent.objects.get(
-            application=self.occupancy_exception,
+            application=self.pet_exception,
             kind=ApplicationReviewEvent.Kind.ELIGIBILITY_APPROVED,
         )
         self.assertEqual(event.actor, self.employee)
-        self.assertEqual(event.reason, "Schlafräume sind flexibel nutzbar")
+        self.assertEqual(event.reason, "Tierhaltung wurde geprüft")
         matching = self.client.get(self.list_url, {"wohnung": self.unit.pk})
-        self.assertIn(self.occupancy_exception, matching.context["applications"])
+        self.assertIn(self.pet_exception, matching.context["applications"])
 
-        self.unit.max_occupants = 1
+        self.unit.pet_review_reason = "Ergänzte Prüfung der konkreten Tierhaltung"
         self.unit.save()
         matching = self.client.get(self.list_url, {"wohnung": self.unit.pk})
         review = self.client.get(self.list_url, {"wohnung": self.unit.pk, "segment": "review"})
-        self.assertNotIn(self.occupancy_exception, matching.context["applications"])
-        self.assertIn(self.occupancy_exception, review.context["applications"])
+        self.assertNotIn(self.pet_exception, matching.context["applications"])
+        self.assertIn(self.pet_exception, review.context["applications"])
 
     def test_filters_and_priority_sorting_keep_pagination_parameters(self):
         self.configure_requirements(max_occupants=4, pet_review_required=False)

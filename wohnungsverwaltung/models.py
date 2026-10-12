@@ -363,6 +363,13 @@ class Wohnung(models.Model):
     def __str__(self) -> str:
         return f"Gebäude {self.gebaeudenummer}, Wohnung {self.wohnungsnummer}"
 
+    def occupancy_decline_reason(self, people_count: int) -> str:
+        return (
+            f"Haushalt mit {people_count} Personen überschreitet die Höchstzahl von "
+            f"{self.max_occupants} Personen. Wohnungsanforderung: "
+            f"{self.occupancy_requirement_reason}"
+        ).strip()
+
     def save(self, *args, **kwargs):
         requirement_fields = (
             "max_occupants",
@@ -390,11 +397,43 @@ class Wohnung(models.Model):
             requirements_changed = previous and any(
                 getattr(self, field) != previous[field] for field in fields_to_check
             )
+            occupancy_limit_changed = (
+                previous
+                and "max_occupants" in fields_to_check
+                and self.max_occupants != previous["max_occupants"]
+            )
             if requirements_changed:
                 self.requirements_version = previous["requirements_version"] + 1
                 if update_fields is not None:
                     kwargs["update_fields"] = {*update_fields, "requirements_version"}
-            return super().save(*args, **kwargs)
+            saved = super().save(*args, **kwargs)
+            if occupancy_limit_changed and self.max_occupants is not None:
+                now = timezone.now()
+                applications = list(
+                    Bewerbung.objects.select_for_update()
+                    .filter(
+                        wohnung_id=self.pk,
+                        status=BewerbungStatus.OPEN,
+                        interest_withdrawn_at__isnull=True,
+                        main_application_unlocked=False,
+                        submitted_at__isnull=True,
+                        personenanzahl__gt=self.max_occupants,
+                    )
+                    .values_list("pk", "personenanzahl")
+                )
+                for application_id, people_count in applications:
+                    Bewerbung.objects.filter(pk=application_id).update(
+                        status=BewerbungStatus.DECLINED,
+                        updated_at=now,
+                    )
+                    ApplicationReviewEvent.objects.create(
+                        application_id=application_id,
+                        kind=ApplicationReviewEvent.Kind.OCCUPANCY_DECLINED,
+                        to_value=BewerbungStatus.DECLINED,
+                        reason=self.occupancy_decline_reason(people_count),
+                        requirements_version=self.requirements_version,
+                    )
+            return saved
 
 
 class Bewerbung(models.Model):
@@ -476,11 +515,6 @@ class Bewerbung(models.Model):
     @property
     def suitability_review_flags(self) -> tuple[str, ...]:
         flags = []
-        if (
-            self.wohnung.max_occupants is not None
-            and self.personenanzahl > self.wohnung.max_occupants
-        ):
-            flags.append("Belegungsanforderung überschritten")
         if self.wohnung.pet_review_required is True and self.haustiere:
             flags.append("Tierhaltung muss geprüft werden")
         return tuple(flags)
@@ -516,6 +550,7 @@ class ApplicationReviewEvent(models.Model):
     class Kind(models.TextChoices):
         PRIORITY_CHANGED = "priority_changed", "Priorität geändert"
         ELIGIBILITY_APPROVED = "eligibility_approved", "Einzelfall freigegeben"
+        OCCUPANCY_DECLINED = "occupancy_declined", "Wegen Belegungsgrenze abgelehnt"
         MAIN_UNLOCKED = "main_unlocked", "Main-Bewerbung freigeschaltet"
         INVITATION_SENT = "invitation_sent", "Einladung per E-Mail versendet"
         INVITATION_FAILED = "invitation_failed", "Einladungsversand fehlgeschlagen"

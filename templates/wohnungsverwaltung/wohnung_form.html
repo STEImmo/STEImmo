@@ -38,13 +38,13 @@
             <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
                 <h2 class="uk-h3">Anforderungen für die Bewerberauswahl</h2>
                 <p class="uk-text-meta">
-                    Diese Angaben steuern nur die Mitarbeiterübersicht. Eine Abweichung wird
-                    zur Einzelfallprüfung angezeigt und führt nicht automatisch zu einer Ablehnung.
+                    Eine Überschreitung der festgelegten Personenhöchstzahl führt zur Ablehnung.
+                    Haustierangaben lösen bei aktivierter Prüfung eine Einzelfallprüfung aus.
                 </p>
                 <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
                     <div>
                         {% include "wohnungsverwaltung/_form_field.html" with field=form.max_occupants %}
-                        <p class="uk-text-meta">Leer lassen, solange keine begründete Höchstzahl festgelegt ist. Sie wird nicht aus der Zimmerzahl abgeleitet.</p>
+                        <p class="uk-text-meta">Leer lassen, solange keine begründete Höchstzahl festgelegt ist. Sie wird nicht aus der Zimmerzahl abgeleitet. Beim Speichern werden offene Bewerbungen oberhalb der Grenze abgelehnt, die noch nicht zur Main-Bewerbung freigeschaltet sind.</p>
                         {% include "wohnungsverwaltung/_form_field.html" with field=form.occupancy_requirement_reason %}
                     </div>
                     <div>
