@@ -93,7 +93,7 @@ class NavigationReachabilityTests(TestCase):
         detail = reverse(
             "wohnungsverwaltung_public:apartment_detail_placeholder", args=[self.unit.pk]
         )
-        for name in ("login", "register", "imprint", "privacy"):
+        for name in ("login", "register", "imprint", "privacy", "image_credits"):
             self.assert_click_path(reverse(name))
         for floor in range(5):
             self.assert_click_path(

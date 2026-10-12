@@ -38,6 +38,7 @@ from .access import (
 from .building_plans import (
     FLOOR_SHAPES,
     PLAN_REFERENCES,
+    building_overview,
     floor_label,
 )
 from .forms import (
@@ -200,29 +201,10 @@ def apartment_search(request: HttpRequest) -> HttpResponse:
 def building_view(request: HttpRequest) -> HttpResponse:
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
-    floors_by_number = {}
-    for unit in Wohnung.objects.filter(etage__in=FLOOR_SHAPES).order_by("-etage", "wohnungsnummer"):
-        floor = floors_by_number.setdefault(
-            unit.etage,
-            {
-                "number": unit.etage,
-                "label": floor_label(unit.etage),
-                "units": [],
-                "available_count": 0,
-                "facade_y": 244 + (3 - unit.etage) * 112,
-            },
-        )
-        floor["units"].append(unit)
-        if unit.status == WohnungStatus.FREE:
-            floor["available_count"] += 1
     return render(
         request,
         "wohnungsverwaltung/building_view.html",
-        {
-            "floors": list(floors_by_number.values()),
-            "total_units": sum(len(f["units"]) for f in floors_by_number.values()),
-            "total_available": sum(f["available_count"] for f in floors_by_number.values()),
-        },
+        building_overview(Wohnung.objects.order_by("-etage", "wohnungsnummer")),
     )
 
 

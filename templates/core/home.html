@@ -3,13 +3,34 @@
 {% block title %}STE Immobilien eGbR – Wohnungsvermietung in Würzburg{% endblock %}
 
 {% block content %}
-<section class="uk-section uk-section-muted">
+{% include "core/_home_company.html" %}
+{% include "core/_home_journey.html" %}
+<section id="konto" class="uk-section uk-section-default home-portal" aria-labelledby="home-portal-title" tabindex="-1">
     <div class="uk-container">
-        <h1 class="uk-heading-medium">STE Immobilien eGbR</h1>
-        <p class="uk-text-lead">
-            Wohnungsvermietung in Würzburg.
-        </p>
-        <p>Informieren Sie sich über Wohnungen und begleiten Sie Ihre Bewerbung im Portal.</p>
+        <div class="home-portal-inner">
+            <div>
+                <p class="home-eyebrow">Ihr persönlicher Bereich</p>
+                <h2 id="home-portal-title" class="uk-margin-small-bottom">Schon bei uns angemeldet?</h2>
+                <p class="uk-margin-remove-bottom">Im Konto finden Sie Ihre Bewerbungen und die für Sie freigeschalteten Unterlagen.</p>
+            </div>
+            <div class="home-actions">
+                {% if user.is_authenticated %}
+                    {% if perms.immobilien.access_employee_area %}
+                        <a class="uk-button uk-button-primary" href="{% url 'verwaltung:wohnung_list' %}">Zur Verwaltung</a>
+                    {% elif perms.immobilien.access_applicant_area %}
+                        <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:pre_application_list' %}">Meine Bewerbungen</a>
+                    {% elif perms.immobilien.access_tenant_area %}
+                        <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_mine' %}">Meine Übergabeprotokolle</a>
+                    {% else %}
+                        <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Wohnungen finden</a>
+                    {% endif %}
+                {% else %}
+                    <a class="uk-button uk-button-primary" href="{% url 'login' %}">Anmelden</a>
+                    <a class="uk-button uk-button-default" href="{% url 'register' %}">Konto erstellen</a>
+                {% endif %}
+            </div>
+        </div>
     </div>
 </section>
+{% include "core/_home_contact.html" %}
 {% endblock %}

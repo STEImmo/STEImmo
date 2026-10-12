@@ -25,6 +25,7 @@ from wohnungsverwaltung.access import (
     EMPLOYEE_ACCESS_PERMISSION,
     USER_MANAGEMENT_PERMISSION,
 )
+from wohnungsverwaltung.building_plans import building_overview
 from wohnungsverwaltung.forms import (
     ACCOUNT_CREATION_ERROR,
     EmployeeMfaCodeForm,
@@ -37,6 +38,7 @@ from wohnungsverwaltung.models import (
     EmployeeLoginVerification,
     LoginIpThrottle,
     RegistrationVerification,
+    Wohnung,
 )
 
 EMPLOYEE_MFA_USER_SESSION_KEY = "employee_mfa_user_id"
@@ -238,7 +240,8 @@ class ThrottledAuthenticationForm(AuthenticationForm):
 
 
 def home(request: HttpRequest):
-    return render(request, "core/home.html")
+    context = building_overview(Wohnung.objects.order_by("-etage", "wohnungsnummer"))
+    return render(request, "core/home.html", context)
 
 
 def health(request: HttpRequest) -> JsonResponse:

@@ -13,6 +13,62 @@ UI/UX-Muster auf den echten Django-Seiten. Der erste Schritt umfasst Header,
 mobile Navigation, Footer und die sichtbare Unternehmensbezeichnung.
 Weitere Formular-, Listen- und Seitenmuster sind noch offen.
 
+## Startseite: Unternehmen & Wohnen
+
+Die Startseite ergänzt den gemeinsamen Rahmen um einen öffentlichen Einstieg:
+Unternehmensbezeichnung und Standort, Wohnungssuche, Gebäude, Erklärung des
+Besichtigungsablaufs und einen rollenabhängigen Zugang zum persönlichen Bereich.
+Die Gebäudeansicht bleibt als eigene Seite erreichbar.
+
+Gewählt ist das Unternehmensdesign mit einem fotografischen Einstieg über Würzburg,
+grüner Hauptaktion, Unternehmensvorstellung und drei Schritten zur Besichtigungsanfrage.
+Es ist direkt unter `/` erreichbar. Die Vergleichsleiste und der zweite Entwurf
+sind entfernt; alte Entwurfslinks zeigen ebenfalls die gewählte Startseite.
+UIkit-Komponenten und US-17-Tokens bleiben die Grundlage.
+Wiederkehrende Inhalte liegen in `core/_home_*.html`.
+Gebäude- und Startseite verwenden dieselbe Zusammenstellung der Fassade aus
+`building_plans.building_overview`; Verfügbarkeiten werden nicht fest eingetragen.
+Bei leerem oder vollständig belegtem Bestand bleibt die Wohnungssuche erreichbar.
+Die Zeichnung liegt auf einer weißen Fläche im sandfarbenen Rahmen, damit sich
+die helle Fassade vom Hintergrund abhebt. Etagenname und Verfügbarkeit erscheinen
+als größere HTML-Links neben der Zeichnung, auf kleinen Bildschirmen darunter.
+Sie schrumpfen nicht mit der SVG-Darstellung. Die Startseitenvorschau zeigt einen
+engeren SVG-Ausschnitt; die eigene Gebäudeansicht behält den vollständigen Ausschnitt.
+Es gibt keine neue JavaScript-Abhängigkeit.
+
+Der sandfarbene Kontaktabschnitt endet vor einem anthrazitfarbenen Footer.
+Dieser verwendet die bestehenden inversen Theme-Tokens für Hintergrund, Text,
+Links und Tastaturfokus. So bleiben Seiteninhalt und abschließende Navigation
+visuell eindeutig getrennt.
+
+Die lokal gespeicherte Luftaufnahme zeigt Würzburg und die Alte Mainbrücke. Sie stammt
+von Simon Waldherr (2018), Wikimedia Commons, CC BY-SA 4.0. Bildquelle, Lizenz und
+Darstellung als Ausschnitt mit Überlagerung stehen unter `/bildnachweise/` und in
+`static/images/README.md`. Die Seite lädt das Bild ohne externe Bilddienste.
+Es ist ein Stadtmotiv, kein Foto des Mietgebäudes und keine Aussage über dessen Lage.
+
+Unter dem Bild stehen Gebäudezeichnung und aktuelle Bestandszahlen, Unternehmen,
+Besichtigungsablauf, persönlicher Einstieg und Kontaktabschnitt. `unternehmen`,
+`ablauf`, `konto` und `kontakt` sind direkt verlinkbare, fokussierbare Abschnitte.
+Öffentlicher Header und mobiles Menü ergänzen „Über uns“ und „Kontakt“. Der Footer
+gliedert Wohnen/Verwaltung, Unternehmen, Konto und Rechtliches; dazu gehört der neue
+Bildnachweis. Interne Bereichslinks und Berechtigungen bleiben erhalten. Nach einem
+mobilen Ankersprung geht der Fokus an den Abschnitt; Escape führt zum Menüknopf zurück.
+
+Noch benötigte Unternehmensinhalte: echte Haus- und Wohnungsfotos, genaue Lage,
+bestätigte Ausstattungsangaben, konkretere Unternehmensvorstellung, Original-Logo,
+Geschäftskontakt und freigegebene Rechtstexte. Die vorhandenen KI-Demofotos werden
+nicht als Unternehmens- oder Gebäudefotos eingesetzt. Kontaktangaben bleiben als
+Platzhalter gekennzeichnet.
+
+Die Startseiten-, Gebäude- und Navigationstests sowie der manuelle Browsercheck
+sichern Einstieg, Verfügbarkeiten, Links und Mobilansichten ab. US-18 bleibt offen.
+
+Eine eigene persönliche Kontoübersicht existiert derzeit nicht. Das Kontomenü
+zeigt den Anmeldenamen und die Abmeldung; persönliche Inhalte liegen in den
+rollenabhängigen Bewerbungs- und Übergabebereichen. Eine Kontoübersicht ist als
+mögliche Ergänzung zu klären, nicht Bestandteil dieser Startseitenänderung.
+
 ## Noch offener Umfang von US-18
 
 Der Seitenrahmen ist ein Teil der Story. Die geplanten 6–8 Stunden gelten für
@@ -110,7 +166,9 @@ in der isolierten Testdatenbank und prüft auch die HTTP-Antwort jeder Zielseite
 |---|---|---|
 | Gäste: Suche, Gebäude, Anmeldung, Registrierung | Gemeinsame Navigation bzw. Kontolinks | 1 |
 | Alle: Impressum, Datenschutz | Footer → Rechtliches | 1 |
-| Alle: Kontaktangaben | Footer → Kontaktabschnitt des Impressums | 1 |
+| Alle: Kontakt | Header/Footernavigation → Kontaktabschnitt der Startseite | 1 |
+| Alle: Anbieter-Kontaktangaben | Kontaktabschnitt → Impressum | 2 |
+| Alle: Bildnachweise | Footer → Bildnachweise | 1 |
 | Gäste: Etage | Gebäudeansicht → Stockwerk | 2 |
 | Gäste: Wohnungsdetails | Wohnungssuche → Details; alternativ Gebäude → Etage → Wohnung | 2–3 |
 | Gäste / Bewerber: Besichtigungsanfrage | Wohnungssuche → Details → Zur Besichtigung anmelden | 3 |

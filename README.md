@@ -15,6 +15,15 @@ Studierende können verfügbare Einheiten suchen, filtern, ansehen und sich dara
 
 ## Projektstatus
 
+Die [Startseite](http://localhost:8000/) verwendet das gewählte Unternehmensdesign
+mit einer echten Würzburg-Luftaufnahme, Wohnungssuche, Gebäudevorschau, aktuellen
+Bestandszahlen, großen Etagenlinks und Zugang zu den persönlichen Bereichen.
+Unternehmen, Besichtigungsablauf und Kontakt sind als Abschnitte direkt erreichbar.
+Header und Footer ergänzen diese Einstiege sowie Bildnachweise. Quelle und Lizenz
+der lokal gespeicherten Aufnahme stehen in [Bildinformationen](static/images/README.md)
+und auf `/bildnachweise/`. Echte Hausfotos, Lage- und Kontaktdaten sowie freigegebene
+Rechtstexte sind noch zu ergänzen. Die frühere Entwurfsauswahl ist entfernt.
+
 Die Gebäudeansicht ist lokal unter [Gebäude erkunden](http://localhost:8000/wohnungen/gebaeude/)
 erreichbar: Gebäude → Etagenplan → Wohnungsdetails. Öffentliche Wohnungsfotos können im
 Mitarbeiterbereich unter **Wohnung bearbeiten → Wohnungsfotos verwalten** gepflegt werden.

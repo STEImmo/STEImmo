@@ -59,7 +59,16 @@ class SiteNavigationTests(TestCase):
         for label in ("Hauptnavigation", "Mobile Hauptnavigation", "Footernavigation"):
             with self.subTest(navigation=label):
                 self.assertIn(label, navigation)
-                self.assertEqual([href for href, _ in navigation[label]], expected)
+                destinations = expected.copy()
+                if (
+                    label != "Footernavigation"
+                    and reverse("wohnungsverwaltung_public:building_view") in destinations
+                ):
+                    destinations[2:2] = [
+                        f"{reverse('home')}#unternehmen",
+                        f"{reverse('home')}#kontakt",
+                    ]
+                self.assertEqual([href for href, _ in navigation[label]], destinations)
 
     def test_public_pages_use_the_company_name_instead_of_the_project_nickname(self):
         for name in ("home", "login", "wohnungsverwaltung:pre_application_preview"):
@@ -127,6 +136,16 @@ class SiteNavigationTests(TestCase):
         self.assertContains(response, "Gebäudeansicht")
         self.assertContains(response, reverse("wohnungsverwaltung_public:apartment_search"))
 
+    def test_company_sections_and_image_credits_are_reachable(self):
+        home = self.client.get(reverse("home"))
+        for section in ("unternehmen", "kontakt", "ablauf", "konto"):
+            self.assertContains(home, f'id="{section}"')
+            self.assertContains(home, f'href="{reverse("home")}#{section}"')
+        response = self.client.get(reverse("image_credits"))
+        self.assertContains(response, "Simon Waldherr")
+        self.assertContains(response, "CC BY-SA 4.0")
+        self.assertContains(home, f'href="{reverse("image_credits")}"')
+
     def test_legal_drafts_are_public_and_linked_from_every_page(self):
         for name, title in (("imprint", "Impressum"), ("privacy", "Datenschutz")):
             with self.subTest(page=name):
@@ -135,7 +154,7 @@ class SiteNavigationTests(TestCase):
                 self.assertContains(response, "Entwurf")
                 self.assertContains(response, "Angaben folgen")
                 self.assertContains(response, f'href="{reverse(name)}"')
-                self.assertContains(response, f'href="{reverse("imprint")}#kontakt"')
+                self.assertContains(response, f'href="{reverse("home")}#kontakt"')
         self.assertContains(
             self.client.get(reverse("home")), f'href="{reverse("imprint")}#kontakt"'
         )

@@ -8,6 +8,11 @@ urlpatterns = [
     path("", views.home, name="home"),
     path("impressum/", TemplateView.as_view(template_name="core/imprint.html"), name="imprint"),
     path("datenschutz/", TemplateView.as_view(template_name="core/privacy.html"), name="privacy"),
+    path(
+        "bildnachweise/",
+        TemplateView.as_view(template_name="core/image_credits.html"),
+        name="image_credits",
+    ),
     path("health/", views.health, name="health"),
     path(
         "accounts/login/",
