@@ -312,6 +312,13 @@ class WohnungQuerySet(models.QuerySet):
 class Wohnung(models.Model):
     objects = WohnungQuerySet.as_manager()
 
+    @property
+    def display_number(self) -> str:
+        """Keep the original identifier while matching the public floor numbering."""
+        if self.etage == 0 and self.wohnungsnummer in {"1", "2", "3", "4", "5"}:
+            return self.wohnungsnummer.zfill(3)
+        return self.wohnungsnummer
+
     wohnung_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     etage = models.SmallIntegerField(default=0)
     wohnungsnummer = models.CharField(max_length=255)
@@ -322,6 +329,11 @@ class Wohnung(models.Model):
     warmmiete = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     kaution = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     barrierefrei = models.BooleanField(default=False)
+    description = models.TextField(blank=True, default="", max_length=5000)
+    equipment = models.TextField(blank=True, default="", max_length=3000)
+    heating_type = models.CharField(max_length=120, blank=True, default="")
+    energy_information = models.TextField(blank=True, default="", max_length=3000)
+    planned_move_in = models.CharField(max_length=120, blank=True, default="")
     max_occupants = models.PositiveSmallIntegerField(blank=True, null=True)
     occupancy_requirement_reason = models.TextField(blank=True, default="")
     pet_review_required = models.BooleanField(blank=True, null=True)
@@ -434,6 +446,21 @@ class Wohnung(models.Model):
                         requirements_version=self.requirements_version,
                     )
             return saved
+
+
+def apartment_photo_upload_path(instance, _filename):
+    return f"apartments/{instance.apartment_id}/{uuid.uuid4().hex}.jpg"
+
+
+class ApartmentPhoto(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    apartment = models.ForeignKey(Wohnung, on_delete=models.CASCADE, related_name="photos")
+    image = models.ImageField(upload_to=apartment_photo_upload_path)
+    caption = models.CharField(max_length=160, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("created_at", "pk")
 
 
 class Bewerbung(models.Model):
@@ -909,6 +936,26 @@ class RaumMerkmalFoto(models.Model):
                 name="raum_merkmal_foto_hash_eindeutig",
             )
         ]
+
+
+class HandoverPhotoCleanup(models.Model):
+    cleanup_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    storage_name = models.CharField(max_length=512, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "handover_photo_cleanup"
+        ordering = ("created_at", "cleanup_id")
+
+
+class HandoverArchiveCleanup(models.Model):
+    cleanup_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    storage_name = models.CharField(max_length=512, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "handover_archive_cleanup"
+        ordering = ("created_at", "cleanup_id")
 
 
 class ProtokollSchluessel(models.Model):

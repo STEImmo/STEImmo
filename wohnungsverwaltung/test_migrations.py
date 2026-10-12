@@ -10,13 +10,13 @@ class RaumstammMigrationTests(TransactionTestCase):
     def setUp(self) -> None:
         super().setUp()
         self.executor = MigrationExecutor(connection)
+        self.addCleanup(self.restore_latest_schema)
         self.executor.migrate([self.migrate_from])
         self.old_apps = self.executor.loader.project_state([self.migrate_from]).apps
 
-    def tearDown(self) -> None:
+    def restore_latest_schema(self) -> None:
         self.executor = MigrationExecutor(connection)
-        self.executor.migrate([self.migrate_to])
-        super().tearDown()
+        self.executor.migrate(self.executor.loader.graph.leaf_nodes())
 
     def test_backfill_creates_one_apartment_room_for_matching_historical_names(self) -> None:
         Wohnung = self.old_apps.get_model("immobilien", "Wohnung")

@@ -6,10 +6,10 @@
 <section class="uk-section">
     <div class="uk-container uk-container-small">
         <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Zur Übersicht</a>
-        <h1 class="uk-heading-medium">{{ page_title }}</h1>
+        <h1 class="uk-heading-medium uk-text-break">{{ page_title }}</h1>
         <p class="uk-text-lead">Wählen Sie zuerst die Wohnung. Anschließend stehen nur die dieser Wohnung direkt zugeordneten Personen zur Auswahl.</p>
 
-        <form method="post" enctype="multipart/form-data" class="uk-card uk-card-default uk-card-body uk-margin-top" id="handover-protocol-form" data-draft-scope="{{ draft_scope }}" data-draft-save-url="{% url 'wohnungsverwaltung:handover_protocol_draft_save' %}" data-draft-delete-url="{{ server_draft_delete_url }}">
+        <form method="post" enctype="multipart/form-data" class="uk-card uk-card-default uk-card-body uk-margin-top" id="handover-protocol-form" data-draft-scope="{{ draft_scope }}" data-draft-storage-key="{{ draft_storage_key }}" data-draft-save-url="{% url 'wohnungsverwaltung:handover_protocol_draft_save' %}" data-draft-delete-url="{{ server_draft_delete_url }}">
             {% csrf_token %}
             <div class="uk-alert-warning" hidden data-protocol-draft-notice>
                 <p>Ein Entwurf vom <span data-protocol-draft-time></span> ist verfügbar.</p>
@@ -34,7 +34,7 @@
     document.addEventListener("DOMContentLoaded", () => {
         const protocolForm = document.getElementById("handover-protocol-form");
         const draftScope = protocolForm?.dataset.draftScope;
-        const draftStorageKey = draftScope ? `handover-protocol-draft:${draftScope}` : null;
+        const draftStorageKey = protocolForm?.dataset.draftStorageKey || null;
         const draftSaveUrl = protocolForm?.dataset.draftSaveUrl;
         let serverDraftDeleteUrl = protocolForm?.dataset.draftDeleteUrl || "";
         const draftMaximumAge = 7 * 24 * 60 * 60 * 1000;
@@ -59,28 +59,47 @@
 
         const apartmentSelect = document.getElementById("id_wohnung");
         let loadedApartmentId = apartmentSelect?.value || "";
+        let dependentFieldsRequestId = 0;
         const updateApartmentDependentFields = async () => {
             if (!apartmentSelect) {
                 return false;
             }
+            const requestId = ++dependentFieldsRequestId;
+            const requestedApartmentId = apartmentSelect.value;
+            const requestedPersonId = document.getElementById("id_person")?.value || "";
+            const requestedHandoverTime = document.getElementById("id_uebergabe_zeitpunkt")?.value || "";
             const url = new URL(window.location.href);
-            if (apartmentSelect.value) {
-                url.searchParams.set("wohnung", apartmentSelect.value);
+            if (requestedApartmentId) {
+                url.searchParams.set("wohnung", requestedApartmentId);
             } else {
                 url.searchParams.delete("wohnung");
             }
-            const personSelect = document.getElementById("id_person");
-            if (personSelect?.value) {
-                url.searchParams.set("person", personSelect.value);
+            if (requestedPersonId) {
+                url.searchParams.set("person", requestedPersonId);
             } else {
                 url.searchParams.delete("person");
+            }
+            if (requestedHandoverTime) {
+                url.searchParams.set("uebergabe_zeitpunkt", requestedHandoverTime);
+            } else {
+                url.searchParams.delete("uebergabe_zeitpunkt");
             }
             const response = await fetch(url);
             if (!response.ok) {
                 return false;
             }
-            const updatedPage = new DOMParser().parseFromString(await response.text(), "text/html");
-            const apartmentChanged = loadedApartmentId !== apartmentSelect.value;
+            const responseText = await response.text();
+            // The selection may change while fetching headers or the response body.
+            if (
+                requestId !== dependentFieldsRequestId
+                || requestedApartmentId !== apartmentSelect.value
+                || requestedPersonId !== (document.getElementById("id_person")?.value || "")
+                || requestedHandoverTime !== (document.getElementById("id_uebergabe_zeitpunkt")?.value || "")
+            ) {
+                return false;
+            }
+            const updatedPage = new DOMParser().parseFromString(responseText, "text/html");
+            const apartmentChanged = loadedApartmentId !== requestedApartmentId;
             const meterValues = new Map(Array.from(document.querySelectorAll(
                 '#meter-reading-section input[name]:not(:disabled)',
             )).map((field) => [field.name, field.value]));
@@ -92,21 +111,38 @@
                 "room-formset-section",
                 "move-in-reference",
             ].forEach((id) => {
-                if (!apartmentChanged && ["key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
+                if (!apartmentChanged && ["id_person", "key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
                     return;
                 }
                 const currentElement = document.getElementById(id);
                 const updatedElement = updatedPage.getElementById(id);
                 if (currentElement && updatedElement) {
+                    if (!apartmentChanged && id === "meter-reading-section") {
+                        // Keep live inputs, including edits made while the request was pending.
+                        const currentFields = new Map();
+                        currentElement.querySelectorAll("input[name], textarea[name]").forEach((field) => {
+                            const fields = currentFields.get(field.name) || [];
+                            fields.push(field);
+                            currentFields.set(field.name, fields);
+                        });
+                        updatedElement.querySelectorAll("input[name], textarea[name]").forEach((field) => {
+                            const currentField = currentFields.get(field.name)?.shift();
+                            if (currentField) {
+                                field.replaceWith(currentField);
+                            }
+                        });
+                    }
                     currentElement.replaceWith(updatedElement);
                 }
             });
-            document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
-                if (meterValues.has(field.name)) {
-                    field.value = meterValues.get(field.name);
-                }
-            });
-            loadedApartmentId = apartmentSelect.value;
+            if (apartmentChanged) {
+                document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
+                    if (meterValues.has(field.name)) {
+                        field.value = meterValues.get(field.name);
+                    }
+                });
+            }
+            loadedApartmentId = requestedApartmentId;
             document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
             document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
             window.history.replaceState(null, "", url);
@@ -115,18 +151,22 @@
         if (apartmentSelect) {
             apartmentSelect.addEventListener("change", async () => {
                 saveDraft(true);
-                await updateApartmentDependentFields();
+                if (!await updateApartmentDependentFields()) {
+                    return;
+                }
                 updateTypeSpecificSections();
                 updateMeterDifferences();
                 saveDraft(true);
             });
         }
         document.addEventListener("change", async (event) => {
-            if (event.target.id !== "id_person") {
+            if (!["id_person", "id_uebergabe_zeitpunkt"].includes(event.target.id)) {
                 return;
             }
             saveDraft(true);
-            await updateApartmentDependentFields();
+            if (!await updateApartmentDependentFields()) {
+                return;
+            }
             updateTypeSpecificSections();
             updateMeterDifferences();
             saveDraft(true);
@@ -137,24 +177,10 @@
             if (!protocolType) {
                 return;
             }
-            // Repeated meter fields must retain their values when switching type.
-            const activeValues = new Map();
-            document.querySelectorAll("[data-protocol-types]").forEach((section) => {
-                if (!section.hidden) {
-                    section.querySelectorAll("input[name], select[name], textarea[name]").forEach((field) => {
-                        if (!field.disabled && field.type !== "checkbox") {
-                            activeValues.set(field.name, field.value);
-                        }
-                    });
-                }
-            });
             document.querySelectorAll("[data-protocol-types]").forEach((section) => {
                 section.hidden = !section.dataset.protocolTypes.split(" ").includes(protocolType.value);
                 section.querySelectorAll("input, select, textarea").forEach((field) => {
-                    if (activeValues.has(field.name)) {
-                        field.value = activeValues.get(field.name);
-                    }
-                    // Hidden required controls must neither block nor duplicate submission.
+                    // Inactive controls must not block validation or be submitted.
                     field.disabled = section.hidden;
                 });
             });
@@ -239,6 +265,11 @@
                 input.value = roomId;
                 input.setAttribute("value", roomId);
             });
+            const roomProtocolId = card.querySelector("[data-room-removal]")?.value || "";
+            card.querySelectorAll('input[name$="-raumprotokoll"]').forEach((input) => {
+                input.value = roomProtocolId;
+                input.setAttribute("value", roomProtocolId);
+            });
             const title = card.querySelector("[data-room-title]");
             if (title) {
                 title.textContent = roomName ? `Raum: ${roomName}` : "Raum";
@@ -299,6 +330,10 @@
             const removeRoomButton = event.target.closest("[data-remove-room]");
             if (removeRoomButton) {
                 const roomCard = removeRoomButton.closest("[data-room-card]");
+                const removal = roomCard?.querySelector("[data-room-removal]");
+                if (removal) {
+                    removal.checked = true;
+                }
                 roomCard?.querySelectorAll('input[name$="-DELETE"]').forEach((input) => {
                     input.checked = true;
                 });
@@ -379,7 +414,7 @@
             "nachbesserung_bis",
             "nachbesserung_beschreibung",
         ];
-        const checklistFieldNames = ["pruefpunkt", "bereich", "merkmal", "wert", "zusatzangaben", "DELETE"];
+        const checklistFieldNames = ["raumprotokoll", "pruefpunkt", "bereich", "merkmal", "wert", "zusatzangaben", "DELETE"];
         const keyFieldNames = [
             "schluessel",
             "DELETE",
@@ -430,6 +465,8 @@
             rooms: Array.from(document.querySelectorAll("[data-room-card]"))
                 .map((card) => ({
                     raum: card.querySelector("[data-room-source]")?.value || "",
+                    raumprotokoll: card.querySelector("[data-room-removal]")?.value || "",
+                    removed: Boolean(card.querySelector("[data-room-removal]")?.checked),
                     items: Array.from(card.querySelectorAll("[data-room-checklist-form]"))
                         .map((item) => serializeFields(item, checklistFieldNames)),
                 })),
@@ -517,11 +554,15 @@
             }
             (rooms || []).forEach((savedRoom) => {
                 let card = Array.from(target.querySelectorAll("[data-room-card]")).find((existing) => (
-                    existing.querySelector("[data-room-source]")?.value === savedRoom.raum
+                    savedRoom.raumprotokoll
+                        ? existing.querySelector("[data-room-removal]")?.value === savedRoom.raumprotokoll
+                        : (!("raumprotokoll" in savedRoom) || !existing.querySelector("[data-room-removal]"))
+                            && existing.querySelector("[data-room-source]")?.value === savedRoom.raum
                 ));
                 if (!card) {
                     card = Array.from(target.querySelectorAll("[data-room-card]")).find((existing) => (
-                        !existing.querySelector("[data-room-source]")?.value
+                        !existing.querySelector("[data-room-removal]")
+                            && !existing.querySelector("[data-room-source]")?.value
                     ));
                 }
                 if (!card) {
@@ -563,7 +604,12 @@
                     item.hidden = Boolean(savedItem.DELETE?.checked);
                     filterFeatureNames(item);
                 });
-                card.hidden = Array.from(card.querySelectorAll("[data-room-checklist-form]")).every((item) => item.hidden);
+                const removal = card.querySelector("[data-room-removal]");
+                if (removal) {
+                    removal.checked = Boolean(savedRoom.removed);
+                }
+                card.hidden = Boolean(savedRoom.removed)
+                    || Array.from(card.querySelectorAll("[data-room-checklist-form]")).every((item) => item.hidden);
                 synchronizeRoomCard(card);
             });
         };
@@ -604,10 +650,17 @@
                 const savedApartment = draft.fields?.wohnung?.value;
                 if (apartmentSelect && savedApartment && apartmentSelect.value !== savedApartment) {
                     apartmentSelect.value = savedApartment;
-                    await updateApartmentDependentFields();
+                    if (!await updateApartmentDependentFields()) {
+                        return;
+                    }
+                    updateTypeSpecificSections();
                 }
                 restoreFields(protocolForm, draft.fields);
+                if (!await updateApartmentDependentFields()) {
+                    return;
+                }
                 updateTypeSpecificSections();
+                updateMeterDifferences();
                 restoreRooms(draft.rooms);
                 restoreKeys(draft.keys);
                 document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);

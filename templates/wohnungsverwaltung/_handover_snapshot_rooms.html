@@ -1,0 +1,24 @@
+{% for room in snapshot.rooms %}
+    <article class="uk-card {{ card_class|default:'uk-card-default' }} uk-card-body uk-margin">
+        <h2>Raum: {{ room.title }}</h2>
+        {% for item in room.items %}
+            <h3>{{ item.title }}</h3>
+            {% for side in item.sides %}
+                <h4>{{ side.label }}</h4><p>{{ side.text|linebreaksbr }}</p>
+                <dl class="uk-description-list">{% for label, value in side.details %}<dt>{{ label }}</dt><dd>{{ value|linebreaksbr }}</dd>{% endfor %}</dl>
+                {% for photo in side.photos %}
+                    <figure>
+                        {% if archive_detail %}
+                            <a href="{{ photo.url }}" data-handover-photo data-caption="{{ room.title }} / {{ item.title }} / {{ side.label }} / Foto {{ forloop.counter }}">
+                                <img class="uk-border-rounded handover-photo-thumbnail" src="{{ photo.url }}" alt="{{ room.title }} / {{ item.title }} / {{ side.label }} / Foto {{ forloop.counter }}" loading="lazy">
+                            </a>
+                        {% else %}
+                            <img src="{{ photo.url }}" alt="{{ room.title }} / {{ item.title }} / {{ side.label }} / Foto {{ forloop.counter }}">
+                        {% endif %}
+                        <figcaption>{{ room.title }} / {{ item.title }} / {{ side.label }} / Foto {{ forloop.counter }}</figcaption>
+                    </figure>
+                {% endfor %}
+            {% endfor %}
+        {% endfor %}
+    </article>
+{% endfor %}

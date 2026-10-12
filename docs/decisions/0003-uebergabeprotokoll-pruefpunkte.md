@@ -18,6 +18,16 @@ Schlüsselpositionen werden als `ProtokollSchluessel` im Protokoll gespeichert. 
 
 Eine Bestätigung ist nur bei vollständigen Raumprüfpunkten und expliziten Erklärungen möglich. Danach erhält das Protokoll den Status `signed` und ist in der Oberfläche gegen Änderungen gesperrt.
 
+Zusatzangaben werden in beiden regulären Prüfpunktformularen vor dem Speichern
+auf lesbares JSON und PostgreSQL-kompatible Textwerte geprüft. Nullzeichen,
+ungepaarte Unicode-Surrogate, übermäßig verschachteltes JSON und überlange
+JSON-Zahlen erhalten einen Fehler am Feld Zusatzangaben. Das Formular wird mit
+HTTP 200 erneut angezeigt; bestehende Protokolle und Prüfpunkte bleiben
+unverändert (#108). Die gemeinsame Formularvalidierung ersetzt hier eine
+Abweisung beim Datenbankspeichern, damit Eingabefehler nicht als Server- oder
+Foto-Speicherfehler erscheinen. Gültige Unicode-Texte und wörtliche
+Escape-Zeichenfolgen bleiben zulässig.
+
 ## Konsequenzen
 
 - Die Räume und Prüfpunkte des bisherigen Bogens können vollständig in ein konkretes Protokoll übertragen werden.

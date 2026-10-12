@@ -51,11 +51,11 @@
             {% for field in form.visible_fields %}
                 <div class="uk-margin">
                     <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    <div class="uk-form-controls">{{ field }}{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>
+                    <div class="uk-form-controls">{{ field }}{% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}</div>
                 </div>
             {% endfor %}
             {{ form.zusatzangaben }}
-            {% for error in form.zusatzangaben.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+            {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.zusatzangaben only %}
             <div class="uk-flex uk-flex-right">
                 <button class="uk-button uk-button-primary" type="submit">Prüfpunkt speichern</button>
             </div>

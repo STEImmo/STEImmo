@@ -668,6 +668,8 @@ class UserAccountManagementTests(TestCase):
             user=account, vorname="Unverändert", nachname="Test", email=account.email
         )
         account.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+        form_response = self.client.get(reverse("verwaltung:user_account_edit", args=[account.pk]))
+        self.assertNotContains(form_response, "Offene Registrierung widerrufen")
         applicant_client = Client()
         applicant_client.force_login(account)
         response = self.client.post(
@@ -783,6 +785,8 @@ class UserAccountManagementTests(TestCase):
         pending_client.post(reverse("register"), RegistrationViewTests().registration_data())
         account = self.user_model.objects.get(username="lina.lang@example.test")
         code = re.search(r"\b[0-9]{6}\b", mail.outbox[-1].body).group()
+        form_response = self.client.get(reverse("verwaltung:user_account_edit", args=[account.pk]))
+        self.assertContains(form_response, "Offene Registrierung widerrufen")
         response = self.client.post(
             reverse("verwaltung:user_account_edit", args=[account.pk]),
             self.account_payload(
@@ -793,6 +797,7 @@ class UserAccountManagementTests(TestCase):
                 password1="",
                 password2="",
                 is_active="",
+                revoke_registration="on",
             ),
         )
         self.assertEqual(response.status_code, 302)

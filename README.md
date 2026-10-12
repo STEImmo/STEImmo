@@ -10,6 +10,16 @@ Studierende können verfügbare Einheiten suchen, filtern, ansehen und sich dara
 
 ## Projektstatus
 
+Die Gebäudeansicht ist lokal unter [Gebäude erkunden](http://localhost:8000/wohnungen/gebaeude/)
+erreichbar: Gebäude → Etagenplan → Wohnungsdetails. Öffentliche Wohnungsfotos können im
+Mitarbeiterbereich unter **Wohnung bearbeiten → Wohnungsfotos verwalten** gepflegt werden.
+Die Etagenpläne sind vereinfachte Vektorgrafiken nach den Vorlagen. Von den Wohnungsdetails
+führt **Zur Besichtigung anmelden** zur wohnungsbezogenen Voranfrage; die Hauptbewerbung
+wird später freigeschaltet.
+Die Einrichtung, der Abgleich älterer Beispielwohnungen und die noch vorläufige räumliche
+Zuordnung sind in der [Dokumentation zu US-02](docs/prototypes/16-building-apartment-view.md)
+beschrieben.
+
 Der Stack ist festgelegt. Die Foundation ist umgesetzt; die fachlichen MVP-Vertical-Slices folgen.
 
 Statussymbole:
@@ -97,6 +107,19 @@ Offene Aufträge müssen betrieblich regelmäßig mit
 `python manage.py retry_application_proof_cleanup` wiederholt werden; der Befehl
 liefert bei fehlgeschlagenen Löschungen einen Fehlerstatus.
 
+Nach einem fehlgeschlagenen Wohnungs- oder Protokollfoto-Upload werden neu
+geschriebene Dateien bereinigt. Scheitert diese Bereinigung, bleibt ein Auftrag
+erhalten. Offene Foto-Aufträge werden mit `python manage.py retry_handover_photo_cleanup`
+wiederholt; fehlgeschlagene Löschungen liefern einen Fehlerstatus. Bereits
+referenzierte Fotos werden dabei geschützt.
+
+Beim Entfernen eines Wohnungs- oder Protokollfotos wird derselbe Bereinigungsauftrag
+zusammen mit der Datenbankreferenz geändert. Erst nach dem Commit wird die Datei
+gelöscht.
+Scheitert die Löschung oder endet der Prozess vorher, bleibt der Auftrag für
+den Wiederholungsbefehl erhalten. Dies gilt auch beim Entfernen eines Prüfpunkts
+oder eines Protokollraums.
+
 Private Uploads verwenden Dateirechte `0600` und Verzeichnisrechte `0700`.
 Öffentliche statische Dateien verwenden separat `0644` und `0755`, damit ein
 Reverse-Proxy sie lesen kann. Bei bereits mit privaten Rechten erzeugten
@@ -139,7 +162,7 @@ Eine Roadmap-Phase gilt erst als abgeschlossen, wenn ihre Akzeptanzkriterien erf
 
 Konten mit Mitarbeiterzugriff oder Benutzerverwaltung – auch bei direkt zugewiesenem Einzelrecht – benötigen bei jeder Anmeldung zusätzlich zum Passwort einen sechsstelligen E-Mail-Einmalcode. Der Code ist 15 Minuten gültig, wird nur gehasht gespeichert und erlaubt höchstens fünf Versuche. Es gibt bewusst keine dauerhafte Browserfreigabe. Erhält ein zuvor nicht privilegiertes Konto Mitarbeiter- oder Benutzerverwaltungsrechte, werden bestehende Sitzungen beendet; der nächste Zugriff erfordert eine neue Anmeldung mit Einmalcode. In der lokalen Entwicklungsumgebung erscheint der Code im automatisch gestarteten Mailpit-Postfach unter [http://localhost:8025](http://localhost:8025); Produktion verwendet den konfigurierten SMTP-Backend.
 
-Die reguläre Anmeldung unter `/accounts/login/` sperrt nach drei falschen Passwörtern das betroffene Konto für 15 Minuten. Zusätzlich werden zehn fehlgeschlagene Anmeldungen derselben IP-Adresse innerhalb von 15 Minuten begrenzt. Die Anwendung speichert dafür nie die IP-Adresse selbst, sondern nur einen mit dem Servergeheimnis abgeleiteten Fingerprint. Falsches Passwort, unbekanntes Konto und Sperren liefern dieselbe neutrale Meldung. Django-Admin ist bewusst nicht Teil dieser Anmeldestrecke. Hinter einem Reverse-Proxy darf `DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS` ausschließlich mit dessen vertrauenswürdigen IP-Adressen gesetzt werden; nur dann wird dessen `X-Forwarded-For` berücksichtigt.
+Die reguläre Anmeldung unter `/accounts/login/` sperrt nach drei falschen Passwörtern das betroffene Konto für 15 Minuten. Zusätzlich werden zehn fehlgeschlagene Anmeldungen derselben IP-Adresse innerhalb von 15 Minuten begrenzt. Die Anwendung speichert dafür nie die IP-Adresse selbst, sondern nur einen mit dem Servergeheimnis abgeleiteten Fingerprint. Falsches Passwort, unbekanntes Konto und Sperren liefern dieselbe neutrale Meldung. Der ungenutzte Django-Admin ist unter `/admin/` nicht erreichbar; auch Staff- und Superuser-Konten verwenden die reguläre Anmeldung mit MFA. Hinter einem Reverse-Proxy darf `DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS` ausschließlich mit dessen vertrauenswürdigen IP-Adressen gesetzt werden; nur dann wird dessen `X-Forwarded-For` berücksichtigt.
 
 Nach dem Ausführen der Migrationen wird der erste Benutzerverwalter einmalig angelegt:
 
@@ -163,7 +186,7 @@ Mit dem Development-Override wird beim Containerstart außerdem ein ausschließl
 
 Der lokale Bootstrap reaktiviert dieses fiktive Konto und setzt sein Passwort bei jedem Entwicklungsstart auf den dokumentierten Wert zurück. Die Zugangsdaten sind absichtlich öffentlich und dürfen niemals außerhalb der lokalen Entwicklungsumgebung verwendet werden.
 
-Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD` und `DJANGO_EMAIL_USE_TLS`. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
+Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD`, `DJANGO_EMAIL_USE_TLS` und `DJANGO_EMAIL_TIMEOUT`. Der SMTP-Timeout beträgt standardmäßig zehn Sekunden und kann über `DJANGO_EMAIL_TIMEOUT` in Sekunden angepasst werden. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
 
 ## Bewerbungen im Betreiberbereich
 

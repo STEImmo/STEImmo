@@ -1,35 +1,45 @@
 import json
 import unicodedata
 import warnings
+from copy import copy
+from io import BytesIO
 from uuid import UUID
 
 from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.models import Session
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.storage import Storage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.db.models import Q
 from django.forms.formsets import BaseFormSet
 from django.forms.models import inlineformset_factory
 from django.utils import timezone
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from pypdf import PdfReader
 from pypdf.errors import DependencyError, PyPdfError
 
 from .access import (
     ACCESS_PERMISSION_CODENAMES,
     APP_LABEL,
-    EMPLOYEE_ACCESS_PERMISSION,
     ROLE_NAMES,
     ROLE_USER_MANAGEMENT,
     USER_MANAGEMENT_PERMISSION,
 )
+from .handover_photos import (
+    PHOTO_READ_ERROR,
+    HandoverPhotoReadError,
+    existing_photo_checksums,
+    save_handover_photo,
+)
 from .models import (
     AbnahmeStatus,
+    ApartmentPhoto,
     ApplicationProof,
     ApplicationProofCategory,
     Bewerbung,
@@ -85,6 +95,15 @@ METER_READING_FIELDS = (
 )
 
 ACCOUNT_CREATION_ERROR = "Mit diesen Angaben kann kein Konto erstellt werden."
+ACCOUNT_EMAIL_MAX_LENGTH = get_user_model()._meta.get_field("username").max_length
+ACCOUNT_FIRST_NAME_MAX_LENGTH = get_user_model()._meta.get_field("first_name").max_length
+ACCOUNT_LAST_NAME_MAX_LENGTH = get_user_model()._meta.get_field("last_name").max_length
+ACCOUNT_EMAIL_LENGTH_ERROR = (
+    f"Die E-Mail-Adresse darf für ein Konto höchstens {ACCOUNT_EMAIL_MAX_LENGTH} Zeichen enthalten."
+)
+LAST_ACCOUNT_MANAGER_ERROR = (
+    "Der letzte aktive Benutzerverwalter darf seine Berechtigung nicht entfernen."
+)
 PHOTO_CONTENT_TYPES = {
     "JPEG": "image/jpeg",
     "PNG": "image/png",
@@ -108,20 +127,46 @@ def verified_photo_content_type(photo) -> str:
     return content_type
 
 
+def _validate_account_email_length(email: str) -> None:
+    if len(email) > ACCOUNT_EMAIL_MAX_LENGTH:
+        raise ValidationError(ACCOUNT_EMAIL_LENGTH_ERROR, code="max_length")
+
+
+def _validate_account_names(vorname: str, nachname: str) -> None:
+    errors = [
+        f"Der {label} darf für ein Konto höchstens {limit} Zeichen enthalten."
+        for value, label, limit in (
+            (vorname, "Vorname", ACCOUNT_FIRST_NAME_MAX_LENGTH),
+            (nachname, "Nachname", ACCOUNT_LAST_NAME_MAX_LENGTH),
+        )
+        if len(value) > limit
+    ]
+    if errors:
+        raise ValidationError(errors)
+
+
+def _has_other_active_account_manager(account) -> bool:
+    return any(
+        user.has_perm(USER_MANAGEMENT_PERMISSION)
+        for user in get_user_model().objects.filter(is_active=True).exclude(pk=account.pk)
+    )
+
+
 class RegistrationForm(forms.Form):
     vorname = forms.CharField(
         label="Vorname",
-        max_length=255,
+        max_length=ACCOUNT_FIRST_NAME_MAX_LENGTH,
         widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "given-name"}),
     )
     nachname = forms.CharField(
         label="Nachname",
-        max_length=255,
+        max_length=ACCOUNT_LAST_NAME_MAX_LENGTH,
         widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "family-name"}),
     )
     email = forms.EmailField(
         label="E-Mail-Adresse",
-        max_length=255,
+        max_length=ACCOUNT_EMAIL_MAX_LENGTH,
+        error_messages={"max_length": ACCOUNT_EMAIL_LENGTH_ERROR},
         widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "username"}),
     )
     password1 = forms.CharField(
@@ -137,6 +182,7 @@ class RegistrationForm(forms.Form):
 
     def clean_email(self) -> str:
         email = self.cleaned_data["email"].strip().lower()
+        _validate_account_email_length(email)
         user_model = get_user_model()
         if (
             Person.objects.filter(email__iexact=email).exists()
@@ -256,19 +302,20 @@ class UserAccountForm(forms.Form):
     )
     vorname = forms.CharField(
         label="Neue Person: Vorname",
-        max_length=255,
+        max_length=ACCOUNT_FIRST_NAME_MAX_LENGTH,
         required=False,
         widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "given-name"}),
     )
     nachname = forms.CharField(
         label="Neue Person: Nachname",
-        max_length=255,
+        max_length=ACCOUNT_LAST_NAME_MAX_LENGTH,
         required=False,
         widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "family-name"}),
     )
     email = forms.EmailField(
         label="Neue Person: E-Mail-Adresse",
-        max_length=255,
+        max_length=ACCOUNT_EMAIL_MAX_LENGTH,
+        error_messages={"max_length": ACCOUNT_EMAIL_LENGTH_ERROR},
         required=False,
         widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "username"}),
     )
@@ -288,6 +335,12 @@ class UserAccountForm(forms.Form):
         label="Konto ist aktiv",
         required=False,
         initial=True,
+        widget=forms.CheckboxInput(attrs={"class": "uk-checkbox"}),
+    )
+    revoke_registration = forms.BooleanField(
+        label="Offene Registrierung widerrufen",
+        required=False,
+        help_text="Verhindert die Bestätigung und den erneuten Versand eines Registrierungscodes.",
         widget=forms.CheckboxInput(attrs={"class": "uk-checkbox"}),
     )
     password1 = forms.CharField(
@@ -322,6 +375,8 @@ class UserAccountForm(forms.Form):
         ).order_by("name")
         self.fields["roles"].widget.attrs["class"] = "uk-checkbox"
         self.fields["direct_permissions"].widget.attrs["class"] = "uk-checkbox"
+        if account is None or not RegistrationVerification.objects.filter(user=account).exists():
+            self.fields.pop("revoke_registration")
         if account is not None and not self.is_bound:
             self.initial.update(
                 {
@@ -337,11 +392,18 @@ class UserAccountForm(forms.Form):
             )
 
     def clean_email(self) -> str:
-        return self.cleaned_data["email"].strip().lower()
+        email = self.cleaned_data["email"].strip().lower()
+        _validate_account_email_length(email)
+        return email
 
     def clean(self) -> dict:
         cleaned_data = super().clean()
         selected_person = cleaned_data.get("person")
+        if selected_person is not None:
+            try:
+                _validate_account_names(selected_person.vorname, selected_person.nachname)
+            except ValidationError as error:
+                self.add_error("person", error)
         inline_values = {
             field_name: cleaned_data.get(field_name, "").strip()
             for field_name in ("vorname", "nachname", "email")
@@ -363,6 +425,10 @@ class UserAccountForm(forms.Form):
             selected_person.email if selected_person is not None else inline_values["email"]
         )
         if target_email:
+            try:
+                _validate_account_email_length(target_email)
+            except ValidationError as error:
+                self.add_error("person" if selected_person is not None else "email", error)
             user_model = get_user_model()
             existing_accounts = user_model.objects.filter(
                 Q(username__iexact=target_email) | Q(email__iexact=target_email)
@@ -383,7 +449,9 @@ class UserAccountForm(forms.Form):
         if self.account is not None:
             current_person = getattr(self.account, "person_profile", None)
             person_changed = selected_person is None or selected_person != current_person
-            if person_changed and (not password1 or self.account.check_password(password1)):
+            if person_changed and (
+                not password1 or check_password(password1, self.account.password)
+            ):
                 self.add_error(
                     "password1",
                     "Bei einem Personenwechsel muss ein neues Passwort vergeben werden.",
@@ -392,7 +460,7 @@ class UserAccountForm(forms.Form):
             if password1 != password2:
                 self.add_error("password2", "Die Passwörter stimmen nicht überein.")
             elif target_email:
-                user = self.account or get_user_model()()
+                user = copy(self.account) if self.account is not None else get_user_model()()
                 user.username = target_email
                 user.email = target_email
                 try:
@@ -411,31 +479,62 @@ class UserAccountForm(forms.Form):
             return
         roles = cleaned_data.get("roles") or []
         direct_permissions = cleaned_data.get("direct_permissions") or []
-        will_manage_accounts = any(role.name == ROLE_USER_MANAGEMENT for role in roles) or any(
-            permission.codename == "manage_user_accounts" for permission in direct_permissions
+        will_manage_accounts = (
+            self.account.is_superuser
+            or any(role.name == ROLE_USER_MANAGEMENT for role in roles)
+            or any(
+                permission.codename == "manage_user_accounts" for permission in direct_permissions
+            )
         )
         if self.account.has_perm(USER_MANAGEMENT_PERMISSION) and not will_manage_accounts:
-            user_model = get_user_model()
-            has_other_manager = any(
-                user.has_perm(USER_MANAGEMENT_PERMISSION)
-                for user in user_model.objects.filter(is_active=True).exclude(pk=self.account.pk)
-            )
-            if not has_other_manager:
-                self.add_error(
-                    "roles",
-                    "Der letzte aktive Benutzerverwalter darf seine Berechtigung nicht entfernen.",
-                )
+            if not _has_other_active_account_manager(self.account):
+                self.add_error("roles", LAST_ACCOUNT_MANAGER_ERROR)
 
     def save(self):
         user_model = get_user_model()
         selected_person = self.cleaned_data["person"]
-        privileged_permissions = (EMPLOYEE_ACCESS_PERMISSION, USER_MANAGEMENT_PERMISSION)
         with transaction.atomic():
+            # Serialize account administration across different users before
+            # locking an individual account. NO KEY UPDATE leaves foreign-key
+            # references to this stable role available to authentication.
+            Group.objects.select_for_update(no_key=True).get(name=ROLE_USER_MANAGEMENT)
+            if self.actor is not None:
+                actor = user_model.objects.select_for_update().filter(pk=self.actor.pk).first()
+                if (
+                    actor is None
+                    or not actor.is_active
+                    or not actor.has_perm(USER_MANAGEMENT_PERMISSION)
+                    or any(
+                        getattr(actor, field) != getattr(self.actor, field)
+                        for field in ("password", "username", "email")
+                    )
+                ):
+                    raise PermissionDenied(
+                        "Sie sind für diese Kontoänderung nicht mehr berechtigt. "
+                        "Bitte melden Sie sich erneut an."
+                    )
             original_account = (
-                user_model.objects.get(pk=self.account.pk) if self.account is not None else None
+                user_model.objects.select_for_update().get(pk=self.account.pk)
+                if self.account is not None
+                else None
             )
-            previously_privileged = original_account is not None and any(
-                original_account.has_perm(permission) for permission in privileged_permissions
+            was_active_manager = original_account is not None and copy(original_account).has_perm(
+                USER_MANAGEMENT_PERMISSION
+            )
+            previous_roles = (
+                set(original_account.groups.values_list("pk", flat=True))
+                if original_account is not None
+                else set()
+            )
+            previous_permissions = (
+                set(original_account.user_permissions.values_list("pk", flat=True))
+                if original_account is not None
+                else set()
+            )
+            previous_person = (
+                Person.objects.select_for_update().filter(user=original_account).first()
+                if original_account is not None
+                else None
             )
             if selected_person is None:
                 person = Person(
@@ -450,12 +549,19 @@ class UserAccountForm(forms.Form):
                         "Die ausgewählte Person ist inzwischen einem Konto zugeordnet."
                     )
 
-            if self.account is None:
-                account = user_model()
-            else:
-                account = self.account
-            account.username = self.cleaned_data["target_email"]
-            account.email = self.cleaned_data["target_email"]
+            person_changed = original_account is not None and previous_person != person
+            _validate_account_email_length(person.email)
+            _validate_account_names(person.vorname, person.nachname)
+            if person_changed and (
+                not self.cleaned_data["password1"]
+                or check_password(self.cleaned_data["password1"], original_account.password)
+            ):
+                raise ValidationError(
+                    "Bei einem Personenwechsel muss ein neues Passwort vergeben werden."
+                )
+            account = copy(original_account) if original_account is not None else user_model()
+            account.username = person.email
+            account.email = person.email
             account.first_name = person.vorname
             account.last_name = person.nachname
             account.is_active = self.cleaned_data["is_active"]
@@ -463,7 +569,6 @@ class UserAccountForm(forms.Form):
                 account.set_password(self.cleaned_data["password1"])
             account.save()
 
-            previous_person = Person.objects.select_for_update().filter(user=account).first()
             if previous_person is not None and previous_person != person:
                 previous_person.user = None
                 previous_person.save(update_fields=["user", "updated_at"])
@@ -483,20 +588,39 @@ class UserAccountForm(forms.Form):
             account.user_permissions.set(
                 [*other_permissions, *self.cleaned_data["direct_permissions"]]
             )
-            # Read fresh permissions: the form's account may cache its previous rights.
-            updated_account = user_model.objects.get(pk=account.pk)
-            newly_privileged = not previously_privileged and any(
-                updated_account.has_perm(permission) for permission in privileged_permissions
+            # Recheck the actual resulting permissions, including direct grants,
+            # preserved groups and superuser access. Failure rolls back all writes.
+            if (
+                was_active_manager
+                and not account.has_perm(USER_MANAGEMENT_PERMISSION)
+                and not _has_other_active_account_manager(account)
+            ):
+                raise ValidationError(LAST_ACCOUNT_MANAGER_ERROR)
+            access_changed = previous_roles != set(account.groups.values_list("pk", flat=True)) or (
+                previous_permissions != set(account.user_permissions.values_list("pk", flat=True))
             )
             credentials_changed = bool(self.cleaned_data["password1"]) or (
-                original_account is not None and original_account.email != account.email
+                original_account is not None
+                and (
+                    original_account.email != account.email
+                    or original_account.username != account.username
+                )
             )
-            if newly_privileged or credentials_changed or not account.is_active:
+            status_changed = (
+                original_account is not None and original_account.is_active != account.is_active
+            )
+            if original_account is not None and (
+                access_changed
+                or credentials_changed
+                or person_changed
+                or status_changed
+                or self.cleaned_data.get("revoke_registration", False)
+            ):
                 # A pending code was issued for the previous credentials or access state.
                 EmployeeLoginVerification.objects.filter(user=account).delete()
                 RegistrationVerification.objects.filter(user=account).delete()
-                # End only this account's active sessions. A privileged account must
-                # enter the normal password/MFA flow with its current credentials.
+                # Login completion persists its session under the same user-row
+                # lock, so this also catches sessions from concurrent requests.
                 for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator():
                     if session.get_decoded().get("_auth_user_id") == str(account.pk):
                         session.delete()
@@ -879,6 +1003,10 @@ class ApartmentSearchForm(forms.Form):
 
 
 class HandoverProtocolForm(forms.ModelForm):
+    removed_rooms = forms.ModelMultipleChoiceField(
+        queryset=Raumprotokoll.objects.none(), required=False, widget=forms.MultipleHiddenInput
+    )
+
     vermieter_name = forms.ChoiceField(
         label="Anwesend für den Vermieter",
         choices=(),
@@ -959,6 +1087,8 @@ class HandoverProtocolForm(forms.ModelForm):
 
     def __init__(self, *args, wohnung_id: str | None = None, employee=None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        if not self.instance._state.adding:
+            self.fields["removed_rooms"].queryset = self.instance.raeume.all()
         self.fields["wohnung"].queryset = Wohnung.objects.order_by(
             "gebaeudenummer", "wohnungsnummer"
         )
@@ -998,7 +1128,7 @@ class HandoverProtocolForm(forms.ModelForm):
         self.fields["abnahme_status"].choices = ACCEPTANCE_STATUS_LABELS.items()
         for field_name, _number_field, label in METER_READING_FIELDS:
             self.fields[field_name].widget.attrs["data-meter-reading"] = ""
-            self.fields[field_name].widget.attrs["aria-label"] = f"{label}, Auszug neu"
+            self.fields[field_name].widget.attrs["aria-label"] = f"{label}, aktueller Zählerstand"
 
     def clean(self) -> dict:
         cleaned_data = super().clean()
@@ -1189,7 +1319,7 @@ def _clean_additional_details(raw_value: str, feature: Merkmal | None) -> dict[s
         return {}
     try:
         details = json.loads(raw_value)
-    except json.JSONDecodeError as error:
+    except (ValueError, RecursionError) as error:
         raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.") from error
     if not isinstance(details, dict):
         raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.")
@@ -1203,6 +1333,12 @@ def _clean_additional_details(raw_value: str, feature: Merkmal | None) -> dict[s
             )
         if not isinstance(value, str):
             raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.")
+        if "\x00" in value:
+            raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise forms.ValidationError("Die zusätzlichen Angaben sind ungültig.") from error
         if cleaned_value := value.strip():
             cleaned_details[label] = cleaned_value
     return cleaned_details
@@ -1268,6 +1404,43 @@ class RoomChecklistItemForm(forms.Form):
         )
 
 
+class ApartmentPhotoForm(forms.ModelForm):
+    class Meta:
+        model = ApartmentPhoto
+        fields = ("image", "caption")
+        labels = {"image": "Wohnungsfoto", "caption": "Bildbeschreibung"}
+        widgets = {
+            "image": forms.FileInput(
+                attrs={"class": "uk-input", "accept": "image/jpeg,image/png,image/webp"}
+            ),
+            "caption": forms.TextInput(
+                attrs={"class": "uk-input", "placeholder": "Zum Beispiel: Wohnbereich"}
+            ),
+        }
+
+    def clean_image(self):
+        upload = self.cleaned_data["image"]
+        if upload.size > settings.APARTMENT_PHOTO_MAX_SIZE:
+            raise forms.ValidationError("Die Datei ist zu groß. Erlaubt sind höchstens 8 MiB.")
+        try:
+            upload.seek(0)
+            with Image.open(upload) as source:
+                if source.format not in {"JPEG", "PNG", "WEBP"}:
+                    raise forms.ValidationError("Erlaubt sind JPEG, PNG und WebP.")
+                if source.width * source.height > 25_000_000:
+                    raise forms.ValidationError("Das Bild darf höchstens 25 Megapixel haben.")
+                image = ImageOps.exif_transpose(source).convert("RGB")
+                image.thumbnail((2400, 2400))
+                # Encode pixels into a new file; discard EXIF/location and other metadata.
+                output = BytesIO()
+                clean_image = Image.new("RGB", image.size)
+                clean_image.paste(image)
+                clean_image.save(output, "JPEG", quality=88)
+        except (OSError, ValueError, Image.DecompressionBombError) as error:
+            raise forms.ValidationError("Das Bild konnte nicht verarbeitet werden.") from error
+        return SimpleUploadedFile("photo.jpg", output.getvalue(), content_type="image/jpeg")
+
+
 class MultiplePhotoInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
@@ -1312,14 +1485,19 @@ class RoomChecklistPhotoUploadForm(forms.Form):
         ),
     )
 
-    def __init__(self, *args, existing_photo_count: int, **kwargs) -> None:
+    def __init__(self, *args, existing_photos, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.existing_photo_count = existing_photo_count
+        self.existing_photos = list(existing_photos)
 
     def clean_fotos(self):
         photos = self.cleaned_data["fotos"]
+        try:
+            checksums = existing_photo_checksums(self.existing_photos)
+        except HandoverPhotoReadError as error:
+            raise forms.ValidationError(PHOTO_READ_ERROR) from error
+        photos = [photo for photo in photos if calculate_photo_checksum(photo) not in checksums]
         maximum = settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM
-        if self.existing_photo_count + len(photos) > maximum:
+        if len(self.existing_photos) + len(photos) > maximum:
             raise forms.ValidationError(
                 f"Für einen Prüfpunkt sind höchstens {maximum} Fotos erlaubt."
             )
@@ -1399,6 +1577,9 @@ class ProtocolConfirmationForm(forms.Form):
 
 
 class InlineRoomChecklistForm(forms.Form):
+    raumprotokoll = forms.ModelChoiceField(
+        queryset=Raumprotokoll.objects.none(), required=False, widget=forms.HiddenInput
+    )
     pruefpunkt = forms.ModelChoiceField(
         queryset=RaumMerkmal.objects.none(), required=False, widget=forms.HiddenInput
     )
@@ -1447,16 +1628,21 @@ class InlineRoomChecklistForm(forms.Form):
         wohnung_id: UUID | None = None,
         allow_photo_upload: bool = False,
         protocol=None,
+        removed_rooms=(),
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.allow_photo_upload = allow_photo_upload
         self.protocol = protocol
         self.existing_item = None
+        self.existing_photo_checksums = set()
         if protocol is not None:
-            self.fields["pruefpunkt"].queryset = RaumMerkmal.objects.filter(
-                raumprotokoll__protokoll=protocol
-            ).prefetch_related("fotos")
+            self.fields["raumprotokoll"].queryset = protocol.raeume.all()
+            self.fields["pruefpunkt"].queryset = (
+                RaumMerkmal.objects.filter(raumprotokoll__protokoll=protocol)
+                .exclude(raumprotokoll__in=removed_rooms)
+                .prefetch_related("fotos")
+            )
             try:
                 self.existing_item = (
                     self.fields["pruefpunkt"].queryset.filter(pk=self["pruefpunkt"].value()).first()
@@ -1500,33 +1686,53 @@ class InlineRoomChecklistForm(forms.Form):
             self.add_error("zusatzangaben", error)
         if photos and not self.allow_photo_upload:
             self.add_error("fotos", "Nur die Verwaltung darf Fotos hochladen.")
+        return cleaned_data
+
+    def validate_room_assignment(self, *, removed_item_ids=()) -> None:
+        """Validate the checkpoint after the formset has resolved its room."""
+        cleaned_data = self.cleaned_data
+        room = cleaned_data.get("raum")
+        feature = cleaned_data.get("merkmal")
+        if room is None or feature is None:
+            return
         existing = cleaned_data.get("pruefpunkt")
-        if existing is None and self.protocol and values["raum"] and feature:
-            existing = (
-                self.fields["pruefpunkt"]
-                .queryset.filter(raumprotokoll__raum=values["raum"], merkmal=feature)
-                .first()
+        if existing is not None and existing.pk in removed_item_ids:
+            self.add_error(
+                "pruefpunkt", "Ein Prüfpunkt kann nicht gleichzeitig entfernt und geändert werden."
             )
-        if existing and not cleaned_data.get("DELETE") and not values["wert"]:
-            self.add_error("wert", "Ein vorhandener Prüfpunkt darf nicht leer gespeichert werden.")
-        if existing and values["raum"] and feature:
-            collision = (
-                self.fields["pruefpunkt"]
-                .queryset.filter(raumprotokoll__raum=values["raum"], merkmal=feature)
-                .exclude(pk=existing.pk)
+            return
+        remaining_items = self.fields["pruefpunkt"].queryset.exclude(pk__in=removed_item_ids)
+        if existing is None and self.protocol:
+            existing = remaining_items.filter(raumprotokoll__raum=room, merkmal=feature).first()
+        if existing:
+            self.existing_item = existing
+            collision = remaining_items.filter(raumprotokoll__raum=room, merkmal=feature).exclude(
+                pk=existing.pk
             )
             if collision.exists():
                 self.add_error("merkmal", "Dieser Prüfpunkt ist in diesem Raum bereits erfasst.")
         existing_count = existing.fotos.count() if existing else 0
+        photos = cleaned_data.get("fotos", [])
+        if photos and existing:
+            try:
+                self.existing_photo_checksums = existing_photo_checksums(existing.fotos.all())
+            except HandoverPhotoReadError:
+                self.add_error("fotos", PHOTO_READ_ERROR)
+                return
+        photos = [
+            photo
+            for photo in photos
+            if calculate_photo_checksum(photo) not in self.existing_photo_checksums
+        ]
+        cleaned_data["fotos"] = photos
         if existing_count + len(photos) > settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM:
             maximum = settings.HANDOVER_PHOTO_MAX_PER_CHECKLIST_ITEM
             self.add_error("fotos", f"Für einen Prüfpunkt sind höchstens {maximum} Fotos erlaubt.")
-        return cleaned_data
 
     def has_entry(self) -> bool:
         return self.cleaned_data.get("merkmal") is not None
 
-    def save(self, protocol: Protokoll) -> RaumMerkmal:
+    def save(self, protocol: Protokoll, stored_photo_files) -> RaumMerkmal:
         raum = self.cleaned_data["raum"]
         room, _created = Raumprotokoll.objects.get_or_create(
             protokoll=protocol,
@@ -1548,14 +1754,18 @@ class InlineRoomChecklistForm(forms.Form):
             )
         for photo in self.cleaned_data["fotos"]:
             checksum = calculate_photo_checksum(photo)
-            if checklist_item.fotos.filter(inhalt_hash_sha256=checksum).exists():
+            if checksum in self.existing_photo_checksums:
                 continue
-            RaumMerkmalFoto.objects.create(
-                raum_merkmal=checklist_item,
-                datei=photo,
-                content_type=verified_photo_content_type(photo),
-                dateigroesse=photo.size,
-                inhalt_hash_sha256=checksum,
+            self.existing_photo_checksums.add(checksum)
+            save_handover_photo(
+                RaumMerkmalFoto(
+                    raum_merkmal=checklist_item,
+                    datei=photo,
+                    content_type=verified_photo_content_type(photo),
+                    dateigroesse=photo.size,
+                    inhalt_hash_sha256=checksum,
+                ),
+                stored_photo_files,
             )
         return checklist_item
 
@@ -1563,6 +1773,11 @@ class InlineRoomChecklistForm(forms.Form):
 class RoomChecklistFormSet(BaseFormSet):
     def clean(self) -> None:
         super().clean()
+        removed_item_ids = {
+            form.cleaned_data["pruefpunkt"].pk
+            for form in self.forms
+            if form.cleaned_data.get("DELETE") and form.cleaned_data.get("pruefpunkt") is not None
+        }
         current_room = None
         checklist_entries = []
         for room_form in self.forms:
@@ -1572,6 +1787,9 @@ class RoomChecklistFormSet(BaseFormSet):
                 or not room_form.has_entry()
             ):
                 continue
+            if "raum" in room_form.errors:
+                current_room = None
+                continue
             room = room_form.cleaned_data.get("raum")
             if room is not None:
                 current_room = room
@@ -1579,6 +1797,11 @@ class RoomChecklistFormSet(BaseFormSet):
                 room_form.cleaned_data["raum"] = current_room
             else:
                 room_form.add_error("raum", "Bitte wählen Sie für den ersten Prüfpunkt einen Raum.")
+                continue
+            if room_form.errors:
+                continue
+            room_form.validate_room_assignment(removed_item_ids=removed_item_ids)
+            if room_form.errors:
                 continue
             checklist_entries.append(room_form)
 
@@ -1674,6 +1897,11 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "zaehlernummer_wasser_warm",
             "zaehlernummer_heizung",
             "zaehlernummer_strom",
+            "description",
+            "equipment",
+            "heating_type",
+            "energy_information",
+            "planned_move_in",
         ]
         labels = {
             "gebaeudenummer": "Gebäudenummer",
@@ -1690,6 +1918,25 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "zaehlernummer_wasser_warm": "Zählernummer Warmwasser",
             "zaehlernummer_heizung": "Zählernummer Heizung",
             "zaehlernummer_strom": "Zählernummer Strom",
+            "description": "Beschreibung",
+            "equipment": "Ausstattung",
+            "heating_type": "Heizungstyp",
+            "energy_information": "Energieangaben",
+            "planned_move_in": "Geplanter Einzug",
+        }
+        widgets = {
+            "description": forms.Textarea(attrs={"class": "uk-textarea", "rows": 4}),
+            "equipment": forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
+            "energy_information": forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
+        }
+        help_texts = {
+            "description": "Nur belegte Informationen zur Wohnung eintragen.",
+            "equipment": "Zum Beispiel bestätigte Ausstattung, ein Merkmal pro Zeile.",
+            "heating_type": "Leer lassen, solange der Heizungstyp nicht bestätigt ist.",
+            "energy_information": "Nur bestätigte Angaben aus dem Energieausweis übernehmen.",
+            "planned_move_in": (
+                "Auch ungefähre Angaben sind möglich, zum Beispiel: Voraussichtlich März 2027."
+            ),
         }
 
     def clean(self):

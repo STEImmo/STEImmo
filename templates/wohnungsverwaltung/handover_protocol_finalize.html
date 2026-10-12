@@ -12,21 +12,7 @@
             <dl class="uk-description-list uk-description-list-divider">{% for label, value in section.rows %}<dt>{{ label }}</dt><dd>{{ value|linebreaksbr }}</dd>{% endfor %}</dl>
         </article>
     {% endfor %}
-    {% for room in snapshot.rooms %}
-        <article class="uk-card uk-card-default uk-card-body uk-margin">
-            <h2>Raum: {{ room.title }}</h2>
-            {% for item in room.items %}
-                <h3>{{ item.title }}</h3>
-                {% for side in item.sides %}
-                    <h4>{{ side.label }}</h4><p>{{ side.text|linebreaksbr }}</p>
-                    <dl class="uk-description-list">{% for label, value in side.details %}<dt>{{ label }}</dt><dd>{{ value|linebreaksbr }}</dd>{% endfor %}</dl>
-                    {% for photo in side.photos %}
-                        <figure><img src="{{ photo.url }}" alt="{{ room.title }} / {{ item.title }} / {{ side.label }} / Foto {{ forloop.counter }}"><figcaption>{{ room.title }} / {{ item.title }} / {{ side.label }} / Foto {{ forloop.counter }}</figcaption></figure>
-                    {% endfor %}
-                {% endfor %}
-            {% endfor %}
-        </article>
-    {% endfor %}
+    {% include "wohnungsverwaltung/_handover_snapshot_rooms.html" with snapshot=snapshot only %}
     {% if completion_errors %}
         <div class="uk-alert-danger" role="alert"><ul>{% for error in completion_errors %}<li>{{ error }}</li>{% endfor %}</ul></div>
     {% else %}
