@@ -67,6 +67,7 @@
             const requestId = ++dependentFieldsRequestId;
             const requestedApartmentId = apartmentSelect.value;
             const requestedPersonId = document.getElementById("id_person")?.value || "";
+            const requestedHandoverTime = document.getElementById("id_uebergabe_zeitpunkt")?.value || "";
             const url = new URL(window.location.href);
             if (requestedApartmentId) {
                 url.searchParams.set("wohnung", requestedApartmentId);
@@ -78,9 +79,8 @@
             } else {
                 url.searchParams.delete("person");
             }
-            const handoverTime = document.getElementById("id_uebergabe_zeitpunkt")?.value;
-            if (handoverTime) {
-                url.searchParams.set("uebergabe_zeitpunkt", handoverTime);
+            if (requestedHandoverTime) {
+                url.searchParams.set("uebergabe_zeitpunkt", requestedHandoverTime);
             } else {
                 url.searchParams.delete("uebergabe_zeitpunkt");
             }
@@ -94,6 +94,7 @@
                 requestId !== dependentFieldsRequestId
                 || requestedApartmentId !== apartmentSelect.value
                 || requestedPersonId !== (document.getElementById("id_person")?.value || "")
+                || requestedHandoverTime !== (document.getElementById("id_uebergabe_zeitpunkt")?.value || "")
             ) {
                 return false;
             }
