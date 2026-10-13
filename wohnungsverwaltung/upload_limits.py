@@ -3,6 +3,7 @@
 from django.conf import settings
 from django.core.files.uploadhandler import FileUploadHandler, StopUpload
 from django.http import HttpRequest, HttpResponse
+from django.template.loader import render_to_string
 
 
 def _is_main_application_submission(request: HttpRequest) -> bool:
@@ -16,7 +17,13 @@ def _is_main_application_submission(request: HttpRequest) -> bool:
 
 
 def upload_too_large_response(message: str) -> HttpResponse:
-    response = HttpResponse(message, status=413, content_type="text/plain; charset=utf-8")
+    response = HttpResponse(
+        render_to_string(
+            "core/error.html",
+            {"status": 413, "heading": "Upload zu groß", "message": message},
+        ),
+        status=413,
+    )
     response["X-Content-Type-Options"] = "nosniff"
     response["Cache-Control"] = "private, no-store"
     return response

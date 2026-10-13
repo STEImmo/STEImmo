@@ -15,6 +15,7 @@ from django.db.models import Q
 from django.db.utils import OperationalError
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare, salted_hmac
@@ -46,6 +47,60 @@ EMPLOYEE_MFA_REDIRECT_SESSION_KEY = "employee_mfa_redirect_url"
 EMPLOYEE_MFA_CHALLENGE_SESSION_KEY = "employee_mfa_challenge"
 LOGIN_FAILURE_MESSAGE = "Bitte überprüfen Sie Ihre Zugangsdaten und versuchen Sie es später erneut."
 logger = logging.getLogger(__name__)
+
+
+def _error_response(status, title, message):
+    # No request context: error pages must work without sessions or database access.
+    return HttpResponse(
+        render_to_string(
+            "core/error.html", {"status": status, "heading": title, "message": message}
+        ),
+        status=status,
+    )
+
+
+def bad_request(request, exception):
+    return _error_response(
+        400,
+        "Anfrage nicht möglich",
+        "Bitte öffnen Sie die Seite erneut und versuchen Sie es noch einmal.",
+    )
+
+
+def permission_denied(request, exception):
+    return _error_response(
+        403,
+        "Kein Zugriff",
+        "Für diese Seite fehlt Ihnen die erforderliche Berechtigung. "
+        "Prüfen Sie, ob Sie mit dem richtigen Konto angemeldet sind.",
+    )
+
+
+def page_not_found(request, exception):
+    return _error_response(
+        404,
+        "Seite nicht gefunden",
+        "Diese Seite ist nicht verfügbar. "
+        "Über die Wohnungssuche finden Sie unsere aktuellen Angebote.",
+    )
+
+
+def server_error(request):
+    return _error_response(
+        500,
+        "Das hat leider nicht geklappt",
+        "Die Seite kann gerade nicht geladen werden. Bitte versuchen Sie es später erneut.",
+    )
+
+
+def csrf_failure(request, reason=""):
+    return _error_response(
+        403,
+        "Bitte erneut versuchen",
+        "Das Formular konnte nicht sicher verarbeitet werden. "
+        "Laden Sie die Seite neu und senden Sie das Formular erneut ab. "
+        "Prüfen Sie bei Bedarf auch Ihre Anmeldung.",
+    )
 
 
 def _deliver_verification_code(sender, email: str, code: str) -> bool:

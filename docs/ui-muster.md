@@ -392,6 +392,21 @@ Nicht jeder mögliche Datenzustand ist durch den Browser-Smoke abgedeckt;
 Rollenschutz und seltene Formular-/Exportzustände werden zusätzlich durch
 die bestehenden Django-Tests geprüft.
 
+## Allgemeine Fehlerseiten
+
+HTTP 400, 403, 404 und 500 verwenden eine gemeinsame, schlichte Fehlerseite mit
+Fehlernummer, verständlichem Hinweis und Links zu Startseite und Wohnungssuche.
+Dieselbe Vorlage zeigt Formular-Sicherheitsfehler und bestehende Upload-Limits
+(413) an. Statuscodes, Upload-Grenzen und Schutzmechanismen bleiben erhalten.
+Die Vorlage verwendet keinen Request-Kontext und benötigt keine Datenbankabfrage;
+auch bei einem Datenbankausfall bleibt die Fehleranzeige verfügbar.
+Bei aktiviertem Django-Debugmodus bleiben die technischen 400-/404-/500-Seiten
+für die Entwicklung sichtbar. Die gestalteten Seiten greifen im Betrieb mit
+`DEBUG=False`; 403 und Formular-Sicherheitsfehler sind auch lokal gestaltet.
+
+Inhaltliche Ergänzungen und neue Funktionen wie eine Profilseite werden als
+eigene Aufgaben behandelt. Neue Issues werden erst nach gesondertem Auftrag angelegt.
+
 ## Rechtliche Inhalte vor Veröffentlichung
 
 Die Layoutentwürfe sind auf Wunsch des Auftraggebers vorbereitet. Noch zu ergänzen

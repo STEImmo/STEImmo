@@ -1,0 +1,37 @@
+{% load static %}
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ heading }} · STE Immobilien eGbR</title>
+    <link rel="stylesheet" href="{% static 'vendor/uikit/uikit.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=47">
+</head>
+<body class="site-shell">
+    <a class="site-skip-link" href="#main-content">Zum Inhalt springen</a>
+    <header class="site-header uk-navbar-container">
+        <div class="uk-container site-header-inner">
+            <a class="site-brand" href="{% url 'home' %}" aria-label="STE Immobilien eGbR – Startseite">
+                <span class="site-brand-name">STE Immobilien</span>
+                <span class="site-brand-subtitle">eGbR · Wohnungsvermietung in Würzburg</span>
+            </a>
+        </div>
+    </header>
+    <main id="main-content" class="site-main" tabindex="-1">
+        <section class="uk-section uk-section-large">
+            <div class="uk-container uk-container-small">
+                <p class="uk-text-primary uk-text-bold">Fehler {{ status }}</p>
+                <h1>{{ heading }}</h1>
+                <p class="uk-text-lead">{{ message }}</p>
+                <div class="notice-actions uk-margin-medium-top">
+                    <a class="uk-button uk-button-primary" href="{% url 'home' %}">Zur Startseite</a>
+                    <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Wohnungen finden</a>
+                    {% if status == 403 %}<a class="uk-button uk-button-text" href="{% url 'login' %}">Zur Anmeldung</a>{% endif %}
+                </div>
+            </div>
+        </section>
+    </main>
+    {% include "partials/_site_footer.html" %}
+</body>
+</html>
