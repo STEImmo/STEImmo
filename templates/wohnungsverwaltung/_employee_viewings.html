@@ -63,6 +63,7 @@
         <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_create' application.pk %}" class="uk-form-stacked" data-viewing-time-form data-current-time="{{ viewing_now|date:'c' }}">
             {% csrf_token %}
             {{ viewing_form.as_p }}
+            <p class="uk-text-meta">Die Endzeit wird mit 30 Minuten nach Beginn vorbelegt und kann individuell geändert werden.</p>
             <p class="uk-text-meta">Geplante Termine müssen zukünftig sein. Nachträge erfordern einen vergangenen Termin und eine Begründung. Die Zeiten gelten in Europe/Berlin.</p>
             <button type="submit" class="uk-button uk-button-primary">Besichtigung speichern</button>
         </form>

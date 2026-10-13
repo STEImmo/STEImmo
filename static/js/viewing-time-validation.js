@@ -27,6 +27,8 @@
         const parsedNow = Date.parse(form.dataset.currentTime);
         const serverNow = Number.isFinite(parsedNow) ? parsedNow : Date.now();
         const loadedAt = performance.now();
+        let automaticEnd = !end.value && !end.validity.badInput;
+        let previousStart = null;
         const fields = [date, start, end, reason].map((input) => {
             const error = document.createElement("span");
             error.id = `${input.id}_live_error`;
@@ -44,8 +46,18 @@
             const record = action.value === "record";
             const sameDay = date.value === today;
             const startMinute = asMinutes(start.value);
+            if (automaticEnd && start.value !== previousStart) {
+                // Keep the suggestion on the same day; never wrap into tomorrow.
+                const suggestion = startMinute !== null && startMinute + 30 < 1440
+                    ? asTime(startMinute + 30) : "";
+                if (end.value !== suggestion) end.value = suggestion;
+            }
+            previousStart = start.value;
             const endMinute = asMinutes(end.value);
             const messages = new Map();
+            if (automaticEnd && startMinute !== null && startMinute + 30 >= 1440) {
+                messages.set(end, "30 Minuten würden über Mitternacht hinausgehen. Bitte wählen Sie eine Endzeit am selben Tag.");
+            }
 
             // A same-day appointment needs at least two distinct minute values.
             setLimit(date, "min", record ? "" : currentMinute >= 1438 ? shiftDay(today, 1) : today);
@@ -107,13 +119,18 @@
                 ) {
                     // Populate real minutes before the browser edits the hour
                     // segment; its grey placeholder is not a submitted value.
+                    if (input === end) automaticEnd = false;
                     input.value = "00:00";
                     validate();
                 }
             });
         });
-        form.addEventListener("input", validate);
-        form.addEventListener("change", validate);
+        const handleEdit = (event) => {
+            if (event.target === end) automaticEnd = false;
+            validate();
+        };
+        form.addEventListener("input", handleEdit);
+        form.addEventListener("change", handleEdit);
         form.addEventListener("submit", (event) => {
             validate();
             if (!form.checkValidity()) {

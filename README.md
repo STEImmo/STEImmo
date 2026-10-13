@@ -237,6 +237,10 @@ Die serverseitige Prüfung bleibt unabhängig davon verbindlich.
 Bei der Stundeneingabe in ein leeres Zeitfeld werden die Minuten tatsächlich mit
 `00` vorbelegt. Bereits eingetragene Minuten bleiben bei einer Änderung der Stunde
 erhalten.
+Neue Termine erhalten automatisch eine Endzeit 30 Minuten nach Beginn. Bis zur
+ersten eigenen Bearbeitung folgt die Endzeit Änderungen am Beginn; manuelle und
+bereits gespeicherte Endzeiten bleiben erhalten. Würde der Vorschlag über
+Mitternacht hinausgehen, muss eine Endzeit am selben Tag gewählt werden.
 
 Nach Terminende dokumentieren Mitarbeiter **Durchgeführt** oder **Nicht erschienen**.
 Bereits erfolgte Besichtigungen können mit Begründung nachgetragen werden.
