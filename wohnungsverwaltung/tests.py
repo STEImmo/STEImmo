@@ -1708,7 +1708,8 @@ class HandoverProtocolViewsTests(TestCase):
             )
             self.assertContains(response, "Einzug (alt)")
             self.assertContains(response, "Auszug (neu)")
-            self.assertContains(response, "Einzug (alt)</th><th>Auszug (neu)")
+            self.assertContains(response, '<th scope="col">Einzug (alt)</th>', html=True)
+            self.assertContains(response, '<th scope="col">Auszug (neu)</th>', html=True)
             self.assertContains(response, "handover-photo-modal")
             self.assertContains(response, "data-handover-photo")
             self.assertContains(response, matching_photo_url)
@@ -1751,7 +1752,8 @@ class HandoverProtocolViewsTests(TestCase):
         )
 
         self.assertEqual(response.context["move_in_reference"].pk, move_in.pk)
-        self.assertContains(response, "Einzug (alt)</th><th>Auszug (neu)")
+        self.assertContains(response, '<th scope="col">Einzug (alt)</th>', html=True)
+        self.assertContains(response, '<th scope="col">Auszug (neu)</th>', html=True)
         self.assertContains(response, "Einzug (alt)")
 
     def test_move_out_form_shows_the_signed_move_in_as_a_reference(self) -> None:

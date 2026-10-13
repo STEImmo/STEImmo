@@ -12,8 +12,7 @@ beschreibt diese Grundlage. Die Tokens und die lokalen UIkit-Assets bleiben best
 UI/UX-Muster auf den echten Django-Seiten. Der erste Schritt umfasst Header,
 mobile Navigation, Footer und die sichtbare Unternehmensbezeichnung.
 Formular-, Listen- und Seitenmuster sind inzwischen für Bewerbungen,
-Wohnungsdetails, Verwaltung und Übergaben übernommen. Die abschließende
-Überarbeitung und die Auswahl für Gebäude-/Etagenansicht bleiben offen.
+Wohnungsdetails, Verwaltung und Übergaben übernommen. Gebäude- und Etagenansichten verwenden das gewählte Design B.
 
 ## Startseite: Unternehmen & Wohnen
 
@@ -139,7 +138,7 @@ Die Vergleichsroute `/uebergaben/design/bewerbungen/`, Beispieldaten und Variant
 sind entfernt. Rollen, CSRF, fachliche Validierung und Speicherlogik bleiben erhalten.
 Response- und bestehende Upload-/Berechtigungstests sichern die Übertragung ab;
 die echten Seiten werden zusätzlich auf localhost auf Desktop und Handy geprüft.
-Weitere öffentliche und interne Seitenmuster von US-18 bleiben offen.
+Die übrigen öffentlichen und internen Seiten verwenden ebenfalls gemeinsame Muster.
 ## Wohnungssuche: gewähltes Design A
 
 Die überarbeitete Variante A ist regulär unter `/wohnungen/` integriert:
@@ -153,7 +152,8 @@ Leermeldungen berücksichtigen nur tatsächliche Suchfelder; ungültige Werte ze
 verknüpfte Feldfehler. „Filter zurücksetzen“ führt zur ungefilterten Suche.
 Wohnungen ohne gepflegte Fläche/Miete/Zimmerzahl werden als solche bezeichnet.
 
-Karten, Filter und Felder liegen in `_apartment_search_*.html`. Vorhandene Fotos
+Karten und Filter liegen in `apartment_search.html`; die wiederverwendeten Felder
+liegen in `_apartment_search_field.html`. Vorhandene Fotos
 werden über die bestehende öffentliche Foto-Route geladen; Demo-/KI-Beschriftungen
 bleiben sichtbar. Details führen weiterhin zur konkreten Wohnung und von dort zur
 Besichtigungsanfrage mit serverseitig übernommener Wohnung.
@@ -424,3 +424,31 @@ Grundlagen für diese Inhaltsstruktur:
 
 Cookie-Einstellungen werden erst erforderlich, wenn tatsächlich einwilligungsbedürftige
 Dienste eingesetzt werden. Es wird keine zusätzliche Tracking- oder Consent-Bibliothek eingeführt.
+
+
+## Abschließende UI-Prüfung und Hinweise für die PR
+
+Pflichtfelder der internen Formulare sind anhand der vorhandenen Django-Felder
+markiert. Hilfs- und Fehlermeldungen besitzen die von Django referenzierten IDs.
+Übergabetabellen verwenden beschriftete, fokussierbare Scrollregionen und
+Spaltenüberschriften. Fokusfarben der Zeichnungen/Galerie nutzen den zentralen
+Token; die kleine Fassadenbeschriftung verwendet den kontrastreicheren Text-Token.
+
+Auf dem Handy ist der Filter anfangs eingeklappt und über eine beschriftete
+Schaltfläche erreichbar. Ungültige Filter halten ihn offen; ohne JavaScript bleibt
+das gesamte GET-Formular sichtbar. Auf dem Desktop bleibt der breite Filter stehen.
+Suchwerte, Filterprüfung, Ergebniszusammenstellung und URLs ändern sich nicht.
+
+Die Übergabe ergänzt ausschließlich sichtbare Lade-/Fehlerrückmeldungen und
+`aria-busy` beim vorhandenen Nachladen. Anfragen, Datenübernahme und Rückgabewerte
+bleiben bestehen; Netzwerkfehler werden weiterhin weitergegeben. Für die PR:
+Das bestehende Verhalten bei HTTP-Fehlern (bisherige abhängige Angaben bleiben
+stehen) sowie bei überlappenden Anfragen wird damit nicht fachlich abgesichert.
+Rücksetzen, Abbruch oder Reihenfolgekontrolle wären separate Logikänderungen.
+
+Bilder sind bei gleichen Abmessungen und unverändertem Motiv neu komprimiert.
+Dateiformat des Kontomotivs: WebP. Quellen, Lizenz und sichtbare Kennzeichnung
+bleiben erhalten. Es gibt keine neue Abhängigkeit und keine neue Template-Datei.
+
+Unternehmensinhalte, Rechtstexte, gepflegte Miet-/Zimmerangaben, Originalfotos und
+eine Profilseite bleiben getrennte Aufgaben. Keine Issues dafür eigenständig anlegen.

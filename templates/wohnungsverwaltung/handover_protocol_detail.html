@@ -56,13 +56,13 @@
         </div>
         <div class="uk-card uk-card-default uk-card-body handover-card uk-margin-top">
             <h2 class="handover-section-title">Zählerstände</h2>
-            <div class="uk-overflow-auto">
+            <div class="uk-overflow-auto" tabindex="0" role="region" aria-label="Übergabetabelle – seitlich scrollbar">
                 <table class="uk-table uk-table-divider uk-table-small">
                     <thead>
                         <tr>
-                            <th>Zähler</th>
-                            <th>Zählernummer</th>
-                            {% if move_in_reference %}<th>Einzug (alt)</th><th>Auszug (neu)</th>{% else %}<th>Zählerstand</th>{% endif %}
+                            <th scope="col">Zähler</th>
+                            <th scope="col">Zählernummer</th>
+                            {% if move_in_reference %}<th scope="col">Einzug (alt)</th><th scope="col">Auszug (neu)</th>{% else %}<th scope="col">Zählerstand</th>{% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -108,9 +108,9 @@
                 {% if protocol.status == "open" %}<div class="uk-width-auto"><a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:handover_protocol_key_create' protocol.pk %}">Schlüssel erfassen</a></div>{% endif %}
             </div>
             {% if protocol.protokoll_schluessel.all %}
-                <div class="uk-overflow-auto">
+                <div class="uk-overflow-auto" tabindex="0" role="region" aria-label="Übergabetabelle – seitlich scrollbar">
                     <table class="uk-table uk-table-divider uk-table-small">
-                        <thead><tr><th>Stück</th><th>Raum / Bezeichnung</th><th>Aufschrift / Nummer</th><th>Status</th>{% if protocol.status == "open" %}<th></th>{% endif %}</tr></thead>
+                        <thead><tr><th scope="col">Stück</th><th scope="col">Raum / Bezeichnung</th><th scope="col">Aufschrift / Nummer</th><th scope="col">Status</th>{% if protocol.status == "open" %}<th scope="col"></th>{% endif %}</tr></thead>
                         <tbody>
                             {% for key in protocol.protokoll_schluessel.all %}
                                 <tr>

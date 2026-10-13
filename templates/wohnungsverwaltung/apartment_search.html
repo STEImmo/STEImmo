@@ -10,6 +10,8 @@
         <div class="apartment-search-layout">
             <aside class="apartment-search-filter-panel" aria-labelledby="apartment-filter-title">
                 <h2 id="apartment-filter-title">Filter</h2>
+                <button class="uk-button uk-button-default apartment-search-filter-toggle" type="button" hidden aria-controls="apartment-filter-body" aria-expanded="true" data-mobile-filter-toggle>Filter anzeigen{% if has_filters %} · Filter aktiv{% endif %}</button>
+                <div id="apartment-filter-body" class="apartment-search-filter-body" data-filter-errors="{% if form.errors %}true{% else %}false{% endif %}">
                 <form method="get" action="{% url 'wohnungsverwaltung_public:apartment_search' %}" novalidate>
     <div class="apartment-search-fields">
         <fieldset class="uk-fieldset"><legend>Wohnfläche · m²</legend><div class="apartment-search-range">{% include "wohnungsverwaltung/_apartment_search_field.html" with field=form.groesse_min label="Von" %}{% include "wohnungsverwaltung/_apartment_search_field.html" with field=form.groesse_max label="Bis" %}</div></fieldset>
@@ -20,6 +22,7 @@
     <div class="apartment-search-filter-actions"><button class="uk-button uk-button-primary" type="submit">Wohnungen anzeigen <span uk-icon="search" aria-hidden="true"></span></button><a href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Filter zurücksetzen</a></div>
     <p class="uk-text-meta apartment-search-filter-note">Wohnungen ohne hinterlegte Miete oder Zimmerzahl werden bei entsprechenden Filtern nicht berücksichtigt.</p>
 </form>
+                </div>
             </aside>
             <div class="apartment-search-results">
                 <div class="apartment-search-result-heading"><h2>{{ result_count }} Wohnung{{ result_count|pluralize:"en" }} {% if has_filters %}gefunden{% else %}verfügbar{% endif %}</h2><span>Nur verfügbare Wohnungen</span></div>

@@ -8,7 +8,7 @@ class AuthPagePatternTests(TestCase):
             with self.subTest(page=name):
                 response = self.client.get(reverse(name))
                 self.assertContains(response, 'class="auth-layout"')
-                self.assertContains(response, "auth-moving-in.png")
+                self.assertContains(response, "auth-moving-in.webp")
                 self.assertContains(response, 'method="post"')
                 self.assertContains(response, 'name="csrfmiddlewaretoken"')
                 self.assertNotContains(response, "Designvorschau")

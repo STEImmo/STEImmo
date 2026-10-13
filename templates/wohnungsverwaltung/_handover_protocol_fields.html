@@ -6,21 +6,21 @@
 <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
     {% for field in form.main_fields %}
         <div>
-            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
             <div class="uk-form-controls">
                 {{ field }}
-                {% if field.help_text %}<p class="uk-text-meta">{{ field.help_text }}</p>{% endif %}
-                {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                {% if field.help_text %}<p class="uk-text-meta" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
+                {% if field.errors %}<div id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
             </div>
         </div>
     {% endfor %}
 </div>
 
 <div class="uk-margin-top" data-protocol-types="move_out">
-    <label class="uk-form-label" for="{{ form.mieter_zukuenftige_anschrift.id_for_label }}">{{ form.mieter_zukuenftige_anschrift.label }}</label>
+    <label class="uk-form-label" for="{{ form.mieter_zukuenftige_anschrift.id_for_label }}">{{ form.mieter_zukuenftige_anschrift.label }}{% if form.mieter_zukuenftige_anschrift.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
     <div class="uk-form-controls">
         {{ form.mieter_zukuenftige_anschrift }}
-        {% for error in form.mieter_zukuenftige_anschrift.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+        {% if form.mieter_zukuenftige_anschrift.errors %}<div id="{{ form.mieter_zukuenftige_anschrift.auto_id }}_error" role="alert">{% for error in form.mieter_zukuenftige_anschrift.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
     </div>
 </div>
 
@@ -51,24 +51,24 @@
             <p class="uk-text-meta">Für die gewählte Wohnung und Person liegt noch kein bestätigter Einzug als Vergleich vor.</p>
         {% endif %}
     </div>
-    <div class="uk-overflow-auto">
+    <div class="uk-overflow-auto" tabindex="0" role="region" aria-label="Übergabetabelle – seitlich scrollbar">
         <table class="uk-table uk-table-divider uk-table-small" data-meter-comparison>
             <thead>
                 <tr>
-                    <th>Zähler</th>
-                    <th>Zählernummer aus den Stammdaten</th>
-                    <th data-protocol-types="move_out">Einzug (alt)</th>
-                    <th><span data-protocol-types="move_in">Zählerstand</span><span data-protocol-types="move_out">Auszug (neu)</span></th>
-                    <th data-protocol-types="move_out">Differenz (neu − alt)</th>
+                    <th scope="col">Zähler</th>
+                    <th scope="col">Zählernummer aus den Stammdaten</th>
+                    <th data-protocol-types="move_out" scope="col">Einzug (alt)</th>
+                    <th scope="col"><span data-protocol-types="move_in">Zählerstand</span><span data-protocol-types="move_out">Auszug (neu)</span></th>
+                    <th data-protocol-types="move_out" scope="col">Differenz (neu − alt)</th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in meter_comparison_rows %}
                     <tr data-meter-comparison-row data-old-meter-reading="{{ row.old_reading|default_if_none:'' }}">
-                        <td><label for="{{ row.field.id_for_label }}">{{ row.label }}</label></td>
+                        <td><label for="{{ row.field.id_for_label }}">{{ row.label }}{% if row.field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label></td>
                         <td>{{ row.number|default:"Nicht gepflegt" }}</td>
                         <td data-protocol-types="move_out">{% if row.old_reading is not None %}{{ row.old_reading|floatformat:2 }}{% else %}—{% endif %}</td>
-                        <td>{{ row.field }}{% for error in row.field.errors %}<p class="uk-text-danger uk-margin-remove">{{ error }}</p>{% endfor %}</td>
+                        <td>{{ row.field }}{% if row.field.errors %}<div id="{{ row.field.auto_id }}_error" role="alert">{% for error in row.field.errors %}<p class="uk-text-danger uk-margin-remove">{{ error }}</p>{% endfor %}</div>{% endif %}</td>
                         <td data-protocol-types="move_out"><output data-meter-difference>—</output></td>
                     </tr>
                 {% endfor %}
@@ -76,10 +76,10 @@
         </table>
     </div>
     <div class="uk-margin-small-top">
-        <label class="uk-form-label" for="{{ form.heizungsablesungen.id_for_label }}">{{ form.heizungsablesungen.label }}</label>
+        <label class="uk-form-label" for="{{ form.heizungsablesungen.id_for_label }}">{{ form.heizungsablesungen.label }}{% if form.heizungsablesungen.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
         <div class="uk-form-controls">
             {{ form.heizungsablesungen }}
-            {% for error in form.heizungsablesungen.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+            {% if form.heizungsablesungen.errors %}<div id="{{ form.heizungsablesungen.auto_id }}_error" role="alert">{% for error in form.heizungsablesungen.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
         </div>
     </div>
 </section>
@@ -89,8 +89,8 @@
     <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
         {% for field in form.move_in_fields %}
             <div>
-                <label>{{ field }} {{ field.label }}</label>
-                {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                <label>{{ field }} {{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
+                {% if field.errors %}<div id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
             </div>
         {% endfor %}
     </div>
@@ -102,10 +102,10 @@
     <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
         {% for field in form.move_out_fields %}
             <div>
-                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                 <div class="uk-form-controls">
                     {{ field }}
-                    {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                    {% if field.errors %}<div id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
                 </div>
             </div>
         {% endfor %}
@@ -119,7 +119,7 @@
     </div>
     <p class="uk-text-meta">Wählen Sie einen Raum aus den Stammdaten der gewählten Wohnung.</p>
     {{ room_formset.management_form }}
-    {% for error in form.removed_rooms.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+    {% if form.removed_rooms.errors %}<div id="{{ form.removed_rooms.auto_id }}_error" role="alert">{% for error in form.removed_rooms.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
     {% if room_formset.non_form_errors %}<div class="uk-alert-danger" role="alert">{{ room_formset.non_form_errors }}</div>{% endif %}
     <div id="room-formset">
         {% for group in room_form_groups %}
@@ -133,10 +133,10 @@
                         <button class="uk-button uk-button-danger uk-button-small" type="button" data-remove-room>Raum entfernen</button>
                     </div>
                     <div class="uk-margin-small-top">
-                        <label class="uk-form-label" for="{{ group.room_form.raum.id_for_label }}">{{ group.room_form.raum.label }}</label>
+                        <label class="uk-form-label" for="{{ group.room_form.raum.id_for_label }}">{{ group.room_form.raum.label }}{% if group.room_form.raum.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                         <div class="uk-form-controls">
                             {{ group.room_form.raum }}
-                            {% for error in group.room_form.raum.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                            {% if group.room_form.raum.errors %}<div id="{{ group.room_form.raum.auto_id }}_error" role="alert">{% for error in group.room_form.raum.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
                         </div>
                     </div>
                 </header>
@@ -146,9 +146,9 @@
                         {% for checklist_form in group.checklist_forms %}
                             <div class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-room-checklist-form>
                                 {{ checklist_form.raumprotokoll }}
-                                {% for error in checklist_form.raumprotokoll.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                                {% if checklist_form.raumprotokoll.errors %}<div id="{{ checklist_form.raumprotokoll.auto_id }}_error" role="alert">{% for error in checklist_form.raumprotokoll.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
                                 {{ checklist_form.pruefpunkt }}
-                                {% for error in checklist_form.pruefpunkt.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                                {% if checklist_form.pruefpunkt.errors %}<div id="{{ checklist_form.pruefpunkt.auto_id }}_error" role="alert">{% for error in checklist_form.pruefpunkt.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
                                 {% if checklist_form.existing_item %}
                                     {% include "wohnungsverwaltung/_protocol_saved_photos.html" with item=checklist_form.existing_item %}
                                 {% endif %}
@@ -160,14 +160,14 @@
                                     {% for field in checklist_form.visible_fields %}
                                         {% if field.name != "raum" and field.name != "DELETE" and field.name != "fotos" or field.name == "fotos" and checklist_form.allow_photo_upload %}
                                             <div{% if field.name == "wert" or field.name == "fotos" %} class="uk-width-1-1"{% endif %}>
-                                                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                                                 <div class="uk-form-controls">
                                                     {% if field.name == "fotos" %}
                                                         {% include "wohnungsverwaltung/_photo_picker.html" with field=field %}
                                                     {% else %}
                                                         {{ field }}
                                                     {% endif %}
-                                                    {% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                                                    {% if field.errors %}<div id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
                                                 </div>
                                                 {% if field.name == "fotos" %}<p class="uk-text-meta uk-margin-small-top">JPEG, PNG oder WebP, maximal 8 MiB je Bild. Die Fotos werden erst beim Speichern des Protokolls übertragen und nicht im Entwurf zwischengespeichert.</p>{% endif %}
                                             </div>
@@ -175,7 +175,7 @@
                                     {% endfor %}
                                 </div>
                                 {{ checklist_form.zusatzangaben }}
-                                {% for error in checklist_form.zusatzangaben.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}
+                                {% if checklist_form.zusatzangaben.errors %}<div id="{{ checklist_form.zusatzangaben.auto_id }}_error" role="alert">{% for error in checklist_form.zusatzangaben.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
                                 <button class="uk-button uk-button-danger uk-button-small uk-margin-small-top" type="button" data-remove-room-checklist>Prüfpunkt entfernen</button>
                             </div>
                         {% endfor %}
@@ -193,7 +193,7 @@
                     <button class="uk-button uk-button-danger uk-button-small" type="button" data-remove-room>Raum entfernen</button>
                 </div>
                 <div class="uk-margin-small-top">
-                    <label class="uk-form-label" for="{{ room_formset.empty_form.raum.id_for_label }}">{{ room_formset.empty_form.raum.label }}</label>
+                    <label class="uk-form-label" for="{{ room_formset.empty_form.raum.id_for_label }}">{{ room_formset.empty_form.raum.label }}{% if room_formset.empty_form.raum.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                     <div class="uk-form-controls">{{ room_formset.empty_form.raum }}</div>
                 </div>
             </header>
@@ -208,7 +208,7 @@
                             {% for field in room_formset.empty_form.visible_fields %}
                                 {% if field.name != "raum" and field.name != "DELETE" and field.name != "fotos" or field.name == "fotos" and room_formset.empty_form.allow_photo_upload %}
                                     <div{% if field.name == "wert" or field.name == "fotos" %} class="uk-width-1-1"{% endif %}>
-                                        <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                        <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                                         <div class="uk-form-controls">
                                             {% if field.name == "fotos" %}
                                                 {% include "wohnungsverwaltung/_photo_picker.html" with field=field %}
@@ -239,7 +239,7 @@
                 {% for field in room_formset.empty_form.visible_fields %}
                     {% if field.name != "raum" and field.name != "DELETE" and field.name != "fotos" or field.name == "fotos" and room_formset.empty_form.allow_photo_upload %}
                         <div{% if field.name == "wert" or field.name == "fotos" %} class="uk-width-1-1"{% endif %}>
-                            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                             <div class="uk-form-controls">
                                 {% if field.name == "fotos" %}
                                     {% include "wohnungsverwaltung/_photo_picker.html" with field=field %}
@@ -268,13 +268,13 @@
     <div id="key-formset">
         {% for inline_form in key_formset %}
             <article class="uk-card uk-card-muted uk-card-body uk-margin-small-bottom" data-formset-row data-key-formset-row>
-                {% for hidden in inline_form.hidden_fields %}{{ hidden }}{% for error in hidden.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}{% endfor %}
+                {% for hidden in inline_form.hidden_fields %}{{ hidden }}{% if hidden.errors %}<div id="{{ hidden.auto_id }}_error" role="alert">{% for error in hidden.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}{% endfor %}
                 <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
                     {% for field in inline_form.visible_fields %}
                         {% if field.name != "DELETE" %}
                             <div>
-                                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                                <div class="uk-form-controls">{{ field }}{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>
+                                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
+                                <div class="uk-form-controls">{{ field }}{% if field.errors %}<div id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}</div>
                             </div>
                         {% endif %}
                     {% endfor %}
@@ -291,7 +291,7 @@
                 {% for field in key_formset.empty_form.visible_fields %}
                     {% if field.name != "DELETE" %}
                         <div>
-                            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                             <div class="uk-form-controls">{{ field }}</div>
                         </div>
                     {% endif %}

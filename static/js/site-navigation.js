@@ -28,3 +28,22 @@
         requestAnimationFrame(() => focusAfterClose.focus());
     });
 })();
+
+(() => {
+    const toggle = document.querySelector("[data-mobile-filter-toggle]");
+    const body = document.getElementById("apartment-filter-body");
+    if (!toggle || !body) return;
+    const mobile = window.matchMedia("(max-width: 959px)");
+    let expanded = body.dataset.filterErrors === "true";
+    const update = () => {
+        body.hidden = mobile.matches && !expanded;
+        toggle.setAttribute("aria-expanded", String(!body.hidden));
+        toggle.textContent = `${body.hidden ? "Filter anzeigen" : "Filter schließen"}${toggle.dataset.activeLabel || ""}`;
+    };
+    toggle.dataset.activeLabel = toggle.textContent.includes("Filter aktiv") ? " · Filter aktiv" : "";
+    toggle.hidden = false;
+    toggle.closest("aside").dataset.collapsible = "true";
+    toggle.addEventListener("click", () => { expanded = !expanded; update(); });
+    mobile.addEventListener("change", update);
+    update();
+})();

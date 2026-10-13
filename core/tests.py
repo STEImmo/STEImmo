@@ -1,5 +1,7 @@
+from django import forms
 from django.core.exceptions import PermissionDenied, SuspiciousOperation
 from django.http import Http404
+from django.template.loader import render_to_string
 from django.test import Client, RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import include, path, reverse
 
@@ -50,6 +52,32 @@ class ErrorPageTests(SimpleTestCase):
     def test_missing_csrf_token_uses_error_page_and_still_rejects_submission(self):
         response = Client(enforce_csrf_checks=True).post("/accounts/logout/")
         self.assertContains(response, "Bitte erneut versuchen", status_code=403)
+
+
+class SharedFormFieldTests(SimpleTestCase):
+    def test_required_field_exposes_help_and_error_targets(self):
+        class ExampleForm(forms.Form):
+            name = forms.CharField(label="Name", help_text="Bitte den Namen eingeben.")
+
+        form = ExampleForm(data={})
+        self.assertFalse(form.is_valid())
+        markup = render_to_string("wohnungsverwaltung/_form_field.html", {"field": form["name"]})
+        self.assertIn('for="id_name"', markup)
+        self.assertIn('aria-label="Pflichtfeld"', markup)
+        self.assertIn('id="id_name_helptext"', markup)
+        self.assertIn('id="id_name_error"', markup)
+        self.assertIn('aria-invalid="true"', markup)
+        for target in form["name"].aria_describedby.split():
+            self.assertIn(f'id="{target}"', markup)
+
+    def test_optional_field_is_not_marked_as_required(self):
+        class ExampleForm(forms.Form):
+            note = forms.CharField(required=False, label="Hinweis")
+
+        markup = render_to_string(
+            "wohnungsverwaltung/_form_field.html", {"field": ExampleForm()["note"]}
+        )
+        self.assertNotIn('aria-label="Pflichtfeld"', markup)
 
 
 class FoundationViewTests(TestCase):

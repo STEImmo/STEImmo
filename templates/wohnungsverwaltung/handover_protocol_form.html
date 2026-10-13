@@ -20,6 +20,7 @@
                 </div>
             </div>
             <p class="uk-text-meta" aria-live="polite" data-protocol-draft-status></p>
+            <p class="uk-text-meta" role="status" aria-live="polite" data-dependent-fields-status></p>
             {% include "wohnungsverwaltung/_handover_protocol_fields.html" %}
             <div class="uk-margin-large-top uk-flex uk-flex-right uk-flex-middle handover-form-actions">
                 <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Abbrechen</a>
@@ -60,58 +61,76 @@
 
         const apartmentSelect = document.getElementById("id_wohnung");
         let loadedApartmentId = apartmentSelect?.value || "";
+        const dependentFieldsStatus = document.querySelector("[data-dependent-fields-status]");
+        const showDependentFieldsStatus = (message, failed = false) => {
+            dependentFieldsStatus.textContent = message;
+            dependentFieldsStatus.classList.toggle("uk-text-danger", failed);
+            dependentFieldsStatus.classList.toggle("uk-text-meta", !failed);
+        };
         const updateApartmentDependentFields = async () => {
             if (!apartmentSelect) {
                 return false;
             }
-            const url = new URL(window.location.href);
-            if (apartmentSelect.value) {
-                url.searchParams.set("wohnung", apartmentSelect.value);
-            } else {
-                url.searchParams.delete("wohnung");
-            }
-            const personSelect = document.getElementById("id_person");
-            if (personSelect?.value) {
-                url.searchParams.set("person", personSelect.value);
-            } else {
-                url.searchParams.delete("person");
-            }
-            const response = await fetch(url);
-            if (!response.ok) {
-                return false;
-            }
-            const updatedPage = new DOMParser().parseFromString(await response.text(), "text/html");
-            const apartmentChanged = loadedApartmentId !== apartmentSelect.value;
-            const meterValues = new Map(Array.from(document.querySelectorAll(
-                '#meter-reading-section input[name]:not(:disabled)',
-            )).map((field) => [field.name, field.value]));
-            [
-                "id_person",
-                "meter-reading-section",
-                "key-formset-management",
-                "key-formset",
-                "room-formset-section",
-                "move-in-reference",
-            ].forEach((id) => {
-                if (!apartmentChanged && ["key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
-                    return;
+            showDependentFieldsStatus("Angaben zur Auswahl werden geladen …");
+            protocolForm.setAttribute("aria-busy", "true");
+            try {
+                const url = new URL(window.location.href);
+                if (apartmentSelect.value) {
+                    url.searchParams.set("wohnung", apartmentSelect.value);
+                } else {
+                    url.searchParams.delete("wohnung");
                 }
-                const currentElement = document.getElementById(id);
-                const updatedElement = updatedPage.getElementById(id);
-                if (currentElement && updatedElement) {
-                    currentElement.replaceWith(updatedElement);
+                const personSelect = document.getElementById("id_person");
+                if (personSelect?.value) {
+                    url.searchParams.set("person", personSelect.value);
+                } else {
+                    url.searchParams.delete("person");
                 }
-            });
-            document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
-                if (meterValues.has(field.name)) {
-                    field.value = meterValues.get(field.name);
+                const response = await fetch(url);
+                if (!response.ok) {
+                    showDependentFieldsStatus("Die Angaben konnten nicht geladen werden. Bitte wählen Sie erneut aus oder laden Sie die Seite neu. Noch nicht gespeicherte Eingaben vorher prüfen.", true);
+                    return false;
                 }
-            });
-            loadedApartmentId = apartmentSelect.value;
-            document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
-            document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
-            window.history.replaceState(null, "", url);
-            return true;
+                const updatedPage = new DOMParser().parseFromString(await response.text(), "text/html");
+                const apartmentChanged = loadedApartmentId !== apartmentSelect.value;
+                const meterValues = new Map(Array.from(document.querySelectorAll(
+                    '#meter-reading-section input[name]:not(:disabled)',
+                )).map((field) => [field.name, field.value]));
+                [
+                    "id_person",
+                    "meter-reading-section",
+                    "key-formset-management",
+                    "key-formset",
+                    "room-formset-section",
+                    "move-in-reference",
+                ].forEach((id) => {
+                    if (!apartmentChanged && ["key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
+                        return;
+                    }
+                    const currentElement = document.getElementById(id);
+                    const updatedElement = updatedPage.getElementById(id);
+                    if (currentElement && updatedElement) {
+                        currentElement.replaceWith(updatedElement);
+                    }
+                });
+                document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
+                    if (meterValues.has(field.name)) {
+                        field.value = meterValues.get(field.name);
+                    }
+                });
+                loadedApartmentId = apartmentSelect.value;
+                document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
+                document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
+                window.history.replaceState(null, "", url);
+                showDependentFieldsStatus("Angaben zur Auswahl wurden aktualisiert.");
+                return true;
+            } catch (error) {
+                showDependentFieldsStatus("Die Angaben konnten nicht geladen werden. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.", true);
+                // Keep the existing failure behavior; this change only adds visible feedback.
+                throw error;
+            } finally {
+                protocolForm.removeAttribute("aria-busy");
+            }
         };
         if (apartmentSelect) {
             apartmentSelect.addEventListener("change", async () => {

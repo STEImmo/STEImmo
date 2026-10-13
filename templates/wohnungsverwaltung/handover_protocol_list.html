@@ -18,14 +18,14 @@
             <div class="uk-card uk-card-default uk-card-body handover-card uk-margin-bottom">
                 <h2 class="handover-section-title">Gespeicherte Entwürfe</h2>
                 <p class="uk-text-meta">Entwürfe dieses Browsers werden automatisch zwischengespeichert und können fortgesetzt werden.</p>
-                <div class="uk-overflow-auto">
+                <div class="uk-overflow-auto" tabindex="0" role="region" aria-label="Übergabetabelle – seitlich scrollbar">
                     <table class="uk-table uk-table-divider uk-table-middle uk-margin-remove">
                         <thead>
                             <tr>
-                                <th>Wohnung</th>
-                                <th>Übergabeart</th>
-                                <th>Zuletzt gespeichert</th>
-                                <th><span class="uk-hidden">Aktion</span></th>
+                                <th scope="col">Wohnung</th>
+                                <th scope="col">Übergabeart</th>
+                                <th scope="col">Zuletzt gespeichert</th>
+                                <th scope="col"><span class="uk-hidden-visually">Aktion</span></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -50,15 +50,15 @@
         {% endif %}
 
         {% if protocols %}
-            <div class="uk-overflow-auto uk-card uk-card-default">
+            <div class="uk-overflow-auto uk-card uk-card-default" tabindex="0" role="region" aria-label="Übergabetabelle – seitlich scrollbar">
                 <table class="uk-table uk-table-divider uk-table-middle uk-margin-remove">
                     <thead>
                         <tr>
-                            <th>Wohnung</th>
-                            <th>Übergabeart</th>
-                            <th>Beteiligte Person</th>
-                            <th>Bearbeitungsstand</th>
-                            <th><span class="uk-hidden">Aktion</span></th>
+                            <th scope="col">Wohnung</th>
+                            <th scope="col">Übergabeart</th>
+                            <th scope="col">Beteiligte Person</th>
+                            <th scope="col">Bearbeitungsstand</th>
+                            <th scope="col"><span class="uk-hidden-visually">Aktion</span></th>
                         </tr>
                     </thead>
                     <tbody>

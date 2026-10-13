@@ -1,15 +1,15 @@
 <div class="uk-margin">
     {% if field.field.widget.input_type == "checkbox" %}
         <div class="uk-form-label uk-invisible" aria-hidden="true">&nbsp;</div>
-        <label>{{ field }} {{ field.label }}</label>
+        <label>{{ field }} {{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
     {% else %}
-        {{ field.label_tag }}
+        <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
         {{ field }}
     {% endif %}
     {% if field.help_text %}
-        <div class="uk-text-meta uk-text-small">{{ field.help_text }}</div>
+        <div class="uk-text-meta uk-text-small" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>
     {% endif %}
-    {% for error in field.errors %}
+    {% if field.errors %}<div id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}
         <div class="uk-text-danger uk-text-small">{{ error }}</div>
-    {% endfor %}
+    {% endfor %}</div>{% endif %}
 </div>
