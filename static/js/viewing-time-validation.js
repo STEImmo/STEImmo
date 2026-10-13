@@ -27,8 +27,11 @@
         const parsedNow = Date.parse(form.dataset.currentTime);
         const serverNow = Number.isFinite(parsedNow) ? parsedNow : Date.now();
         const loadedAt = performance.now();
-        let automaticEnd = !end.value && !end.validity.badInput;
-        let previousStart = null;
+        const initialStart = asMinutes(start.value);
+        const initialEnd = asMinutes(end.value);
+        let duration = initialStart !== null && initialEnd !== null && initialEnd > initialStart
+            ? initialEnd - initialStart : 30;
+        let previousStart = end.value || end.validity.badInput ? start.value : null;
         const fields = [date, start, end, reason].map((input) => {
             const error = document.createElement("span");
             error.id = `${input.id}_live_error`;
@@ -46,17 +49,17 @@
             const record = action.value === "record";
             const sameDay = date.value === today;
             const startMinute = asMinutes(start.value);
-            if (automaticEnd && start.value !== previousStart) {
+            if (start.value !== previousStart) {
                 // Keep the suggestion on the same day; never wrap into tomorrow.
-                const suggestion = startMinute !== null && startMinute + 30 < 1440
-                    ? asTime(startMinute + 30) : "";
+                const suggestion = startMinute !== null && startMinute + duration < 1440
+                    ? asTime(startMinute + duration) : "";
                 if (end.value !== suggestion) end.value = suggestion;
             }
             previousStart = start.value;
             const endMinute = asMinutes(end.value);
             const messages = new Map();
-            if (automaticEnd && startMinute !== null && startMinute + 30 >= 1440) {
-                messages.set(end, "30 Minuten würden über Mitternacht hinausgehen. Bitte wählen Sie eine Endzeit am selben Tag.");
+            if (!end.value && startMinute !== null && startMinute + duration >= 1440) {
+                messages.set(end, `${duration} Minuten würden über Mitternacht hinausgehen. Bitte wählen Sie eine Endzeit am selben Tag.`);
             }
 
             // A same-day appointment needs at least two distinct minute values.
@@ -119,14 +122,20 @@
                 ) {
                     // Populate real minutes before the browser edits the hour
                     // segment; its grey placeholder is not a submitted value.
-                    if (input === end) automaticEnd = false;
                     input.value = "00:00";
                     validate();
                 }
             });
         });
         const handleEdit = (event) => {
-            if (event.target === end) automaticEnd = false;
+            if (event.target === end) {
+                const startMinute = asMinutes(start.value);
+                const endMinute = asMinutes(end.value);
+                // Incomplete or invalid edits must not replace the last valid duration.
+                if (startMinute !== null && endMinute !== null && endMinute > startMinute) {
+                    duration = endMinute - startMinute;
+                }
+            }
             validate();
         };
         form.addEventListener("input", handleEdit);
