@@ -31,6 +31,7 @@
         const initialEnd = asMinutes(end.value);
         let duration = initialStart !== null && initialEnd !== null && initialEnd > initialStart
             ? initialEnd - initialStart : 30;
+        let endEditedBeforeStart = false;
         let previousStart = end.value || end.validity.badInput ? start.value : null;
         const fields = [date, start, end, reason].map((input) => {
             const error = document.createElement("span");
@@ -50,10 +51,18 @@
             const sameDay = date.value === today;
             const startMinute = asMinutes(start.value);
             if (start.value !== previousStart) {
-                // Keep the suggestion on the same day; never wrap into tomorrow.
-                const suggestion = startMinute !== null && startMinute + duration < 1440
-                    ? asTime(startMinute + duration) : "";
-                if (end.value !== suggestion) end.value = suggestion;
+                const endMinute = asMinutes(end.value);
+                if (endEditedBeforeStart && startMinute !== null && endMinute !== null) {
+                    if (endMinute > startMinute) {
+                        duration = endMinute - startMinute;
+                        endEditedBeforeStart = false;
+                    }
+                } else {
+                    // Keep the suggestion on the same day; never wrap into tomorrow.
+                    const suggestion = startMinute !== null && startMinute + duration < 1440
+                        ? asTime(startMinute + duration) : "";
+                    if (end.value !== suggestion) end.value = suggestion;
+                }
             }
             previousStart = start.value;
             const endMinute = asMinutes(end.value);
@@ -132,8 +141,11 @@
                 const startMinute = asMinutes(start.value);
                 const endMinute = asMinutes(end.value);
                 // Incomplete or invalid edits must not replace the last valid duration.
-                if (startMinute !== null && endMinute !== null && endMinute > startMinute) {
+                if (startMinute === null && endMinute !== null) {
+                    endEditedBeforeStart = true;
+                } else if (startMinute !== null && endMinute !== null && endMinute > startMinute) {
                     duration = endMinute - startMinute;
+                    endEditedBeforeStart = false;
                 }
             }
             validate();

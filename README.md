@@ -237,10 +237,11 @@ Die serverseitige Prüfung bleibt unabhängig davon verbindlich.
 Bei der Stundeneingabe in ein leeres Zeitfeld werden die Minuten tatsächlich mit
 `00` vorbelegt. Bereits eingetragene Minuten bleiben bei einer Änderung der Stunde
 erhalten.
-Neue Termine erhalten standardmäßig eine Dauer von 30 Minuten. Wird die Endzeit
-geändert, merkt sich das Formular die zuletzt gültige Dauer. Bei Änderungen am
-Beginn wandert die Endzeit entsprechend mit: `14:00–14:45` wird beispielsweise zu
-`15:00–15:45`. Bei bestehenden Terminen wird die gespeicherte Dauer übernommen.
+Neue Termine erhalten standardmäßig eine Dauer von 30 Minuten. Änderungen an
+der Endzeit legen eine neue Dauer fest, die bei Änderungen am Beginn erhalten
+bleibt – unabhängig davon, welches Feld zuerst bearbeitet wurde:
+`14:00–14:45` wird beispielsweise zu `15:00–15:45`. Bei bestehenden Terminen
+wird die gespeicherte Dauer übernommen.
 Würde die Endzeit über Mitternacht hinausgehen, muss eine Endzeit am selben Tag
 gewählt werden.
 
