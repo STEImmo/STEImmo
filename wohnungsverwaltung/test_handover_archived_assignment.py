@@ -26,6 +26,7 @@ class HandoverArchivedAssignmentTests(TestCase):
                 "warmmiete": "790.00",
                 "kaution": "1300.00",
                 "status": self.unit.status,
+                "requirements_version": str(self.unit.requirements_version),
                 "zaehlernummer_wasser_kalt": "WK-1",
                 "zaehlernummer_wasser_warm": "WW-1",
                 "zaehlernummer_heizung": "HZ-1",

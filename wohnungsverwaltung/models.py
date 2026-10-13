@@ -6,7 +6,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from .fields import PostgreSQLEnumField
@@ -334,6 +334,11 @@ class Wohnung(models.Model):
     heating_type = models.CharField(max_length=120, blank=True, default="")
     energy_information = models.TextField(blank=True, default="", max_length=3000)
     planned_move_in = models.CharField(max_length=120, blank=True, default="")
+    max_occupants = models.PositiveSmallIntegerField(blank=True, null=True)
+    occupancy_requirement_reason = models.TextField(blank=True, default="")
+    pet_review_required = models.BooleanField(blank=True, null=True)
+    pet_review_reason = models.TextField(blank=True, default="")
+    requirements_version = models.PositiveIntegerField(default=1, editable=False)
     status = PostgreSQLEnumField(
         enum_type="wohnung_status_enum",
         choices=WohnungStatus.choices,
@@ -370,6 +375,80 @@ class Wohnung(models.Model):
     def __str__(self) -> str:
         return f"Gebäude {self.gebaeudenummer}, Wohnung {self.wohnungsnummer}"
 
+    def occupancy_decline_reason(self, people_count: int) -> str:
+        return (
+            f"Haushalt mit {people_count} Personen überschreitet die Höchstzahl von "
+            f"{self.max_occupants} Personen. Wohnungsanforderung: "
+            f"{self.occupancy_requirement_reason}"
+        ).strip()
+
+    def save(self, *args, **kwargs):
+        requirement_fields = (
+            "max_occupants",
+            "occupancy_requirement_reason",
+            "pet_review_required",
+            "pet_review_reason",
+        )
+        if self._state.adding:
+            return super().save(*args, **kwargs)
+
+        with transaction.atomic():
+            previous = (
+                type(self)
+                .objects.select_for_update()
+                .filter(pk=self.pk)
+                .values(*requirement_fields, "requirements_version")
+                .first()
+            )
+            update_fields = kwargs.get("update_fields")
+            fields_to_check = (
+                set(requirement_fields)
+                if update_fields is None
+                else set(requirement_fields) & set(update_fields)
+            )
+            requirements_changed = previous and any(
+                getattr(self, field) != previous[field] for field in fields_to_check
+            )
+            occupancy_limit_changed = (
+                previous
+                and "max_occupants" in fields_to_check
+                and self.max_occupants != previous["max_occupants"]
+            )
+            if previous:
+                self.requirements_version = previous["requirements_version"]
+            if requirements_changed:
+                self.requirements_version += 1
+                if update_fields is not None:
+                    kwargs["update_fields"] = {*update_fields, "requirements_version"}
+            saved = super().save(*args, **kwargs)
+            if occupancy_limit_changed and self.max_occupants is not None:
+                now = timezone.now()
+                applications = list(
+                    Bewerbung.objects.select_for_update()
+                    .filter(
+                        wohnung_id=self.pk,
+                        status=BewerbungStatus.OPEN,
+                        interest_withdrawn_at__isnull=True,
+                        main_application_unlocked=False,
+                        submitted_at__isnull=True,
+                        personenanzahl__gt=self.max_occupants,
+                    )
+                    .values_list("pk", "personenanzahl")
+                )
+                for application_id, people_count in applications:
+                    Bewerbung.objects.filter(pk=application_id).update(
+                        status=BewerbungStatus.DECLINED,
+                        updated_at=now,
+                    )
+                    ApplicationReviewEvent.objects.create(
+                        application_id=application_id,
+                        kind=ApplicationReviewEvent.Kind.OCCUPANCY_DECLINED,
+                        to_value=BewerbungStatus.DECLINED,
+                        reason=self.occupancy_decline_reason(people_count),
+                        requirements_version=self.requirements_version,
+                    )
+            return saved
+
 
 def apartment_photo_upload_path(instance, _filename):
     return f"apartments/{instance.apartment_id}/{uuid.uuid4().hex}.jpg"
@@ -387,10 +466,21 @@ class ApartmentPhoto(models.Model):
 
 
 class Bewerbung(models.Model):
+    class Priority(models.IntegerChoices):
+        UNRATED = 0, "Unbewertet"
+        LOW = 1, "Niedrig"
+        NORMAL = 2, "Normal"
+        HIGH = 3, "Hoch"
+
     bewerbung_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="bewerbungen")
     wohnung = models.ForeignKey(Wohnung, on_delete=models.CASCADE, related_name="bewerbungen")
     score = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    review_priority = models.PositiveSmallIntegerField(
+        choices=Priority.choices,
+        default=Priority.UNRATED,
+    )
+    review_priority_reason = models.TextField(blank=True, default="")
     personenanzahl = models.PositiveSmallIntegerField(default=1, validators=[MinValueValidator(1)])
     ueber_mich = models.TextField()
     haustiere = models.BooleanField(default=False)
@@ -451,6 +541,13 @@ class Bewerbung(models.Model):
             and self.interest_withdrawn_at is None
         )
 
+    @property
+    def suitability_review_flags(self) -> tuple[str, ...]:
+        flags = []
+        if self.wohnung.pet_review_required is True and self.haustiere:
+            flags.append("Tierhaltung muss geprüft werden")
+        return tuple(flags)
+
     def get_applicant_status_display(self) -> str:
         if self.interest_withdrawn_at is not None:
             return "Zurückgezogen"
@@ -476,6 +573,52 @@ class Bewerbung(models.Model):
         if self.main_application_unlocked:
             return "Bitte reichen Sie die Main-Bewerbung mit allen drei Nachweisen ein."
         return "Warten Sie auf die nächste Rückmeldung zu Ihrer Bewerbung."
+
+
+class ApplicationReviewEvent(models.Model):
+    class Kind(models.TextChoices):
+        PRIORITY_CHANGED = "priority_changed", "Priorität geändert"
+        ELIGIBILITY_APPROVED = "eligibility_approved", "Einzelfall freigegeben"
+        OCCUPANCY_DECLINED = "occupancy_declined", "Wegen Belegungsgrenze abgelehnt"
+        MAIN_UNLOCKED = "main_unlocked", "Main-Bewerbung freigeschaltet"
+        INVITATION_SENT = "invitation_sent", "Einladung per E-Mail versendet"
+        INVITATION_FAILED = "invitation_failed", "Einladungsversand fehlgeschlagen"
+
+    review_event_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    application = models.ForeignKey(
+        Bewerbung,
+        on_delete=models.CASCADE,
+        related_name="review_events",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="application_review_events",
+    )
+    kind = models.CharField(max_length=32, choices=Kind.choices)
+    from_value = models.CharField(max_length=32, blank=True, default="")
+    to_value = models.CharField(max_length=32, blank=True, default="")
+    reason = models.TextField(blank=True, default="")
+    requirements_version = models.PositiveIntegerField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def get_priority_change_display(self) -> str:
+        labels = {str(value): label for value, label in Bewerbung.Priority.choices}
+        previous = labels.get(self.from_value, "Unbekannt")
+        current = labels.get(self.to_value, "Unbekannt")
+        return f"{previous} → {current}"
+
+    class Meta:
+        db_table = "application_review_event"
+        ordering = ("-created_at", "-review_event_id")
+        indexes = [
+            models.Index(
+                fields=("application", "kind", "requirements_version"),
+                name="review_app_kind_version_idx",
+            ),
+        ]
 
 
 class ApplicationProof(models.Model):

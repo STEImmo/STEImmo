@@ -43,6 +43,7 @@ from .models import (
     ApplicationProof,
     ApplicationProofCategory,
     Bewerbung,
+    BewerbungStatus,
     EmployeeLoginVerification,
     Merkmal,
     Person,
@@ -1857,6 +1858,24 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
         label="Verfügbarkeitsstatus",
         widget=forms.Select(attrs={"class": "uk-select"}),
     )
+    max_occupants = forms.IntegerField(
+        required=False,
+        min_value=1,
+        label="Höchstzahl einziehender Personen",
+        widget=forms.NumberInput(attrs={"min": "1", "step": "1"}),
+    )
+    pet_review_required = forms.TypedChoiceField(
+        required=False,
+        choices=(
+            ("", "Noch nicht festgelegt"),
+            (True, "Ja, Tierhaltungsangaben einzeln prüfen"),
+            (False, "Nein, keine gesonderte Tierhaltungsprüfung"),
+        ),
+        coerce=lambda value: {"True": True, "False": False}.get(value),
+        empty_value=None,
+        label="Gesonderte Tierhaltungsprüfung",
+        widget=forms.Select(attrs={"class": "uk-select"}),
+    )
 
     class Meta:
         model = Wohnung
@@ -1866,6 +1885,10 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "etage",
             "groesse_qm",
             "zimmeranzahl",
+            "max_occupants",
+            "occupancy_requirement_reason",
+            "pet_review_required",
+            "pet_review_reason",
             "kaltmiete",
             "warmmiete",
             "kaution",
@@ -1886,6 +1909,8 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
             "etage": "Etage",
             "groesse_qm": "Größe (m²)",
             "zimmeranzahl": "Zimmeranzahl",
+            "occupancy_requirement_reason": "Begründung der Belegungsanforderung",
+            "pet_review_reason": "Begründung der Tierhaltungsregel",
             "kaltmiete": "Kaltmiete (€)",
             "warmmiete": "Warmmiete (€)",
             "kaution": "Kaution (€)",
@@ -1913,6 +1938,102 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
                 "Auch ungefähre Angaben sind möglich, zum Beispiel: Voraussichtlich März 2027."
             ),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if (
+            cleaned_data.get("max_occupants") is not None
+            and not cleaned_data.get("occupancy_requirement_reason", "").strip()
+        ):
+            self.add_error(
+                "occupancy_requirement_reason",
+                "Bitte begründen Sie die Höchstzahl einziehender Personen.",
+            )
+        if (
+            cleaned_data.get("pet_review_required") is not None
+            and not cleaned_data.get("pet_review_reason", "").strip()
+        ):
+            self.add_error("pet_review_reason", "Bitte begründen Sie die Tierhaltungsregel.")
+        return cleaned_data
+
+
+class EmployeeApplicationFilterForm(UIkitFormMixin, forms.Form):
+    status = forms.ChoiceField(
+        required=False,
+        choices=(
+            ("", "Alle Bearbeitungsstatus"),
+            (BewerbungStatus.OPEN, "Offen"),
+            (BewerbungStatus.DECLINED, "Abgelehnt"),
+            (BewerbungStatus.BLOCKED, "Gesperrt"),
+            ("withdrawn", "Zurückgezogen"),
+        ),
+        label="Bearbeitungsstatus",
+    )
+    main_status = forms.ChoiceField(
+        required=False,
+        choices=(
+            ("", "Alle Main-Status"),
+            ("pending", "Noch nicht freigeschaltet"),
+            ("unlocked", "Freigeschaltet"),
+            ("submitted", "Eingereicht"),
+        ),
+        label="Main-Status",
+    )
+    priority = forms.ChoiceField(
+        required=False,
+        choices=(("", "Alle Prioritäten"), *Bewerbung.Priority.choices),
+        label="Priorität",
+    )
+    people = forms.IntegerField(required=False, min_value=1, label="Personenanzahl")
+    q = forms.CharField(required=False, strip=True, label="Name oder E-Mail")
+    created_from = forms.DateField(
+        required=False, label="Eingang ab", widget=forms.DateInput(attrs={"type": "date"})
+    )
+    created_to = forms.DateField(
+        required=False, label="Eingang bis", widget=forms.DateInput(attrs={"type": "date"})
+    )
+    sort = forms.ChoiceField(
+        required=False,
+        choices=(("newest", "Neueste zuerst"), ("priority", "Priorität zuerst")),
+        initial="newest",
+        label="Sortierung",
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        created_from = cleaned_data.get("created_from")
+        created_to = cleaned_data.get("created_to")
+        if created_from and created_to and created_from > created_to:
+            self.add_error("created_to", "Das Enddatum muss nach dem Anfangsdatum liegen.")
+        return cleaned_data
+
+
+class ApplicationPriorityForm(UIkitFormMixin, forms.Form):
+    priority = forms.ChoiceField(choices=Bewerbung.Priority.choices, label="Priorität")
+    reason = forms.CharField(
+        label="Begründung",
+        strip=True,
+        widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 2}),
+    )
+
+
+class EligibilityApprovalForm(UIkitFormMixin, forms.Form):
+    reason = forms.CharField(
+        label="Begründung der Einzelfallfreigabe",
+        strip=True,
+        widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
+    )
+
+
+class MainApplicationInvitationForm(UIkitFormMixin, forms.Form):
+    confirm_positive_decision = forms.BooleanField(
+        label="Ich bestätige die positive Entscheidung nach persönlicher Prüfung.",
+    )
+    reason = forms.CharField(
+        label="Begründung der Freischaltung",
+        strip=True,
+        widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
+    )
 
 
 class RaumForm(UIkitFormMixin, forms.ModelForm):

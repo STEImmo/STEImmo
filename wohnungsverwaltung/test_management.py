@@ -51,6 +51,7 @@ class ManagementViewTests(TestCase):
             "warmmiete": "790.00",
             "kaution": "1300.00",
             "status": WohnungStatus.FREE,
+            "requirements_version": "1",
             "zaehlernummer_wasser_kalt": "KW-1",
             "zaehlernummer_wasser_warm": "WW-2",
             "zaehlernummer_heizung": "HZ-3",
@@ -88,6 +89,82 @@ class ManagementViewTests(TestCase):
             "planned_move_in",
         ):
             self.assertEqual(getattr(unit, name), payload[name])
+
+    def test_stale_apartment_form_cannot_overwrite_newer_selection_requirements(self):
+        self.client.force_login(self.employee_user)
+        wohnung = Wohnung.objects.create(
+            gebaeudenummer="B",
+            wohnungsnummer="17",
+            max_occupants=4,
+            occupancy_requirement_reason="Grundriss und nutzbare Schlafräume",
+            pet_review_required=False,
+            pet_review_reason="Keine gesonderte Tierhaltungsprüfung",
+        )
+        url = reverse("verwaltung:wohnung_edit", args=[wohnung.pk])
+        initial_response = self.client.get(url)
+        self.client.get(url)
+        self.assertContains(initial_response, 'name="requirements_version" value="1"')
+
+        self.client.post(
+            url,
+            self.wohnung_payload()
+            | {
+                "max_occupants": "2",
+                "occupancy_requirement_reason": "Grundriss und nutzbare Schlafräume",
+                "pet_review_required": "False",
+                "pet_review_reason": "Keine gesonderte Tierhaltungsprüfung",
+            },
+        )
+        stale_payload = self.wohnung_payload() | {
+            "max_occupants": "4",
+            "occupancy_requirement_reason": "Grundriss und nutzbare Schlafräume",
+            "pet_review_required": "False",
+            "pet_review_reason": "Tierhaltungsregel wurde separat geändert",
+        }
+        invalid_stale_response = self.client.post(url, stale_payload | {"wohnungsnummer": ""})
+        self.assertEqual(invalid_stale_response.status_code, 200)
+        self.assertContains(
+            invalid_stale_response,
+            'name="requirements_version" value="1"',
+        )
+        stale_response = self.client.post(url, stale_payload)
+
+        wohnung.refresh_from_db()
+        self.assertEqual(stale_response.status_code, 302)
+        self.assertEqual(wohnung.max_occupants, 2)
+        self.assertContains(
+            self.client.get(url),
+            "Die Wohnungsanforderungen wurden zwischenzeitlich geändert.",
+        )
+
+    def test_apartment_edit_preserves_saved_pet_review_settings(self):
+        self.client.force_login(self.employee_user)
+        for value, choice in ((True, "True"), (False, "False")):
+            with self.subTest(value=value):
+                wohnung = Wohnung.objects.create(
+                    gebaeudenummer="B",
+                    wohnungsnummer=f"pet-rule-{value}",
+                    pet_review_required=value,
+                    pet_review_reason="Prüfung der konkreten Tierhaltung",
+                )
+                url = reverse("verwaltung:wohnung_edit", args=[wohnung.pk])
+                edit_page = self.client.get(url)
+                self.assertContains(edit_page, f'<option value="{choice}" selected>')
+
+                response = self.client.post(
+                    url,
+                    self.wohnung_payload()
+                    | {
+                        "wohnungsnummer": wohnung.wohnungsnummer,
+                        "requirements_version": "1",
+                        "pet_review_required": choice,
+                        "pet_review_reason": wohnung.pet_review_reason,
+                    },
+                )
+
+                self.assertEqual(response.status_code, 302)
+                wohnung.refresh_from_db()
+                self.assertIs(wohnung.pet_review_required, value)
 
     def test_optional_public_details_can_be_left_empty(self):
         self.client.force_login(self.employee_user)
