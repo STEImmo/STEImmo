@@ -2013,7 +2013,7 @@ class ApplicationPriorityForm(UIkitFormMixin, forms.Form):
     reason = forms.CharField(
         label="Begründung",
         strip=True,
-        widget=forms.Textarea(attrs={"rows": 2}),
+        widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 2}),
     )
 
 
@@ -2021,7 +2021,7 @@ class EligibilityApprovalForm(UIkitFormMixin, forms.Form):
     reason = forms.CharField(
         label="Begründung der Einzelfallfreigabe",
         strip=True,
-        widget=forms.Textarea(attrs={"rows": 3}),
+        widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
     )
 
 
@@ -2032,7 +2032,7 @@ class MainApplicationInvitationForm(UIkitFormMixin, forms.Form):
     reason = forms.CharField(
         label="Begründung der Freischaltung",
         strip=True,
-        widget=forms.Textarea(attrs={"rows": 3}),
+        widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
     )
 
 

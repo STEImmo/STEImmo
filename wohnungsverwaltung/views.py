@@ -24,6 +24,7 @@ from django.db.models import (
     When,
 )
 from django.db.models.deletion import ProtectedError
+from django.db.models.functions import Concat
 from django.http import (
     FileResponse,
     Http404,
@@ -900,11 +901,9 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
         )
         if cleaned_filters.get("q"):
             query = cleaned_filters["q"]
-            applications = applications.filter(
-                Q(person__vorname__icontains=query)
-                | Q(person__nachname__icontains=query)
-                | Q(person__email__icontains=query)
-            )
+            applications = applications.alias(
+                applicant_name=Concat("person__vorname", Value(" "), "person__nachname")
+            ).filter(Q(applicant_name__icontains=query) | Q(person__email__icontains=query))
         if cleaned_filters.get("people"):
             applications = applications.filter(personenanzahl=cleaned_filters["people"])
         if cleaned_filters.get("status") == "withdrawn":
@@ -1003,10 +1002,10 @@ def employee_application_detail(request: HttpRequest, application_id: UUID) -> H
             ).exists(),
             "review_events": list(application.review_events.select_related("actor")),
             "priority_form": ApplicationPriorityForm(
-                initial={"priority": application.review_priority}
+                initial={"priority": application.review_priority}, auto_id="id_priority_%s"
             ),
-            "eligibility_form": EligibilityApprovalForm(),
-            "invitation_form": MainApplicationInvitationForm(),
+            "eligibility_form": EligibilityApprovalForm(auto_id="id_eligibility_%s"),
+            "invitation_form": MainApplicationInvitationForm(auto_id="id_invitation_%s"),
             "invitation_url": reverse(
                 "wohnungsverwaltung:employee_application_invitation_resend",
                 args=[application.pk],

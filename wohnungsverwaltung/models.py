@@ -604,6 +604,12 @@ class ApplicationReviewEvent(models.Model):
     requirements_version = models.PositiveIntegerField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def get_priority_change_display(self) -> str:
+        labels = {str(value): label for value, label in Bewerbung.Priority.choices}
+        previous = labels.get(self.from_value, "Unbekannt")
+        current = labels.get(self.to_value, "Unbekannt")
+        return f"{previous} → {current}"
+
     class Meta:
         db_table = "application_review_event"
         ordering = ("-created_at", "-review_event_id")

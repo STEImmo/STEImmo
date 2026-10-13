@@ -215,8 +215,10 @@ noch nicht zur Main-Bewerbung freigeschaltete Pre-Bewerbungen ebenfalls abgelehn
 Haustierangaben lösen bei aktivierter
 Tierhaltungsprüfung als einzige Abweichung eine Einzelfallprüfung aus. Eine
 begründete Freigabe gilt bis zur nächsten Änderung der Anforderungen.
-Prioritätsänderungen und Freigaben werden intern protokolliert. Eine manuelle
-Main-Freischaltung erfordert die Bestätigung einer positiven Mitarbeiterentscheidung
+Die Namenssuche berücksichtigt auch vollständige Vor- und Nachnamen.
+Prioritätsänderungen werden mit vorherigem und neuem Wert, Begründung,
+Mitarbeiter und Zeitpunkt angezeigt; Freigaben werden ebenfalls intern protokolliert.
+Eine manuelle Main-Freischaltung erfordert die Bestätigung einer positiven Mitarbeiterentscheidung
 und sendet eine E-Mail. Ein fehlgeschlagener Versand hebt die Freischaltung nicht
 auf und kann erneut angestoßen werden.
 

@@ -98,7 +98,12 @@
             {% if review_events %}
                 <ul class="uk-list uk-list-divider">
                     {% for event in review_events %}
-                        <li><strong>{{ event.get_kind_display }}</strong> · {{ event.created_at|date:"d.m.Y, H:i" }} Uhr · {{ event.actor|default:"Unbekannt" }}{% if event.reason %}<br>{{ event.reason|linebreaksbr }}{% endif %}</li>
+                        <li>
+                            <strong>{{ event.get_kind_display }}</strong>
+                            {% if event.kind == "priority_changed" %} · {{ event.get_priority_change_display }}{% endif %}
+                            · {{ event.created_at|date:"d.m.Y, H:i" }} Uhr · {{ event.actor|default:"Unbekannt" }}
+                            {% if event.reason %}<br>{{ event.reason|linebreaksbr }}{% endif %}
+                        </li>
                     {% endfor %}
                 </ul>
             {% else %}<p>Noch keine internen Änderungen dokumentiert.</p>{% endif %}

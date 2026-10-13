@@ -1,7 +1,9 @@
 from datetime import timedelta
+from html.parser import HTMLParser
 from io import BytesIO
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
@@ -9,7 +11,7 @@ from django.contrib.auth.models import Group, Permission
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -521,6 +523,22 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.assertContains(response, "Aktueller Status: Abgelehnt")
         self.assertNotContains(response, "Main-Bewerbung freischalten und einladen")
 
+    def test_review_forms_have_unique_reason_ids_and_matching_labels(self):
+        self.configure_requirements()
+        response = self.client.get(
+            reverse("wohnungsverwaltung:employee_application_detail", args=[self.pet_exception.pk])
+        )
+        reason_ids = [
+            response.context[name]["reason"].id_for_label
+            for name in ("priority_form", "eligibility_form", "invitation_form")
+        ]
+
+        self.assertEqual(len(set(reason_ids)), 3)
+        for reason_id in reason_ids:
+            with self.subTest(reason_id=reason_id):
+                self.assertContains(response, f'id="{reason_id}"', count=1)
+                self.assertContains(response, f'for="{reason_id}"', count=1)
+
     def test_occupancy_excess_is_declined_and_only_pet_applications_need_review(self):
         self.configure_requirements()
         matching = self.client.get(self.list_url, {"wohnung": self.unit.pk})
@@ -682,7 +700,7 @@ class EmployeeApplicationSelectionTests(TestCase):
         )
         self.assertEqual(withdrawn_ids, {withdrawn.pk})
 
-    def test_filters_and_priority_sorting_keep_pagination_parameters(self):
+    def test_people_filter_and_priority_sorting(self):
         self.configure_requirements(max_occupants=4, pet_review_required=False)
         self.match.review_priority = Bewerbung.Priority.HIGH
         self.match.personenanzahl = 4
@@ -695,6 +713,170 @@ class EmployeeApplicationSelectionTests(TestCase):
             {"wohnung": self.unit.pk, "people": "4", "sort": "priority"},
         )
         self.assertEqual(list(response.context["applications"]), [self.match, other])
+
+    def test_pagination_preserves_combined_filters_and_sorting(self):
+        class LinkParser(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.links = []
+
+            def handle_starttag(self, tag, attrs):
+                if tag == "a":
+                    self.links.append(dict(attrs).get("href", ""))
+
+        self.match.personenanzahl = 4
+        self.match.save(update_fields=("personenanzahl",))
+        applications = [self.match] + [
+            EmployeeDashboardTests.create_application(self.unit, personenanzahl=4)
+            for _ in range(20)
+        ]
+        received_at = timezone.now()
+        Bewerbung.objects.filter(pk__in=[item.pk for item in applications]).update(
+            created_at=received_at, review_priority=Bewerbung.Priority.HIGH
+        )
+        received_date = timezone.localdate(received_at).isoformat()
+        filters = {
+            "wohnung": str(self.unit.pk),
+            "segment": "all",
+            "q": "Berta Bewerber",
+            "people": "4",
+            "status": BewerbungStatus.OPEN,
+            "main_status": "pending",
+            "priority": str(Bewerbung.Priority.HIGH),
+            "sort": "priority",
+            "created_from": received_date,
+            "created_to": received_date,
+        }
+        first_page = self.client.get(self.list_url, filters)
+        parser = LinkParser()
+        parser.feed(first_page.content.decode())
+        next_links = [
+            link for link in parser.links if parse_qs(urlsplit(link).query).get("page") == ["2"]
+        ]
+
+        self.assertEqual(len(next_links), 1)
+        self.assertEqual(
+            parse_qs(urlsplit(next_links[0]).query),
+            {key: [value] for key, value in (filters | {"page": "2"}).items()},
+        )
+        second_page = self.client.get(self.list_url + next_links[0])
+        self.assertEqual(len(first_page.context["applications"]), 20)
+        self.assertEqual(len(second_page.context["applications"]), 1)
+        self.assertEqual(
+            {item.pk for item in first_page.context["applications"]}
+            | {item.pk for item in second_page.context["applications"]},
+            {item.pk for item in applications},
+        )
+
+    def test_name_filter_matches_full_name_and_email(self):
+        person = self.match.person
+        person.vorname = "Ada"
+        person.nachname = "Muster"
+        person.save(update_fields=("vorname", "nachname"))
+
+        for query in ("Ada", "Muster", "ada muster", person.email):
+            with self.subTest(query=query):
+                response = self.client.get(
+                    self.list_url,
+                    {"wohnung": self.unit.pk, "q": query},
+                )
+                self.assertEqual(list(response.context["applications"]), [self.match])
+
+    def test_priority_history_displays_previous_and_new_priority(self):
+        url = reverse(
+            "wohnungsverwaltung:employee_application_priority_update", args=[self.match.pk]
+        )
+        self.client.post(url, {"priority": Bewerbung.Priority.HIGH, "reason": "Erste Prüfung"})
+        self.client.post(url, {"priority": Bewerbung.Priority.LOW, "reason": "Weitere Prüfung"})
+
+        response = self.client.get(
+            reverse("wohnungsverwaltung:employee_application_detail", args=[self.match.pk])
+        )
+        self.assertContains(response, "Unbewertet → Hoch")
+        self.assertContains(response, "Hoch → Niedrig")
+        self.assertContains(response, "Erste Prüfung")
+        self.assertContains(response, "Weitere Prüfung")
+
+    def test_date_priority_and_main_status_filters_select_the_expected_applications(self):
+        received_at = timezone.now() - timedelta(days=2)
+        Bewerbung.objects.filter(pk=self.match.pk).update(
+            created_at=received_at, review_priority=Bewerbung.Priority.HIGH
+        )
+        Bewerbung.objects.filter(pk=self.pet_exception.pk).update(main_application_unlocked=True)
+        Bewerbung.objects.filter(pk=self.occupancy_exception.pk).update(
+            main_application_unlocked=True, submitted_at=timezone.now()
+        )
+        received_date = timezone.localdate(received_at).isoformat()
+        for filters, expected in (
+            ({"created_from": received_date, "created_to": received_date}, [self.match]),
+            ({"priority": str(Bewerbung.Priority.HIGH)}, [self.match]),
+            ({"main_status": "pending"}, [self.match]),
+            ({"main_status": "unlocked"}, [self.pet_exception]),
+            ({"main_status": "submitted"}, [self.occupancy_exception]),
+        ):
+            with self.subTest(filters=filters):
+                response = self.client.get(self.list_url, {"wohnung": self.unit.pk} | filters)
+                self.assertEqual(list(response.context["applications"]), expected)
+
+    def test_review_actions_require_employee_access_post_and_csrf(self):
+        actions = (
+            ("employee_application_priority_update", {"priority": 3, "reason": "Prüfung"}),
+            ("employee_application_suitability_approve", {"reason": "Prüfung"}),
+            (
+                "employee_application_invite",
+                {"confirm_positive_decision": "on", "reason": "Prüfung"},
+            ),
+            ("employee_application_invitation_resend", {}),
+        )
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.employee)
+        for action, payload in actions:
+            url = reverse(f"wohnungsverwaltung:{action}", args=[self.match.pk])
+            with self.subTest(action=action):
+                self.client.force_login(self.applicant_user)
+                self.assertEqual(self.client.post(url, payload).status_code, 403)
+                self.client.force_login(self.employee)
+                self.assertEqual(self.client.get(url).status_code, 405)
+                self.assertEqual(csrf_client.post(url, payload).status_code, 403)
+        self.assertFalse(ApplicationReviewEvent.objects.exists())
+        self.match.refresh_from_db()
+        self.assertFalse(self.match.main_application_unlocked)
+        self.assertEqual(self.match.review_priority, Bewerbung.Priority.UNRATED)
+
+    def test_pet_invitation_requires_current_approval_and_repeated_unlock_is_idempotent(self):
+        self.configure_requirements()
+        invite_url = reverse(
+            "wohnungsverwaltung:employee_application_invite", args=[self.pet_exception.pk]
+        )
+        approval_url = reverse(
+            "wohnungsverwaltung:employee_application_suitability_approve",
+            args=[self.pet_exception.pk],
+        )
+        payload = {"confirm_positive_decision": "on", "reason": "Positive Prüfung"}
+
+        self.client.post(invite_url, payload)
+        self.pet_exception.refresh_from_db()
+        self.assertFalse(self.pet_exception.main_application_unlocked)
+        self.client.post(approval_url, {"reason": "Tierhaltung geprüft"})
+        self.unit.pet_review_reason = "Geänderte Tierhaltungsregel"
+        self.unit.save(update_fields=("pet_review_reason",))
+        self.client.post(invite_url, payload)
+        self.pet_exception.refresh_from_db()
+        self.assertFalse(self.pet_exception.main_application_unlocked)
+        self.assertEqual(len(mail.outbox), 0)
+
+        self.client.post(approval_url, {"reason": "Neue Regel geprüft"})
+        self.client.post(invite_url, payload)
+        self.client.post(invite_url, payload)
+        self.pet_exception.refresh_from_db()
+        self.assertTrue(self.pet_exception.main_application_unlocked)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(
+            ApplicationReviewEvent.objects.filter(
+                application=self.pet_exception, kind=ApplicationReviewEvent.Kind.MAIN_UNLOCKED
+            ).count(),
+            1,
+        )
 
     def test_priority_is_private_and_changes_are_audited(self):
         priority_url = reverse(
