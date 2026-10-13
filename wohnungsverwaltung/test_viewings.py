@@ -125,6 +125,36 @@ class ViewingTests(TestCase):
                 self.post(self.create_url, self.payload())
                 self.assertFalse(ViewingAppointment.objects.exists())
 
+    def test_unconfigured_pet_rule_does_not_block_an_applicant_with_a_pet(self):
+        self.application.haustiere = True
+        self.application.save(update_fields=("haustiere",))
+
+        appointment = self.schedule()
+
+        self.assertEqual(appointment.status, ViewingAppointment.Status.PLANNED)
+
+    def test_application_above_occupancy_limit_cannot_be_scheduled_by_direct_post(self):
+        Bewerbung.objects.filter(pk=self.application.pk).update(personenanzahl=1)
+        self.unit.max_occupants = 1
+        self.unit.occupancy_requirement_reason = "Grundriss"
+        self.unit.save()
+        Bewerbung.objects.filter(pk=self.application.pk).update(personenanzahl=2)
+
+        response = self.post(self.create_url, self.payload())
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ViewingAppointment.objects.exists())
+        detail = self.client.get(self.detail_url)
+        self.assertContains(detail, "Die Personenhöchstzahl der Wohnung wird überschritten")
+
+    def test_low_priority_application_can_be_scheduled(self):
+        self.application.review_priority = Bewerbung.Priority.LOW
+        self.application.save(update_fields=("review_priority",))
+
+        appointment = self.schedule()
+
+        self.assertEqual(appointment.status, ViewingAppointment.Status.PLANNED)
+
     def test_current_pet_approval_allows_schedule_but_stale_approval_does_not(self):
         self.unit.pet_review_required = True
         self.unit.pet_review_reason = "Einzelprüfung"
