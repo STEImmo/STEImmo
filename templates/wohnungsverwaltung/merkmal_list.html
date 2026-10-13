@@ -3,17 +3,18 @@
 {% block title %}Merkmalvorlagen verwalten – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section uk-section-default">
+<section class="uk-section uk-section-default management-page">
     <div class="uk-container">
-        <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-margin-bottom">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
+        <div class="management-page__heading uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-margin-bottom">
             <div>
                 <h1 class="uk-heading-small uk-margin-remove-bottom">Merkmalvorlagen</h1>
                 <p class="uk-text-muted uk-margin-small-top">Globale Vorlagen für Raumprüfungen.</p>
             </div>
             <a class="uk-button uk-button-primary uk-margin-small-top" href="{% url 'verwaltung:merkmal_create' %}">Merkmalvorlage anlegen</a>
         </div>
-        <div class="uk-overflow-auto">
-            <table class="uk-table uk-table-divider uk-table-middle">
+        <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Verwaltungstabelle">
+            <table class="uk-table uk-table-divider uk-table-middle uk-table-small">
                 <thead><tr><th>Wo wird geprüft?</th><th>Was wird geprüft?</th><th>Vorgegebene Bewertung</th><th>Zusätzliche Angaben</th><th><span class="uk-hidden">Aktion</span></th></tr></thead>
                 <tbody>
                     {% for merkmal in merkmale %}

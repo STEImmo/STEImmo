@@ -1002,9 +1002,9 @@ a:active,
 }
 
 /* Shared account pages. */
-.auth-section { padding: var(--steimmo-space-xl); background: var(--steimmo-color-surface); }
-.auth-layout { display: grid; grid-template-columns: 1fr 1fr; max-width: 1200px; margin: auto; overflow: hidden; background: var(--steimmo-color-surface); }
-.auth-card { padding: var(--steimmo-space-xl); align-self: center; }
+.auth-section { padding: 0; background: var(--steimmo-color-surface); }
+.auth-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin: 0; overflow: hidden; background: var(--steimmo-color-surface); }
+.auth-card { padding: clamp(24px, 3vw, 64px); max-width: 760px; width: 100%; box-sizing: border-box; margin-inline: auto; align-self: center; }
 .auth-back { display: inline-flex; gap: var(--steimmo-space-xs); align-items: center; margin-bottom: var(--steimmo-space-lg); font-size: var(--steimmo-font-size-sm); }
 .auth-eyebrow, .application-eyebrow { margin: 0 0 var(--steimmo-space-xs); color: var(--steimmo-color-primary); font-size: var(--steimmo-font-size-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .auth-card h1 { font-size: clamp(1.75rem, 3vw, 2.5rem); font-weight: 600; letter-spacing: -.035em; margin-top: 0; }
@@ -1091,7 +1091,6 @@ a:active,
     .application-sidebar .application-progress { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--steimmo-space-md); }
 }
 @media (max-width: 639px) {
-    .auth-section { padding: var(--steimmo-space-md); }
     .auth-name { grid-column: 1 / -1; }
     .auth-card { padding: var(--steimmo-space-lg); }
     .auth-card h1 { font-size: var(--steimmo-font-size-2xl); }
@@ -1172,3 +1171,347 @@ a:active,
 }
 
 @media (max-width: 639px) { .apartment-search-fields { grid-template-columns: 1fr; } }
+
+/* Selected apartment detail: gallery, compact facts, normal-flow rent panel. */
+.apartment-detail-heading { margin-bottom: 2rem; }
+.apartment-detail-heading h1 { margin: .65rem 0; font-size: clamp(2rem, 4vw, 3rem); }
+.apartment-detail-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 2rem; align-items: start; }
+.apartment-detail-photos { grid-column: 1 / -1; }
+.apartment-detail-cost { grid-column: 2; grid-row: 2; position: static; border: 1px solid var(--steimmo-color-border); border-radius: var(--steimmo-radius-lg); box-shadow: none; }
+.apartment-detail-cost h2 { font-size: 2rem; margin: 0; }
+.apartment-detail-cost h2 + p { margin-top: .25rem; }
+.apartment-detail-cost .uk-button { white-space: nowrap; text-transform: none; padding-inline: var(--steimmo-space-sm); }
+.apartment-detail-content { grid-column: 1; grid-row: 2; min-width: 0; }
+.apartment-detail-content > section { padding: 1.5rem 0; }
+.apartment-detail-content h2 { font-size: 1.5rem; }
+.apartment-detail-metrics { display: flex; flex-wrap: wrap; gap: 1rem 2rem; margin: 0; padding: .85rem 0; border-top: 1px solid var(--steimmo-color-border); border-bottom: 1px solid var(--steimmo-color-border); }
+.apartment-detail-metrics dt { font-size: .85rem; color: var(--steimmo-color-text-muted); }
+.apartment-detail-metrics dd { margin: .25rem 0 0; font-size: 1.1rem; font-weight: 600; }
+.apartment-detail-facts { margin: 1.5rem 0; }
+.apartment-detail-facts > div { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(0, 1.4fr); padding: .8rem 0; border-bottom: 1px solid var(--steimmo-color-border); gap: 1rem; }
+.apartment-detail-facts dt { font-weight: 600; }
+.apartment-detail-facts dd { margin: 0; overflow-wrap: anywhere; }
+.workspace-navigation { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; padding: 1rem 1.25rem; margin-bottom: 1.5rem; background: var(--steimmo-color-surface); border: 1px solid var(--steimmo-color-border); border-radius: var(--steimmo-radius-md); }
+.workspace-navigation a { color: var(--steimmo-color-text); padding: .25rem 0; }
+.workspace-navigation a[aria-current] { color: var(--steimmo-color-primary); font-weight: 700; border-bottom: 2px solid currentColor; }
+@media (max-width: 959px) {
+    .apartment-detail-layout { display: flex; flex-direction: column; }
+    .apartment-detail-layout > * { width: 100%; box-sizing: border-box; }
+    .apartment-detail-cost { order: 3; }
+}
+@media (max-width: 639px) {
+    .apartment-detail-facts > div { grid-template-columns: 1fr; gap: .3rem; }
+    .apartment-detail-cost { padding: 1.25rem; }
+}
+
+/* Shared compact workspace for the selected management design. */
+.management-page {
+    padding-block: var(--steimmo-space-xl);
+    background: var(--steimmo-color-surface-page);
+}
+.management-page > .uk-container {
+    max-width: 1280px;
+}
+.management-page > .uk-container-small {
+    max-width: 1120px;
+}
+.management-page h1 {
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    line-height: var(--steimmo-line-height-tight);
+}
+.management-page h2 {
+    font-size: var(--steimmo-font-size-xl);
+}
+.management-page__heading {
+    gap: var(--steimmo-space-md);
+    padding-bottom: var(--steimmo-space-md);
+}
+.management-panel {
+    border: 1px solid var(--steimmo-color-border);
+    border-top: 3px solid var(--steimmo-color-primary);
+    border-radius: var(--steimmo-radius-sm);
+    box-shadow: none;
+    padding: var(--steimmo-space-lg);
+}
+.management-page .uk-heading-divider {
+    padding-bottom: var(--steimmo-space-sm);
+    border-bottom-color: var(--steimmo-color-border);
+}
+.management-table {
+    background: var(--steimmo-color-surface);
+    border: 1px solid var(--steimmo-color-border);
+    border-top: 3px solid var(--steimmo-color-primary);
+    padding: var(--steimmo-space-sm) var(--steimmo-space-lg);
+}
+.management-table .uk-table {
+    margin-block: var(--steimmo-space-xs);
+    min-width: 620px;
+}
+.management-table .uk-table th,
+.management-table .uk-table td {
+    padding: var(--steimmo-space-sm);
+    vertical-align: middle;
+}
+.management-table .uk-table thead th {
+    color: var(--steimmo-color-text-muted);
+    font-size: var(--steimmo-font-size-xs);
+    font-weight: 700;
+}
+.management-table .uk-table caption {
+    padding: var(--steimmo-space-xs) var(--steimmo-space-sm);
+}
+.management-table .uk-table tbody tr:hover {
+    background: var(--steimmo-color-surface-subtle);
+}
+.management-table .uk-table td:last-child {
+    white-space: nowrap;
+}
+.management-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--steimmo-space-lg);
+    align-items: start;
+}
+.management-form-grid > .uk-margin {
+    margin: 0 !important;
+}
+.management-form-grid--two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.management-page .uk-form-label {
+    font-weight: 600;
+}
+.management-page .uk-margin > label:first-child { display: block; margin-bottom: var(--steimmo-space-xs); font-weight: 600; }
+.management-page .uk-button,
+.handover-page .uk-button { text-transform: none; }
+.management-page .uk-form-controls,
+.management-form-grid > div {
+    min-width: 0;
+}
+.management-page fieldset .uk-form-controls label {
+    overflow-wrap: anywhere;
+}
+.management-page .uk-flex-between {
+    gap: var(--steimmo-space-sm);
+}
+.management-facts {
+    display: grid;
+    grid-template-columns: minmax(140px, 220px) minmax(0, 1fr);
+    gap: var(--steimmo-space-sm) var(--steimmo-space-lg);
+    margin-top: var(--steimmo-space-lg);
+}
+.management-facts > dt,
+.management-facts > dt:nth-child(n+2),
+.management-facts > dd {
+    margin: 0;
+}
+.management-facts > dt {
+    color: var(--steimmo-color-text-muted);
+    font-weight: 500;
+}
+.management-facts > dd {
+    overflow-wrap: anywhere;
+}
+.management-page .apartment-photo-thumbnail {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+}
+@media (max-width: 960px) {
+    .management-form-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 640px) {
+    .management-page {
+        padding-block: var(--steimmo-space-lg);
+    }
+    .management-form-grid,
+    .management-facts {
+        grid-template-columns: 1fr;
+    }
+    .management-facts > dd {
+        margin-bottom: var(--steimmo-space-sm);
+    }
+    .management-panel {
+        padding: var(--steimmo-space-md);
+    }
+    .management-table {
+        padding-inline: var(--steimmo-space-xs);
+    }
+    .management-page .uk-flex-between {
+        flex-wrap: wrap;
+    }
+    .management-page [data-option-row] {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+    .management-page [data-option-row] > .uk-width-expand {
+        min-width: 180px;
+    }
+    .management-page [data-option-row] > .uk-margin-left {
+        margin-left: 0 !important;
+    }
+}
+
+/* Selected handover layout: compact workspace with horizontal navigation. */
+.handover-page {
+    background: var(--steimmo-color-surface-page);
+}
+
+.handover-page h1 {
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    line-height: var(--steimmo-line-height-tight);
+    margin-top: var(--steimmo-space-lg);
+    margin-bottom: var(--steimmo-space-md);
+}
+
+.handover-page .uk-text-lead {
+    font-size: var(--steimmo-font-size-lg);
+    max-width: 72ch;
+}
+
+.handover-card,
+.handover-page .uk-overflow-auto.uk-card {
+    border: 1px solid var(--steimmo-color-border);
+    border-radius: var(--steimmo-radius-md);
+    box-shadow: none;
+}
+
+.handover-card {
+    padding: var(--steimmo-space-lg);
+}
+
+.handover-section-header { margin-bottom: var(--steimmo-space-lg); }
+.handover-page .handover-title,
+.handover-page .handover-section-title { overflow-wrap: anywhere; }
+[data-photo-selection] input[type="file"],
+[data-photo-selection] input[type="file"]::file-selector-button { cursor: pointer; }
+
+.handover-section-title,
+.handover-page .uk-heading-divider,
+.handover-page .uk-card-title {
+    font-size: var(--steimmo-font-size-xl);
+    font-weight: 600;
+    margin-bottom: var(--steimmo-space-md);
+}
+
+.handover-detail-grid,
+.handover-document-grid,
+.handover-room-workspace,
+.handover-field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--steimmo-space-lg);
+    align-items: start;
+}
+
+.handover-detail-grid > *,
+.handover-document-grid > *,
+.handover-room-workspace > *,
+.handover-field-grid > * {
+    min-width: 0;
+}
+
+.handover-document-grid > .uk-margin,
+.handover-detail-grid > .uk-margin-top,
+.handover-room-workspace > .uk-margin-top,
+.handover-field-grid > .uk-margin {
+    /* Grid gap replaces UIkit's important vertical margin utilities. */
+    margin: 0 !important;
+}
+
+.handover-detail-grid { margin-top: var(--steimmo-space-lg); }
+.handover-room-workspace > :only-child { grid-column: 1 / -1; }
+.handover-protocol-editor > section > .uk-flex,
+.handover-protocol-editor [data-room-card] .uk-card-header > .uk-flex,
+.handover-page article.uk-card-muted > .uk-flex {
+    flex-wrap: wrap;
+    gap: var(--steimmo-space-sm);
+}
+
+.handover-room-workspace {
+    margin-top: var(--steimmo-space-lg);
+}
+
+.handover-form-actions,
+.handover-form-wide {
+    grid-column: 1 / -1;
+}
+
+.handover-form-actions {
+    gap: var(--steimmo-space-sm);
+    flex-wrap: wrap;
+}
+
+.handover-protocol-editor > section {
+    border-top: 1px solid var(--steimmo-color-border);
+    padding-top: var(--steimmo-space-lg);
+}
+
+.handover-page .uk-description-list > dt {
+    font-size: var(--steimmo-font-size-sm);
+    color: var(--steimmo-color-text-muted);
+}
+
+.handover-page .uk-description-list > dd {
+    overflow-wrap: anywhere;
+}
+
+.handover-page .uk-table th {
+    color: var(--steimmo-color-text-muted);
+    font-size: var(--steimmo-font-size-sm);
+    text-transform: none;
+}
+
+.handover-page .uk-table td {
+    padding-top: var(--steimmo-space-md);
+    padding-bottom: var(--steimmo-space-md);
+    vertical-align: middle;
+}
+
+.handover-page .uk-table .uk-button {
+    white-space: nowrap;
+}
+
+.handover-page .uk-form-label {
+    display: block;
+    margin-bottom: var(--steimmo-space-xs);
+}
+
+.handover-page .uk-card-muted {
+    border-radius: var(--steimmo-radius-md);
+}
+
+@media (max-width: 959px) {
+    .handover-detail-grid,
+    .handover-document-grid,
+    .handover-room-workspace {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 639px) {
+    .handover-field-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .handover-card {
+        padding: var(--steimmo-space-md);
+    }
+
+    .handover-form-actions {
+        justify-content: stretch;
+    }
+
+    .handover-form-actions > * {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .handover-form-actions .uk-button {
+        width: 100%;
+    }
+    .handover-protocol-editor > section > .uk-flex > .uk-button,
+    .handover-protocol-editor [data-room-card] .uk-card-header > .uk-flex > .uk-button { width: 100%; }
+}

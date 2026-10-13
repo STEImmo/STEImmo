@@ -3,19 +3,20 @@
 {% block title %}Übergabeprotokolle – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section uk-section-muted">
+<section class="uk-section handover-page">
     <div class="uk-container">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="handover" %}
         <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
             <div>
                 <span class="uk-label">Wohnungsübergabe</span>
-                <h1 class="uk-heading-medium uk-margin-small-top">Übergabeprotokolle</h1>
+                <h1 class="handover-title uk-margin-small-top">Übergabeprotokolle</h1>
             </div>
             <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_create' %}">Protokoll anlegen</a>
         </div>
 
         {% if draft_entries %}
-            <div class="uk-card uk-card-default uk-card-body uk-margin-bottom">
-                <h2 class="uk-heading-divider">Gespeicherte Entwürfe</h2>
+            <div class="uk-card uk-card-default uk-card-body handover-card uk-margin-bottom">
+                <h2 class="handover-section-title">Gespeicherte Entwürfe</h2>
                 <p class="uk-text-meta">Entwürfe dieses Browsers werden automatisch zwischengespeichert und können fortgesetzt werden.</p>
                 <div class="uk-overflow-auto">
                     <table class="uk-table uk-table-divider uk-table-middle uk-margin-remove">
@@ -30,7 +31,7 @@
                         <tbody>
                             {% for entry in draft_entries %}
                                 <tr>
-                                    <td>{% if entry.wohnung %}Gebäude {{ entry.wohnung.gebaeudenummer }}, Wohnung {{ entry.wohnung.wohnungsnummer }}{% else %}Noch nicht ausgewählt{% endif %}</td>
+                                    <td>{% if entry.wohnung %}Gebäude {{ entry.wohnung.gebaeudenummer }}, Wohnung {{ entry.wohnung.display_number }}{% else %}Noch nicht ausgewählt{% endif %}</td>
                                     <td>{{ entry.protokoll_typ }}</td>
                                     <td>{{ entry.draft.updated_at|date:"d.m.Y H:i" }}</td>
                                     <td>
@@ -63,7 +64,7 @@
                     <tbody>
                         {% for protocol in protocols %}
                             <tr>
-                                <td>Gebäude {{ protocol.wohnung.gebaeudenummer }}, Wohnung {{ protocol.wohnung.wohnungsnummer }}</td>
+                                <td>Gebäude {{ protocol.wohnung.gebaeudenummer }}, Wohnung {{ protocol.wohnung.display_number }}</td>
                                 <td>{% if protocol.protokoll_typ == "move_in" %}Einzug{% else %}Auszug{% endif %}</td>
                                 <td>{{ protocol.person.vorname }} {{ protocol.person.nachname }}</td>
                                 <td>{% if protocol.status == "open" %}<span class="uk-label">In Bearbeitung</span>{% elif protocol.status == "signed" %}<span class="uk-label uk-label-success">Bestätigt</span>{% else %}<span class="uk-label uk-label-danger">Gesperrt</span>{% endif %}</td>
@@ -74,7 +75,7 @@
                 </table>
             </div>
         {% else %}
-            <div class="uk-card uk-card-default uk-card-body uk-text-center">
+            <div class="uk-card uk-card-default uk-card-body handover-card uk-text-center">
                 <p>Noch kein Übergabeprotokoll angelegt.</p>
                 <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_create' %}">Erstes Protokoll anlegen</a>
             </div>

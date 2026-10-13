@@ -87,6 +87,37 @@ class SiteNavigationTests(TestCase):
             ),
         )
 
+    def test_workspace_navigation_uses_real_destinations_and_respects_account_permissions(self):
+        self.client.force_login(self.manager)
+        response = self.client.get(reverse("verwaltung:wohnung_list"))
+        parser = NavigationParser()
+        parser.feed(response.content.decode())
+        links = [href for href, _ in parser.navigation["Verwaltungsbereiche"]]
+        self.assertEqual(
+            links,
+            [
+                reverse(name)
+                for name in (
+                    "wohnungsverwaltung:employee_application_list",
+                    "verwaltung:wohnung_list",
+                    "verwaltung:stellplatz_list",
+                    "verwaltung:merkmal_list",
+                    "verwaltung:user_account_list",
+                )
+            ],
+        )
+        self.client.force_login(self.resident)
+        response = self.client.get(reverse("wohnungsverwaltung:handover_protocol_mine"))
+        parser = NavigationParser()
+        parser.feed(response.content.decode())
+        self.assertEqual(
+            parser.navigation["Übergabebereich"],
+            [(reverse("wohnungsverwaltung:handover_protocol_mine"), "true")],
+        )
+
+    def test_temporary_design_comparison_is_removed(self):
+        self.assertEqual(self.client.get("/design/seiten/").status_code, 404)
+
     def test_combined_applicant_and_tenant_permissions_keep_both_personal_sections(self):
         self.client.force_login(self.resident)
         response = self.client.get(reverse("home"))

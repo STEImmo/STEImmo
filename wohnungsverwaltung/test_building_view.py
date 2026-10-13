@@ -51,7 +51,9 @@ class BuildingViewTests(TestCase):
         response = self.client.get(
             reverse("wohnungsverwaltung_public:apartment_detail_placeholder", args=[unit.pk])
         )
-        self.assertContains(response, "Noch nicht angegeben", count=9)
+        self.assertContains(response, "Noch nicht angegeben")
+        self.assertContains(response, "Preis folgt")
+        self.assertContains(response, "Noch offen")
         self.assertNotContains(response, "0,00 €")
         floor = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[0]))
         self.assertContains(floor, "Zimmerzahl noch nicht angegeben")
@@ -360,6 +362,21 @@ class BuildingViewTests(TestCase):
             response,
             reverse("wohnungsverwaltung_public:viewing_request", args=[unit.pk]),
         )
+
+    @override_settings(DEBUG=False)
+    def test_selected_detail_keeps_real_actions_without_design_controls(self):
+        unit = self.create_unit("001", 0)
+        response = self.client.get(
+            reverse("wohnungsverwaltung_public:apartment_detail_placeholder", args=[unit.pk])
+        )
+        self.assertContains(response, 'aria-label="Mietangaben"')
+        self.assertContains(
+            response,
+            'href="' + reverse("wohnungsverwaltung_public:viewing_request", args=[unit.pk]) + '"',
+        )
+        self.assertNotContains(response, "Ihre monatlichen Kosten")
+        self.assertNotContains(response, "Designvergleich")
+        self.assertNotContains(response, "Anfrage ist deaktiviert")
 
     def test_unavailable_detail_is_not_public(self):
         unit = self.create_unit("A-18", 2, WohnungStatus.TAKEN)

@@ -3,13 +3,14 @@
 {% block title %}{{ page_title }} – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section">
-    <div class="uk-container uk-container-small">
+<section class="uk-section handover-page">
+    <div class="uk-container">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="handover" %}
         <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Zur Übersicht</a>
-        <h1 class="uk-heading-medium">{{ page_title }}</h1>
+        <h1 class="handover-title">{{ page_title }}</h1>
         <p class="uk-text-lead">Wählen Sie zuerst die Wohnung. Anschließend stehen nur die dieser Wohnung direkt zugeordneten Personen zur Auswahl.</p>
 
-        <form method="post" enctype="multipart/form-data" class="uk-card uk-card-default uk-card-body uk-margin-top" id="handover-protocol-form" data-draft-scope="{{ draft_scope }}" data-draft-storage-key="{{ draft_storage_key }}" data-draft-save-url="{% url 'wohnungsverwaltung:handover_protocol_draft_save' %}" data-draft-delete-url="{{ server_draft_delete_url }}">
+        <form method="post" enctype="multipart/form-data" class="uk-card uk-card-default uk-card-body handover-card handover-protocol-editor uk-margin-top" id="handover-protocol-form" data-draft-scope="{{ draft_scope }}" data-draft-storage-key="{{ draft_storage_key }}" data-draft-save-url="{% url 'wohnungsverwaltung:handover_protocol_draft_save' %}" data-draft-delete-url="{{ server_draft_delete_url }}">
             {% csrf_token %}
             <div class="uk-alert-warning" hidden data-protocol-draft-notice>
                 <p>Ein Entwurf vom <span data-protocol-draft-time></span> ist verfügbar.</p>
@@ -20,7 +21,7 @@
             </div>
             <p class="uk-text-meta" aria-live="polite" data-protocol-draft-status></p>
             {% include "wohnungsverwaltung/_handover_protocol_fields.html" %}
-            <div class="uk-margin-large-top uk-flex uk-flex-right uk-flex-middle">
+            <div class="uk-margin-large-top uk-flex uk-flex-right uk-flex-middle handover-form-actions">
                 <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Abbrechen</a>
                 <div class="uk-margin-small-left">
                     <button class="uk-button uk-button-primary" type="submit">{{ submit_label }}</button>

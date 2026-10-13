@@ -11,7 +11,9 @@ beschreibt diese Grundlage. Die Tokens und die lokalen UIkit-Assets bleiben best
 [US-18 / #46](https://github.com/STEImmo/STEImmo/issues/46) ergänzt gemeinsame
 UI/UX-Muster auf den echten Django-Seiten. Der erste Schritt umfasst Header,
 mobile Navigation, Footer und die sichtbare Unternehmensbezeichnung.
-Weitere Formular-, Listen- und Seitenmuster sind noch offen.
+Formular-, Listen- und Seitenmuster sind inzwischen für Bewerbungen,
+Wohnungsdetails, Verwaltung und Übergaben übernommen. Die abschließende
+Überarbeitung und die Auswahl für Gebäude-/Etagenansicht bleiben offen.
 
 ## Startseite: Unternehmen & Wohnen
 
@@ -25,7 +27,7 @@ grüner Hauptaktion, Unternehmensvorstellung und drei Schritten zur Besichtigung
 Es ist direkt unter `/` erreichbar. Die Vergleichsleiste und der zweite Entwurf
 sind entfernt; alte Entwurfslinks zeigen ebenfalls die gewählte Startseite.
 UIkit-Komponenten und US-17-Tokens bleiben die Grundlage.
-Wiederkehrende Inhalte liegen in `core/_home_*.html`.
+Die nur einmal verwendeten Startseitenabschnitte liegen zusammen in `core/home.html`.
 Gebäude- und Startseite verwenden dieselbe Zusammenstellung der Fassade aus
 `building_plans.building_overview`; Verfügbarkeiten werden nicht fest eingetragen.
 Bei leerem oder vollständig belegtem Bestand bleibt die Wohnungssuche erreichbar.
@@ -72,6 +74,9 @@ mögliche Ergänzung zu klären, nicht Bestandteil dieser Startseitenänderung.
 ## Kontoseiten: gewähltes Design A
 
 Der Auftraggeber hat A gewählt: helles Einzugsmotiv links, echtes Formular rechts.
+Das gemeinsame Layout nutzt die gesamte Bildschirmbreite: Das Bild beginnt
+direkt am linken Rand unter dem Header; das Formular behält eigene Innenabstände
+und eine begrenzte Lesebreite. Auf schmalen Bildschirmen steht das Bild über dem Formular.
 Anmeldung, Registrierung, E-Mail-Bestätigung und Mitarbeiter-Einmalcode verwenden
 `registration/auth_base.html`. Namensfelder stehen auf dem Handy untereinander,
 das Bild kompakt über dem Formular. UIkit und vorhandene Theme-Tokens bleiben die Basis.
@@ -298,6 +303,68 @@ Header-/Footer-Prototyp mehr.
 - Die integrierte Gebäudeansicht ist unter `/wohnungen/gebaeude/` erreichbar.
   Gebäude- und Etagenansicht markieren den eigenen Navigationsbereich.
 - US-18 bleibt offen, bis auch die übrigen UI/UX-Muster umgesetzt und abgenommen sind.
+
+## Übernommene Einzelansichten und Dateiumfang
+
+Wohnungsdetail A, Verwaltung B und Übergaben B sind in die echten Django-Seiten
+übernommen. Das Wohnungsdetail zeigt die vorhandene Galerie, eine kompakte
+Eckdatenzeile ohne farbige Karte und Mietangaben im normalen Seitenfluss.
+Die Besichtigungsaktion verwendet weiterhin den bestehenden wohnungsbezogenen Ablauf.
+
+Alle zwölf Verwaltungsansichten verwenden eine horizontale Bereichsnavigation,
+kompakte Tabellen und gegliederte Formulare. Die neun Übergabeansichten verwenden
+dasselbe Orientierungsmuster, kompakte Karten und bei ausreichender Bildschirmbreite
+zwei Spalten. Vorhandene Aktionen, Fehleranzeigen, Formsets, CSRF, Uploads,
+Unterschriften, Entwürfe und Berechtigungen bleiben bestehen. Mieter sehen ihre
+zugeordneten Protokolle; Verwaltungslinks bleiben rollenabhängig.
+
+Die Entwicklungsvorschau `/design/seiten/` und ihre neun temporären Dateien sind
+entfernt. Nur einmal verwendete Startseitenabschnitte und die Filterhülle sind
+in die bestehenden Seiten zurückgeführt. Mehrfach verwendete Formular-,
+Navigations- und Ergebnisbausteine bleiben als Partials. Das neue
+`_workspace_navigation.html` bündelt die Bereichsnavigation der 21 internen Seiten.
+Das ausgewählte CSS liegt ausschließlich im bestehenden `static/css/app.css`.
+
+Gegenüber dem gemeinsamen Ausgangsstand des UI-Branches verbleiben 29 neue
+dauerhafte Dateien: 16 Templates, sieben Testmodule, zwei Dokumentationen,
+zwei Bildassets und zwei kleine JavaScript-Dateien. Benutzerseitige lokale
+Dateien werden dabei nicht mitgezählt. Die Übernahme der 21 internen Ansichten
+ändert bestehende Templates; es entsteht keine Datei pro Variante.
+
+Validierung: 191 Tests für öffentliche Seiten und Verwaltung sowie 504 Tests
+der Wohnungsverwaltung erfolgreich (teilweise überlappende Testgruppen).
+Django-Systemcheck, Migrationsprüfung, Ruff und Diff-Prüfung erfolgreich.
+Browser-Smoke auf echten Wohnungsdetails, Mitarbeiteranmeldung, Verwaltung,
+Wohnungsformular, Übergabeübersicht/-detail, Protokollbearbeitung, Raumprüfung,
+Schlüssel und Abschlussansicht durchgeführt. Keine Testdaten über die
+Formulare gespeichert und kein Protokoll unterschrieben oder bestätigt.
+
+Gebäude-/Etagenansicht und der Zugangshinweis bleiben im bisherigen Design,
+bis ihre konkrete Variante ausgewählt ist. Weitere Überarbeitung erfolgt nach
+Sichtung der echten Seiten. Die Dokumentation bleibt lokal; das ursprüngliche
+GitHub-Issue wird nicht verändert.
+
+### Gestaltungsprüfung nach der Übernahme
+
+Die erreichbaren 29 Seiten wurden auf Desktopbreite und mit 320 Pixel Breite
+auf horizontale Überläufe geprüft. Zusätzlich wurden die vorhandenen Templates
+für Konten, Bewerbungen, Verwaltung und Übergaben auf gemeinsame Abstände,
+Tabellendarstellung, Formularlabels und Aktionsbereiche geprüft.
+
+Korrigiert sind der Mauszeiger des überlagerten Foto-Dateifelds, der Abstand
+zwischen Schlüsselkopf und Tabelle, die identische obere Ausrichtung der
+Abschlusskarten und die doppelten UIkit-Abstände in CSS-Grids. Raumüberschriften
+und Aktionen können auf schmalen Bildschirmen umbrechen; die Verwaltungstabelle
+der Räume ist seitlich scrollbar. Ein einzelnes Raumformular nutzt die gesamte
+Arbeitsfläche. Verwaltungs- und Übergabebuttons verwenden dieselbe normale
+Schreibweise wie die übrigen Bereiche.
+
+Für diese Korrekturen sind keine weiteren Dateien und keine fachlichen
+Änderungen entstanden. Die 111 betroffenen UI-, Verwaltungs-, Übergabe- und
+Exporttests sowie Django-, Migrations-, Ruff- und Diff-Prüfungen sind erfolgreich.
+Nicht jeder mögliche Datenzustand ist durch den Browser-Smoke abgedeckt;
+Rollenschutz und seltene Formular-/Exportzustände werden zusätzlich durch
+die bestehenden Django-Tests geprüft.
 
 ## Rechtliche Inhalte vor Veröffentlichung
 

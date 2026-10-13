@@ -3,20 +3,22 @@
 {% block title %}Raum erfassen – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section">
-    <div class="uk-container uk-container-small">
+<section class="uk-section handover-page">
+    <div class="uk-container">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="handover" %}
         <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}">Zum Übergabeprotokoll</a>
-        <h1 class="uk-heading-medium">Raum erfassen</h1>
+        <h1 class="handover-title">Raum erfassen</h1>
         <p class="uk-text-lead">Legen Sie einen Raum oder einen sonstigen Bereich an und erfassen Sie danach die zugehörigen Prüfpunkte.</p>
-        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top">
+        <form method="post" class="uk-card uk-card-default uk-card-body handover-card handover-field-grid uk-margin-top">
             {% csrf_token %}
+            {% if form.non_field_errors %}<div class="uk-alert-danger handover-form-wide" role="alert">{{ form.non_field_errors }}</div>{% endif %}
             {% for field in form.visible_fields %}
                 <div class="uk-margin">
                     <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                     <div class="uk-form-controls">{{ field }}{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>
                 </div>
             {% endfor %}
-            <div class="uk-flex uk-flex-right">
+            <div class="uk-flex uk-flex-right handover-form-actions">
                 <button class="uk-button uk-button-primary" type="submit">Raum anlegen</button>
             </div>
         </form>

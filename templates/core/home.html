@@ -1,10 +1,91 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}STE Immobilien eGbR – Wohnungsvermietung in Würzburg{% endblock %}
 
 {% block content %}
-{% include "core/_home_company.html" %}
-{% include "core/_home_journey.html" %}
+<section class="uk-section home-company-hero" aria-labelledby="home-title">
+    <img class="home-city-image" src="{% static 'images/wuerzburg-aerial.jpg' %}" alt="" width="1920" height="1536" fetchpriority="high">
+    <div class="uk-container home-hero-content">
+        <p class="home-eyebrow">STE Immobilien eGbR · Wohnungsvermietung</p>
+        <h1 id="home-title" class="home-title">Wohnen in Würzburg.<br><span>Ihr nächstes Kapitel.</span></h1>
+        <p class="uk-text-lead home-intro">Ein neues Zuhause beginnt mit einem guten Überblick.</p>
+        <p class="home-copy">Entdecken Sie unser Gebäude, vergleichen Sie verfügbare Wohnungen und fragen Sie Ihre Besichtigung direkt online an.</p>
+        <div class="home-actions uk-margin-medium-top">
+            <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Wohnungen finden <span uk-icon="arrow-right" aria-hidden="true"></span></a>
+            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:building_view' %}">Gebäude erkunden</a>
+        </div>
+        {% if total_available %}
+<p class="home-availability"><span class="home-status-dot" aria-hidden="true"></span><strong>{{ total_available }} Wohnung{% if total_available != 1 %}en{% endif %} verfügbar</strong></p>
+{% else %}
+<p class="home-availability">Aktuell sind keine Wohnungen verfügbar.</p>
+{% endif %}
+        <p class="home-image-credit">Würzburg aus der Luft · © Simon Waldherr · <a href="{% url 'image_credits' %}">CC BY-SA 4.0 / Bildnachweis</a></p>
+    </div>
+</section>
+<section class="uk-section uk-section-default home-building-section" aria-labelledby="home-building-title">
+    <div class="uk-container">
+        <div class="uk-grid-large uk-flex-middle" uk-grid>
+            <div class="uk-width-2-5@m">
+                <p class="home-eyebrow">Unser Gebäude</p>
+                <h2 id="home-building-title">Ein Haus. Ihr Überblick.</h2>
+                <p>Wählen Sie eine Etage in der Zeichnung und entdecken Sie die Wohnungen im Grundriss. In den Wohnungsdetails finden Sie die hinterlegten Fotos, Ausstattung und Mietangaben.</p>
+                {% if total_units %}
+                <dl class="home-building-facts">
+                    <div><dt>Wohnungen im Gebäude</dt><dd>{{ total_units }}</dd></div>
+                    <div><dt>Etagen im Überblick</dt><dd>{{ floors|length }}</dd></div>
+                    <div><dt>Aktuell verfügbar</dt><dd>{{ total_available }}</dd></div>
+                </dl>
+                {% endif %}
+                <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung_public:building_view' %}">Zur vollständigen Gebäudeansicht <span uk-icon="arrow-right" aria-hidden="true"></span></a>
+            </div>
+            <div class="uk-width-3-5@m">
+                <figure class="home-building-figure uk-margin-remove">
+                    <div class="home-figure-heading"><span>Etage auswählen</span><span class="home-eyebrow">Wohnungen entdecken</span></div>
+                    {% if floors %}
+                        <div class="home-facade-preview">
+                            {% if floors %}
+<ul class="uk-list home-floor-links" aria-label="Etagen entdecken">
+    {% for floor in floors %}
+    <li><a href="{% url 'wohnungsverwaltung_public:floor_view' floor.number %}#etagenplan"><strong>{{ floor.label }}</strong><span class="home-floor-availability">{{ floor.available_count }} Wohnung{% if floor.available_count != 1 %}en{% endif %} frei</span><span class="home-floor-arrow" uk-icon="arrow-right" aria-hidden="true"></span></a></li>
+    {% endfor %}
+</ul>
+{% endif %}
+                            {% include "wohnungsverwaltung/_building_facade.html" with facade_preview=True %}
+                        </div>
+                    {% else %}
+                        <div class="home-building-empty"><span uk-icon="icon: home; ratio: 3" aria-hidden="true"></span><p>Lernen Sie unser Gebäude kennen.</p></div>
+                    {% endif %}
+                    <figcaption>Unser Gebäude als Zeichnung · Etage auswählen und Wohnungen entdecken</figcaption>
+                </figure>
+            </div>
+        </div>
+    </div>
+</section>
+<section id="unternehmen" class="uk-section home-company-band" aria-labelledby="home-company-title" tabindex="-1">
+    <div class="uk-container">
+        <div class="uk-grid-large" uk-grid>
+            <div class="uk-width-1-3@m"><p class="home-eyebrow">Über uns</p><h2 id="home-company-title">STE Immobilien eGbR</h2></div>
+            <div class="uk-width-2-3@m">
+                <p class="uk-text-lead uk-margin-remove-top">Wohnungsvermietung in Würzburg.</p>
+                <p class="home-copy">Wir vermieten die Wohnungen in unserem Würzburger Gebäude. Dieses Portal verbindet die Wohnungssuche mit Ihrer Besichtigungsanfrage und dem weiteren Bewerbungsablauf.</p>
+                <p class="home-copy">Sie können das Angebot ohne Konto erkunden. Für Ihre Besichtigungsanfrage melden Sie sich an; anschließend können Sie Ihre Bewerbungen im persönlichen Bereich wieder aufrufen.</p>
+                <a class="uk-button uk-button-text" href="{% url 'home' %}#kontakt">Kontakt & Besichtigung <span uk-icon="arrow-right" aria-hidden="true"></span></a>
+            </div>
+        </div>
+    </div>
+</section>
+<section id="ablauf" class="uk-section uk-section-default home-journey" aria-labelledby="home-journey-title" tabindex="-1">
+    <div class="uk-container">
+        <p class="home-eyebrow">Vom ersten Blick zum nächsten Schritt</p>
+        <h2 id="home-journey-title">So kommen Sie zur Besichtigung</h2>
+        <ol class="uk-grid uk-grid-large uk-child-width-1-3@m home-steps" uk-grid>
+            <li><span class="home-step-number" aria-hidden="true">01</span><h3>Wohnung finden</h3><p>In der Suche filtern oder über das Gebäude eine Etage und Wohnung auswählen.</p><a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Zur Wohnungssuche <span uk-icon="arrow-right" aria-hidden="true"></span></a></li>
+            <li><span class="home-step-number" aria-hidden="true">02</span><h3>Details kennenlernen</h3><p>Grundriss, Ausstattung, Fotos und Mietangaben in der Wohnungsansicht ansehen.</p><a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung_public:building_view' %}">Gebäude erkunden <span uk-icon="arrow-right" aria-hidden="true"></span></a></li>
+            <li><span class="home-step-number" aria-hidden="true">03</span><h3>Besichtigung anfragen</h3><p>Bei einer verfügbaren Wohnung „Zur Besichtigung anmelden“ wählen und die Anfrage mit Ihrem Konto senden.</p><p class="uk-text-small uk-text-muted uk-margin-small-top">Ihre Bewerbung finden Sie anschließend im persönlichen Bereich.</p></li>
+        </ol>
+    </div>
+</section>
 <section id="konto" class="uk-section uk-section-default home-portal" aria-labelledby="home-portal-title" tabindex="-1">
     <div class="uk-container">
         <div class="home-portal-inner">
@@ -32,5 +113,24 @@
         </div>
     </div>
 </section>
-{% include "core/_home_contact.html" %}
+<section id="kontakt" class="uk-section home-contact" aria-labelledby="home-contact-title" tabindex="-1">
+    <div class="uk-container">
+        <div class="uk-grid-large uk-flex-middle" uk-grid>
+            <div class="uk-width-1-2@m">
+                <p class="home-eyebrow">Kontakt & Besichtigung</p>
+                <h2 id="home-contact-title">Lernen Sie Ihr nächstes Zuhause kennen.</h2>
+                <p>Interessiert an einer Wohnung? Öffnen Sie die Wohnungsdetails und wählen Sie „Zur Besichtigung anmelden“. So kommt Ihre Anfrage direkt mit der passenden Wohnung bei uns an.</p>
+                <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Verfügbare Wohnungen ansehen</a>
+            </div>
+            <div class="uk-width-1-2@m">
+                <div class="uk-card uk-card-default uk-card-body home-contact-card">
+                    <h3 class="uk-card-title">STE Immobilien eGbR</h3>
+                    <p>Wohnungsvermietung in Würzburg</p>
+                    <p class="uk-text-meta">Kontaktangaben folgen: Das Unternehmen ergänzt hier Geschäftsanschrift, E-Mail-Adresse und weitere Kontaktmöglichkeiten.</p>
+                    <a class="uk-button uk-button-text" href="{% url 'imprint' %}#kontakt">Zu den Anbieter- und Kontaktangaben</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 {% endblock %}

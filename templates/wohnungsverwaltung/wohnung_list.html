@@ -3,9 +3,10 @@
 {% block title %}Wohnungen verwalten – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section uk-section-default">
+<section class="uk-section uk-section-default management-page">
     <div class="uk-container">
-        <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
+        <div class="management-page__heading uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-margin-bottom">
             <div>
                 <h1 class="uk-heading-small uk-margin-remove-bottom">Wohnungen</h1>
                 <p class="uk-text-muted uk-margin-small-top">Wohnungsstammdaten und Schlüssel.</p>
@@ -15,8 +16,8 @@
             </a>
         </div>
 
-        <div class="uk-overflow-auto">
-            <table class="uk-table uk-table-divider uk-table-middle">
+        <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Verwaltungstabelle">
+            <table class="uk-table uk-table-divider uk-table-middle uk-table-small">
                 <thead>
                     <tr>
                         <th>Gebäude</th>
@@ -32,7 +33,7 @@
                     {% for wohnung in wohnungen %}
                         <tr>
                             <td>{{ wohnung.gebaeudenummer }}</td>
-                            <td>{{ wohnung.wohnungsnummer }}</td>
+                            <td><strong>{{ wohnung.display_number }}</strong></td>
                             <td>{{ wohnung.etage }}</td>
                             <td>{{ wohnung.groesse_qm }} m²</td>
                             <td>{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl }}{% else %}Noch nicht angegeben{% endif %}</td>

@@ -2,21 +2,24 @@
 {% load static %}
 {% block title %}Übergabe prüfen und unterschreiben – STE Immobilien eGbR{% endblock %}
 {% block content %}
-<section class="uk-section"><div class="uk-container uk-container-small">
+<section class="uk-section handover-page"><div class="uk-container">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="handover" %}
     <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}">Zurück zum Protokoll</a>
     <h1>Übergabe prüfen und unterschreiben</h1>
     <p>Bitte prüfen Sie gemeinsam den vollständigen Inhalt. Die Unterschriften gelten für den hier angezeigten Stand.</p>
+    <div class="handover-document-grid">
     {% for section in snapshot.sections %}
-        <article class="uk-card uk-card-default uk-card-body uk-margin">
+        <article class="uk-card uk-card-default uk-card-body handover-card uk-margin">
             <h2 class="uk-card-title">{{ section.title }}</h2>
             <dl class="uk-description-list uk-description-list-divider">{% for label, value in section.rows %}<dt>{{ label }}</dt><dd>{{ value|linebreaksbr }}</dd>{% endfor %}</dl>
         </article>
     {% endfor %}
+    </div>
     {% include "wohnungsverwaltung/_handover_snapshot_rooms.html" with snapshot=snapshot only %}
     {% if completion_errors %}
         <div class="uk-alert-danger" role="alert"><ul>{% for error in completion_errors %}<li>{{ error }}</li>{% endfor %}</ul></div>
     {% else %}
-        <form id="handover-signing-form" method="post" enctype="multipart/form-data" action="{% url 'wohnungsverwaltung:handover_protocol_confirm' protocol.pk %}" class="uk-card uk-card-default uk-card-body uk-margin">
+        <form id="handover-signing-form" method="post" enctype="multipart/form-data" action="{% url 'wohnungsverwaltung:handover_protocol_confirm' protocol.pk %}" class="uk-card uk-card-default uk-card-body handover-card uk-margin">
             {% csrf_token %}{{ form.content_token }}
             <h2>Unterschriften</h2>
             <div class="uk-margin"><label>{{ form.schluessel_ueberprueft }} {{ form.schluessel_ueberprueft.label }}</label></div>

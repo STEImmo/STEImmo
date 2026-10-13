@@ -3,20 +3,21 @@
 {% block title %}Bewerbung ansehen – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section">
+<section class="uk-section management-page">
     <div class="uk-container uk-container-small">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
         <p>
             <a class="uk-button uk-button-text"
                href="{% url 'wohnungsverwaltung:employee_application_list' %}?wohnung={{ application.wohnung.pk }}">
                 Zurück zu den Bewerbungen dieser Wohnung
             </a>
         </p>
-        <article class="uk-card uk-card-default uk-card-body uk-text-break">
+        <article class="management-panel uk-card uk-card-default uk-card-body uk-text-break">
             <span class="uk-label">{{ application.get_applicant_status_display }}</span>
             <h1 class="uk-card-title">{{ application.person }} – {{ application.wohnung }}</h1>
             <h2 class="uk-h3">Besichtigungsanfrage</h2>
             <p>Eingang der Besichtigungsanfrage: {{ application.created_at|date:"d.m.Y, H:i" }} Uhr</p>
-            <dl class="uk-description-list">
+            <dl class="management-facts uk-description-list">
                 <dt>Titel</dt>
                 <dd>{{ application.person.titel|default:"Nicht angegeben" }}</dd>
                 <dt>Geburtsdatum</dt>
@@ -44,7 +45,7 @@
             </dl>
         </article>
 
-        <article class="uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
+        <article class="management-panel uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
             <h2 class="uk-card-title">Hauptbewerbung</h2>
             {% if application.submitted_at %}
                 <p>Eingang der Hauptbewerbung: {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr</p>
