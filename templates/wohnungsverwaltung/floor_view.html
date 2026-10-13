@@ -1,27 +1,41 @@
 {% extends "base.html" %}
 {% block title %}{{ floor_label }} – STE Immobilien eGbR{% endblock %}
 {% block content %}
-<section class="uk-section uk-section-small uk-section-default">
+<section class="uk-section architecture-view architecture-view--floor">
     <div class="uk-container">
         <ul class="uk-breadcrumb"><li><a href="{% url 'wohnungsverwaltung_public:building_view' %}">Gebäude</a></li><li><span>{{ floor_label }}</span></li></ul>
-        <h1 class="uk-h2 uk-margin-remove">{{ floor_label }}</h1>
-        <p class="uk-text-meta uk-margin-small-top uk-margin-small-bottom">{{ units|length }} Wohnungen · Wählen Sie eine freie Wohnung im Grundriss.</p>
-        <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-margin-top uk-margin-bottom">
-        <ul id="etagenplan" class="uk-subnav uk-subnav-pill uk-margin-remove floor-navigation" aria-label="Andere Etage wählen">
-            {% for number, label in floor_numbers %}<li{% if number == floor_number %} class="uk-active"{% endif %}><a href="{% url 'wohnungsverwaltung_public:floor_view' number %}#etagenplan"{% if number == floor_number %} aria-current="page"{% endif %}>{{ label }}</a></li>{% endfor %}
+        <header class="architecture-heading">
+            <p class="architecture-eyebrow">Unser Gebäude · Etage entdecken</p>
+            <h1>{{ floor_label }}</h1>
+            <p class="uk-text-lead">{{ units|length }} Wohnungen · Grundriss und Verfügbarkeit auf einen Blick.</p>
+        </header>
+        <ul id="etagenplan" class="architecture-floor-navigation" aria-label="Andere Etage auswählen">
+            {% for number, label in floor_numbers %}<li><a class="uk-button {% if number == floor_number %}uk-button-primary{% else %}uk-button-default{% endif %}" href="{% url 'wohnungsverwaltung_public:floor_view' number %}#etagenplan"{% if number == floor_number %} aria-current="page"{% endif %}>{{ label }}</a></li>{% endfor %}
         </ul>
-            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:building_view' %}">Zur Gebäudeansicht</a>
-        </div>
-        <p class="uk-text-meta uk-hidden@m">Auf kleinen Bildschirmen können Sie den Grundriss seitlich verschieben.</p>
-        {% if has_unmapped_units %}<div class="uk-alert-warning" uk-alert>Für einzelne Wohnungen liegt keine eindeutige Zuordnung im Grundriss vor. Bitte nutzen Sie die Wohnungsliste.</div>{% endif %}
-        <div class="floor-plan-frame uk-margin-medium-top" tabindex="0" role="region" aria-label="Grundriss {{ floor_label }} – seitlich scrollbar">{% include "wohnungsverwaltung/_floor_plan.html" %}</div>
-        <p class="uk-text-meta uk-text-center">Vereinfachter Grundriss nach der Vorlage · nicht maßstabsgetreu.</p>
-        <h2 class="uk-h3 uk-margin-medium-top">Wohnungen auf dieser Etage</h2>
-        <div class="uk-grid-small uk-child-width-1-2@s uk-child-width-1-3@m" uk-grid>
-        {% for wohnung in units %}<div>
-            {% if wohnung.status == 'free' %}<a class="uk-card uk-card-default uk-card-body uk-display-block apartment-list-link" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' wohnung.pk %}"><span class="uk-label uk-label-success">Verfügbar</span><h3 class="uk-h4 uk-margin-small-top">Wohnung {{ wohnung.display_number }}</h3><span>{% if wohnung.groesse_qm > 0 %}{{ wohnung.groesse_qm }} m²{% else %}Wohnfläche noch nicht angegeben{% endif %} · {% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl }} Zimmer{% else %}Zimmerzahl noch nicht angegeben{% endif %}</span><p class="uk-margin-small-top uk-margin-remove-bottom">{% if wohnung.kaltmiete > 0 %}{{ wohnung.kaltmiete }} € Kaltmiete{% else %}Kaltmiete noch nicht angegeben{% endif %} →</p></a>
-            {% else %}<div class="uk-card uk-card-body uk-background-muted uk-text-muted"><span class="uk-label">Nicht verfügbar</span><h3 class="uk-h4 uk-text-muted">Wohnung {{ wohnung.display_number }}</h3><span>{% if wohnung.groesse_qm > 0 %}{{ wohnung.groesse_qm }} m²{% else %}Wohnfläche noch nicht angegeben{% endif %}</span></div>{% endif %}
-        </div>{% endfor %}
+        {% if has_unmapped_units %}<div class="uk-alert-warning">Für einzelne Wohnungen liegt keine eindeutige Zuordnung im Grundriss vor. Bitte nutzen Sie die Wohnungsliste.</div>{% endif %}
+        <div class="architecture-floor-layout">
+            <figure class="architecture-floor-drawing uk-margin-remove">
+                <div class="architecture-visual floor-plan-frame" tabindex="0" role="region" aria-label="Grundriss {{ floor_label }} – seitlich scrollbar">{% include "wohnungsverwaltung/_floor_plan.html" %}</div>
+                <figcaption>Vereinfachter Grundriss · nicht maßstabsgetreu.</figcaption>
+                <div class="architecture-plan-legend"><span><i class="architecture-legend-free" aria-hidden="true"></i>Verfügbar · anklickbar</span><span><i class="architecture-legend-taken" aria-hidden="true"></i>Nicht verfügbar</span></div>
+                <p class="uk-text-meta uk-hidden@m">Den Grundriss können Sie seitlich verschieben. Alle Wohnungen finden Sie auch in der Liste.</p>
+            </figure>
+            <section class="architecture-floor-apartments" aria-labelledby="architecture-apartments-title">
+                <h2 id="architecture-apartments-title">Wohnungen auf dieser Etage</h2>
+                <div class="architecture-apartment-cards">
+                    {% for wohnung in units %}
+                    <article class="uk-card uk-card-default uk-card-body architecture-apartment-card{% if wohnung.status != 'free' %} architecture-apartment-taken{% endif %}">
+                        <div class="architecture-apartment-title"><h3>Wohnung {{ wohnung.display_number }}</h3><span class="uk-label {% if wohnung.status == 'free' %}uk-label-success{% endif %}">{% if wohnung.status == 'free' %}Verfügbar{% else %}Nicht verfügbar{% endif %}</span></div>
+                        <dl class="architecture-apartment-facts">
+                            <div><dt>Wohnfläche</dt><dd>{% if wohnung.groesse_qm > 0 %}{{ wohnung.groesse_qm }} m²{% else %}Wohnfläche noch nicht angegeben{% endif %}</dd></div>
+                            <div><dt>Zimmer</dt><dd>{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl }}{% else %}Zimmerzahl noch nicht angegeben{% endif %}</dd></div>
+                            <div><dt>Kaltmiete / Monat</dt><dd>{% if wohnung.kaltmiete > 0 %}{{ wohnung.kaltmiete }} €{% else %}Kaltmiete noch nicht angegeben{% endif %}</dd></div>
+                        </dl>
+                        {% if wohnung.status == 'free' %}<a class="uk-button uk-button-default architecture-apartment-link" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' wohnung.pk %}">Wohnung ansehen <span uk-icon="arrow-right" aria-hidden="true"></span></a>{% endif %}
+                    </article>
+                    {% empty %}<p>Noch keine Wohnungen vorhanden.</p>{% endfor %}
+                </div>
+            </section>
         </div>
     </div>
 </section>

@@ -1,12 +1,10 @@
 {% with route=request.resolver_match.url_name namespace=request.resolver_match.namespace %}
-    {% if not perms.immobilien.access_employee_area %}
         <li><a href="{% url 'wohnungsverwaltung_public:apartment_search' %}"{% if namespace == "wohnungsverwaltung_public" and route != "building_view" and route != "floor_view" %} aria-current="{% if route == 'apartment_search' %}page{% else %}true{% endif %}"{% endif %}>Wohnungen finden</a></li>
         <li><a href="{% url 'wohnungsverwaltung_public:building_view' %}"{% if route == "building_view" %} aria-current="page"{% elif route == "floor_view" %} aria-current="true"{% endif %}>Gebäudeansicht</a></li>
-        {% if company_links %}
+        {% if company_links and not perms.immobilien.access_employee_area %}
             <li><a href="{% url 'home' %}#unternehmen">Über uns</a></li>
             <li><a href="{% url 'home' %}#kontakt">Kontakt</a></li>
         {% endif %}
-    {% endif %}
     {% if user.is_authenticated %}
         {% if perms.immobilien.access_tenant_area %}
             <li><a href="{% url 'wohnungsverwaltung:handover_protocol_mine' %}"{% if route == "handover_protocol_mine" %} aria-current="page"{% elif not perms.immobilien.access_employee_area and 'handover_protocol' in route %} aria-current="true"{% endif %}>Meine Übergabeprotokolle</a></li>

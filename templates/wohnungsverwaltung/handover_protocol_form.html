@@ -14,7 +14,7 @@
             {% csrf_token %}
             <div class="uk-alert-warning" hidden data-protocol-draft-notice>
                 <p>Ein Entwurf vom <span data-protocol-draft-time></span> ist verfügbar.</p>
-                <div class="uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
+                <div class="notice-actions">
                     <div><button class="uk-button uk-button-primary uk-button-small" type="button" data-restore-protocol-draft>Entwurf wiederherstellen</button></div>
                     <div><button class="uk-button uk-button-default uk-button-small" type="button" data-discard-protocol-draft>Entwurf verwerfen</button></div>
                 </div>

@@ -225,7 +225,9 @@ Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfigu
 
 ## Bewerbungen im Betreiberbereich
 
-Die Mitarbeiternavigation blendet **Wohnungen finden** und **Gebäudeansicht** aus.
+Die Mitarbeiternavigation zeigt **Wohnungen finden** und **Gebäudeansicht**
+weiterhin an. Mitarbeiter können das öffentliche Angebot direkt prüfen und
+zusätzlich ihre freigeschalteten Verwaltungsbereiche aufrufen.
 Besichtigungsanfragen werden aus dem Kontext der jeweiligen Wohnung gestartet;
 die technische Bewerbungsvorschau ist kein Navigationspunkt der Website.
 

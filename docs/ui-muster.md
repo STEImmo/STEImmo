@@ -221,7 +221,7 @@ Eine Original-Logodatei ist noch nicht eingebunden; die Firmenwortmarke dient bi
 
 Die Linkliste übernimmt die vorhandenen Berechtigungsbedingungen einschließlich
 Mehrfachrollen und Einzelrechten. Die öffentlichen Links führen zur Wohnungssuche
-und Gebäudeansicht. Die technische Bewerbungsvorschau ist kein Navigationspunkt;
+und Gebäudeansicht und bleiben auch für Mitarbeiter sichtbar. Die technische Bewerbungsvorschau ist kein Navigationspunkt;
 Besichtigungsanfragen gehören zum Kontext der jeweiligen Wohnung.
 Aktuelle Seiten verwenden `aria-current="page"`,
 übergeordnete Bereiche `aria-current="true"`. Die aktive Position wird zusätzlich
@@ -320,13 +320,14 @@ zugeordneten Protokolle; Verwaltungslinks bleiben rollenabhängig.
 
 Die Entwicklungsvorschau `/design/seiten/` und ihre neun temporären Dateien sind
 entfernt. Nur einmal verwendete Startseitenabschnitte und die Filterhülle sind
-in die bestehenden Seiten zurückgeführt. Mehrfach verwendete Formular-,
-Navigations- und Ergebnisbausteine bleiben als Partials. Das neue
+in die bestehenden Seiten zurückgeführt. Die nur in der Suche verwendete
+Ergebniskarte ist ebenfalls in die Suchseite integriert. Mehrfach verwendete
+Formular- und Navigationsbausteine bleiben als Partials. Das neue
 `_workspace_navigation.html` bündelt die Bereichsnavigation der 21 internen Seiten.
 Das ausgewählte CSS liegt ausschließlich im bestehenden `static/css/app.css`.
 
-Gegenüber dem gemeinsamen Ausgangsstand des UI-Branches verbleiben 29 neue
-dauerhafte Dateien: 16 Templates, sieben Testmodule, zwei Dokumentationen,
+Gegenüber dem gemeinsamen Ausgangsstand des UI-Branches verbleiben 28 neue
+dauerhafte Dateien: 15 Templates, sieben Testmodule, zwei Dokumentationen,
 zwei Bildassets und zwei kleine JavaScript-Dateien. Benutzerseitige lokale
 Dateien werden dabei nicht mitgezählt. Die Übernahme der 21 internen Ansichten
 ändert bestehende Templates; es entsteht keine Datei pro Variante.
@@ -339,12 +340,37 @@ Wohnungsformular, Übergabeübersicht/-detail, Protokollbearbeitung, Raumprüfun
 Schlüssel und Abschlussansicht durchgeführt. Keine Testdaten über die
 Formulare gespeichert und kein Protokoll unterschrieben oder bestätigt.
 
-Gebäude-/Etagenansicht und der Zugangshinweis bleiben im bisherigen Design,
-bis ihre konkrete Variante ausgewählt ist. Weitere Überarbeitung erfolgt nach
-Sichtung der echten Seiten. Die Dokumentation bleibt lokal; das ursprüngliche
-GitHub-Issue wird nicht verändert.
+Gebäude und alle fünf Etagen verwenden das ausgewählte Design B auf den
+echten Seiten `/wohnungen/gebaeude/` und `/wohnungen/etagen/0/` bis `/wohnungen/etagen/4/`.
+Die Gebäudeangaben stehen schlicht unter der Fassade. Der große Grundriss führt
+zu vergleichbaren Wohnungszeilen mit umrahmten Detailbuttons. Bestehende
+Zeichnungen, Daten, Verfügbarkeitsregeln und Etagenlinks bleiben erhalten.
+Vergleichsvorlage, A-/C-Stile und Vorschauauswahl sind entfernt; alte Links mit
+Entwurfsparametern zeigen ebenfalls die echte Ansicht. Das gilt auch in Produktion.
+
+Der Zugriffshinweis bei fehlender Bewerberrolle und die historische technische
+Bewerbungsvorschau verwenden ebenfalls den gemeinsamen Seitenrahmen. Die
+technische Vorschau bleibt ohne Navigationseintrag und ohne Speichermöglichkeit.
+Damit sind alle regulären MVP-Seiten gestalterisch abgedeckt. Für den vollständigen
+UI-Abschluss fehlen noch eigene allgemeine Fehlerseiten (403/404/500 sowie
+Uploadlimit-Antwort), abschließende Sichtung/Abnahme und die Freigabe über PR/Review.
+Rechtstexte, Kontaktangaben, Originalbilder und bestätigte Wohnungsdaten bleiben
+inhaltliche Aufgaben. Zimmerzahlen werden weiterhin aus dem vorhandenen Feld
+gelesen; im geprüften lokalen Bestand sind bei allen 25 Wohnungen nur die
+Standardwerte 0,00 hinterlegt. Fehlende Angaben werden ausdrücklich angezeigt.
+Die Dokumentation bleibt lokal; das ursprüngliche GitHub-Issue wird nicht verändert.
+
+Abschlussprüfung dieser Übernahme: 160 Tests für Core, öffentliche Ansichten,
+Wohnungssuche und Bewerbungsoberfläche sowie System-, Migrations-, Ruff- und
+Diff-Prüfungen erfolgreich. Die Geschäftslogik und das Datenbankschema sind unverändert.
 
 ### Gestaltungsprüfung nach der Übernahme
+
+Hinweisboxen haben unabhängig von der zusätzlich vorhandenen UIkit-Basisklasse
+einheitliche Innenabstände: 16 Pixel oben/unten und 24 Pixel links/rechts.
+Damit sind auch die Farbvarianten bei Formularfehlern, Entwürfen und Statushinweisen
+abgedeckt. Der Entwurfshinweis nutzt eine umbruchfähige Aktionszeile mit 12 Pixel
+Abstand zwischen den Buttons, ohne negative UIkit-Gridränder.
 
 Die erreichbaren 29 Seiten wurden auf Desktopbreite und mit 320 Pixel Breite
 auf horizontale Überläufe geprüft. Zusätzlich wurden die vorhandenen Templates

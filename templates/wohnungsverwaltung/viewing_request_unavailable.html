@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Besichtigungsanfrage – STE Immobilien eGbR{% endblock %}
 {% block content %}
-<section class="uk-section uk-section-default">
+<section class="uk-section apartment-detail">
     <div class="uk-container uk-container-small">
-        <h1 class="uk-heading-small">Besichtigung für Wohnung {{ wohnung.display_number }}</h1>
+        <header class="apartment-detail-heading"><p class="application-eyebrow">Besichtigungsanfrage</p><h1>Wohnung {{ wohnung.display_number }}</h1></header>
+        <article class="uk-card uk-card-default uk-card-body application-form-card">
         <div class="uk-alert-primary" uk-alert>
             {% if missing_profile %}
                 <h2 class="uk-h4">Ihr Personenprofil fehlt</h2>
@@ -15,6 +16,7 @@
         </div>
         <p>Eine Anfrage reserviert noch keinen Termin. Die Hauptbewerbung folgt erst nach der Besichtigung und Freigabe durch die Verwaltung.</p>
         <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' wohnung.pk %}">Zurück zur Wohnung</a>
+        </article>
     </div>
 </section>
 {% endblock %}

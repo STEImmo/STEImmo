@@ -487,10 +487,20 @@ a:active,
     opacity: 0.65;
 }
 
-.uk-alert {
+.uk-alert,
+.uk-alert-primary,
+.uk-alert-success,
+.uk-alert-warning,
+.uk-alert-danger {
+    position: relative;
+    margin-block: var(--steimmo-space-md);
     border-radius: var(--steimmo-radius-sm);
-    padding: var(--steimmo-space-sm) var(--steimmo-space-md);
+    padding: var(--steimmo-space-md) var(--steimmo-space-lg);
 }
+
+:is(.uk-alert, .uk-alert-primary, .uk-alert-success, .uk-alert-warning, .uk-alert-danger) > :first-child { margin-top: 0; }
+:is(.uk-alert, .uk-alert-primary, .uk-alert-success, .uk-alert-warning, .uk-alert-danger) > :last-child { margin-bottom: 0; }
+.notice-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--steimmo-space-sm); }
 
 .uk-alert-primary {
     border-left: 4px solid var(--steimmo-color-info-border);
@@ -1514,4 +1524,74 @@ a:active,
     }
     .handover-protocol-editor > section > .uk-flex > .uk-button,
     .handover-protocol-editor [data-room-card] .uk-card-header > .uk-flex > .uk-button { width: 100%; }
+}
+
+/* Building and floor exploration: selected architecture layout. */
+.architecture-view { background: var(--steimmo-color-surface-page); }
+.architecture-heading { max-width: 850px; margin-bottom: 2rem; }
+.architecture-heading h1 { font-size: clamp(2rem, 4vw, 3.2rem); margin: .6rem 0 1rem; }
+.architecture-heading .uk-text-lead { margin: 0; }
+.architecture-eyebrow { color: var(--steimmo-color-primary); font-size: .85rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin: 0; }
+.architecture-visual { background: var(--steimmo-color-surface); border: 1px solid var(--steimmo-color-border); border-radius: var(--steimmo-radius-lg); padding: 1rem; box-sizing: border-box; min-width: 0; }
+.architecture-view figcaption { font-size: .85rem; color: var(--steimmo-color-text-muted); text-align: center; padding: 1rem .5rem 0; }
+.architecture-view .uk-button { text-transform: none; }
+.architecture-building-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+.architecture-building-drawing { width: 100%; max-width: 1050px; box-sizing: border-box; justify-self: center; }
+.architecture-building-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem 2rem; }
+.architecture-building-stats > div { display: flex; align-items: baseline; gap: .5rem; }
+.architecture-building-stats strong { font-size: 1.1rem; }
+.architecture-building-stats span { font-size: .9rem; }
+.architecture-building-selection { min-width: 0; }
+.architecture-building-selection h2, .architecture-floor-apartments > h2 { font-size: 1.45rem; margin: 0 0 .75rem; }
+.architecture-building-selection > p { margin: 0 0 1.25rem; }
+.architecture-floor-cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .8rem; }
+.architecture-floor-card { border: 1px solid var(--steimmo-color-border); border-radius: var(--steimmo-radius-lg); padding: 1.2rem; color: var(--steimmo-color-text); box-shadow: none; }
+.architecture-floor-card:hover { text-decoration: none; border-color: var(--steimmo-color-primary); background: var(--steimmo-color-success-surface); }
+.architecture-floor-card h3 { font-size: 1.2rem; min-height: 3rem; margin: 0 0 .45rem; }
+.architecture-floor-card > span { display: block; }
+.architecture-floor-free { font-weight: 700; color: var(--steimmo-color-primary); margin-bottom: .2rem; }
+.architecture-floor-card:focus-visible { outline: 3px solid var(--steimmo-color-focus-ring); outline-offset: 3px; }
+.architecture-building-search { display: flex; justify-content: space-between; gap: 1.5rem; align-items: center; border-top: 1px solid var(--steimmo-color-border); padding-top: 1.5rem; margin-top: .5rem; }
+.architecture-building-search h2 { font-size: 1.3rem; margin: 0 0 .4rem; }
+.architecture-building-search p { margin: 0; }
+.architecture-building-search > a { flex-shrink: 0; }
+.architecture-floor-navigation { display: flex; flex-wrap: wrap; gap: .6rem; padding: 0; list-style: none; margin: 0 0 2rem; scroll-margin-top: 1rem; }
+.architecture-floor-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2rem; }
+.architecture-floor-drawing { min-width: 0; width: 100%; max-width: 1100px; justify-self: center; }
+.architecture-floor-drawing .floor-plan-frame { max-width: 100%; }
+.architecture-apartment-cards { display: grid; gap: 1rem; }
+.architecture-apartment-card { display: grid; grid-template-columns: 250px minmax(0, 1fr) 190px; gap: 1rem; align-items: center; border: 1px solid var(--steimmo-color-border); border-radius: var(--steimmo-radius-lg); box-shadow: none; padding: 1.3rem 1.5rem; }
+.architecture-apartment-title h3 { font-size: 1.2rem; margin: 0 0 .4rem; }
+.architecture-apartment-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin: 0; }
+.architecture-apartment-facts dt { font-size: .85rem; color: var(--steimmo-color-text-muted); }
+.architecture-apartment-facts dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
+.architecture-apartment-taken { background: var(--steimmo-color-surface-muted); color: var(--steimmo-color-text-muted); }
+.architecture-apartment-link { padding-inline: var(--steimmo-space-sm); white-space: nowrap; justify-self: start; }
+.architecture-plan-legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 1rem; margin-top: .8rem; font-size: .85rem; }
+.architecture-plan-legend > span { display: flex; align-items: center; gap: .45rem; }
+.architecture-plan-legend i { display: inline-block; width: 14px; height: 14px; border: 1px solid var(--steimmo-color-border-strong); border-radius: 3px; }
+.architecture-legend-free { background: var(--steimmo-color-success-surface); }
+.architecture-legend-taken { background: repeating-linear-gradient(135deg, var(--steimmo-color-surface-muted) 0 3px, var(--steimmo-color-border-strong) 3px 4px); }
+@media (max-width: 1199px) {
+    .architecture-floor-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .architecture-apartment-card { grid-template-columns: 200px minmax(0, 1fr); }
+    .architecture-apartment-link { grid-column: 2; }
+}
+@media (max-width: 959px) {
+    .architecture-floor-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .architecture-apartment-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .architecture-apartment-card { display: flex; flex-direction: column; align-items: stretch; min-width: 0; padding: 1.35rem; }
+    .architecture-apartment-facts { grid-template-columns: minmax(0, 1fr); }
+    .architecture-apartment-facts > div { display: flex; justify-content: space-between; gap: 1rem; }
+    .architecture-apartment-facts dd { margin: 0; text-align: right; }
+    .architecture-apartment-link { align-self: start; margin-top: auto; }
+}
+@media (max-width: 639px) {
+    .architecture-view { padding: 2rem 0; }
+    .architecture-building-search { flex-direction: column; align-items: stretch; }
+    .architecture-building-stats { gap: .5rem 1rem; }
+    .architecture-floor-cards, .architecture-apartment-cards { grid-template-columns: minmax(0, 1fr); }
+    .architecture-floor-card h3 { min-height: 0; }
+    .architecture-floor-navigation .uk-button { padding: 0 12px; }
+    .architecture-visual { padding: .5rem; }
 }

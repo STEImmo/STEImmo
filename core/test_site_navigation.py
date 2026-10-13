@@ -63,6 +63,7 @@ class SiteNavigationTests(TestCase):
                 if (
                     label != "Footernavigation"
                     and reverse("wohnungsverwaltung_public:building_view") in destinations
+                    and not response.context["user"].has_perm("immobilien.access_employee_area")
                 ):
                     destinations[2:2] = [
                         f"{reverse('home')}#unternehmen",
@@ -131,12 +132,14 @@ class SiteNavigationTests(TestCase):
             ),
         )
 
-    def test_direct_employee_permissions_keep_internal_links_and_hide_public_sections(self):
+    def test_employees_keep_public_navigation_alongside_their_workspaces(self):
         self.client.force_login(self.manager)
         response = self.client.get(reverse("home"))
         self.assert_navigation_destinations(
             response,
             (
+                "wohnungsverwaltung_public:apartment_search",
+                "wohnungsverwaltung_public:building_view",
                 "verwaltung:wohnung_list",
                 "wohnungsverwaltung:handover_protocol_list",
                 "wohnungsverwaltung:employee_application_list",
