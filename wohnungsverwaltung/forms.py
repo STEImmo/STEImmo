@@ -2,6 +2,7 @@ import json
 import unicodedata
 import warnings
 from copy import copy
+from datetime import datetime
 from io import BytesIO
 from uuid import UUID
 
@@ -59,6 +60,7 @@ from .models import (
     Stellplatz,
     StellplatzZuordnung,
     UebergabeStatus,
+    ViewingAppointment,
     Wohnung,
     WohnungStatus,
     calculate_photo_checksum,
@@ -1958,6 +1960,15 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
 
 
 class EmployeeApplicationFilterForm(UIkitFormMixin, forms.Form):
+    viewing_status = forms.ChoiceField(
+        required=False,
+        choices=(
+            ("", "Alle Terminstatus"),
+            ("none", "Ohne Termin"),
+            *ViewingAppointment.Status.choices,
+        ),
+        label="Besichtigung",
+    )
     status = forms.ChoiceField(
         required=False,
         choices=(
@@ -2034,6 +2045,108 @@ class MainApplicationInvitationForm(UIkitFormMixin, forms.Form):
         strip=True,
         widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 3}),
     )
+
+
+class ViewingAppointmentForm(UIkitFormMixin, forms.Form):
+    date = forms.DateField(
+        label="Datum", widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"})
+    )
+    start_time = forms.TimeField(
+        label="Beginn", widget=forms.TimeInput(format="%H:%M", attrs={"type": "time"})
+    )
+    end_time = forms.TimeField(
+        label="Ende", widget=forms.TimeInput(format="%H:%M", attrs={"type": "time"})
+    )
+    action = forms.ChoiceField(
+        choices=(
+            ("schedule", "Termin planen"),
+            ("record", "Durchgeführte Besichtigung nachtragen"),
+        ),
+        label="Erfassung",
+    )
+    reason = forms.CharField(
+        required=False,
+        strip=True,
+        label="Interne Begründung / Notiz",
+        widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 2}),
+    )
+    version = forms.IntegerField(required=False, min_value=1, widget=forms.HiddenInput)
+
+    def __init__(self, *args, appointment=None, **kwargs):
+        from .viewings import BERLIN
+
+        if appointment is not None:
+            kwargs.setdefault("initial", {}).update(
+                {
+                    "date": timezone.localtime(appointment.starts_at, BERLIN).date(),
+                    "start_time": timezone.localtime(appointment.starts_at, BERLIN).time(),
+                    "end_time": timezone.localtime(appointment.ends_at, BERLIN).time(),
+                    "version": appointment.version,
+                    "action": "reschedule",
+                }
+            )
+        super().__init__(*args, **kwargs)
+        if appointment is not None:
+            self.fields["action"].choices = (("reschedule", "Termin verschieben"),)
+            self.fields["action"].widget = forms.HiddenInput()
+            self.fields["version"].required = True
+
+    def clean(self):
+        from .viewings import BERLIN
+
+        cleaned = super().clean()
+        date = cleaned.get("date")
+        for field_name, time_name in (("starts_at", "start_time"), ("ends_at", "end_time")):
+            time = cleaned.get(time_name)
+            if date is not None and time is not None:
+                naive = datetime.combine(date, time)
+                if (
+                    naive.replace(tzinfo=BERLIN, fold=0).utcoffset()
+                    != naive.replace(tzinfo=BERLIN, fold=1).utcoffset()
+                ):
+                    self.add_error(
+                        time_name,
+                        "Diese Uhrzeit ist wegen der Zeitumstellung nicht eindeutig "
+                        "oder existiert nicht.",
+                    )
+                else:
+                    cleaned[field_name] = timezone.make_aware(naive, BERLIN)
+        start, end = cleaned.get("starts_at"), cleaned.get("ends_at")
+        if start and end:
+            if end <= start:
+                self.add_error("end_time", "Das Ende muss nach dem Beginn liegen.")
+            if cleaned.get("action") == "record":
+                if end > timezone.now():
+                    self.add_error("date", "Ein Nachtrag muss bereits vollständig vergangen sein.")
+                if not cleaned.get("reason"):
+                    self.add_error("reason", "Bitte begründen Sie den Nachtrag.")
+            elif start <= timezone.now():
+                self.add_error(
+                    "date", "Ein neuer oder verschobener Termin muss in der Zukunft liegen."
+                )
+        return cleaned
+
+
+class ViewingActionForm(UIkitFormMixin, forms.Form):
+    version = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
+    action = forms.ChoiceField(
+        choices=tuple(
+            (value, value) for value in ("cancel", "complete", "no_show", "confirm", "decline")
+        ),
+        widget=forms.HiddenInput,
+    )
+    reason = forms.CharField(
+        required=False,
+        strip=True,
+        label="Interne Begründung",
+        widget=forms.Textarea(attrs={"class": "uk-textarea", "rows": 2}),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("action") == "cancel" and not cleaned.get("reason"):
+            self.add_error("reason", "Bitte begründen Sie die Absage.")
+        return cleaned
 
 
 class RaumForm(UIkitFormMixin, forms.ModelForm):

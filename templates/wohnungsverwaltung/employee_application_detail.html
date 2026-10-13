@@ -44,6 +44,8 @@
             </dl>
         </article>
 
+        {% include "wohnungsverwaltung/_employee_viewings.html" %}
+
         <article class="uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
             <h2 class="uk-card-title">Interne Prüfung</h2>
             <p>Priorität: <strong>{{ application.get_review_priority_display }}</strong></p>
@@ -82,11 +84,15 @@
                     </form>
                 {% endif %}
             {% elif application.status == "open" and not application.interest_withdrawn_at and not application.submitted_at %}
+                {% if not has_completed_viewing %}
+                    <p class="uk-alert-warning" uk-alert>Für die Main-Freischaltung fehlt eine dokumentierte, durchgeführte Besichtigung.</p>
+                {% else %}
                 <form method="post" action="{% url 'wohnungsverwaltung:employee_application_invite' application.pk %}" class="uk-form-stacked">
                     {% csrf_token %}
                     {{ invitation_form.as_p }}
                     <button class="uk-button uk-button-primary" type="submit">Main-Bewerbung freischalten und einladen</button>
                 </form>
+                {% endif %}
             {% else %}
                 <p class="uk-alert-warning" uk-alert>
                     Eine Main-Bewerbung kann nur für eine aktive, offene Pre-Bewerbung freigeschaltet werden.

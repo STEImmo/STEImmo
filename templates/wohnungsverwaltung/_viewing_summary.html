@@ -1,0 +1,8 @@
+{% load tz %}
+{% timezone "Europe/Berlin" %}
+<p>
+    <strong>Besichtigung: {{ appointment.starts_at|date:"d.m.Y" }}</strong><br>
+    {{ appointment.starts_at|date:"H:i" }}–{{ appointment.ends_at|date:"H:i" }} Uhr (Europe/Berlin)
+    · <span class="uk-label">{{ appointment.get_status_display }}</span>
+</p>
+{% endtimezone %}

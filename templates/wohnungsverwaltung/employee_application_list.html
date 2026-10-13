@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load tz %}
 
 {% block title %}Bewerbungen – STEImmo{% endblock %}
 
@@ -59,6 +60,7 @@
                                 <th scope="col">Bearbeitungsstatus</th>
                                 <th scope="col">Main-Status</th>
                                 <th scope="col">Priorität</th>
+                                <th scope="col">Besichtigung</th>
                                 {% if segment == 'review' %}<th scope="col">Prüfgrund</th>{% endif %}
                                 <th scope="col">Pre-Eingang</th>
                                 <th scope="col">Details</th>
@@ -79,6 +81,14 @@
                                         {% else %}Noch nicht freigeschaltet{% endif %}
                                     </td>
                                     <td>{{ application.get_review_priority_display }}</td>
+                                    <td>
+                                        {% if application.latest_viewing_start %}
+                                            {% timezone "Europe/Berlin" %}
+                                            <span class="uk-text-nowrap">{{ application.latest_viewing_start|date:"d.m.Y, H:i" }}–{{ application.latest_viewing_end|date:"H:i" }} Uhr</span><br>
+                                            {% endtimezone %}
+                                        {% endif %}
+                                        {{ application.get_latest_viewing_status_display }}
+                                    </td>
                                     {% if segment == 'review' %}
                                         <td>
                                             {% for flag in application.suitability_review_flags %}{{ flag }}{% if not forloop.last %}<br>{% endif %}{% endfor %}

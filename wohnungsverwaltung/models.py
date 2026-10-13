@@ -447,6 +447,13 @@ class Wohnung(models.Model):
                         reason=self.occupancy_decline_reason(people_count),
                         requirements_version=self.requirements_version,
                     )
+                    from .viewings import cancel_open_viewings
+
+                    cancel_open_viewings(
+                        application_id,
+                        reason="Bewerbung wegen Personenhöchstzahl beendet",
+                        notify=True,
+                    )
             return saved
 
 
@@ -561,6 +568,11 @@ class Bewerbung(models.Model):
             return "Main-Bewerbung freigeschaltet"
         return "In Bearbeitung"
 
+    def get_latest_viewing_status_display(self):
+        return dict(ViewingAppointment.Status.choices).get(
+            getattr(self, "latest_viewing_status", None), "Ohne Termin"
+        )
+
     def get_applicant_next_step(self) -> str:
         if self.interest_withdrawn_at is not None:
             return "Für diese Bewerbung sind keine weiteren Schritte möglich."
@@ -619,6 +631,151 @@ class ApplicationReviewEvent(models.Model):
                 name="review_app_kind_version_idx",
             ),
         ]
+
+
+class ViewingAppointment(models.Model):
+    class Status(models.TextChoices):
+        PLANNED = "planned", "Geplant"
+        CONFIRMED = "confirmed", "Bestätigt"
+        COMPLETED = "completed", "Durchgeführt"
+        APPLICANT_DECLINED = "applicant_declined", "Vom Bewerber abgesagt"
+        CANCELLED = "cancelled", "Abgesagt"
+        NO_SHOW = "no_show", "Nicht erschienen"
+
+    appointment_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    application = models.ForeignKey(Bewerbung, on_delete=models.CASCADE, related_name="viewings")
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    status = models.CharField(max_length=24, choices=Status.choices, default=Status.PLANNED)
+    version = models.PositiveIntegerField(default=1, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def is_open(self):
+        return self.status in (self.Status.PLANNED, self.Status.CONFIRMED)
+
+    @property
+    def can_respond(self):
+        return self.is_open and self.starts_at > timezone.now()
+
+    @property
+    def can_record_result(self):
+        return self.is_open and self.ends_at <= timezone.now()
+
+    def snapshot(self):
+        return {
+            "starts_at": self.starts_at.isoformat(),
+            "ends_at": self.ends_at.isoformat(),
+            "status": self.status,
+        }
+
+    class Meta:
+        db_table = "viewing_appointment"
+        ordering = ("-created_at", "-appointment_id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(ends_at__gt=models.F("starts_at")),
+                name="viewing_end_after_start",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    status__in=(
+                        "planned",
+                        "confirmed",
+                        "completed",
+                        "applicant_declined",
+                        "cancelled",
+                        "no_show",
+                    )
+                ),
+                name="viewing_valid_status",
+            ),
+            models.UniqueConstraint(
+                fields=("application",),
+                condition=models.Q(status__in=("planned", "confirmed")),
+                name="viewing_one_open_per_app",
+            ),
+        ]
+
+
+class ViewingAppointmentEvent(models.Model):
+    class Kind(models.TextChoices):
+        CREATED = "created", "Besichtigung geplant"
+        RESCHEDULED = "rescheduled", "Besichtigung verschoben"
+        STATUS_CHANGED = "status_changed", "Terminstatus geändert"
+        RECORDED = "recorded", "Besichtigung nachgetragen"
+        MAIL_SENT = "mail_sent", "Terminbenachrichtigung versendet"
+        MAIL_FAILED = "mail_failed", "Terminversand fehlgeschlagen"
+
+    class NotificationStatus(models.TextChoices):
+        NONE = "none", "Keine Benachrichtigung erforderlich"
+        PENDING = "pending", "Versand ausstehend"
+        SENT = "sent", "Versendet"
+        FAILED = "failed", "Versand fehlgeschlagen"
+        OBSOLETE = "obsolete", "Überholt"
+
+    event_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    appointment = models.ForeignKey(
+        ViewingAppointment, on_delete=models.CASCADE, related_name="events"
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="viewing_events",
+    )
+    kind = models.CharField(max_length=24, choices=Kind.choices)
+    before = models.JSONField(default=dict)
+    after = models.JSONField(default=dict)
+    reason = models.TextField(blank=True, default="")
+    appointment_version = models.PositiveIntegerField()
+    notification_status = models.CharField(
+        max_length=16, choices=NotificationStatus.choices, default=NotificationStatus.NONE
+    )
+    notification_url = models.URLField(max_length=2048, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def before_status_display(self):
+        return dict(ViewingAppointment.Status.choices).get(self.before.get("status"), "—")
+
+    @property
+    def after_status_display(self):
+        return dict(ViewingAppointment.Status.choices).get(self.after.get("status"), "—")
+
+    @property
+    def before_start(self):
+        from django.utils.dateparse import parse_datetime
+
+        value = self.before.get("starts_at")
+        return parse_datetime(value) if value else None
+
+    @property
+    def after_start(self):
+        from django.utils.dateparse import parse_datetime
+
+        value = self.after.get("starts_at")
+        return parse_datetime(value) if value else None
+
+    @property
+    def before_end(self):
+        from django.utils.dateparse import parse_datetime
+
+        value = self.before.get("ends_at")
+        return parse_datetime(value) if value else None
+
+    @property
+    def after_end(self):
+        from django.utils.dateparse import parse_datetime
+
+        value = self.after.get("ends_at")
+        return parse_datetime(value) if value else None
+
+    class Meta:
+        db_table = "viewing_appointment_event"
+        ordering = ("-created_at", "-event_id")
 
 
 class ApplicationProof(models.Model):

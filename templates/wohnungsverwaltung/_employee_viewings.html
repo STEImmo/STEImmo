@@ -1,0 +1,70 @@
+<article class="uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
+    <h2 class="uk-card-title">Besichtigung</h2>
+    {% if viewing_eligibility_error %}
+        <div class="uk-alert-warning" uk-alert><p>{{ viewing_eligibility_error }} Neue Termine oder Verschiebungen sind erst nach Klärung möglich.</p></div>
+    {% endif %}
+    {% for appointment in viewings %}
+        <section class="uk-margin-medium-bottom">
+            {% include "wohnungsverwaltung/_viewing_summary.html" with appointment=appointment only %}
+            {% if appointment.current_notice %}
+                <p>Benachrichtigung: <strong>{{ appointment.current_notice.get_notification_status_display }}</strong></p>
+                <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_resend' application.pk appointment.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="event" value="{{ appointment.current_notice.pk }}">
+                    <button type="submit" class="uk-button uk-button-default">Aktuelle Terminbenachrichtigung erneut versenden</button>
+                </form>
+            {% endif %}
+            {% if appointment.is_open %}
+                {% if not viewing_eligibility_error %}
+                    <details class="uk-margin"{% if appointment.edit_form.is_bound %} open{% endif %}>
+                        <summary>Termin verschieben</summary>
+                        <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_update' application.pk appointment.pk %}" class="uk-form-stacked uk-margin-top">
+                            {% csrf_token %}
+                            {{ appointment.edit_form.as_p }}
+                            <p class="uk-text-meta">Eine bestehende Zusage wird bei Verschiebung zurückgesetzt. Der Bewerber erhält eine neue E-Mail.</p>
+                            <button type="submit" class="uk-button uk-button-default">Verschiebung speichern</button>
+                        </form>
+                    </details>
+                {% endif %}
+                <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_update' application.pk appointment.pk %}" class="uk-form-stacked uk-margin">
+                    {% csrf_token %}
+                    <input type="hidden" name="version" value="{{ appointment.version }}">
+                    <label class="uk-form-label" for="id_viewing_action_reason_{{ appointment.pk }}">Interne Begründung (bei Absage erforderlich)</label>
+                    <textarea class="uk-textarea" name="reason" id="id_viewing_action_reason_{{ appointment.pk }}" rows="2"></textarea>
+                    <div class="uk-flex uk-flex-wrap uk-grid-small uk-margin-small-top" uk-grid>
+                        <div><button type="submit" name="action" value="cancel" class="uk-button uk-button-default">Termin absagen</button></div>
+                        {% if appointment.can_record_result %}
+                            <div><button type="submit" name="action" value="complete" class="uk-button uk-button-primary">Als durchgeführt dokumentieren</button></div>
+                            <div><button type="submit" name="action" value="no_show" class="uk-button uk-button-default">Nicht erschienen</button></div>
+                        {% endif %}
+                    </div>
+                </form>
+                {% if not appointment.can_record_result %}<p class="uk-text-meta">Das Ergebnis kann nach Terminende dokumentiert werden.</p>{% endif %}
+            {% endif %}
+            <details class="uk-margin-top">
+                <summary>Interner Terminverlauf</summary>
+                <ul class="uk-list uk-list-divider">
+                    {% for event in appointment.events.all %}
+                        <li>
+                            <strong>{{ event.get_kind_display }}</strong>
+                            · {{ event.created_at|date:"d.m.Y, H:i" }} Uhr · {{ event.actor|default:"System" }}
+                            {% if event.before %}<br>{{ event.before_status_display }} → {{ event.after_status_display }}{% endif %}
+                            {% if event.kind == "rescheduled" %}<br>{{ event.before_start|date:"d.m.Y, H:i" }}–{{ event.before_end|date:"H:i" }} Uhr → {{ event.after_start|date:"d.m.Y, H:i" }}–{{ event.after_end|date:"H:i" }} Uhr{% endif %}
+                            {% if event.reason %}<br>{{ event.reason|linebreaksbr }}{% endif %}
+                            {% if event.notification_status != "none" %}<br>{{ event.get_notification_status_display }}{% endif %}
+                        </li>
+                    {% empty %}<li>Kein Terminverlauf vorhanden.</li>{% endfor %}
+                </ul>
+            </details>
+        </section>
+    {% empty %}<p>Noch keine Besichtigung dokumentiert.</p>{% endfor %}
+    {% if not has_open_viewing and not viewing_eligibility_error %}
+        <h3 class="uk-h4">Termin planen oder Besichtigung nachtragen</h3>
+        <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_create' application.pk %}" class="uk-form-stacked">
+            {% csrf_token %}
+            {{ viewing_form.as_p }}
+            <p class="uk-text-meta">Geplante Termine müssen zukünftig sein. Nachträge erfordern einen vergangenen Termin und eine Begründung. Die Zeiten gelten in Europe/Berlin.</p>
+            <button type="submit" class="uk-button uk-button-primary">Besichtigung speichern</button>
+        </form>
+    {% endif %}
+</article>

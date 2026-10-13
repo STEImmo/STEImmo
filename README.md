@@ -222,6 +222,30 @@ Eine manuelle Main-Freischaltung erfordert die Bestätigung einer positiven Mita
 und sendet eine E-Mail. Ein fehlgeschlagener Versand hebt die Freischaltung nicht
 auf und kann erneut angestoßen werden.
 
+Besichtigungen werden je Bewerbung mit Datum, Beginn und Ende verwaltet. Mitarbeiter
+können aktive, bereits bewertete und aktuell passende Bewerbungen einladen. Pro
+Bewerbung ist höchstens ein offener Termin möglich; gemeinsame Besichtigungszeiten
+für mehrere Bewerber sind erlaubt. Die Uhrzeiten gelten in `Europe/Berlin`.
+Bewerber sehen ausschließlich eigene Termine unter **Meine Bewerbungen** und können
+vor Beginn zusagen oder absagen. Eine Terminabsage beendet die Bewerbung nicht.
+Eine Verschiebung setzt eine Zusage zurück und erfordert eine erneute Bestätigung.
+
+Nach Terminende dokumentieren Mitarbeiter **Durchgeführt** oder **Nicht erschienen**.
+Bereits erfolgte Besichtigungen können mit Begründung nachgetragen werden.
+Neue Main-Freischaltungen verlangen eine durchgeführte Besichtigung derselben
+Bewerbung und weiterhin eine positive Mitarbeiterentscheidung. Bereits bestehende
+Main-Freischaltungen bleiben erhalten.
+
+Einladungen, Verschiebungen und Mitarbeiterabsagen senden nach erfolgreicher
+Speicherung eine E-Mail. Versandfehler ändern den Termin nicht; die aktuelle
+Benachrichtigung kann erneut gesendet werden. Interne Notizen werden nicht an
+Bewerber versendet. Rückzug und automatische Personenlimit-Ablehnung sagen offene
+Termine ebenfalls ab; bei der automatischen Ablehnung wird eine Absage versendet.
+Änderungen der Priorität oder Haustierregeln stornieren vorhandene Termine nicht,
+verlangen aber eine erneute Prüfung vor weiteren Zuweisungen oder Verschiebungen.
+Der interne Verlauf dokumentiert Termin- und Statusänderungen sowie Versandversuche.
+Es gibt keine Selbstbuchung, Kalenderintegration, Kapazitätsprüfung oder Erinnerungen.
+
 ## Lokale Entwicklung
 
 Übergabeprotokolle werden über **Protokoll prüfen und unterschreiben** abgeschlossen.
