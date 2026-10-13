@@ -135,8 +135,29 @@ sind entfernt. Rollen, CSRF, fachliche Validierung und Speicherlogik bleiben erh
 Response- und bestehende Upload-/Berechtigungstests sichern die Übertragung ab;
 die echten Seiten werden zusätzlich auf localhost auf Desktop und Handy geprüft.
 Weitere öffentliche und interne Seitenmuster von US-18 bleiben offen.
-## Noch offener Umfang von US-18
+## Wohnungssuche: gewähltes Design A
 
+Die überarbeitete Variante A ist regulär unter `/wohnungen/` integriert:
+kompakter Seitenkopf, Filter links und Wohnungskarten rechts. Der Filter heißt
+„Filter“, ist auf dem Desktop 340 px breit und bleibt beim Scrollen sichtbar.
+Eingabefelder und Hauptaktion sind 48 px hoch. Bei geringer Fensterhöhe ist der
+Filter selbst scrollbar; unter 960 px steht er regulär über den Ergebnissen.
+
+Filter, Validierungen und Verfügbarkeitsregeln bleiben erhalten. Ergebniszahl und
+Leermeldungen berücksichtigen nur tatsächliche Suchfelder; ungültige Werte zeigen
+verknüpfte Feldfehler. „Filter zurücksetzen“ führt zur ungefilterten Suche.
+Wohnungen ohne gepflegte Fläche/Miete/Zimmerzahl werden als solche bezeichnet.
+
+Karten, Filter und Felder liegen in `_apartment_search_*.html`. Vorhandene Fotos
+werden über die bestehende öffentliche Foto-Route geladen; Demo-/KI-Beschriftungen
+bleiben sichtbar. Details führen weiterhin zur konkreten Wohnung und von dort zur
+Besichtigungsanfrage mit serverseitig übernommener Wohnung.
+
+Vergleichsroute, Umschaltung, Varianten B/C und Vorschautemplates/-tests/-stile
+sind entfernt. Reguläre UI- und bestehende Such-/Gebäude-/Klickwegtests sichern
+die Integration ab. Keine neue Dependency oder Migration; US-18 bleibt offen.
+
+## Noch offener Umfang von US-18
 Der Seitenrahmen ist ein Teil der Story. Die geplanten 6–8 Stunden gelten für
 die gesamte Umsetzung einschließlich der Prüfung; sie sind keine gemessene
 Arbeitszeit und keine Zusage für ein vollständiges Redesign aller Seiten.
@@ -148,7 +169,7 @@ Für die restliche Umsetzung gelten folgende konkrete Arbeitspakete:
 - Formularmuster für sichtbare Labels, Pflichtfelder, Hilfen, feldnahe Fehler
   sowie Speichern und Abbrechen; das erprobte Kontomuster auf Bewerbung und
   Verwaltungsformulare übertragen.
-- Wohnungs- und Bewerbungslisten sowie Mitarbeiterdetails vereinheitlichen;
+- Wohnungsdetails, Gebäude-/Etagenansichten und interne Listen vereinheitlichen;
   Tabellen, Karten, Filter und Aktionen auch auf kleinen Bildschirmen bedienen können.
 - Gemeinsame Muster für leere Listen, Erfolg, Warnungen, Fehler und tatsächlich
   vorhandene Upload-/Ladezustände anwenden. Keine künstlichen Ladeanimationen ergänzen.

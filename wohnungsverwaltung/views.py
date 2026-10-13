@@ -161,7 +161,25 @@ def apartment_search(request: HttpRequest) -> HttpResponse:
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
 
-    form = ApartmentSearchForm(request.GET)
+    context = _apartment_search_context(request.GET)
+    units = list(context["wohnungen"].prefetch_related("photos"))
+    context.update(
+        rows=[
+            {
+                "unit": unit,
+                "floor": floor_label(unit.etage),
+                "photo": next(iter(unit.photos.all()), None),
+            }
+            for unit in units
+        ],
+        result_count=len(units),
+        has_filters=any(request.GET.get(name) for name in context["form"].fields),
+    )
+    return render(request, "wohnungsverwaltung/apartment_search.html", context)
+
+
+def _apartment_search_context(query) -> dict:
+    form = ApartmentSearchForm(query)
     wohnungen = Wohnung.objects.available()
     if form.is_valid():
         filter_fields = {
@@ -188,14 +206,7 @@ def apartment_search(request: HttpRequest) -> HttpResponse:
     else:
         wohnungen = wohnungen.none()
 
-    return render(
-        request,
-        "wohnungsverwaltung/apartment_search.html",
-        {
-            "form": form,
-            "wohnungen": wohnungen.order_by("etage", "wohnungsnummer"),
-        },
-    )
+    return {"form": form, "wohnungen": wohnungen.order_by("etage", "wohnungsnummer")}
 
 
 def building_view(request: HttpRequest) -> HttpResponse:
