@@ -12,6 +12,10 @@
         value.setUTCDate(value.getUTCDate() + amount);
         return value.toISOString().slice(0, 10);
     };
+    const setLimit = (input, limit, value) => {
+        // Reassigning an unchanged time limit resets the browser's hour typing buffer.
+        if (input[limit] !== value) input[limit] = value;
+    };
 
     forms.forEach((form) => {
         const date = form.elements.namedItem("date");
@@ -44,16 +48,16 @@
             const messages = new Map();
 
             // A same-day appointment needs at least two distinct minute values.
-            date.min = record ? "" : currentMinute >= 1438 ? shiftDay(today, 1) : today;
-            date.max = record ? currentMinute === 0 ? shiftDay(today, -1) : today : "";
-            start.min = !record && sameDay && currentMinute < 1438 ? asTime(currentMinute + 1) : "";
-            start.max = record && sameDay && currentMinute > 0 ? asTime(Math.min(1438, currentMinute - 1)) : "23:58";
+            setLimit(date, "min", record ? "" : currentMinute >= 1438 ? shiftDay(today, 1) : today);
+            setLimit(date, "max", record ? currentMinute === 0 ? shiftDay(today, -1) : today : "");
+            setLimit(start, "min", !record && sameDay && currentMinute < 1438 ? asTime(currentMinute + 1) : "");
+            setLimit(start, "max", record && sameDay && currentMinute > 0 ? asTime(Math.min(1438, currentMinute - 1)) : "23:58");
             const earliestEnd = Math.max(
                 startMinute !== null ? startMinute + 1 : 1,
                 !record && sameDay ? currentMinute + 2 : 1,
             );
-            end.min = asTime(Math.min(1439, earliestEnd));
-            end.max = record && sameDay ? asTime(currentMinute) : "23:59";
+            setLimit(end, "min", asTime(Math.min(1439, earliestEnd)));
+            setLimit(end, "max", record && sameDay ? asTime(currentMinute) : "23:59");
             reason.required = record;
 
             if (date.value && !record && date.value < date.min) {
@@ -94,6 +98,20 @@
                 button.disabled = messages.size > 0;
             });
         };
+        [start, end].forEach((input) => {
+            input.addEventListener("keydown", (event) => {
+                if (
+                    /^\d$/.test(event.key)
+                    && !event.ctrlKey && !event.metaKey && !event.altKey
+                    && !input.value && !input.validity.badInput
+                ) {
+                    // Populate real minutes before the browser edits the hour
+                    // segment; its grey placeholder is not a submitted value.
+                    input.value = "00:00";
+                    validate();
+                }
+            });
+        });
         form.addEventListener("input", validate);
         form.addEventListener("change", validate);
         form.addEventListener("submit", (event) => {

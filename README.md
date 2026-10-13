@@ -234,6 +234,9 @@ sind vergangene Tage gesperrt; für heute muss der Beginn noch zukünftig sein u
 das Ende nach dem Beginn liegen. Fehler erscheinen am Feld und sperren das
 Speichern. Beim ausdrücklich gewählten Nachtrag gelten die umgekehrten Datumsgrenzen.
 Die serverseitige Prüfung bleibt unabhängig davon verbindlich.
+Bei der Stundeneingabe in ein leeres Zeitfeld werden die Minuten tatsächlich mit
+`00` vorbelegt. Bereits eingetragene Minuten bleiben bei einer Änderung der Stunde
+erhalten.
 
 Nach Terminende dokumentieren Mitarbeiter **Durchgeführt** oder **Nicht erschienen**.
 Bereits erfolgte Besichtigungen können mit Begründung nachgetragen werden.
