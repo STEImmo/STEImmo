@@ -197,6 +197,35 @@ class ViewingTests(TestCase):
         self.assertEqual(form.initial["start_time"].hour, 10)
         self.assertEqual(form.initial["end_time"].minute, 30)
 
+    def test_form_sets_native_date_limits_for_planning_and_historical_records(self):
+        with timezone.override("Europe/Berlin"):
+            today = timezone.localdate().isoformat()
+            planned = ViewingAppointmentForm()
+            record = ViewingAppointmentForm(self.payload(days=-1, action="record"))
+        self.assertEqual(planned.fields["date"].widget.attrs["min"], today)
+        self.assertNotIn("max", planned.fields["date"].widget.attrs)
+        self.assertEqual(record.fields["date"].widget.attrs["max"], today)
+        self.assertNotIn("min", record.fields["date"].widget.attrs)
+        self.assertEqual(planned.fields["start_time"].widget.attrs["step"], "60")
+        self.assertEqual(planned.fields["end_time"].widget.attrs["step"], "60")
+
+    def test_direct_post_cannot_bypass_time_validation(self):
+        for data in (self.payload(days=-1), self.payload(end_time="09:00")):
+            with self.subTest(data=data):
+                response = self.client.post(self.create_url, data)
+                self.assertEqual(response.status_code, 400)
+                self.assertFalse(ViewingAppointment.objects.exists())
+                self.assertFalse(ViewingAppointmentEvent.objects.exists())
+
+    def test_employee_forms_offer_live_validation_for_create_and_reschedule(self):
+        response = self.client.get(self.detail_url)
+        self.assertContains(response, "data-viewing-time-form", count=1)
+        self.assertContains(response, "js/viewing-time-validation.js")
+        appointment = self.schedule()
+        response = self.client.get(self.detail_url)
+        self.assertContains(response, "data-viewing-time-form", count=1)
+        self.assertContains(response, f'id="id_viewing_{appointment.pk}_date"')
+
     def test_applicant_can_confirm_and_decline_without_ending_application(self):
         appointment = self.schedule()
         self.client.force_login(self.user)

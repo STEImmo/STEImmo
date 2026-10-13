@@ -2086,6 +2086,15 @@ class ViewingAppointmentForm(UIkitFormMixin, forms.Form):
                 }
             )
         super().__init__(*args, **kwargs)
+        today = timezone.localtime(timezone.now(), BERLIN).date().isoformat()
+        action = (
+            self.data.get(self.add_prefix("action"))
+            if self.is_bound
+            else self.initial.get("action")
+        )
+        self.fields["date"].widget.attrs["max" if action == "record" else "min"] = today
+        self.fields["start_time"].widget.attrs.update({"step": "60", "max": "23:58"})
+        self.fields["end_time"].widget.attrs.update({"step": "60"})
         if appointment is not None:
             self.fields["action"].choices = (("reschedule", "Termin verschieben"),)
             self.fields["action"].widget = forms.HiddenInput()

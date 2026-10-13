@@ -229,6 +229,11 @@ für mehrere Bewerber sind erlaubt. Die Uhrzeiten gelten in `Europe/Berlin`.
 Bewerber sehen ausschließlich eigene Termine unter **Meine Bewerbungen** und können
 vor Beginn zusagen oder absagen. Eine Terminabsage beendet die Bewerbung nicht.
 Eine Verschiebung setzt eine Zusage zurück und erfordert eine erneute Bestätigung.
+Die Terminformulare prüfen Datum und Uhrzeiten direkt bei der Eingabe. Beim Planen
+sind vergangene Tage gesperrt; für heute muss der Beginn noch zukünftig sein und
+das Ende nach dem Beginn liegen. Fehler erscheinen am Feld und sperren das
+Speichern. Beim ausdrücklich gewählten Nachtrag gelten die umgekehrten Datumsgrenzen.
+Die serverseitige Prüfung bleibt unabhängig davon verbindlich.
 
 Nach Terminende dokumentieren Mitarbeiter **Durchgeführt** oder **Nicht erschienen**.
 Bereits erfolgte Besichtigungen können mit Begründung nachgetragen werden.

@@ -1056,6 +1056,7 @@ def _employee_application_detail_response(
         {
             "application": application,
             "viewings": viewings,
+            "viewing_now": timezone.now(),
             "viewing_form": viewing_form
             if viewing_form is not None
             else ViewingAppointmentForm(

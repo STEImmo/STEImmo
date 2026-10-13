@@ -18,7 +18,7 @@
                 {% if not viewing_eligibility_error %}
                     <details class="uk-margin"{% if appointment.edit_form.is_bound %} open{% endif %}>
                         <summary>Termin verschieben</summary>
-                        <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_update' application.pk appointment.pk %}" class="uk-form-stacked uk-margin-top">
+                        <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_update' application.pk appointment.pk %}" class="uk-form-stacked uk-margin-top" data-viewing-time-form data-current-time="{{ viewing_now|date:'c' }}">
                             {% csrf_token %}
                             {{ appointment.edit_form.as_p }}
                             <p class="uk-text-meta">Eine bestehende Zusage wird bei Verschiebung zurückgesetzt. Der Bewerber erhält eine neue E-Mail.</p>
@@ -60,7 +60,7 @@
     {% empty %}<p>Noch keine Besichtigung dokumentiert.</p>{% endfor %}
     {% if not has_open_viewing and not viewing_eligibility_error %}
         <h3 class="uk-h4">Termin planen oder Besichtigung nachtragen</h3>
-        <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_create' application.pk %}" class="uk-form-stacked">
+        <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_create' application.pk %}" class="uk-form-stacked" data-viewing-time-form data-current-time="{{ viewing_now|date:'c' }}">
             {% csrf_token %}
             {{ viewing_form.as_p }}
             <p class="uk-text-meta">Geplante Termine müssen zukünftig sein. Nachträge erfordern einen vergangenen Termin und eine Begründung. Die Zeiten gelten in Europe/Berlin.</p>

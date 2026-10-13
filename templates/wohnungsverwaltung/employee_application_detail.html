@@ -1,6 +1,11 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Bewerbung ansehen – STEImmo{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/viewing-time-validation.js' %}" defer></script>
+{% endblock %}
 
 {% block content %}
 <section class="uk-section">
