@@ -601,6 +601,14 @@ a:active,
     table-layout: fixed;
 }
 
+.application-table [data-application-row] {
+    cursor: pointer;
+}
+
+.application-table [data-application-row]:hover {
+    background: var(--steimmo-color-surface-subtle);
+}
+
 .application-table th,
 .application-table td {
     overflow-wrap: anywhere;

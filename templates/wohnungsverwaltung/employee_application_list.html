@@ -1,6 +1,11 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Bewerbungen – STEImmo{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/application-row-navigation.js' %}" defer></script>
+{% endblock %}
 
 {% block content %}
 <section class="uk-section">

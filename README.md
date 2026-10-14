@@ -198,6 +198,9 @@ Bildschirmen eine kompakte Tabelle. Unter 1200 Pixeln werden dieselben Angaben a
 beschriftete Bewerbungskarten angezeigt, ohne seitliches Scrollen. Name,
 Personenanzahl, Haustiere, Bearbeitungsstatus, Priorität, Main-Status,
 Besichtigung und Pre-Eingangsdatum bleiben in beiden Darstellungen sichtbar.
+Ein Klick auf die Zeile beziehungsweise Karte öffnet die Bewerbungsdetails.
+Der Link **Ansehen** bleibt für die Tastaturbedienung verfügbar; Text kann
+weiterhin markiert und kopiert werden.
 Auch abgelehnte, gesperrte und zurückgezogene Bewerbungen bleiben sichtbar.
 Die neuesten Pre-Bewerbungen stehen zuerst; pro Seite werden 20 Bewerbungen angezeigt.
 

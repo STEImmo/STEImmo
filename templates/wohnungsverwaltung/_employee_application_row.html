@@ -1,12 +1,12 @@
 {% load tz %}
-<tr role="row">
+<tr role="row" data-application-row>
     <th scope="row" role="rowheader">
         <strong>{{ application.person }}</strong>
         <div class="uk-text-small uk-margin-small-top">
             Personenanzahl: {{ application.personenanzahl }}<br>
             Haustiere: {{ application.haustiere|yesno:"Ja,Nein" }}
         </div>
-        <a class="uk-button uk-button-default uk-button-small uk-margin-small-top"
+        <a class="uk-button uk-button-default uk-button-small uk-margin-small-top" data-application-detail
            href="{% url 'wohnungsverwaltung:employee_application_detail' application.pk %}"
            aria-label="Bewerbung von {{ application.person }} ansehen">Ansehen</a>
     </th>
