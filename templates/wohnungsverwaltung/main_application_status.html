@@ -6,7 +6,7 @@
 {% block application_heading %}Ihre Hauptbewerbung{% endblock %}
 {% block application_intro %}Hier sammeln Sie Ihre Nachweise und reichen die Bewerbung ein.{% endblock %}
 {% block application_content %}<article class="uk-card uk-card-default uk-card-body application-summary">
-            <span class="uk-label">{{ application.get_applicant_status_display }}</span>
+            <span class="uk-label{% if not application.interest_withdrawn_at %}{% if application.status == 'declined' or application.status == 'blocked' %} uk-label-danger{% endif %}{% endif %}">{{ application.get_applicant_status_display }}</span>
             <h2 class="uk-card-title">Hauptbewerbung für {{ application.wohnung }}</h2>
             {% if not application.submitted_at %}<p>Die Hauptbewerbung ist freigeschaltet.</p>{% endif %}
             <div class="application-next-step"><span uk-icon="arrow-right" aria-hidden="true"></span><div><strong>Ihr nächster Schritt</strong><p>{{ application.get_applicant_next_step }}</p></div></div>

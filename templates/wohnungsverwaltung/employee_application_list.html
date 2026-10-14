@@ -15,22 +15,21 @@
             <h2 class="uk-h3">{{ unit }}</h2>
 
             {% if requirements_open %}
-                <div class="uk-alert-warning" uk-alert>
-                    <p><strong>Anforderungen offen:</strong> Für diese Wohnung sind die Auswahlkriterien noch nicht vollständig eingerichtet. Es werden keine Bewerbungen anhand fehlender Kriterien ausgeschlossen.</p>
-                </div>
+                {% url 'verwaltung:wohnung_edit' unit.pk as requirements_url %}
+                {% include "partials/_status_notice.html" with notice_label="Anforderungen offen" notice_title="Auswahlkriterien noch nicht vollständig" notice_message="Für diese Wohnung sind die Auswahlkriterien noch nicht vollständig eingerichtet. Es werden keine Bewerbungen anhand fehlender Kriterien ausgeschlossen." notice_primary_url=requirements_url notice_primary_label="Auswahlkriterien bearbeiten" only %}
             {% endif %}
 
-            <ul class="uk-tab" role="tablist">
+            <nav aria-label="Bewerbungsansichten"><ul class="uk-tab">
                 <li class="{% if segment == 'matching' %}uk-active{% endif %}">
-                    <a href="{% querystring segment='matching' page=None %}" aria-current="{% if segment == 'matching' %}page{% endif %}">Passend</a>
+                    <a href="{% querystring segment='matching' page=None %}" {% if segment == 'matching' %}aria-current="page"{% endif %}>Passend</a>
                 </li>
                 <li class="{% if segment == 'review' %}uk-active{% endif %}">
-                    <a href="{% querystring segment='review' page=None %}" aria-current="{% if segment == 'review' %}page{% endif %}">Einzelfallprüfung</a>
+                    <a href="{% querystring segment='review' page=None %}" {% if segment == 'review' %}aria-current="page"{% endif %}>Einzelfallprüfung</a>
                 </li>
                 <li class="{% if segment == 'all' %}uk-active{% endif %}">
-                    <a href="{% querystring segment='all' page=None %}" aria-current="{% if segment == 'all' %}page{% endif %}">Alle Bewerbungen</a>
+                    <a href="{% querystring segment='all' page=None %}" {% if segment == 'all' %}aria-current="page"{% endif %}>Alle Bewerbungen</a>
                 </li>
-            </ul>
+            </ul></nav>
 
             <form method="get" class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
                 <input type="hidden" name="wohnung" value="{{ unit.pk }}">
@@ -46,7 +45,7 @@
 
             <p class="uk-text-meta">
                 {{ page_obj.paginator.count }} Bewerbung{{ page_obj.paginator.count|pluralize:"en" }}
-                · {% if filters.cleaned_data.sort == 'priority' %}Priorität zuerst{% else %}Neueste Pre-Bewerbungen zuerst{% endif %}
+                · {% if filters.cleaned_data.sort == 'priority' %}Priorität zuerst{% else %}Neueste Bewerbungen zuerst{% endif %}
             </p>
             {% if applications %}
                 <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Bewerbungstabelle">
@@ -58,7 +57,7 @@
                                 <th scope="col">Personen</th>
                                 <th scope="col">Haustiere</th>
                                 <th scope="col">Bearbeitungsstatus</th>
-                                <th scope="col">Main-Status</th>
+                                <th scope="col">Hauptbewerbungsstatus</th>
                                 <th scope="col">Priorität</th>
                                 {% if segment == 'review' %}<th scope="col">Prüfgrund</th>{% endif %}
                                 <th scope="col">Anfrage eingegangen</th>
@@ -71,8 +70,8 @@
                                     <th scope="row" data-label="Name">{{ application.person }}</th>
                                     <td data-label="Personen">{{ application.personenanzahl }}</td>
                                     <td data-label="Haustiere">{{ application.haustiere|yesno:"Ja,Nein" }}</td>
-                                    <td data-label="Bearbeitungsstatus"><span class="uk-label">{{ application.get_applicant_status_display }}</span></td>
-                                    <td data-label="Main-Status">
+                                    <td data-label="Bearbeitungsstatus"><span class="uk-label{% if not application.interest_withdrawn_at %}{% if application.status == 'declined' or application.status == 'blocked' %} uk-label-danger{% endif %}{% endif %}">{{ application.get_applicant_status_display }}</span></td>
+                                    <td data-label="Hauptbewerbungsstatus">
                                         {% if application.submitted_at %}Eingereicht
                                         {% elif application.main_application_unlocked and application.latest_invitation_status == "invitation_failed" %}Einladung fehlgeschlagen
                                         {% elif application.main_application_unlocked and application.latest_invitation_status == "invitation_sent" %}Einladung versendet

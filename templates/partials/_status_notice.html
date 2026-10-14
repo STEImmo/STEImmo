@@ -1,0 +1,16 @@
+<section class="uk-alert-{{ notice_tone|default:'warning' }} status-notice" role="{{ notice_role|default:'note' }}"{% if notice_id %} id="{{ notice_id }}"{% endif %}>
+    <div class="status-notice-heading">
+        <span class="status-notice-icon" uk-icon="icon: warning; ratio: 1.6" aria-hidden="true"></span>
+        <div><p class="status-notice-label">{{ notice_label|default:"Aktion derzeit nicht möglich" }}</p>{% if notice_title %}<h2 class="uk-h3">{{ notice_title }}</h2>{% endif %}</div>
+    </div>
+    {% if notice_message %}<p>{{ notice_message }}</p>{% endif %}
+    {% if notice_status %}<p>Aktueller Status: {{ notice_status }}</p>{% endif %}
+    {% if notice_errors %}<ul class="uk-list uk-list-bullet">{% for error in notice_errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+    {% if notice_next %}<div class="status-notice-next"><h3 class="uk-h5">So geht es weiter</h3><p>{{ notice_next }}</p></div>{% endif %}
+    {% if notice_primary_url or notice_secondary_url %}
+    <div class="notice-actions uk-margin-medium-top">
+        {% if notice_primary_url %}<a class="uk-button uk-button-primary" href="{{ notice_primary_url }}">{{ notice_primary_label }}</a>{% endif %}
+        {% if notice_secondary_url %}<a class="uk-button uk-button-default" href="{{ notice_secondary_url }}">{{ notice_secondary_label }}</a>{% endif %}
+    </div>
+    {% endif %}
+</section>

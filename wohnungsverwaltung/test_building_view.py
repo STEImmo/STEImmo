@@ -504,7 +504,9 @@ class ViewingRequestEntryTests(TestCase):
         self.user.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
         self.client.force_login(self.user)
         response = self.client.get(self.url)
-        self.assertContains(response, "Für diese Anfrage benötigen Sie ein Bewerberkonto")
+        self.assertContains(response, "Mit diesem Konto können Sie keine Besichtigung anfragen")
+        self.assertContains(response, "Mit Bewerberkonto anmelden")
+        self.assertNotContains(response, "Designvergleich")
         protected = reverse(
             "wohnungsverwaltung:pre_application_create_for_unit", args=[self.unit.pk]
         )

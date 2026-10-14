@@ -1640,3 +1640,23 @@ a:active,
 @media (min-width: 960px) {
     .apartment-search-filter-body[hidden] { display: block; }
 }
+
+/* Shared notice pattern: warning/blocked states use the selected A layout. */
+.status-notice { border-radius: var(--steimmo-radius-lg); border-left-width: 6px; padding: var(--steimmo-space-2xl); }
+.status-notice-heading { display: flex; align-items: flex-start; gap: var(--steimmo-space-lg); }
+.status-notice-heading h2 { margin: 0; max-width: 760px; }
+.status-notice-label { margin: 0 0 var(--steimmo-space-xs); font-size: var(--steimmo-font-size-sm); font-weight: 700; }
+.status-notice-icon { flex: 0 0 auto; display: grid; place-items: center; width: 48px; height: 48px; background: var(--steimmo-color-surface); border-radius: var(--steimmo-radius-pill); }
+.status-notice-next { border-top: 1px solid currentColor; padding-top: var(--steimmo-space-lg); margin-top: var(--steimmo-space-lg); }
+.status-notice-next h3 { margin: 0 0 var(--steimmo-space-xs); }
+.status-notice-next p { margin: 0; }
+.status-notice .uk-button { text-transform: none; }
+/* Compact notices and validation summaries retain their existing markup and IDs. */
+.uk-alert-warning:not(.status-notice), .uk-alert-danger:not(.status-notice) { border-left-width: 6px; padding-left: calc(var(--steimmo-space-2xl) + var(--steimmo-space-lg)); min-height: 26px; }
+.uk-alert-warning:not(.status-notice)::before, .uk-alert-danger:not(.status-notice)::before { content: "!"; position: absolute; left: var(--steimmo-space-lg); top: var(--steimmo-space-md); width: 24px; height: 24px; display: grid; place-items: center; border: 2px solid currentColor; border-radius: var(--steimmo-radius-pill); font-weight: 700; background: var(--steimmo-color-surface); }
+@media (max-width: 639px) {
+    .status-notice { padding: var(--steimmo-space-lg); }
+    .status-notice-heading { gap: var(--steimmo-space-sm); }
+    .status-notice-heading h2 { font-size: var(--steimmo-font-size-xl); }
+    .status-notice .notice-actions .uk-button { width: 100%; padding-inline: var(--steimmo-space-xs); }
+}

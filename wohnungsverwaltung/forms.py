@@ -1976,12 +1976,12 @@ class EmployeeApplicationFilterForm(UIkitFormMixin, forms.Form):
     main_status = forms.ChoiceField(
         required=False,
         choices=(
-            ("", "Alle Main-Status"),
+            ("", "Alle Hauptbewerbungsstatus"),
             ("pending", "Noch nicht freigeschaltet"),
             ("unlocked", "Freigeschaltet"),
             ("submitted", "Eingereicht"),
         ),
-        label="Main-Status",
+        label="Hauptbewerbungsstatus",
     )
     priority = forms.ChoiceField(
         required=False,

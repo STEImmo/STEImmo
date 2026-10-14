@@ -1,5 +1,44 @@
 # Gemeinsamer Seitenrahmen – US-18
 
+## Zustands- und Usability-Prüfung vom 14. Oktober 2026
+
+Die aktive Nachprüfung umfasst 74 Desktop-/Mobilaufrufe von 37 öffentlichen und
+Mitarbeiter-Seiten bzw. GET-Zuständen, zusätzlich die Mitarbeiter-Bewerbungsdetails
+und alle drei Zugangsentwürfe bei 320 Pixeln. Schwerpunkt sind verständliche
+Sperren, Warnungen, nächste Schritte und leere Ergebnisse. Es wurden keine
+Bewerbungen verändert, Freigaben erteilt, Dateien hochgeladen oder Protokolle
+bestätigt. Weitere Bewerber-/Fehlerzustände wurden ergänzend anhand der Templates
+und vorhandenen Django-Tests beurteilt; sie wurden nicht alle im Browser ausgelöst.
+
+Gewählt ist A: gelbe Warnfläche mit Warnsymbol, Ursache und nächstem Schritt.
+Die gemeinsame Vorlage `templates/partials/_status_notice.html` wird von Zugangs-,
+Freischaltungs-, Abschluss-, PDF- und allgemeinen Fehlerseiten verwendet. Warnungen
+bleiben gelb; echte Fehler und Ablehnungen verwenden Rot im selben Aufbau. Kleine
+Formular-/Entwurfswarnungen erhalten ebenfalls das Warnsymbol und den stärkeren Rand.
+Informationshinweise behalten ihre eigene Bedeutung und blaue Darstellung.
+Die Vergleichsnavigation, Varianten B/C und die Parameterzweige sind entfernt.
+Bei fehlendem Personenprofil bleibt der nächste Schritt die Prüfung der Zuordnung;
+ein Kontowechsel wird nur bei fehlender Bewerberberechtigung angeboten.
+
+Die erneute Prüfung findet keine Seitenüberläufe oder fehlenden Hilfstext-IDs,
+zeigte folgende konkrete Usability-Nacharbeiten, die jetzt umgesetzt sind:
+
+| Priorität | Beobachtung | Reine UI-Verbesserung |
+|---|---|---|
+| Hoch | Zugangssperre wirkt bisher wie eine blaue Information und bietet keinen direkten Weg zur Anmeldung. | Gewählten Warnentwurf übernehmen; Kontoprüfung bleibt unverändert. |
+| Hoch | Abschlussfehler beim Übergabeprotokoll stehen erst unter der langen Zusammenfassung; im geprüften Mobilzustand bei ca. 3542 px. | Blockierenden Hinweis zusätzlich unmittelbar nach dem Seitentitel zeigen, mit Sprung zu den betroffenen Räumen/Prüfpunkten. |
+| Mittel | „Anforderungen offen“ in der Bewerberübersicht erklärt die Lage, bietet aber keine passende Aktion. | Bestehende Wohnungsbearbeitung verlinken, Berechtigungen beibehalten. |
+| Mittel | Neue interne Prüf-/Einladungsformulare verwenden `as_p`; erforderliche Begründungen und Bestätigungen sind nicht visuell markiert. | Vorhandene Formularbausteine und Pflichtkennzeichnung verwenden, keine Felder oder Regeln ändern. |
+| Mittel | „Main-Status“, „Main-Bewerbung“ und „Pre-Bewerbungen“ sind wieder auf neuen Mitarbeiterseiten sichtbar. | Sichtbare Begriffe mit „Hauptbewerbung“ und „Bewerbung“ vereinheitlichen; interne Namen behalten. |
+| Mittel | Ablehnung erscheint in der Bewerbungsübersicht als einfacher roter Text; beendete Status teilen sich die gelbe Kennzeichnung. | Ablehnung/Sperre mit deutlichem Statushinweis kennzeichnen und vom neutralen Rückzug unterscheiden; Statuslogik behalten. |
+| Mittel | PDF-Fehlerseite erklärt den Fehler, bietet aber keinen direkten Rückweg; Browser-Titel ist generisch. | Seitentitel und erreichbaren Rückweg ergänzen, keine PDF-Erzeugung auslösen. |
+| Klein | Bewerbungssegmente tragen `role="tablist"`, enthalten aber gewöhnliche Navigationslinks ohne Tab-Rollen. | Als beschriftete Navigation für serverseitige Ansichten auszeichnen. |
+
+Ein Hinweis ist nicht automatisch eine Warnung: fehlende Vergleichsdaten oder
+erläuternde Uploadhinweise dürfen informativ bleiben. Blockierte Aktionen brauchen
+dagegen eine klare Kennzeichnung, Ursache und eine tatsächlich ausführbare nächste
+Handlung. Diese Prüfung ersetzt keine vollständige Abnahme mit Assistenzsoftware.
+
 ## Grundlage und Abgrenzung
 
 [US-17 / #45](https://github.com/STEImmo/STEImmo/issues/45) liefert das Corporate-Theme
@@ -574,3 +613,34 @@ Textunterstreichung; die Hover-Unterstreichung bleibt auf anderen Links erhalten
 Dasselbe Verhalten gilt für die Desktop-Hauptnavigation im Header: Die aktive
 Seite zeigt nur die feste Positionslinie, ohne zusätzliche Textunterstreichung
 bei Hover oder Fokus. Der sichtbare Tastatur-Fokusrahmen bleibt erhalten.
+
+
+## Übernahme der Zustandsmuster – 14. Oktober 2026
+
+Blockierende Abschlussfehler erscheinen vor der Protokollzusammenfassung, mit
+Links zum vorhandenen Protokoll und seinen Prüfpunkten. Vollständigkeitsprüfung,
+Unterschriftenformular und Freigabe bleiben unverändert. Der allgemeine Rückweg
+funktioniert auch für fehlende Zähler-/Schlüsselangaben; Fehlertexte werden nicht
+als Grundlage einer neuen fachlichen Zuordnungslogik ausgewertet.
+
+Die vorhandenen Prüf-/Einladungsformulare verwenden die gemeinsamen Feldbausteine.
+Feldnamen, Hidden-Felder, CSRF, POST-Ziele und Validierung bleiben bestehen.
+Mitarbeiterseiten, Filterbeschriftungen, Benachrichtigungen und Einladungstexte
+verwenden „Hauptbewerbung“ bzw. „Bewerbung“. Python-Namen, Statuswerte und geteilte
+Migrationen werden nicht umbenannt. Die historische Enum-Beschriftung für
+`main_unlocked` wird nur in der Anzeige des Änderungsverlaufs übersetzt; damit
+entsteht keine Migration für eine reine UI-Beschriftung.
+
+PDF-Fehler bekommen einen eindeutigen Seitentitel und einen rollenabhängigen
+Rückweg. Es wird keine PDF-Erzeugung automatisch erneut ausgelöst. Bewerbungssegmente
+sind normale Navigation mit `aria-current`, da der Server neue Ansichten liefert.
+Die Befunde und die Grenzen der Nachlade-Rückmeldungen bleiben für die PR dokumentiert.
+
+Prüfstand nach der Übernahme: 111 Browseraufrufe bei 1440, 390 und 320 Pixeln
+ohne Seitenüberläufe, fehlende Formularverknüpfungen oder kaputte Bilder. Der
+blockierende Abschlussfehler beginnt im geprüften Mobilzustand bei ca. 502 px
+statt 3542 px. Die vollständige Suite mit 653 Tests hatte eine überholte
+Buttontext-Erwartung („Main-Bewerbung“); nach Anpassung sind die 37 gezielt erneut
+geprüften Auswahl-, Zugriffs- und Fehlerseitentests erfolgreich. Die übrigen
+Tests der vollständigen Suite waren erfolgreich. Django-, Migrations-, Ruff-
+und Diff-Prüfungen sind erfolgreich. Keine Änderung an Schema oder Berechtigungen.

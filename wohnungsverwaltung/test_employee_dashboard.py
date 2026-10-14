@@ -510,7 +510,7 @@ class EmployeeApplicationSelectionTests(TestCase):
             "wohnungsverwaltung:employee_application_detail", args=[self.match.pk]
         )
         response = self.client.get(open_detail_url)
-        self.assertContains(response, "Main-Bewerbung freischalten und einladen")
+        self.assertContains(response, "Hauptbewerbung freischalten und einladen")
         self.assertContains(response, "Ich bestätige die positive Entscheidung")
 
         declined = EmployeeDashboardTests.create_application(
@@ -521,7 +521,7 @@ class EmployeeApplicationSelectionTests(TestCase):
         )
         response = self.client.get(declined_detail_url)
         self.assertContains(response, "Aktueller Status: Abgelehnt")
-        self.assertNotContains(response, "Main-Bewerbung freischalten und einladen")
+        self.assertNotContains(response, "Hauptbewerbung freischalten und einladen")
 
     def test_review_forms_have_unique_reason_ids_and_matching_labels(self):
         self.configure_requirements()

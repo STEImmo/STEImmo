@@ -1101,12 +1101,12 @@ def employee_application_suitability_approve(
 def _send_application_invitation(application: Bewerbung, actor, base_url: str) -> bool:
     recipient = application.person.email
     detail_url = reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
-    subject = "Ihre Main-Bewerbung bei STEImmo"
+    subject = "Ihre Hauptbewerbung bei STE Immobilien eGbR"
     body = (
         f"Guten Tag {application.person.vorname} {application.person.nachname},\n\n"
         f"Sie können nun Ihre Bewerbung für {application.wohnung} im geschützten Bereich "
         "vervollständigen.\n\n"
-        f"Zur Main-Bewerbung: {base_url}{detail_url}\n"
+        f"Zur Hauptbewerbung: {base_url}{detail_url}\n"
     )
     try:
         sent = send_mail(subject, body, None, [recipient], fail_silently=False)
@@ -1159,13 +1159,13 @@ def employee_application_invite(request: HttpRequest, application_id: UUID) -> H
                 request, "Diese Bewerbung ist nicht mehr aktiv und kann nicht eingeladen werden."
             )
         elif application.submitted_at is not None:
-            messages.info(request, "Die Main-Bewerbung wurde bereits eingereicht.")
+            messages.info(request, "Die Hauptbewerbung wurde bereits eingereicht.")
         elif application.suitability_review_flags and not current_approval:
             messages.error(request, "Bitte prüfen Sie zuerst die Abweichungen zur Wohnung.")
         elif application.main_application_unlocked:
             messages.info(
                 request,
-                "Die Main-Bewerbung ist bereits freigeschaltet. "
+                "Die Hauptbewerbung ist bereits freigeschaltet. "
                 "Sie können die E-Mail erneut senden.",
             )
         else:
@@ -1186,12 +1186,12 @@ def employee_application_invite(request: HttpRequest, application_id: UUID) -> H
         )
         if sent:
             messages.success(
-                request, "Die Main-Bewerbung wurde freigeschaltet und die Einladung versendet."
+                request, "Die Hauptbewerbung wurde freigeschaltet und die Einladung versendet."
             )
         else:
             messages.error(
                 request,
-                "Die Main-Bewerbung ist freigeschaltet, aber die E-Mail konnte nicht "
+                "Die Hauptbewerbung ist freigeschaltet, aber die E-Mail konnte nicht "
                 "versendet werden. Sie können den Versand erneut anstoßen.",
             )
     return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
