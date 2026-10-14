@@ -895,8 +895,10 @@ a:active,
     .site-brand { flex-shrink: 1; }
     .site-brand-subtitle { max-width: 205px; }
     .site-header-inner { gap: var(--steimmo-space-xs); }
-    .site-footer-top { grid-template-columns: 1fr; }
+    .site-footer-top { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--steimmo-space-lg) var(--steimmo-space-md); }
+    .site-footer-top > nav { min-width: 0; }
     .site-footer-links { flex-direction: column; }
+    .site-footer-links a { overflow-wrap: anywhere; }
 }
 
 /* Homepage layout uses the shared UIkit components and US-17 theme tokens. */
@@ -1090,6 +1092,9 @@ a:active,
 .application-fields textarea { resize: vertical; }
 .application-fields .uk-margin { margin-block: var(--steimmo-space-lg); }
 .application-form-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--steimmo-space-md); margin-top: var(--steimmo-space-xl); }
+.application-withdraw-actions { justify-content: flex-start; align-items: stretch; }
+.application-withdraw-actions form { margin: 0; }
+.application-withdraw-actions .uk-button { white-space: normal; line-height: 1.4; min-height: 40px; padding-block: var(--steimmo-space-sm); box-sizing: border-box; }
 .application-proof-count { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--steimmo-space-md); margin-block: var(--steimmo-space-lg); }
 .application-proof-count strong { color: var(--steimmo-color-primary); font-size: var(--steimmo-font-size-2xl); }
 .application-proof-count span { color: var(--steimmo-color-text-muted); }
@@ -1117,6 +1122,7 @@ a:active,
     .application-sidebar .application-progress { grid-template-columns: 1fr; gap: 0; }
     .application-form-actions { flex-direction: column; }
     .application-form-actions .uk-button { width: 100%; }
+    .application-withdraw-actions form { width: 100%; }
     .application-proof, .application-next-step { padding: var(--steimmo-space-md); }
     .application-area .uk-label { white-space: normal; }
 }
@@ -1307,13 +1313,24 @@ a:active,
     .workspace-table tbody tr + tr {
         border-top: 1px solid var(--steimmo-color-border);
     }
+    .management-table .workspace-table tbody tr + tr {
+        margin-top: var(--steimmo-space-md);
+        padding-top: var(--steimmo-space-md);
+        border-top-width: 2px;
+    }
 }
+.management-panel input[type="file"] { height: auto; min-height: 40px; padding: 0; border: 0; background: transparent; }
+.management-panel input[type="file"]::file-selector-button { font: inherit; color: var(--steimmo-color-text); background: var(--steimmo-color-surface); border: 1px solid var(--steimmo-color-border-strong); border-radius: var(--steimmo-radius-sm); min-height: 40px; padding: var(--steimmo-space-xs) var(--steimmo-space-lg); margin-right: var(--steimmo-space-sm); cursor: pointer; }
+.management-panel input[type="file"]::file-selector-button:hover { background: var(--steimmo-color-surface-muted); }
 .management-form-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--steimmo-space-lg);
     align-items: start;
 }
+.feature-option-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--steimmo-space-sm); }
+.feature-option-controls .uk-input { min-width: 0; }
+.feature-option-controls .uk-button { min-height: 40px; box-sizing: border-box; padding-inline: var(--steimmo-space-md); }
 .management-form-grid > .uk-margin {
     margin: 0 !important;
 }
@@ -1627,6 +1644,7 @@ a:active,
     .architecture-floor-card h3 { min-height: 0; }
     .architecture-floor-navigation .uk-button { padding: 0 12px; }
     .architecture-visual { padding: var(--steimmo-space-xs); }
+    .architecture-floor-drawing .floor-plan { min-width: 960px; max-width: none; }
 }
 
 /* Optional mobile filter disclosure; the GET form works without JavaScript. */

@@ -11,7 +11,7 @@
                 Möchten Sie Ihr Interesse an der Bewerbung für {{ application.wohnung }} wirklich
                 zurückziehen? Dieser Schritt kann nicht rückgängig gemacht werden.
             </p>
-            <div class="uk-flex uk-flex-wrap uk-grid-small" uk-grid>
+            <div class="application-form-actions application-withdraw-actions">
                 <form method="post">
                     {% csrf_token %}
                     <button class="uk-button uk-button-danger" type="submit">

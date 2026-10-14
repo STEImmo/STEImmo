@@ -644,3 +644,33 @@ Buttontext-Erwartung („Main-Bewerbung“); nach Anpassung sind die 37 gezielt 
 geprüften Auswahl-, Zugriffs- und Fehlerseitentests erfolgreich. Die übrigen
 Tests der vollständigen Suite waren erfolgreich. Django-, Migrations-, Ruff-
 und Diff-Prüfungen sind erfolgreich. Keine Änderung an Schema oder Berechtigungen.
+
+## Mobiler Feinschliff – 14. Oktober 2026
+
+Die Geschosspläne behalten unter 640 px eine Mindestbreite von 960 px, damit
+Beschriftungen und Wohnungsflächen lesbar bleiben. Nur der Plan ist seitlich
+verschiebbar; die Seite selbst bleibt auf Bildschirmbreite. Der Bedienhinweis
+steht vor der Zeichnung. Die Wohnungsliste bleibt der alternative Einstieg.
+
+Der Footer zeigt die vier Linkgruppen auch auf kleinen Bildschirmen in zwei
+Spalten. Gestapelte Verwaltungsdatensätze bekommen zusätzlichen Abstand und
+eine stärkere Trennlinie. Die native Dateiauswahl in Verwaltungsformularen
+verwendet dieselben Farben, Rahmen und Mindesthöhe wie die übrigen Buttons;
+Dateiname und native Tastaturbedienung bleiben erhalten. Auf der Bestätigung
+zum Zurückziehen stehen beide Aktionen mobil linksbündig und gleich breit
+untereinander. POST-Ziel, CSRF und fachlicher Ablauf bleiben unverändert.
+
+Prüfung: 92 relevante Navigations-, Bewerbungs-, Geschoss- und Suchtests sowie
+Django-Check, Migrationsprüfung, beide Ruff-Prüfungen und Diff-Prüfung erfolgreich.
+Die vollständige Suite mit 653 Tests war vor diesem reinen Template-/CSS-
+Feinschliff erfolgreich. Die betroffenen Ansichten werden zusätzlich bei 320,
+390 und 1440 px im Browser geprüft; es werden keine Testdateien hochgeladen
+und keine Bewerbungen zurückgezogen.
+
+Zusätzliche Angaben in Merkmalformularen verwenden einen gemeinsamen Zeilenbaustein
+für bestehende und dynamisch hinzugefügte Zeilen. Die Beschriftung steht über den
+Bedienelementen; Eingabefeld und Entfernen-Button sind nebeneinander gleich hoch.
+Feldfehler stehen darunter. Beide Formulare wurden bei 320, 390 und 1440 px
+einschließlich Hinzufügen und Entfernen in einer synthetischen Vorschau geprüft.
+Die 20 Verwaltungstests sowie Django-, Migrations-, Ruff- und Diff-Prüfungen sind
+erfolgreich; die fachliche Formset-Verarbeitung bleibt unverändert.

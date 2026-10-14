@@ -1,0 +1,9 @@
+<div class="uk-margin-small-bottom" data-option-row>
+    <label class="uk-form-label" for="{{ option_form.wert.id_for_label }}">{{ option_form.wert.label }}{% if option_form.wert.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
+    <div class="feature-option-controls">
+        {{ option_form.wert }}
+        <button class="uk-button uk-button-danger" type="button" data-remove-option>Entfernen</button>
+    </div>
+    {% include "wohnungsverwaltung/_form_field_feedback.html" with field=option_form.wert only %}
+    <div hidden>{{ option_form.DELETE }}</div>
+</div>

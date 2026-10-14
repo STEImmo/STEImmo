@@ -15,10 +15,10 @@
         {% if has_unmapped_units %}<div class="uk-alert-warning">Für einzelne Wohnungen liegt keine eindeutige Zuordnung im Grundriss vor. Bitte nutzen Sie die Wohnungsliste.</div>{% endif %}
         <div class="architecture-floor-layout">
             <figure class="architecture-floor-drawing uk-margin-remove">
+                <p class="uk-text-meta uk-hidden@m"><span uk-icon="move" aria-hidden="true"></span> Zum Erkunden den großen Grundriss seitlich verschieben. Alle Wohnungen finden Sie auch in der Liste darunter.</p>
                 <div class="architecture-visual floor-plan-frame" tabindex="0" role="region" aria-label="Grundriss {{ floor_label }} – seitlich scrollbar">{% include "wohnungsverwaltung/_floor_plan.html" %}</div>
                 <figcaption>Vereinfachter Grundriss · nicht maßstabsgetreu.</figcaption>
                 <div class="architecture-plan-legend"><span><i class="architecture-legend-free" aria-hidden="true"></i>Verfügbar · anklickbar</span><span><i class="architecture-legend-taken" aria-hidden="true"></i>Nicht verfügbar</span></div>
-                <p class="uk-text-meta uk-hidden@m">Den Grundriss können Sie seitlich verschieben. Alle Wohnungen finden Sie auch in der Liste.</p>
             </figure>
             <section class="architecture-floor-apartments" aria-labelledby="architecture-apartments-title">
                 <h2 id="architecture-apartments-title">Wohnungen auf dieser Etage</h2>
