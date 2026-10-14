@@ -1133,10 +1133,11 @@ a:active,
 .apartment-search-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--steimmo-space-lg); margin-bottom: var(--steimmo-space-xl); }
 .apartment-search-heading h1 { margin: 0 0 var(--steimmo-space-sm); font-size: clamp(1.8rem, 3.5vw, 2.75rem); letter-spacing: -.035em; font-weight: 600; }
 .apartment-search-heading p:last-child { margin: 0; color: var(--steimmo-color-text-muted); }
-.apartment-search-layout { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: var(--steimmo-space-xl); align-items: start; }
-.apartment-search-filter-panel { padding: var(--steimmo-space-lg); background: var(--steimmo-color-surface-brand); border-radius: var(--steimmo-radius-lg); }
-.apartment-search-filter-panel h2 { margin: 0 0 var(--steimmo-space-lg); font-size: var(--steimmo-font-size-lg); font-weight: 600; }
+.apartment-search-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: var(--steimmo-space-xl); align-items: start; }
+.apartment-search-filter-panel { padding: 0; background: transparent; border-radius: 0; }
+.apartment-search-filter-panel h2 { margin: 0 0 var(--steimmo-space-lg); padding-bottom: var(--steimmo-space-sm); border-bottom: 3px solid var(--steimmo-color-primary); font-size: var(--steimmo-font-size-xl); font-weight: 600; }
 .apartment-search-fields { display: grid; gap: var(--steimmo-space-lg); }
+.apartment-search-fields > fieldset { min-width: 0; margin: 0; padding: 0 0 var(--steimmo-space-md); border: 0; border-bottom: 1px solid var(--steimmo-color-border); }
 .apartment-search-fields legend { margin-bottom: var(--steimmo-space-xs); font-size: var(--steimmo-font-size-sm); font-weight: 600; }
 .apartment-search-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--steimmo-space-sm); }
 .apartment-search-field { min-width: 0; }
@@ -1173,7 +1174,7 @@ a:active,
 .apartment-search { padding-top: var(--steimmo-space-xl); }
 .apartment-search .apartment-search-heading { margin-bottom: var(--steimmo-space-lg); }
 .apartment-search .apartment-search-heading h1 { font-size: clamp(1.8rem, 3vw, 2.25rem); }
-.apartment-search .apartment-search-filter-panel { position: sticky; top: var(--steimmo-space-lg); max-height: calc(100dvh - 2 * var(--steimmo-space-lg)); overflow-y: auto; box-sizing: border-box; border: 1px solid var(--steimmo-color-border-strong); }
+.apartment-search .apartment-search-filter-panel { box-sizing: border-box; border: 0; }
 .apartment-search .apartment-search-field .uk-input, .apartment-search .apartment-search-field .uk-select { height: 48px; font-size: var(--steimmo-font-size-base); }
 .apartment-search .apartment-search-field .uk-form-label { font-size: var(--steimmo-font-size-sm); }
 .apartment-search .apartment-search-filter-actions .uk-button { min-height: 48px; }
@@ -1187,7 +1188,7 @@ a:active,
     .apartment-search-result-grid { grid-template-columns: 1fr; }
     .apartment-search-card-heading h3 { font-size: var(--steimmo-font-size-lg); }
     .apartment-search-heading > .uk-button { width: 100%; box-sizing: border-box; }
-    .apartment-search-card-content, .apartment-search-filter-panel { padding: var(--steimmo-space-md); }
+    .apartment-search-card-content { padding: var(--steimmo-space-md); }
     .apartment-search-result-heading > span { display: none; }
 }
 
@@ -1649,6 +1650,7 @@ a:active,
 
 /* Optional mobile filter disclosure; the GET form works without JavaScript. */
 .apartment-search-filter-toggle { display: none; width: 100%; text-align: left; }
+.apartment-search .apartment-search-filter-toggle { padding-inline: 0; background: transparent; border: 0; border-bottom: 3px solid var(--steimmo-color-primary); border-radius: 0; font-weight: 600; }
 .apartment-search-filter-toggle[aria-expanded="true"] { margin-bottom: var(--steimmo-space-lg); }
 @media (max-width: 959px) {
     .apartment-search-filter-toggle:not([hidden]) { display: block; }

@@ -8,7 +8,8 @@
             <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:building_view' %}"><span uk-icon="home" aria-hidden="true"></span> Gebäude erkunden</a>
         </header>
         <div class="apartment-search-layout">
-            <aside class="apartment-search-filter-panel" aria-labelledby="apartment-filter-title">
+            <div class="apartment-search-filter-column">
+            <aside class="apartment-search-filter-panel" aria-labelledby="apartment-filter-title" uk-sticky="offset: 24; end: .apartment-search-layout; media: 960">
                 <h2 id="apartment-filter-title">Filter</h2>
                 <button class="uk-button uk-button-default apartment-search-filter-toggle" type="button" hidden aria-controls="apartment-filter-body" aria-expanded="true" data-mobile-filter-toggle>Filter anzeigen{% if has_filters %} · Filter aktiv{% endif %}</button>
                 <div id="apartment-filter-body" class="apartment-search-filter-body" data-filter-errors="{% if form.errors %}true{% else %}false{% endif %}">
@@ -24,6 +25,7 @@
 </form>
                 </div>
             </aside>
+            </div>
             <div class="apartment-search-results">
                 {% if form.errors %}
                 <div class="uk-alert-danger" role="alert">Bitte prüfen Sie die markierten Filterwerte. Danach können Sie die Suche erneut starten.</div>

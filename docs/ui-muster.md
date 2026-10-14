@@ -674,3 +674,23 @@ Feldfehler stehen darunter. Beide Formulare wurden bei 320, 390 und 1440 px
 einschließlich Hinzufügen und Entfernen in einer synthetischen Vorschau geprüft.
 Die 20 Verwaltungstests sowie Django-, Migrations-, Ruff- und Diff-Prüfungen sind
 erfolgreich; die fachliche Formset-Verarbeitung bleibt unverändert.
+
+## Offene Filterspalte der Wohnungssuche – 14. Oktober 2026
+
+Gewählt ist „Offen und geradlinig“: Die linke Filterspalte hat keine eigene
+Sandfläche, keinen äußeren Rahmen und keine abgerundete Box mehr. Eine grüne
+Linie unter der Überschrift und feine Trennlinien zwischen den Filtergruppen
+strukturieren die vorhandenen Felder. Die Desktopspalte ist 260 px breit und
+lässt mehr Platz für die Ergebnisse. Mobil bleibt der aufklappbare Filter mit
+einer geradlinigen grünen Markierung erhalten. UIkit-Formfelder, Theme-Farben,
+GET-Parameter, Fehlermeldungen und Suchregeln bleiben bestehen.
+Die Filterspalte läuft auf dem Desktop mit UIkit Sticky innerhalb der Suchergebnisse
+mit. Sie hat weder eine feste Maximalhöhe noch einen eigenen Scrollbereich.
+UIkit berücksichtigt überhohe Filter, sodass bei niedrigen Fenstern die unteren
+Felder und die Suchaktion durch normales Seitenscrollen erreichbar bleiben.
+Unter 960 px bleibt der Filter im normalen Seitenfluss.
+
+Prüfung: 29 Such-/Navigations- und Response-Tests, Django-Check, Migrationsprüfung,
+beide Ruff-Prüfungen und Diff-Prüfung erfolgreich. Browser-Smoke-Test bei 1440,
+390 und 320 px ohne Seitenüberbreite; mobiles Auf-/Zuklappen, Etagenfilter,
+automatisch geöffnete ungültige Filter und Zurücksetzen geprüft.
