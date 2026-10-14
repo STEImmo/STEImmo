@@ -702,6 +702,10 @@ a:active,
     text-transform: none;
 }
 
+.site-desktop-navigation .uk-navbar-nav > li > a[aria-current] {
+    text-decoration: none;
+}
+
 .site-desktop-navigation a[aria-current]::after {
     position: absolute;
     right: 0;
@@ -1204,7 +1208,7 @@ a:active,
 .apartment-detail-facts dd { margin: 0; overflow-wrap: anywhere; }
 .workspace-navigation { display: flex; flex-wrap: wrap; gap: var(--steimmo-space-xs) var(--steimmo-space-lg); padding: var(--steimmo-space-md) var(--steimmo-space-lg); margin-bottom: var(--steimmo-space-lg); background: var(--steimmo-color-surface); border: 1px solid var(--steimmo-color-border); border-radius: var(--steimmo-radius-md); }
 .workspace-navigation a { color: var(--steimmo-color-text); padding: var(--steimmo-space-2xs) 0; }
-.workspace-navigation a[aria-current] { color: var(--steimmo-color-primary); font-weight: 700; border-bottom: 2px solid currentColor; }
+.workspace-navigation a[aria-current] { color: var(--steimmo-color-primary); font-weight: 700; border-bottom: 2px solid currentColor; text-decoration: none; }
 @media (max-width: 959px) {
     .apartment-detail-layout { display: flex; flex-direction: column; }
     .apartment-detail-layout > * { width: 100%; box-sizing: border-box; }
@@ -1216,14 +1220,17 @@ a:active,
 }
 
 /* Shared compact workspace for the selected management design. */
-.management-page {
+.management-page,
+.handover-page {
     padding-block: var(--steimmo-space-xl);
     background: var(--steimmo-color-surface-page);
 }
-.management-page > .uk-container {
+.management-page > .uk-container,
+.handover-page > .uk-container {
     max-width: 1280px;
 }
-.management-page > .uk-container-small {
+.management-page > .uk-container-small,
+.handover-page > .uk-container-small {
     max-width: 1120px;
 }
 .management-page h1 {
@@ -1358,7 +1365,8 @@ a:active,
     }
 }
 @media (max-width: 640px) {
-    .management-page {
+    .management-page,
+    .handover-page {
         padding-block: var(--steimmo-space-lg);
     }
     .management-form-grid,

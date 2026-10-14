@@ -562,3 +562,15 @@ erfolgreich. Django-Check, Migrationsprüfung, Ruff-Lint, Ruff-Formatprüfung un
 Diff-Prüfung erfolgreich. Browser-Smoke: Bewerbungsübersicht, mobile Filter und
 Bewerbungsdetails sowie Übergabeformular ohne JavaScript-Syntaxfehler. Seltene
 Datenzustände und Anmeldeseiten sind zusätzlich durch die Django-Tests abgedeckt.
+Übergaben und Verwaltung/Bewerbungen verwenden dieselben Containerbreiten und
+Seitenabstände. Die Übersichtsüberschrift und die Anlegen-Aktion stehen auf
+schmalen Bildschirmen untereinander. Die Übergabe-Bereichsnavigation zeigt auf
+der Übersicht nur „Übergaben“; weitere Punkte benötigen ein ausgewähltes
+Protokoll, Bearbeitungspunkte zusätzlich dessen offenen Status. Dies hängt auf
+der Mitarbeiterübersicht nicht von zusätzlichen Kontorechten ab.
+Aktive Bereichslinks behalten ihre feste Linienmarkierung ohne zusätzliche
+Textunterstreichung; die Hover-Unterstreichung bleibt auf anderen Links erhalten.
+
+Dasselbe Verhalten gilt für die Desktop-Hauptnavigation im Header: Die aktive
+Seite zeigt nur die feste Positionslinie, ohne zusätzliche Textunterstreichung
+bei Hover oder Fokus. Der sichtbare Tastatur-Fokusrahmen bleibt erhalten.
