@@ -25,8 +25,10 @@
                 </div>
             </aside>
             <div class="apartment-search-results">
+                {% if form.errors %}
+                <div class="uk-alert-danger" role="alert">Bitte prüfen Sie die markierten Filterwerte. Danach können Sie die Suche erneut starten.</div>
+                {% else %}
                 <div class="apartment-search-result-heading"><h2>{{ result_count }} Wohnung{{ result_count|pluralize:"en" }} {% if has_filters %}gefunden{% else %}verfügbar{% endif %}</h2><span>Nur verfügbare Wohnungen</span></div>
-                {% if form.errors %}<div class="uk-alert-danger" role="alert">Bitte prüfen Sie die markierten Filterwerte.</div>{% endif %}
                 {% if rows %}<div class="apartment-search-result-grid">
                     {% for row in rows %}<article class="uk-card uk-card-default apartment-search-card">
     <a class="apartment-search-image" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' row.unit.pk %}" aria-label="Wohnung {{ row.unit.display_number }} ansehen">
@@ -39,6 +41,7 @@
     </div>
 </article>{% endfor %}
                 </div>{% else %}<article class="uk-card uk-card-default uk-card-body apartment-search-empty"><span uk-icon="icon: search; ratio: 2" aria-hidden="true"></span><h3>{% if has_filters %}Keine verfügbaren Wohnungen passen zu diesen Filtern.{% else %}Zurzeit sind keine Wohnungen verfügbar.{% endif %}</h3><p>{% if has_filters %}Passen Sie Ihre Filter an oder sehen Sie sich alle verfügbaren Wohnungen an.{% else %}Sie können unser Gebäude und die Etagen weiterhin erkunden.{% endif %}</p>{% if has_filters %}<a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Filter zurücksetzen</a>{% else %}<a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:building_view' %}">Gebäude erkunden</a>{% endif %}</article>{% endif %}
+                {% endif %}
                 <p class="apartment-search-journey"><span uk-icon="info" aria-hidden="true"></span> Erst die Wohnung ansehen, dann „Zur Besichtigung anmelden“ wählen. Die Wohnung wird in Ihre Anfrage übernommen.</p>
             </div>
         </div>

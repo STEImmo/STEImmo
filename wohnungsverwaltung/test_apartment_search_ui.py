@@ -40,6 +40,17 @@ class ApartmentSearchUITests(TestCase):
         )
         self.assertContains(response, 'id="id_groesse_min_error"')
         self.assertNotContains(response, "Wohnung 001")
+        self.assertNotContains(response, "0 Wohnungen gefunden")
+        self.assertNotContains(response, "Keine verfügbaren Wohnungen passen")
+
+    def test_reversed_area_range_shows_correction_instead_of_empty_results(self):
+        response = self.client.get(
+            reverse("wohnungsverwaltung_public:apartment_search"),
+            {"groesse_min": "80", "groesse_max": "20"},
+        )
+        self.assertContains(response, "Der Höchstwert muss mindestens dem Mindestwert entsprechen.")
+        self.assertNotContains(response, "0 Wohnungen gefunden")
+        self.assertNotContains(response, "Keine verfügbaren Wohnungen passen")
 
     def test_empty_inventory_offers_building_link(self):
         Wohnung.objects.update(status=WohnungStatus.TAKEN)

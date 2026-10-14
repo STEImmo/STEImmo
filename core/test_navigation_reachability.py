@@ -1,4 +1,4 @@
-"""Check actual rendered click paths, including context-dependent pages."""
+"""Check rendered link paths; menu toggles and authentication are separate steps."""
 
 from html.parser import HTMLParser
 from urllib.parse import urldefrag, urlencode, urljoin
@@ -9,6 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from wohnungsverwaltung.access import ROLE_APPLICANT, ROLE_TENANT
+from wohnungsverwaltung.forms import SchluesselForm
 from wohnungsverwaltung.models import (
     AbnahmeStatus,
     Bewerbung,
@@ -86,6 +87,42 @@ class NavigationReachabilityTests(TestCase):
             response = self.client.get(destination, follow=True)
             self.assertEqual(response.status_code, 200)
             current_url = response.redirect_chain[-1][0] if response.redirect_chain else destination
+
+    def test_handover_sections_link_to_existing_entries_and_mark_room_context(self):
+        self.client.force_login(self.employee)
+        detail = reverse("wohnungsverwaltung:handover_protocol_detail", args=[self.protocol.pk])
+        response = self.client.get(detail)
+        self.assertContains(response, f'href="{detail}#protocol-rooms"')
+        self.assertContains(response, f'href="{detail}#protocol-keys"')
+        self.assertContains(response, 'id="protocol-rooms"')
+        self.assertContains(response, 'id="protocol-keys"')
+        response = self.client.get(
+            reverse(
+                "wohnungsverwaltung:handover_protocol_room_detail",
+                args=[self.protocol.pk, self.protocol_room.pk],
+            )
+        )
+        self.assertContains(response, f'href="{detail}#protocol-rooms" aria-current="true"')
+
+    def test_key_status_labels_are_german_and_keep_existing_values(self):
+        form = SchluesselForm()
+        self.assertEqual(
+            dict(form.fields["status"].choices),
+            {"": "---------", "lost": "Verloren", "in_use": "In Gebrauch", "blocked": "Gesperrt"},
+        )
+        form = SchluesselForm(
+            data={"bezeichnung": "Wohnungstür", "anzahl": 2, "aufschrift": "", "status": "in_use"}
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["status"], "in_use")
+
+    def test_mobile_home_shortcuts_use_the_same_role_destinations(self):
+        self.client.force_login(self.employee)
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, 'aria-label="Direktzugänge"')
+        self.assertContains(response, "Direkt zu Ihrem Bereich")
+        self.client.logout()
+        self.assertNotContains(self.client.get(reverse("home")), 'aria-label="Direktzugänge"')
 
     def test_public_pages_and_viewing_request_are_reachable_within_three_clicks(self):
         search = reverse("wohnungsverwaltung_public:apartment_search")

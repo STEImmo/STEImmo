@@ -259,7 +259,7 @@ in der isolierten Testdatenbank und prüft auch die HTTP-Antwort jeder Zielseite
 | Gäste: Etage | Gebäudeansicht → Stockwerk | 2 |
 | Gäste: Wohnungsdetails | Wohnungssuche → Details; alternativ Gebäude → Etage → Wohnung | 2–3 |
 | Gäste / Bewerber: Besichtigungsanfrage | Wohnungssuche → Details → Zur Besichtigung anmelden | 3 |
-| Bewerber: neue Bewerbung | Meine Bewerbungen → Neue Bewerbung, sofern keine offene Bewerbung besteht | 2 |
+| Bewerber: neue Bewerbung | Wohnungssuche → Details → Zur Besichtigung anmelden | 3 |
 | Bewerber: freigeschaltete Hauptbewerbung / Rücknahme | Meine Bewerbungen → Bewerbung vervollständigen → Zurückziehen | 2–3 |
 | Mieter: eigene Übergabeprotokolle | Meine Übergabeprotokolle | 1 |
 | Mitarbeiter: Wohnung, Räume, Fotos | Verwaltung → Wohnung bearbeiten → Raum oder Fotos | 2–3 |
@@ -452,3 +452,85 @@ bleiben erhalten. Es gibt keine neue Abhängigkeit und keine neue Template-Datei
 
 Unternehmensinhalte, Rechtstexte, gepflegte Miet-/Zimmerangaben, Originalfotos und
 eine Profilseite bleiben getrennte Aufgaben. Keine Issues dafür eigenständig anlegen.
+
+## Stand vor der PR – 13. Oktober 2026
+
+Die abschließende Browserprüfung umfasst erneut 102 Aufrufe der erreichbaren
+öffentlichen und Mitarbeiteransichten bei 1440, 390 und 320 Pixeln. Keine
+Seitenüberläufe, fehlenden Feldbeschriftungen, defekten Hilfstext-Verknüpfungen
+oder kaputten Bilder gefunden. Seltene Datenzustände und andere Kontorollen
+werden ergänzend über Templates und Django-Tests geprüft, nicht vollständig visuell.
+
+Die vollständige lokale Suite umfasst 607 Tests. Ein veralteter Navigationstest
+schlug in drei Rollen-Unterfällen fehl, weil er noch ausgeblendete öffentliche
+Links erwartete. Seine Erwartung ist an die freigegebene Navigation angepasst;
+die zehn Zugriffsschutztests wurden danach erfolgreich erneut ausgeführt.
+Die übrigen Tests der vollständigen Suite waren erfolgreich. Django-Check,
+Migrationsprüfung, Ruff und Diff-Prüfung werden vor der PR ebenfalls ausgeführt.
+
+Der UI-Branch enthält gegenüber seinem gemeinsamen Ausgangspunkt mit main
+29 neue und 58 geänderte Dateien, einschließlich Tests, Bildern und Dokumentation.
+Temporäre Vergleichsseiten sind entfernt. AGENTS.md, UIkit-Vendor-Dateien und
+Migrationen wurden durch die UI-Arbeit nicht verändert.
+
+Wichtig für die PR: Neben Templates/CSS enthält die Umsetzung Anzeige-Kontext
+in Views, einheitliche Wohnungsbezeichnungen und den ausdrücklich abgestimmten
+GET-Einstieg zur Bewerbung über die Wohnungssuche. Alte POST-Einstiege bleiben
+erhalten. Nicht pauschal als ausschließlich CSS-Änderung beschreiben; Datenmodell,
+Validierung, Statuswechsel und Berechtigungen werden nicht fachlich neu definiert.
+
+Der remote main-Stand a4572bf enthält inzwischen weitere Formularverbesserungen
+und Bewerberfilter. Die rein lokale Merge-Simulation ergibt 17 Dateikonflikte,
+überwiegend in Templates sowie in wohnungsverwaltung/views.py. Es wurde kein
+Merge ausgeführt. Vor Ready for Review sind diese Änderungen zu integrieren,
+Konflikte unter Erhalt der fachlichen Funktionen zu lösen und der gemeinsame
+Stand erneut zu prüfen. Bis dahin die PR mit Refs #46 statt Closes #46 vorbereiten.
+
+## Korrekturen aus dem Review vom 14. Oktober 2026
+
+Verwaltungslisten, Raumlisten, Bewerbungslisten und die Übergabeübersicht nutzen
+UIkits `uk-table-responsive`: Unter 960 Pixeln stehen die Felder je Eintrag
+untereinander mit sichtbaren Spaltenbezeichnungen. Aktionen bleiben ohne
+seitliches Scrollen zugänglich. Die pauschale Mindestbreite von 620 Pixeln ist
+entfernt. Fachliche Vergleichstabellen im Protokoll bleiben gezielt scrollbar.
+
+Die Übergabenavigation führt mit „Räume“ und „Schlüssel“ zu den vorhandenen
+Abschnitten des Protokolls. Hinzufügen bleibt eine gesonderte Aktion. Raum- und
+Schlüsselunterseiten markieren ihren jeweiligen Bereich. Drei einfache
+Übergabeformulare verwenden das bestehende Feld-Partial für Labels, Hilfstexte,
+Pflichtkennzeichnung und Fehler. Schlüsselstatus erhalten im Formular deutsche
+Anzeigetexte; gespeicherte Werte und Datenbankschema bleiben unverändert.
+
+Ungültige Suchfilter zeigen ausschließlich die Korrekturaufforderung statt
+einer Trefferzahl und eines vermeintlichen leeren Ergebnisses. Gültige Suchen
+ohne Treffer behalten ihren Leerzustand und den Link zum Zurücksetzen.
+
+Angemeldete Nutzer erhalten auf der Startseite unterhalb des Headers direkte
+Bereichslinks, wenn der Desktop-Header ausgeblendet ist. Diese verwenden dasselbe
+rollenabhängige Navigations-Partial. Damit benötigen die Hauptwege ab Startseite
+kein Öffnen des mobilen Menüs und keinen Umweg zum Footer. Die Drei-Klick-Angabe
+bezieht sich auf Seitenwechsel über direkte Links; Anmeldung, Bestätigungscodes,
+Formulareingaben und Absenden sind zusätzliche Schritte. Die Linktests ersetzen
+keine visuelle oder vollständige Interaktionsprüfung.
+
+IDE-Dateien werden über `.gitignore` ausgeschlossen. Die beiden Filter-SVGs sind
+weiterhin unversionierte Entwürfe und keine Laufzeitabhängigkeit. Ihre Aufnahme
+in einen PR ist nur bei einem bewussten Dokumentationszweck sinnvoll.
+
+Die Integration der 17 Konfliktdateien mit dem bekannten main-Stand bleibt offen.
+Empfohlen ist zuerst ein lokaler Merge mit `--no-commit --no-ff`, dann die
+Konfliktlösung unter Erhalt der fachlichen Erweiterungen aus main und abschließend
+die vollständige Prüfung. Ein solcher Merge wurde für diese UI-Korrekturen nicht
+begonnen. Es erfolgen keine GitHub-Änderungen, Commits oder Pushes ohne Auftrag.
+
+Verifikation dieses lokalen Stands: 611 Django-Tests erfolgreich. Django-Check,
+Migrationsprüfung, Ruff-Lint, Ruff-Formatprüfung und Diff-Prüfung erfolgreich.
+Browser-Smoke: Listen und Aktionen bei 320/390 Pixeln, deutsche Schlüsselstatus,
+mobile Direktzugänge, Raumanker mit Fokus und korrigierter Filterfehlerzustand.
+Die Mitarbeiter-Navigation wurde zusätzlich bei 1200 Pixeln ohne Seitenüberlauf
+geprüft. Andere Rollen sind über die bestehenden Berechtigungs- und Navigationstests
+abgedeckt; kein vollständiger Geräte- oder Screenreader-Audit.
+
+Die vollständige Gebäudeansicht schneidet den ungenutzten SVG-Bereich oberhalb
+des Dachs ab (viewBox: 0 110 1100 680). Zeichnung, Etagenlinks und der gesonderte
+Ausschnitt der Startseitenvorschau bleiben erhalten.

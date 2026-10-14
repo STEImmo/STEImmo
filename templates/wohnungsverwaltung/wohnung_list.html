@@ -17,7 +17,7 @@
         </div>
 
         <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Verwaltungstabelle">
-            <table class="uk-table uk-table-divider uk-table-middle uk-table-small">
+            <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
                 <thead>
                     <tr>
                         <th>Gebäude</th>
@@ -26,23 +26,23 @@
                         <th>Größe</th>
                         <th>Zimmer</th>
                         <th>Status</th>
-                        <th><span class="uk-hidden">Aktion</span></th>
+                        <th><span class="uk-hidden-visually">Aktion</span></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for wohnung in wohnungen %}
                         <tr>
-                            <td>{{ wohnung.gebaeudenummer }}</td>
-                            <td><strong>{{ wohnung.display_number }}</strong></td>
-                            <td>{{ wohnung.etage }}</td>
-                            <td>{{ wohnung.groesse_qm }} m²</td>
-                            <td>{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl }}{% else %}Noch nicht angegeben{% endif %}</td>
-                            <td>
+                            <td data-label="Gebäude">{{ wohnung.gebaeudenummer }}</td>
+                            <td data-label="Wohnung"><strong>{{ wohnung.display_number }}</strong></td>
+                            <td data-label="Etage">{{ wohnung.etage }}</td>
+                            <td data-label="Größe">{{ wohnung.groesse_qm }} m²</td>
+                            <td data-label="Zimmer">{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl }}{% else %}Noch nicht angegeben{% endif %}</td>
+                            <td data-label="Status">
                                 <span class="uk-label">
                                     {% if wohnung.status == "free" %}Verfügbar{% elif wohnung.status == "taken" %}Vermietet{% else %}Gesperrt{% endif %}
                                 </span>
                             </td>
-                            <td class="uk-text-right">
+                            <td class="uk-text-right" data-label="Aktion">
                                 <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:wohnung_edit' wohnung.wohnung_id %}">
                                     Bearbeiten
                                 </a>

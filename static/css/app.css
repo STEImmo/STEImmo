@@ -1256,7 +1256,6 @@ a:active,
 }
 .management-table .uk-table {
     margin-block: var(--steimmo-space-xs);
-    min-width: 620px;
 }
 .management-table .uk-table th,
 .management-table .uk-table td {
@@ -1276,6 +1275,31 @@ a:active,
 }
 .management-table .uk-table td:last-child {
     white-space: nowrap;
+}
+/* UIkit stacks list rows on small screens; retain their column context. */
+.home-workspace-links { padding-block: var(--steimmo-space-sm); }
+.home-workspace-links .uk-subnav > * > a {
+    color: var(--steimmo-color-text);
+    text-transform: none;
+    padding-block: var(--steimmo-space-xs);
+}
+@media (max-width: 959px) {
+    .workspace-table td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: var(--steimmo-space-2xs);
+        color: var(--steimmo-color-text-muted);
+        font-size: var(--steimmo-font-size-xs);
+        font-weight: 600;
+    }
+    .workspace-table td,
+    .workspace-table th {
+        text-align: left !important;
+        overflow-wrap: anywhere;
+    }
+    .workspace-table tbody tr + tr {
+        border-top: 1px solid var(--steimmo-color-border);
+    }
 }
 .management-form-grid {
     display: grid;

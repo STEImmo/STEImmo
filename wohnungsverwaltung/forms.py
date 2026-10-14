@@ -1952,6 +1952,13 @@ MerkmalOptionFormSet = forms.formset_factory(MerkmalOptionForm, extra=1, can_del
 
 
 class SchluesselForm(UIkitFormMixin, forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        labels = {"lost": "Verloren", "in_use": "In Gebrauch", "blocked": "Gesperrt"}
+        self.fields["status"].choices = [
+            (value, labels.get(value, label)) for value, label in self.fields["status"].choices
+        ]
+
     class Meta:
         model = Schluessel
         fields = ["bezeichnung", "anzahl", "aufschrift", "status"]

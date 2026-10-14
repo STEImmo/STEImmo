@@ -238,16 +238,16 @@ class AccessControlTests(TestCase):
         self.assertTrue(self.applicant.groups.filter(name=ROLE_APPLICANT).exists())
         self.assertTrue(self.applicant.groups.filter(name=ROLE_TENANT).exists())
 
-    def test_employee_navigation_hides_public_applicant_links(self) -> None:
+    def test_employee_navigation_keeps_public_links_alongside_authorized_workspaces(self) -> None:
         direct_user = self.create_user("navigation-direct@example.test")
         direct_user.user_permissions.add(Permission.objects.get(codename="access_employee_area"))
         for user in (self.employee, self.account_manager, direct_user):
             with self.subTest(user=user.username):
                 self.client.force_login(user)
                 response = self.client.get(reverse("home"))
-                self.assertNotContains(response, ">Wohnungen finden<")
+                self.assertContains(response, ">Wohnungen finden<")
                 self.assertNotContains(response, ">Bewerbungsvorschau<")
-                self.assertNotContains(response, ">Gebäudeansicht<")
+                self.assertContains(response, ">Gebäudeansicht<")
                 self.assertContains(response, ">Verwaltung<")
 
     def test_public_and_applicant_navigation_keeps_apartment_links(self) -> None:

@@ -102,13 +102,13 @@
             {% if apartment_is_saved %}
                 {% if raeume %}
                     <div class="management-table uk-overflow-auto uk-margin-top" tabindex="0" role="region" aria-label="Räume der Wohnung">
-                    <table class="uk-table uk-table-divider uk-table-small uk-margin-top">
-                        <thead><tr><th>Name</th><th><span class="uk-hidden">Aktion</span></th></tr></thead>
+                    <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-small uk-margin-top">
+                        <thead><tr><th>Name</th><th><span class="uk-hidden-visually">Aktion</span></th></tr></thead>
                         <tbody>
                             {% for raum in raeume %}
                                 <tr>
-                                    <td>{{ raum.name }}</td>
-                                    <td class="uk-text-right">
+                                    <td data-label="Name">{{ raum.name }}</td>
+                                    <td class="uk-text-right" data-label="Aktion">
                                         <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:raum_edit' wohnung.pk raum.pk %}">Bearbeiten</a>
                                         <form class="uk-display-inline" method="post" action="{% url 'verwaltung:raum_delete' wohnung.pk raum.pk %}">
                                             {% csrf_token %}

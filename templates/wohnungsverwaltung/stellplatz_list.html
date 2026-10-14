@@ -17,22 +17,22 @@
         </div>
 
         <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Verwaltungstabelle">
-            <table class="uk-table uk-table-divider uk-table-middle uk-table-small">
-                <thead><tr><th>Name</th><th>Typ</th><th>Wohnung</th><th>Miete</th><th><span class="uk-hidden">Aktion</span></th></tr></thead>
+            <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
+                <thead><tr><th>Name</th><th>Typ</th><th>Wohnung</th><th>Miete</th><th><span class="uk-hidden-visually">Aktion</span></th></tr></thead>
                 <tbody>
                     {% for stellplatz in stellplaetze %}
                         <tr>
-                            <td>{{ stellplatz.name }}</td>
-                            <td>{{ stellplatz.stellplatz_typ }}</td>
-                            <td>
+                            <td data-label="Name">{{ stellplatz.name }}</td>
+                            <td data-label="Typ">{{ stellplatz.stellplatz_typ }}</td>
+                            <td data-label="Wohnung">
                                 {% for zuordnung in stellplatz.zuordnungen.all %}
                                     Wohnung {{ zuordnung.wohnung.display_number }}
                                 {% empty %}
                                     <span class="uk-text-muted">Nicht zugeordnet</span>
                                 {% endfor %}
                             </td>
-                            <td>{{ stellplatz.miete }} €</td>
-                            <td class="uk-text-right">
+                            <td data-label="Miete">{{ stellplatz.miete }} €</td>
+                            <td class="uk-text-right" data-label="Aktion">
                                 <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:stellplatz_edit' stellplatz.stellplatz_id %}">
                                     Bearbeiten
                                 </a>

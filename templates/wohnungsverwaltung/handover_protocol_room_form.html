@@ -13,10 +13,7 @@
             {% csrf_token %}
             {% if form.non_field_errors %}<div class="uk-alert-danger handover-form-wide" role="alert">{{ form.non_field_errors }}</div>{% endif %}
             {% for field in form.visible_fields %}
-                <div class="uk-margin">
-                    <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
-                    <div class="uk-form-controls">{{ field }}{% if field.errors %}<div id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}</div>
-                </div>
+                {% include "wohnungsverwaltung/_form_field.html" %}
             {% endfor %}
             <div class="uk-flex uk-flex-right handover-form-actions">
                 <button class="uk-button uk-button-primary" type="submit">Raum anlegen</button>

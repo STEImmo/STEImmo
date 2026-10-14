@@ -51,10 +51,7 @@
             {% csrf_token %}
             <h2 class="handover-section-title">Prüfpunkt hinzufügen</h2>
             {% for field in form.visible_fields %}
-                <div class="uk-margin">
-                    <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
-                    <div class="uk-form-controls">{{ field }}{% if field.errors %}<div id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}</div>
-                </div>
+                {% include "wohnungsverwaltung/_form_field.html" %}
             {% endfor %}
             {{ form.zusatzangaben }}
             {% if form.zusatzangaben.errors %}<div id="{{ form.zusatzangaben.auto_id }}_error" role="alert">{% for error in form.zusatzangaben.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}

@@ -4,6 +4,12 @@
 {% block title %}STE Immobilien eGbR – Wohnungsvermietung in Würzburg{% endblock %}
 
 {% block content %}
+{% if user.is_authenticated %}
+<nav class="uk-container uk-hidden@l home-workspace-links" aria-label="Direktzugänge">
+    <p class="uk-text-meta uk-margin-small-bottom">Direkt zu Ihrem Bereich</p>
+    <ul class="uk-subnav uk-margin-remove-top">{% include "partials/_navigation_links.html" with company_links=False %}</ul>
+</nav>
+{% endif %}
 <section class="uk-section home-company-hero" aria-labelledby="home-title">
     <img class="home-city-image" src="{% static 'images/wuerzburg-aerial.jpg' %}" alt="" width="1920" height="1536" fetchpriority="high">
     <div class="uk-container home-hero-content">

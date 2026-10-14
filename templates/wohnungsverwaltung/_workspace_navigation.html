@@ -15,8 +15,8 @@
                 <a href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}" {% if route == 'handover_protocol_detail' %}aria-current="page"{% endif %}>Protokoll</a>
                 {% if protocol.status == 'open' %}
                     <a href="{% url 'wohnungsverwaltung:handover_protocol_edit' protocol.pk %}" {% if route == 'handover_protocol_edit' %}aria-current="page"{% endif %}>Zuordnung &amp; Zähler</a>
-                    <a href="{% url 'wohnungsverwaltung:handover_protocol_room_create' protocol.pk %}" {% if route == 'handover_protocol_room_create' %}aria-current="page"{% endif %}>Räume</a>
-                    <a href="{% url 'wohnungsverwaltung:handover_protocol_key_create' protocol.pk %}" {% if route == 'handover_protocol_key_create' %}aria-current="page"{% endif %}>Schlüssel</a>
+                    <a href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}#protocol-rooms" {% if 'handover_protocol_room' in route %}aria-current="true"{% endif %}>Räume</a>
+                    <a href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}#protocol-keys" {% if 'handover_protocol_key' in route %}aria-current="true"{% endif %}>Schlüssel</a>
                     <a href="{% url 'wohnungsverwaltung:handover_protocol_finalize' protocol.pk %}" {% if route == 'handover_protocol_finalize' %}aria-current="page"{% endif %}>Abschluss</a>
                 {% endif %}
             {% endif %}

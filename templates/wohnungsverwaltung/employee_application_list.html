@@ -16,7 +16,7 @@
             <p class="uk-text-meta">{{ page_obj.paginator.count }} Bewerbung{{ page_obj.paginator.count|pluralize:"en" }} · Neueste Besichtigungsanfragen zuerst</p>
             {% if applications %}
                 <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Bewerbungstabelle">
-                    <table class="uk-table uk-table-divider uk-table-middle uk-table-small">
+                    <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
                         <caption class="uk-text-left">Bewerbungen für {{ unit }}</caption>
                         <thead>
                             <tr>
@@ -31,12 +31,12 @@
                         <tbody>
                             {% for application in applications %}
                                 <tr>
-                                    <th scope="row">{{ application.person }}</th>
-                                    <td>{{ application.personenanzahl }}</td>
-                                    <td>{{ application.haustiere|yesno:"Ja,Nein" }}</td>
-                                    <td><span class="uk-label">{{ application.get_applicant_status_display }}</span></td>
-                                    <td class="uk-text-nowrap">{{ application.created_at|date:"d.m.Y, H:i" }} Uhr</td>
-                                    <td>
+                                    <th scope="row" data-label="Name">{{ application.person }}</th>
+                                    <td data-label="Personenanzahl">{{ application.personenanzahl }}</td>
+                                    <td data-label="Haustiere">{{ application.haustiere|yesno:"Ja,Nein" }}</td>
+                                    <td data-label="Bearbeitungsstatus"><span class="uk-label">{{ application.get_applicant_status_display }}</span></td>
+                                    <td class="uk-text-nowrap" data-label="Anfrage eingegangen">{{ application.created_at|date:"d.m.Y, H:i" }} Uhr</td>
+                                    <td data-label="Details">
                                         <a class="uk-button uk-button-default uk-button-small uk-text-nowrap"
                                            href="{% url 'wohnungsverwaltung:employee_application_detail' application.pk %}"
                                            aria-label="Bewerbung von {{ application.person }} ansehen">Ansehen</a>
@@ -68,14 +68,14 @@
             <h1 class="uk-heading-small">Bewerbungen je Wohnung</h1>
             <p>Wählen Sie eine Wohnung, um ihre Bewerbungen anzusehen.</p>
             <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Wohnungen und Bewerbungen">
-                <table class="uk-table uk-table-divider uk-table-middle uk-table-small">
+                <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
                     <thead><tr><th scope="col">Wohnung</th><th scope="col">Bewerbungen</th><th scope="col">Aktion</th></tr></thead>
                     <tbody>
                 {% for unit in units %}
                     <tr>
-                        <th scope="row">Wohnung {{ unit.display_number }}</th>
-                        <td>{{ unit.application_count }} Bewerbung{{ unit.application_count|pluralize:"en" }}</td>
-                        <td><a class="uk-button uk-button-default uk-button-small" href="?wohnung={{ unit.pk }}"
+                        <th scope="row" data-label="Wohnung">Wohnung {{ unit.display_number }}</th>
+                        <td data-label="Bewerbungen">{{ unit.application_count }} Bewerbung{{ unit.application_count|pluralize:"en" }}</td>
+                        <td data-label="Aktion"><a class="uk-button uk-button-default uk-button-small" href="?wohnung={{ unit.pk }}"
                                aria-label="Bewerbungen für {{ unit }} ansehen">Bewerbungen ansehen</a>
                         </td>
                     </tr>
