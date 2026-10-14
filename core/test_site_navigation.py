@@ -60,15 +60,18 @@ class SiteNavigationTests(TestCase):
             with self.subTest(navigation=label):
                 self.assertIn(label, navigation)
                 destinations = expected.copy()
-                if (
-                    label != "Footernavigation"
-                    and reverse("wohnungsverwaltung_public:building_view") in destinations
-                    and not response.context["user"].has_perm("immobilien.access_employee_area")
+                if label != "Footernavigation" and response.context["user"].has_perm(
+                    "immobilien.access_employee_area"
                 ):
-                    destinations[2:2] = [
-                        f"{reverse('home')}#unternehmen",
-                        f"{reverse('home')}#kontakt",
+                    destinations[2:] = [
+                        reverse("wohnungsverwaltung:employee_application_list"),
+                        reverse("wohnungsverwaltung:handover_protocol_list"),
+                        reverse("verwaltung:wohnung_list"),
+                        reverse("verwaltung:stellplatz_list"),
+                        reverse("verwaltung:merkmal_list"),
                     ]
+                    if response.context["user"].has_perm("immobilien.manage_user_accounts"):
+                        destinations.append(reverse("verwaltung:user_account_list"))
                 self.assertEqual([href for href, _ in navigation[label]], destinations)
 
     def test_public_pages_use_the_company_name_instead_of_the_project_nickname(self):
@@ -90,23 +93,30 @@ class SiteNavigationTests(TestCase):
 
     def test_workspace_navigation_uses_real_destinations_and_respects_account_permissions(self):
         self.client.force_login(self.manager)
-        response = self.client.get(reverse("verwaltung:wohnung_list"))
-        parser = NavigationParser()
-        parser.feed(response.content.decode())
-        links = [href for href, _ in parser.navigation["Verwaltungsbereiche"]]
-        self.assertEqual(
-            links,
-            [
-                reverse(name)
-                for name in (
-                    "wohnungsverwaltung:employee_application_list",
-                    "verwaltung:wohnung_list",
-                    "verwaltung:stellplatz_list",
-                    "verwaltung:merkmal_list",
-                    "verwaltung:user_account_list",
+        for page in ("verwaltung:wohnung_list", "wohnungsverwaltung:handover_protocol_list"):
+            with self.subTest(page=page):
+                response = self.client.get(reverse(page))
+                parser = NavigationParser()
+                parser.feed(response.content.decode())
+                links = parser.navigation["Verwaltungsbereiche"]
+                self.assertEqual(
+                    [href for href, _ in links],
+                    [
+                        reverse(name)
+                        for name in (
+                            "wohnungsverwaltung:employee_application_list",
+                            "wohnungsverwaltung:handover_protocol_list",
+                            "verwaltung:wohnung_list",
+                            "verwaltung:stellplatz_list",
+                            "verwaltung:merkmal_list",
+                            "verwaltung:user_account_list",
+                        )
+                    ],
                 )
-            ],
-        )
+                self.assertEqual(
+                    [(href, current) for href, current in links if current],
+                    [(reverse(page), "page")],
+                )
         self.client.force_login(self.resident)
         response = self.client.get(reverse("wohnungsverwaltung:handover_protocol_mine"))
         parser = NavigationParser()
@@ -167,7 +177,7 @@ class SiteNavigationTests(TestCase):
     def test_building_link_uses_the_merged_public_view(self):
         self.assertEqual(reverse("wohnungsverwaltung_public:building_view"), "/wohnungen/gebaeude/")
         response = self.client.get(reverse("wohnungsverwaltung_public:building_view"))
-        self.assertContains(response, "Gebäudeansicht")
+        self.assertContains(response, "Gebäude entdecken")
         self.assertContains(response, reverse("wohnungsverwaltung_public:apartment_search"))
 
     def test_company_sections_and_image_credits_are_reachable(self):
@@ -201,7 +211,11 @@ class SiteNavigationTests(TestCase):
             with self.subTest(navigation=label):
                 self.assertEqual(
                     [(href, current) for href, current in links if current],
-                    [(reverse("verwaltung:wohnung_list"), "true")],
+                    [
+                        (reverse("verwaltung:wohnung_list"), "true")
+                        if label == "Footernavigation"
+                        else (reverse("verwaltung:stellplatz_list"), "page")
+                    ],
                 )
         self.assertEqual(len(self.parse_navigation(response)), 3)
 

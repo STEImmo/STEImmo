@@ -1,10 +1,6 @@
 {% with route=request.resolver_match.url_name namespace=request.resolver_match.namespace %}
         <li><a href="{% url 'wohnungsverwaltung_public:apartment_search' %}"{% if namespace == "wohnungsverwaltung_public" and route != "building_view" and route != "floor_view" %} aria-current="{% if route == 'apartment_search' %}page{% else %}true{% endif %}"{% endif %}>Wohnungen finden</a></li>
-        <li><a href="{% url 'wohnungsverwaltung_public:building_view' %}"{% if route == "building_view" %} aria-current="page"{% elif route == "floor_view" %} aria-current="true"{% endif %}>Gebäudeansicht</a></li>
-        {% if company_links and not perms.immobilien.access_employee_area %}
-            <li><a href="{% url 'home' %}#unternehmen">Über uns</a></li>
-            <li><a href="{% url 'home' %}#kontakt">Kontakt</a></li>
-        {% endif %}
+        <li><a href="{% url 'wohnungsverwaltung_public:building_view' %}"{% if route == "building_view" %} aria-current="page"{% elif route == "floor_view" %} aria-current="true"{% endif %}>Gebäude entdecken</a></li>
     {% if user.is_authenticated %}
         {% if perms.immobilien.access_tenant_area %}
             <li><a href="{% url 'wohnungsverwaltung:handover_protocol_mine' %}"{% if route == "handover_protocol_mine" %} aria-current="page"{% elif not perms.immobilien.access_employee_area and 'handover_protocol' in route %} aria-current="true"{% endif %}>Meine Übergabeprotokolle</a></li>
@@ -12,6 +8,21 @@
         {% if perms.immobilien.access_applicant_area %}
             <li><a href="{% url 'wohnungsverwaltung:pre_application_list' %}"{% if route == "pre_application_list" %} aria-current="page"{% elif route != "pre_application_preview" and 'pre_application' in route or 'main_application' in route or 'applicant_application' in route or route == "application_withdraw" %} aria-current="true"{% endif %}>Meine Bewerbungen</a></li>
         {% endif %}
+        {% if navigation_mode %}
+            {% if perms.immobilien.access_employee_area or perms.immobilien.manage_user_accounts %}
+                {% if navigation_mode == "desktop" %}
+                    <li class="site-management-menu">
+                        <button id="management-toggle" class="site-management-toggle{% if namespace == 'verwaltung' or 'employee_application' in route or 'handover_protocol' in route and route != 'handover_protocol_mine' and perms.immobilien.access_employee_area %} is-current{% endif %}" type="button">Verwaltung <span uk-icon="icon: chevron-down; ratio: .8" aria-hidden="true"></span></button>
+                        <div class="site-management-dropdown" uk-dropdown="mode: click; pos: bottom-right" aria-labelledby="management-toggle">
+                            <ul class="uk-nav uk-dropdown-nav">{% include "partials/_management_links.html" %}</ul>
+                        </div>
+                    </li>
+                {% else %}
+                    <li class="uk-nav-header site-mobile-management-heading">Verwaltung</li>
+                    {% include "partials/_management_links.html" %}
+                {% endif %}
+            {% endif %}
+        {% else %}
         {% if perms.immobilien.access_employee_area %}
             <li><a href="{% url 'verwaltung:wohnung_list' %}"{% if namespace == "verwaltung" and 'user_account' not in route %} aria-current="{% if route == 'wohnung_list' %}page{% else %}true{% endif %}"{% endif %}>Verwaltung</a></li>
             <li><a href="{% url 'wohnungsverwaltung:handover_protocol_list' %}"{% if 'handover_protocol' in route and route != "handover_protocol_mine" %} aria-current="{% if route == 'handover_protocol_list' %}page{% else %}true{% endif %}"{% endif %}>Übergaben</a></li>
@@ -19,6 +30,7 @@
         {% endif %}
         {% if perms.immobilien.manage_user_accounts %}
             <li><a href="{% url 'verwaltung:user_account_list' %}"{% if namespace == "verwaltung" and 'user_account' in route %} aria-current="{% if route == 'user_account_list' %}page{% else %}true{% endif %}"{% endif %}>Benutzer</a></li>
+        {% endif %}
         {% endif %}
     {% endif %}
 {% endwith %}

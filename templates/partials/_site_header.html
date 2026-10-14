@@ -5,7 +5,7 @@
             <span class="site-brand-subtitle">eGbR · Wohnungsvermietung in Würzburg</span>
         </a>
         <nav class="site-desktop-navigation" aria-label="Hauptnavigation">
-            <ul class="uk-navbar-nav">{% include "partials/_navigation_links.html" with company_links=True %}</ul>
+            <ul class="uk-navbar-nav">{% include "partials/_navigation_links.html" with navigation_mode="desktop" %}</ul>
         </nav>
         <div class="site-desktop-account">
             {% if user.is_authenticated %}
@@ -27,7 +27,7 @@
         <button class="uk-offcanvas-close" type="button" uk-close aria-label="Menü schließen"></button>
         <p class="site-mobile-menu-heading">STE Immobilien <span class="uk-text-small">eGbR</span></p>
         <nav aria-label="Mobile Hauptnavigation">
-            <ul class="uk-nav uk-nav-default">{% include "partials/_navigation_links.html" with company_links=True %}</ul>
+            <ul class="uk-nav uk-nav-default">{% include "partials/_navigation_links.html" with navigation_mode="mobile" %}</ul>
         </nav>
         <div class="site-mobile-account">{% include "partials/_account_actions.html" %}</div>
     </div>

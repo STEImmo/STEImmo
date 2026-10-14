@@ -90,7 +90,8 @@ Es ist ein Stadtmotiv, kein Foto des Mietgebäudes und keine Aussage über desse
 Unter dem Bild stehen Gebäudezeichnung und aktuelle Bestandszahlen, Unternehmen,
 Besichtigungsablauf, persönlicher Einstieg und Kontaktabschnitt. `unternehmen`,
 `ablauf`, `konto` und `kontakt` sind direkt verlinkbare, fokussierbare Abschnitte.
-Öffentlicher Header und mobiles Menü ergänzen „Über uns“ und „Kontakt“. Der Footer
+„Über uns“ und „Kontakt“ bleiben über den Footer und die Startseite erreichbar;
+Header und mobiles Menü konzentrieren sich auf die Wohnungssuche und die Rollenbereiche. Der Footer
 gliedert Wohnen/Verwaltung, Unternehmen, Konto und Rechtliches; dazu gehört der neue
 Bildnachweis. Interne Bereichslinks und Berechtigungen bleiben erhalten. Nach einem
 mobilen Ankersprung geht der Fokus an den Abschnitt; Escape führt zum Menüknopf zurück.
@@ -255,6 +256,7 @@ Eine Original-Logodatei ist noch nicht eingebunden; die Firmenwortmarke dient bi
 |---|---|
 | `_site_header.html` | Firmenwortmarke, Desktopnavigation, Konto und mobiles UIkit-Offcanvas |
 | `_navigation_links.html` | Gemeinsame Linkliste für Desktop, Mobil und Footer |
+| `_management_links.html` | Gemeinsame berechtigte Verwaltungsziele für Dropdown, mobiles Menü und Bereichsnavigation |
 | `_account_actions.html` | Anmelden, Registrieren oder CSRF-geschütztes Abmelden per POST |
 | `_site_footer.html` | Unternehmensbezeichnung, Kontaktlink, Navigation und rechtliche Informationen |
 
@@ -267,6 +269,20 @@ Aktuelle Seiten verwenden `aria-current="page"`,
 unterstrichen. Ein Sprunglink führt zum Hauptinhalt.
 
 Unterhalb von 1200 Pixeln ersetzt ein beschrifteter Menüschalter die Desktopnavigation.
+Auf dem Desktop stehen „Wohnungen finden“, „Gebäude entdecken“ und für berechtigte
+Nutzer das UIkit-Dropdown „Verwaltung“ nebeneinander. Das per Klick oder Tastatur
+geöffnete Menü zeigt Bewerbungen, Übergaben, Wohnungen, Stellplätze und Prüfvorlagen
+als schlichte Linkliste ohne Zwischenüberschriften;
+Benutzerkonten erscheinen nur mit dem vorhandenen Einzelrecht. Der aktive Bereich
+ist im Header markiert, das konkrete Ziel zusätzlich im Dropdown. Zwischen 1200
+und 1399 px entfällt der Wortmarken-Untertext. Persönliche Bereiche für Bewerber
+und Mieter bleiben direkt erreichbar. Mobil stehen die Verwaltungsziele unter
+einer eigenen Überschrift ohne zusätzliches Untermenü bereit.
+Die Bereichsnavigation auf den Verwaltungs- und Übergabeseiten verwendet dieselben
+Ziele in derselben Reihenfolge aus derselben Partial. Damit ist „Übergaben“ auch
+aus der Wohnungsverwaltung direkt erreichbar; auf der Übergabeübersicht ersetzt
+die vollständige Bereichsauswahl den bisherigen einzelnen Übergabe-Tab.
+Innerhalb eines Protokolls folgt zusätzlich die Navigation der Protokollschritte.
 Das UIkit-Offcanvas erhält beim Öffnen den Fokus auf den ersten Navigationslink;
 beim Schließen kehrt der Fokus zum Menüschalter zurück. Das kleine Vanilla-Script
 `static/js/site-navigation.js` hält den auf-/zugeklappten Zustand synchron.
@@ -277,6 +293,9 @@ verwendet die bestehende inverse Fokusfarbe.
 Die Footer-Spalten dürfen bei vielen Rollenlinks umbrechen.
 Auf Anmeldung und Registrierung übernehmen die Kontolinks auch im mobilen Menü
 das vorhandene `next`-Ziel, damit die ausgewählte Wohnung erhalten bleibt.
+Systemmeldungen behalten mit UIkit-Abständen 20 px Abstand zum folgenden Inhalt.
+Im seitenbreiten Anmelde- und Registrierungsrahmen sind sie ebenfalls seitenbreit;
+auf regulären Inhaltsseiten bleiben sie am gemeinsamen Container ausgerichtet.
 
 ## Erreichbarkeit nach Integration der Gebäudeansicht
 
@@ -292,7 +311,7 @@ in der isolierten Testdatenbank und prüft auch die HTTP-Antwort jeder Zielseite
 |---|---|---|
 | Gäste: Suche, Gebäude, Anmeldung, Registrierung | Gemeinsame Navigation bzw. Kontolinks | 1 |
 | Alle: Impressum, Datenschutz | Footer → Rechtliches | 1 |
-| Alle: Kontakt | Header/Footernavigation → Kontaktabschnitt der Startseite | 1 |
+| Alle: Kontakt | Footernavigation → Kontaktabschnitt der Startseite | 1 |
 | Alle: Anbieter-Kontaktangaben | Kontaktabschnitt → Impressum | 2 |
 | Alle: Bildnachweise | Footer → Bildnachweise | 1 |
 | Gäste: Etage | Gebäudeansicht → Stockwerk | 2 |
@@ -302,16 +321,24 @@ in der isolierten Testdatenbank und prüft auch die HTTP-Antwort jeder Zielseite
 | Bewerber: freigeschaltete Hauptbewerbung / Rücknahme | Meine Bewerbungen → Bewerbung vervollständigen → Zurückziehen | 2–3 |
 | Mieter: eigene Übergabeprotokolle | Meine Übergabeprotokolle | 1 |
 | Mitarbeiter: Wohnung, Räume, Fotos | Verwaltung → Wohnung bearbeiten → Raum oder Fotos | 2–3 |
-| Mitarbeiter: Stellplätze und Merkmale | Verwaltung → Liste → Anlegen oder Bearbeiten | 3 |
+| Mitarbeiter: Stellplätze und Prüfvorlagen | Verwaltung → Liste → Anlegen oder Bearbeiten | 3 |
 | Mitarbeiter: Übergabeprotokoll und Unterseiten | Übergaben → Protokoll → Bearbeiten, Raum, Schlüssel oder Unterschriften | 2–3 |
 | Mitarbeiter: Bewerbungsdetails | Bewerbungen → Wohnung → Bewerbung | 3 |
 | Kontoverwaltung: Benutzer anlegen / bearbeiten | Benutzer → Anlegen oder Bearbeiten | 2 |
 
 Auf dem Handy benötigt das Öffnen des Header-Menüs einen zusätzlichen Klick.
+Auf dem Desktop benötigt das Öffnen des Verwaltungs-Dropdowns ebenfalls einen
+zusätzlichen Klick; die tabellierten Linkwege zählen diesen Menüschalter nicht.
 Die Bereichslinks stehen deshalb auch direkt im Footer bereit; über diesen Weg
 bleibt die Grenze von drei Klicks erhalten. Scrollen und automatische Weiterleitungen
 zählen nicht als Klick. Eine erforderliche Anmeldung und fachliche Freigaben
 bleiben Teil des jeweiligen Ablaufs.
+
+Prüfung der Header-Vereinfachung: 25 Navigations- und Erreichbarkeitstests,
+Django-Check, Migrationsprüfung, beide Ruff-Prüfungen und Diff-Prüfung erfolgreich.
+Browserprüfung bei 1440, 1200, 390 und 320 px: Verwaltungsmenü per Enter öffnen,
+Tab-Fokus auf die Ziele, Escape zum Schließen, Bereichswechsel und aktive Markierung
+sowie mobiles Menü ohne horizontale Überbreite geprüft.
 
 Codebestätigung, Mitarbeiter-MFA und zustandsabhängige Bestätigungsseiten werden
 im passenden Ablauf erreicht. Downloads, technische Endpunkte und ausschließlich

@@ -2577,13 +2577,13 @@ def merkmal_list(request: HttpRequest) -> HttpResponse:
 
 @employee_required
 def merkmal_create(request: HttpRequest) -> HttpResponse:
-    return _merkmal_form(request, Merkmal(), "Merkmalvorlage anlegen")
+    return _merkmal_form(request, Merkmal(), "Prüfvorlage anlegen")
 
 
 @employee_required
 def merkmal_edit(request: HttpRequest, merkmal_id) -> HttpResponse:
     merkmal = get_object_or_404(Merkmal, pk=merkmal_id)
-    return _merkmal_form(request, merkmal, "Merkmalvorlage bearbeiten")
+    return _merkmal_form(request, merkmal, "Prüfvorlage bearbeiten")
 
 
 def _merkmal_form(request: HttpRequest, merkmal: Merkmal, title: str) -> HttpResponse:
@@ -2600,7 +2600,7 @@ def _merkmal_form(request: HttpRequest, merkmal: Merkmal, title: str) -> HttpRes
                 and option_form.cleaned_data["wert"].strip()
             ]
             saved_feature.save()
-            messages.success(request, "Die Merkmalvorlage wurde gespeichert.")
+            messages.success(request, "Die Prüfvorlage wurde gespeichert.")
             return redirect("verwaltung:merkmal_edit", merkmal_id=saved_feature.pk)
     else:
         form = MerkmalForm(instance=merkmal)

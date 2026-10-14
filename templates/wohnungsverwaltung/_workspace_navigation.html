@@ -1,17 +1,13 @@
-{% with route=request.resolver_match.url_name %}
-<nav class="workspace-navigation" aria-label="{% if area == 'handover' %}Übergabebereich{% else %}Verwaltungsbereiche{% endif %}">
-    {% if area == 'management' %}
-        {% if perms.immobilien.access_employee_area %}
-            <a href="{% url 'wohnungsverwaltung:employee_application_list' %}" {% if 'employee_application' in route %}aria-current="true"{% endif %}>Bewerbungen</a>
-            <a href="{% url 'verwaltung:wohnung_list' %}" {% if 'wohnung' in route or 'raum' in route or route == 'apartment_photos' %}aria-current="true"{% endif %}>Wohnungen</a>
-            <a href="{% url 'verwaltung:stellplatz_list' %}" {% if 'stellplatz' in route %}aria-current="true"{% endif %}>Stellplätze</a>
-            <a href="{% url 'verwaltung:merkmal_list' %}" {% if 'merkmal' in route %}aria-current="true"{% endif %}>Merkmale</a>
-        {% endif %}
-        {% if perms.immobilien.manage_user_accounts %}<a href="{% url 'verwaltung:user_account_list' %}" {% if 'user_account' in route %}aria-current="true"{% endif %}>Benutzerkonten</a>{% endif %}
-    {% elif area == 'handover' %}
-        {% if perms.immobilien.access_employee_area %}
-            <a href="{% url 'wohnungsverwaltung:handover_protocol_list' %}" {% if route == 'handover_protocol_list' %}aria-current="page"{% endif %}>Übergaben</a>
+{% with route=request.resolver_match.url_name namespace=request.resolver_match.namespace %}
+{% if perms.immobilien.access_employee_area or perms.immobilien.manage_user_accounts %}
+<nav class="workspace-navigation" aria-label="Verwaltungsbereiche">
+    <ul class="uk-subnav uk-margin-remove workspace-navigation-list">{% include "partials/_management_links.html" %}</ul>
+</nav>
+{% endif %}
+{% if area == 'handover' %}
+    {% if perms.immobilien.access_employee_area %}
             {% if protocol %}
+            <nav class="workspace-navigation" aria-label="Übergabebereich">
                 <a href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}" {% if route == 'handover_protocol_detail' %}aria-current="page"{% endif %}>Protokoll</a>
                 {% if protocol.status == 'open' %}
                     <a href="{% url 'wohnungsverwaltung:handover_protocol_edit' protocol.pk %}" {% if route == 'handover_protocol_edit' %}aria-current="page"{% endif %}>Zuordnung &amp; Zähler</a>
@@ -19,8 +15,10 @@
                     <a href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}#protocol-keys" {% if 'handover_protocol_key' in route %}aria-current="true"{% endif %}>Schlüssel</a>
                     <a href="{% url 'wohnungsverwaltung:handover_protocol_finalize' protocol.pk %}" {% if route == 'handover_protocol_finalize' %}aria-current="page"{% endif %}>Abschluss</a>
                 {% endif %}
+            </nav>
             {% endif %}
-        {% elif perms.immobilien.access_tenant_area %}<a href="{% url 'wohnungsverwaltung:handover_protocol_mine' %}" aria-current="true">Meine Übergaben</a>{% endif %}
+        {% elif perms.immobilien.access_tenant_area %}
+        <nav class="workspace-navigation" aria-label="Übergabebereich"><a href="{% url 'wohnungsverwaltung:handover_protocol_mine' %}" aria-current="true">Meine Übergaben</a></nav>
     {% endif %}
-</nav>
+{% endif %}
 {% endwith %}
