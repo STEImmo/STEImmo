@@ -247,6 +247,29 @@ class ViewingTests(TestCase):
                 self.assertFalse(ViewingAppointment.objects.exists())
                 self.assertFalse(ViewingAppointmentEvent.objects.exists())
 
+    def test_scheduling_rejects_start_that_passes_while_waiting_for_locks(self):
+        from .views import _lock_viewing_application
+
+        now = timezone.localtime(timezone.now()).replace(hour=10, minute=0, second=0, microsecond=0)
+        data = self.payload(date=now.date().isoformat(), start_time="10:01", end_time="10:31")
+        with patch("django.utils.timezone.now", return_value=now) as clock:
+
+            def delayed_lock(application_id):
+                application = _lock_viewing_application(application_id)
+                clock.return_value = now + timedelta(minutes=2)
+                return application
+
+            with patch(
+                "wohnungsverwaltung.views._lock_viewing_application", side_effect=delayed_lock
+            ):
+                response = self.post(self.create_url, data)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "muss in der Zukunft liegen", status_code=400)
+        self.assertFalse(ViewingAppointment.objects.exists())
+        self.assertFalse(ViewingAppointmentEvent.objects.exists())
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_employee_forms_offer_live_validation_for_create_and_reschedule(self):
         response = self.client.get(self.detail_url)
         self.assertContains(response, "data-viewing-time-form", count=1)

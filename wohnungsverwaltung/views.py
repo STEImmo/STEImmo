@@ -1113,14 +1113,14 @@ def _lock_viewing_application(application_id):
 def employee_viewing_create(request, application_id):
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    get_object_or_404(Bewerbung, pk=application_id)
     form = ViewingAppointmentForm(request.POST, auto_id="id_viewing_create_%s")
-    if not form.is_valid():
-        return _employee_application_detail_response(
-            request, application_id, viewing_form=form, status=400
-        )
     with transaction.atomic():
         application = _lock_viewing_application(application_id)
+        # Acquiring the locks may take long enough for a future start to pass.
+        if not form.is_valid():
+            return _employee_application_detail_response(
+                request, application_id, viewing_form=form, status=400
+            )
         error = viewing_eligibility_error(application)
         if application.viewings.filter(status__in=("planned", "confirmed")).exists():
             error = "Für diese Bewerbung besteht bereits ein offener Termin."
