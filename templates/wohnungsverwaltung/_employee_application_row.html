@@ -1,0 +1,50 @@
+{% load tz %}
+<tr role="row">
+    <th scope="row" role="rowheader">
+        <strong>{{ application.person }}</strong>
+        <div class="uk-text-small uk-margin-small-top">
+            Personenanzahl: {{ application.personenanzahl }}<br>
+            Haustiere: {{ application.haustiere|yesno:"Ja,Nein" }}
+        </div>
+        <a class="uk-button uk-button-default uk-button-small uk-margin-small-top"
+           href="{% url 'wohnungsverwaltung:employee_application_detail' application.pk %}"
+           aria-label="Bewerbung von {{ application.person }} ansehen">Ansehen</a>
+    </th>
+    <td role="cell">
+        <span class="application-cell-label uk-text-meta">Bearbeitung</span>
+        <div class="application-review-summary{% if application.interest_withdrawn_at %} application-review-summary-neutral{% elif application.status == 'declined' %} application-review-summary-danger{% elif application.status == 'blocked' %} application-review-summary-warning{% elif application.submitted_at or application.main_application_unlocked %} application-review-summary-success{% endif %}">
+            <div>{{ application.get_applicant_status_display }}</div>
+        </div>
+        <div class="uk-text-small uk-margin-small-top">Priorität: {{ application.get_review_priority_display }}</div>
+        {% if segment == 'review' %}
+            <div class="uk-text-small uk-margin-small-top">
+                <strong>Prüfgrund:</strong>
+                {% for flag in application.suitability_review_flags %}{{ flag }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                {% if application.has_current_suitability_approval %}<br><strong class="uk-text-success">Einzelfall freigegeben</strong>{% endif %}
+            </div>
+        {% endif %}
+    </td>
+    <td role="cell">
+        <span class="application-cell-label uk-text-meta">Main-Status</span>
+        {% if application.submitted_at %}Eingereicht
+        {% elif application.main_application_unlocked and application.latest_invitation_status == "invitation_failed" %}Einladung fehlgeschlagen
+        {% elif application.main_application_unlocked and application.latest_invitation_status == "invitation_sent" %}Einladung versendet
+        {% elif application.main_application_unlocked %}Freigeschaltet
+        {% else %}Noch nicht freigeschaltet{% endif %}
+    </td>
+    <td role="cell">
+        <span class="application-cell-label uk-text-meta">Besichtigung</span>
+        {% if application.latest_viewing_start %}
+            {% timezone "Europe/Berlin" %}
+                <div>{{ application.latest_viewing_start|date:"d.m.Y" }}</div>
+                <div>{{ application.latest_viewing_start|date:"H:i" }}–{{ application.latest_viewing_end|date:"H:i" }} Uhr</div>
+            {% endtimezone %}
+        {% endif %}
+        {{ application.get_latest_viewing_status_display }}
+    </td>
+    <td role="cell">
+        <span class="application-cell-label uk-text-meta">Pre-Eingang</span>
+        <div>{{ application.created_at|date:"d.m.Y" }}</div>
+        <div>{{ application.created_at|date:"H:i" }} Uhr</div>
+    </td>
+</tr>

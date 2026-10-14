@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load tz %}
 
 {% block title %}Bewerbungen – STEImmo{% endblock %}
 
@@ -40,8 +39,10 @@
                         <div>{% include "wohnungsverwaltung/_form_field.html" with field=field %}</div>
                     {% endfor %}
                 </div>
-                <button class="uk-button uk-button-primary" type="submit">Filtern</button>
-                <a class="uk-button uk-button-text" href="?wohnung={{ unit.pk }}&amp;segment={{ segment }}">Filter zurücksetzen</a>
+                <div class="application-filter-actions uk-flex uk-flex-wrap uk-flex-middle uk-margin-top">
+                    <button class="uk-button uk-button-primary" type="submit">Filtern</button>
+                    <a class="uk-button uk-button-text" href="?wohnung={{ unit.pk }}&amp;segment={{ segment }}">Filter zurücksetzen</a>
+                </div>
             </form>
 
             <p class="uk-text-meta">
@@ -49,63 +50,23 @@
                 · {% if filters.cleaned_data.sort == 'priority' %}Priorität zuerst{% else %}Neueste Pre-Bewerbungen zuerst{% endif %}
             </p>
             {% if applications %}
-                <div class="uk-overflow-auto" tabindex="0" role="region" aria-label="Bewerbungstabelle">
-                    <table class="uk-table uk-table-divider uk-table-middle">
-                        <caption class="uk-text-left">Bewerbungen für {{ unit }}</caption>
-                        <thead>
-                            <tr>
-                                <th scope="col">Name</th>
-                                <th scope="col">Personen</th>
-                                <th scope="col">Haustiere</th>
-                                <th scope="col">Bearbeitungsstatus</th>
-                                <th scope="col">Main-Status</th>
-                                <th scope="col">Priorität</th>
-                                <th scope="col">Besichtigung</th>
-                                {% if segment == 'review' %}<th scope="col">Prüfgrund</th>{% endif %}
-                                <th scope="col">Pre-Eingang</th>
-                                <th scope="col">Details</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for application in applications %}
-                                <tr>
-                                    <th scope="row">{{ application.person }}</th>
-                                    <td>{{ application.personenanzahl }}</td>
-                                    <td>{{ application.haustiere|yesno:"Ja,Nein" }}</td>
-                                    <td><span class="uk-label">{{ application.get_applicant_status_display }}</span></td>
-                                    <td>
-                                        {% if application.submitted_at %}Eingereicht
-                                        {% elif application.main_application_unlocked and application.latest_invitation_status == "invitation_failed" %}Einladung fehlgeschlagen
-                                        {% elif application.main_application_unlocked and application.latest_invitation_status == "invitation_sent" %}Einladung versendet
-                                        {% elif application.main_application_unlocked %}Freigeschaltet
-                                        {% else %}Noch nicht freigeschaltet{% endif %}
-                                    </td>
-                                    <td>{{ application.get_review_priority_display }}</td>
-                                    <td>
-                                        {% if application.latest_viewing_start %}
-                                            {% timezone "Europe/Berlin" %}
-                                            <span class="uk-text-nowrap">{{ application.latest_viewing_start|date:"d.m.Y, H:i" }}–{{ application.latest_viewing_end|date:"H:i" }} Uhr</span><br>
-                                            {% endtimezone %}
-                                        {% endif %}
-                                        {{ application.get_latest_viewing_status_display }}
-                                    </td>
-                                    {% if segment == 'review' %}
-                                        <td>
-                                            {% for flag in application.suitability_review_flags %}{{ flag }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
-                                            {% if application.has_current_suitability_approval %}<span class="uk-label uk-label-success">Einzelfall freigegeben</span>{% endif %}
-                                        </td>
-                                    {% endif %}
-                                    <td class="uk-text-nowrap">{{ application.created_at|date:"d.m.Y, H:i" }} Uhr</td>
-                                    <td>
-                                        <a class="uk-button uk-button-default uk-button-small uk-text-nowrap"
-                                           href="{% url 'wohnungsverwaltung:employee_application_detail' application.pk %}"
-                                           aria-label="Bewerbung von {{ application.person }} ansehen">Ansehen</a>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                <table class="application-table uk-table uk-table-divider" role="table">
+                    <caption class="uk-text-left">Bewerbungen für {{ unit }}</caption>
+                    <thead role="rowgroup">
+                        <tr role="row">
+                            <th scope="col" role="columnheader">Bewerber</th>
+                            <th scope="col" role="columnheader">Bearbeitung</th>
+                            <th scope="col" role="columnheader">Main-Status</th>
+                            <th scope="col" role="columnheader">Besichtigung</th>
+                            <th scope="col" role="columnheader">Pre-Eingang</th>
+                        </tr>
+                    </thead>
+                    <tbody role="rowgroup">
+                        {% for application in applications %}
+                            {% include "wohnungsverwaltung/_employee_application_row.html" %}
+                        {% endfor %}
+                    </tbody>
+                </table>
                 {% if page_obj.has_other_pages %}
                     <nav aria-label="Seiten der Bewerbungen">
                         <ul class="uk-pagination uk-flex-center uk-flex-middle">

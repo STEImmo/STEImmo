@@ -193,8 +193,11 @@ Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfigu
 Die Mitarbeiternavigation blendet **Wohnungen finden** und **Bewerbungsvorschau** aus.
 
 Unter **Bewerbungen** sehen berechtigte Mitarbeiter alle Wohnungen mit der Anzahl
-zugeordneter Bewerbungen. Nach Auswahl einer Wohnung erscheint eine Tabelle mit
-Name, Personenanzahl, Haustieren, Bearbeitungsstatus und Pre-Eingangsdatum.
+zugeordneter Bewerbungen. Nach Auswahl einer Wohnung erscheint auf breiten
+Bildschirmen eine kompakte Tabelle. Unter 1200 Pixeln werden dieselben Angaben als
+beschriftete Bewerbungskarten angezeigt, ohne seitliches Scrollen. Name,
+Personenanzahl, Haustiere, Bearbeitungsstatus, Priorität, Main-Status,
+Besichtigung und Pre-Eingangsdatum bleiben in beiden Darstellungen sichtbar.
 Auch abgelehnte, gesperrte und zurückgezogene Bewerbungen bleiben sichtbar.
 Die neuesten Pre-Bewerbungen stehen zuerst; pro Seite werden 20 Bewerbungen angezeigt.
 
