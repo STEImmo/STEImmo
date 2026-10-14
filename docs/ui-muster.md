@@ -534,3 +534,31 @@ abgedeckt; kein vollständiger Geräte- oder Screenreader-Audit.
 Die vollständige Gebäudeansicht schneidet den ungenutzten SVG-Bereich oberhalb
 des Dachs ab (viewBox: 0 110 1100 680). Zeichnung, Etagenlinks und der gesonderte
 Ausschnitt der Startseitenvorschau bleiben erhalten.
+
+## Integration mit main – 14. Oktober 2026
+
+Die 17 Konfliktdateien des bereits gestarteten Merges mit `origin/main` (a4572bf)
+sind lokal kombiniert. Das UI-Layout und die mobilen Tabellen bleiben erhalten;
+Bewerberfilter, Prioritäten, Einladungen, interne Prüfungen und die neuen
+Wohnungsanforderungen aus main werden vollständig angezeigt. Automatische
+Ablehnungen bleiben für Bewerber verständlich sichtbar. Die gemeinsamen
+Formularhilfen aus main ergänzen die vorhandenen Labels und Pflichtkennzeichnungen.
+
+Beim Nachladen der Übergabeangaben bleiben die zeitbezogene Auswahl historischer
+Vergleiche, der Schutz vor veralteten Antworten und die Erhaltung bereits
+bearbeiteter Felder aus main erhalten. Lade-, Fehler- und Erfolgsmeldungen sowie
+`aria-busy` aus dem UI-Branch sind damit verbunden; nur die aktuelle Anfrage
+aktualisiert die Rückmeldung und beendet den Ladezustand.
+
+Der abgeschnittene Leerraum oberhalb des Gebäudedachs bleibt erhalten. Die drei
+vorhandenen reversiblen Migrationen 0024, 0025 und 0027 aus main sind auf der lokalen
+Entwicklungsdatenbank angewendet; es wurden keine Migrationen neu erstellt oder
+bestehende Migrationen umgeschrieben. Der Merge wird erst mit einem späteren,
+vom Nutzer ausgeführten Commit abgeschlossen. GitHub und remote Branches werden
+für diese lokale Konfliktlösung nicht verändert.
+Prüfung des kombinierten Stands: vollständige Suite mit 653 Tests erfolgreich;
+61 Bewerbungs-/Navigationsprüfungen nach der letzten Tabellenkorrektur zusätzlich
+erfolgreich. Django-Check, Migrationsprüfung, Ruff-Lint, Ruff-Formatprüfung und
+Diff-Prüfung erfolgreich. Browser-Smoke: Bewerbungsübersicht, mobile Filter und
+Bewerbungsdetails sowie Übergabeformular ohne JavaScript-Syntaxfehler. Seltene
+Datenzustände und Anmeldeseiten sind zusätzlich durch die Django-Tests abgedeckt.

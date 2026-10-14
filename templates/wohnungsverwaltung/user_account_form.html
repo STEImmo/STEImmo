@@ -21,7 +21,7 @@
                     <div class="uk-margin">
                         <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                         <div class="uk-form-controls">{{ field }}</div>
-                        {% if field.errors %}<div id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
+                        {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
                     </div>
                 {% endif %}
             {% endfor %}
@@ -31,13 +31,13 @@
             {% for field in form %}
                 {% if field.name == "roles" or field.name == "direct_permissions" %}
                     <div class="uk-margin">
-                        <fieldset class="uk-fieldset"><legend class="uk-form-label">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</legend>
+                        <fieldset class="uk-fieldset"{% if field.aria_describedby %} aria-describedby="{{ field.aria_describedby }}"{% endif %}><legend class="uk-form-label">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</legend>
                         <div class="uk-form-controls uk-margin-small-top">
                             {% for choice in field %}
                                 <label class="uk-display-block uk-margin-small-bottom">{{ choice.tag }} {{ choice.choice_label }}</label>
                             {% endfor %}
                         </div>
-                        {% if field.errors %}<div id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
+                        {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
                         </fieldset>
                     </div>
                 {% endif %}
@@ -46,13 +46,12 @@
             <h2 class="uk-heading-divider uk-margin-large-top">Kontostatus</h2>
             <div class="uk-margin">
                 <label>{{ form.is_active }} {{ form.is_active.label }}{% if form.is_active.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
-                {% if form.is_active.errors %}<div id="{{ form.is_active.auto_id }}_error" role="alert">{% for error in form.is_active.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
+                {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.is_active only %}
             </div>
             {% if form.revoke_registration %}
                 <div class="uk-margin">
                     <label>{{ form.revoke_registration }} {{ form.revoke_registration.label }}{% if form.revoke_registration.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
-                    <p class="uk-text-meta" id="{{ form.revoke_registration.auto_id }}_helptext">{{ form.revoke_registration.help_text }}</p>
-                    {% if form.revoke_registration.errors %}<div id="{{ form.revoke_registration.auto_id }}_error" role="alert">{% for error in form.revoke_registration.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
+                    {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.revoke_registration only %}
                 </div>
             {% endif %}
             <p class="uk-text-meta">{% if account %}Leer lassen, um das bestehende Passwort beizubehalten.{% else %}Für neue Konten ist ein Passwort erforderlich.{% endif %}</p>
@@ -62,7 +61,7 @@
                     <div class="uk-margin">
                         <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                         <div class="uk-form-controls">{{ field }}</div>
-                        {% if field.errors %}<div id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
+                        {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
                     </div>
                 {% endif %}
             {% endfor %}

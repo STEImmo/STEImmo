@@ -8,10 +8,23 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import Count
+from django.db.models import (
+    BooleanField,
+    Case,
+    Count,
+    Exists,
+    OuterRef,
+    Prefetch,
+    Q,
+    Subquery,
+    Value,
+    When,
+)
 from django.db.models.deletion import ProtectedError
+from django.db.models.functions import Concat
 from django.http import (
     FileResponse,
     Http404,
@@ -48,13 +61,17 @@ from .forms import (
     METER_READING_FIELDS,
     ApartmentPhotoForm,
     ApartmentSearchForm,
+    ApplicationPriorityForm,
     ApplicationProofStorageError,
     BewerbungForm,
+    EligibilityApprovalForm,
+    EmployeeApplicationFilterForm,
     HandoverKeyForm,
     HandoverKeyFormSet,
     HandoverProtocolForm,
     InlineRoomChecklistFormSet,
     MainApplicationForm,
+    MainApplicationInvitationForm,
     MerkmalForm,
     MerkmalOptionFormSet,
     RaumForm,
@@ -85,6 +102,7 @@ from .models import (
     ApplicationProof,
     ApplicationProofCategory,
     ApplicationProofCleanup,
+    ApplicationReviewEvent,
     Bewerbung,
     BewerbungStatus,
     Merkmal,
@@ -412,7 +430,23 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
                     form.add_error("wohnung", "Die Wohnung ist nicht mehr verfügbar.")
                 else:
                     form.instance.wohnung = selected_unit
-                    form.save()
+                    exceeds_occupancy_limit = (
+                        selected_unit.max_occupants is not None
+                        and form.instance.personenanzahl > selected_unit.max_occupants
+                    )
+                    if exceeds_occupancy_limit:
+                        form.instance.status = BewerbungStatus.DECLINED
+                    application = form.save()
+                    if exceeds_occupancy_limit:
+                        ApplicationReviewEvent.objects.create(
+                            application=application,
+                            kind=ApplicationReviewEvent.Kind.OCCUPANCY_DECLINED,
+                            to_value=BewerbungStatus.DECLINED,
+                            reason=selected_unit.occupancy_decline_reason(
+                                application.personenanzahl
+                            ),
+                            requirements_version=selected_unit.requirements_version,
+                        )
                     application_created = True
         except IntegrityError:
             form.add_error(
@@ -420,12 +454,20 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
                 "Sie haben bereits eine offene Bewerbung. Bitte warten Sie deren Abschluss ab.",
             )
         if application_created:
-            messages.success(
-                request,
-                "Ihre Besichtigungsanfrage wurde gespeichert. Ein Termin wird separat bestätigt."
-                if unit is not None
-                else "Ihre Bewerbung wurde erfolgreich gespeichert.",
-            )
+            if exceeds_occupancy_limit:
+                messages.warning(
+                    request,
+                    "Ihre Bewerbung wurde gespeichert und wegen der überschrittenen "
+                    "Personenhöchstzahl abgelehnt.",
+                )
+            else:
+                success_message = (
+                    "Ihre Besichtigungsanfrage wurde gespeichert. "
+                    "Ein Termin wird separat bestätigt."
+                    if unit is not None
+                    else "Ihre Bewerbung wurde erfolgreich gespeichert."
+                )
+                messages.success(request, success_message)
             return redirect("wohnungsverwaltung:pre_application_list")
 
     return render(
@@ -444,7 +486,18 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
 def pre_application_list(request: HttpRequest) -> HttpResponse:
     applicant = _applicant_for_user(request)
     applications = (
-        Bewerbung.objects.filter(person=applicant).select_related("wohnung").order_by("-created_at")
+        Bewerbung.objects.filter(person=applicant)
+        .select_related("wohnung")
+        .prefetch_related(
+            Prefetch(
+                "review_events",
+                queryset=ApplicationReviewEvent.objects.filter(
+                    kind=ApplicationReviewEvent.Kind.OCCUPANCY_DECLINED
+                ).only("application_id", "reason", "created_at"),
+                to_attr="occupancy_decline_events",
+            )
+        )
+        .order_by("-created_at")
     )
     return render(
         request,
@@ -793,13 +846,119 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
         if unit_id is None:
             raise Http404("Diese Wohnung existiert nicht.")
         unit = get_object_or_404(Wohnung, pk=unit_id)
+        filters = EmployeeApplicationFilterForm(request.GET)
+        filters.is_valid()
+        cleaned_filters = filters.cleaned_data
+        pet_review_mismatch = Q(haustiere=True) if unit.pet_review_required is True else Q()
+        pet_review_expression = (
+            Case(
+                When(pet_review_mismatch, then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+            if pet_review_mismatch
+            else Value(False, output_field=BooleanField())
+        )
+        occupancy_mismatch_expression = (
+            Case(
+                When(personenanzahl__gt=unit.max_occupants, then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+            if unit.max_occupants is not None
+            else Value(False, output_field=BooleanField())
+        )
+        latest_invitation_status = (
+            ApplicationReviewEvent.objects.filter(
+                application_id=OuterRef("pk"),
+                kind__in=(
+                    ApplicationReviewEvent.Kind.INVITATION_SENT,
+                    ApplicationReviewEvent.Kind.INVITATION_FAILED,
+                ),
+            )
+            .order_by("-created_at", "-review_event_id")
+            .values("kind")[:1]
+        )
         applications = (
             Bewerbung.objects.filter(wohnung=unit)
             .select_related("person", "wohnung")
-            .order_by("-created_at", "pk")
+            .annotate(
+                requires_pet_review=pet_review_expression,
+                occupancy_mismatch=occupancy_mismatch_expression,
+                latest_invitation_status=Subquery(latest_invitation_status),
+                has_current_suitability_approval=Exists(
+                    ApplicationReviewEvent.objects.filter(
+                        application_id=OuterRef("pk"),
+                        kind=ApplicationReviewEvent.Kind.ELIGIBILITY_APPROVED,
+                        requirements_version=unit.requirements_version,
+                    )
+                ),
+            )
         )
+        if cleaned_filters.get("q"):
+            query = cleaned_filters["q"]
+            applications = applications.alias(
+                applicant_name=Concat("person__vorname", Value(" "), "person__nachname")
+            ).filter(Q(applicant_name__icontains=query) | Q(person__email__icontains=query))
+        if cleaned_filters.get("people"):
+            applications = applications.filter(personenanzahl=cleaned_filters["people"])
+        if cleaned_filters.get("status") == "withdrawn":
+            applications = applications.filter(interest_withdrawn_at__isnull=False)
+        elif cleaned_filters.get("status"):
+            applications = applications.filter(status=cleaned_filters["status"])
+            if cleaned_filters["status"] == BewerbungStatus.OPEN:
+                applications = applications.filter(interest_withdrawn_at__isnull=True)
+        if cleaned_filters.get("main_status") == "pending":
+            applications = applications.filter(
+                main_application_unlocked=False, submitted_at__isnull=True
+            )
+        elif cleaned_filters.get("main_status") == "unlocked":
+            applications = applications.filter(
+                main_application_unlocked=True, submitted_at__isnull=True
+            )
+        elif cleaned_filters.get("main_status") == "submitted":
+            applications = applications.filter(submitted_at__isnull=False)
+        if cleaned_filters.get("priority"):
+            applications = applications.filter(review_priority=cleaned_filters["priority"])
+        if cleaned_filters.get("created_from"):
+            applications = applications.filter(
+                created_at__date__gte=cleaned_filters["created_from"]
+            )
+        if cleaned_filters.get("created_to"):
+            applications = applications.filter(created_at__date__lte=cleaned_filters["created_to"])
+
+        segment = request.GET.get("segment", "matching")
+        if segment not in {"matching", "review", "all"}:
+            segment = "matching"
+        if segment == "matching":
+            applications = applications.filter(
+                status=BewerbungStatus.OPEN,
+                interest_withdrawn_at__isnull=True,
+                occupancy_mismatch=False,
+            ).filter(Q(requires_pet_review=False) | Q(has_current_suitability_approval=True))
+        elif segment == "review":
+            applications = applications.filter(
+                status=BewerbungStatus.OPEN,
+                interest_withdrawn_at__isnull=True,
+                occupancy_mismatch=False,
+                requires_pet_review=True,
+                has_current_suitability_approval=False,
+            )
+        if cleaned_filters.get("sort") == "priority":
+            applications = applications.order_by("-review_priority", "-created_at", "pk")
+        else:
+            applications = applications.order_by("-created_at", "pk")
+
         page = Paginator(applications, 20).get_page(request.GET.get("page"))
-        context.update(unit=unit, applications=page, page_obj=page)
+        context.update(
+            unit=unit,
+            applications=page,
+            page_obj=page,
+            filters=filters,
+            segment=segment,
+            requirements_open=(unit.max_occupants is None or unit.pet_review_required is None),
+            unit_application_count=Bewerbung.objects.filter(wohnung=unit).count(),
+        )
     else:
         context["units"] = Wohnung.objects.annotate(
             application_count=Count("bewerbungen")
@@ -828,6 +987,25 @@ def employee_application_detail(request: HttpRequest, application_id: UUID) -> H
         "wohnungsverwaltung/employee_application_detail.html",
         {
             "application": application,
+            "suitability_flags": application.suitability_review_flags,
+            "can_approve_suitability": (
+                application.status == BewerbungStatus.OPEN
+                and application.interest_withdrawn_at is None
+            ),
+            "has_current_suitability_approval": application.review_events.filter(
+                kind=ApplicationReviewEvent.Kind.ELIGIBILITY_APPROVED,
+                requirements_version=application.wohnung.requirements_version,
+            ).exists(),
+            "review_events": list(application.review_events.select_related("actor")),
+            "priority_form": ApplicationPriorityForm(
+                initial={"priority": application.review_priority}, auto_id="id_priority_%s"
+            ),
+            "eligibility_form": EligibilityApprovalForm(auto_id="id_eligibility_%s"),
+            "invitation_form": MainApplicationInvitationForm(auto_id="id_invitation_%s"),
+            "invitation_url": reverse(
+                "wohnungsverwaltung:employee_application_invitation_resend",
+                args=[application.pk],
+            ),
             "proof_groups": (
                 _application_proof_groups(application, employee=True)
                 if application.submitted_at is not None
@@ -835,6 +1013,219 @@ def employee_application_detail(request: HttpRequest, application_id: UUID) -> H
             ),
         },
     )
+
+
+@employee_required
+def employee_application_priority_update(
+    request: HttpRequest,
+    application_id: UUID,
+) -> HttpResponse:
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    application = get_object_or_404(Bewerbung, pk=application_id)
+    form = ApplicationPriorityForm(request.POST)
+    if form.is_valid():
+        new_priority = int(form.cleaned_data["priority"])
+        with transaction.atomic():
+            application = Bewerbung.objects.select_for_update().get(pk=application.pk)
+            old_priority = application.review_priority
+            if new_priority != old_priority or form.cleaned_data["reason"]:
+                application.review_priority = new_priority
+                application.review_priority_reason = form.cleaned_data["reason"]
+                application.save(
+                    update_fields=("review_priority", "review_priority_reason", "updated_at")
+                )
+                ApplicationReviewEvent.objects.create(
+                    application=application,
+                    actor=request.user,
+                    kind=ApplicationReviewEvent.Kind.PRIORITY_CHANGED,
+                    from_value=str(old_priority),
+                    to_value=str(new_priority),
+                    reason=form.cleaned_data["reason"],
+                )
+        messages.success(request, "Die Priorität der Bewerbung wurde gespeichert.")
+    else:
+        messages.error(request, "Bitte geben Sie eine Priorität und eine Begründung an.")
+    return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
+
+
+@employee_required
+def employee_application_suitability_approve(
+    request: HttpRequest,
+    application_id: UUID,
+) -> HttpResponse:
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    application = get_object_or_404(Bewerbung.objects.select_related("wohnung"), pk=application_id)
+    form = EligibilityApprovalForm(request.POST)
+    if form.is_valid():
+        with transaction.atomic():
+            unit = Wohnung.objects.select_for_update().get(pk=application.wohnung_id)
+            application = (
+                Bewerbung.objects.select_for_update()
+                .select_related("wohnung")
+                .get(pk=application.pk)
+            )
+            application.wohnung = unit
+            if (
+                application.status != BewerbungStatus.OPEN
+                or application.interest_withdrawn_at is not None
+            ):
+                messages.info(
+                    request,
+                    "Für eine nicht mehr aktive Bewerbung ist keine Einzelfallfreigabe möglich.",
+                )
+            elif not application.suitability_review_flags:
+                messages.info(request, "Für diese Bewerbung ist keine Einzelfallfreigabe nötig.")
+            elif ApplicationReviewEvent.objects.filter(
+                application=application,
+                kind=ApplicationReviewEvent.Kind.ELIGIBILITY_APPROVED,
+                requirements_version=application.wohnung.requirements_version,
+            ).exists():
+                messages.info(request, "Diese Bewerbung ist bereits freigegeben.")
+            else:
+                ApplicationReviewEvent.objects.create(
+                    application=application,
+                    actor=request.user,
+                    kind=ApplicationReviewEvent.Kind.ELIGIBILITY_APPROVED,
+                    to_value="approved",
+                    reason=form.cleaned_data["reason"],
+                    requirements_version=application.wohnung.requirements_version,
+                )
+                messages.success(request, "Die Einzelfallfreigabe wurde dokumentiert.")
+    else:
+        messages.error(request, "Bitte begründen Sie die Einzelfallfreigabe.")
+    return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
+
+
+def _send_application_invitation(application: Bewerbung, actor, base_url: str) -> bool:
+    recipient = application.person.email
+    detail_url = reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
+    subject = "Ihre Main-Bewerbung bei STEImmo"
+    body = (
+        f"Guten Tag {application.person.vorname} {application.person.nachname},\n\n"
+        f"Sie können nun Ihre Bewerbung für {application.wohnung} im geschützten Bereich "
+        "vervollständigen.\n\n"
+        f"Zur Main-Bewerbung: {base_url}{detail_url}\n"
+    )
+    try:
+        sent = send_mail(subject, body, None, [recipient], fail_silently=False)
+    except Exception:
+        sent = 0
+    kind = (
+        ApplicationReviewEvent.Kind.INVITATION_SENT
+        if sent
+        else ApplicationReviewEvent.Kind.INVITATION_FAILED
+    )
+    ApplicationReviewEvent.objects.create(
+        application=application,
+        actor=actor,
+        kind=kind,
+        to_value="sent" if sent else "failed",
+    )
+    return bool(sent)
+
+
+@employee_required
+def employee_application_invite(request: HttpRequest, application_id: UUID) -> HttpResponse:
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    application = get_object_or_404(
+        Bewerbung.objects.select_related("person", "wohnung"), pk=application_id
+    )
+    form = MainApplicationInvitationForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Bitte bestätigen und begründen Sie die positive Entscheidung.")
+        return redirect(
+            "wohnungsverwaltung:employee_application_detail", application_id=application_id
+        )
+
+    invite = False
+    with transaction.atomic():
+        unit = Wohnung.objects.select_for_update().get(pk=application.wohnung_id)
+        application = (
+            Bewerbung.objects.select_for_update()
+            .select_related("person", "wohnung")
+            .get(pk=application.pk)
+        )
+        application.wohnung = unit
+        current_approval = ApplicationReviewEvent.objects.filter(
+            application=application,
+            kind=ApplicationReviewEvent.Kind.ELIGIBILITY_APPROVED,
+            requirements_version=application.wohnung.requirements_version,
+        ).exists()
+        if application.status != BewerbungStatus.OPEN or application.interest_withdrawn_at:
+            messages.error(
+                request, "Diese Bewerbung ist nicht mehr aktiv und kann nicht eingeladen werden."
+            )
+        elif application.submitted_at is not None:
+            messages.info(request, "Die Main-Bewerbung wurde bereits eingereicht.")
+        elif application.suitability_review_flags and not current_approval:
+            messages.error(request, "Bitte prüfen Sie zuerst die Abweichungen zur Wohnung.")
+        elif application.main_application_unlocked:
+            messages.info(
+                request,
+                "Die Main-Bewerbung ist bereits freigeschaltet. "
+                "Sie können die E-Mail erneut senden.",
+            )
+        else:
+            application.main_application_unlocked = True
+            application.save(update_fields=("main_application_unlocked", "updated_at"))
+            ApplicationReviewEvent.objects.create(
+                application=application,
+                actor=request.user,
+                kind=ApplicationReviewEvent.Kind.MAIN_UNLOCKED,
+                to_value="unlocked",
+                reason=form.cleaned_data["reason"],
+                requirements_version=application.wohnung.requirements_version,
+            )
+            invite = True
+    if invite:
+        sent = _send_application_invitation(
+            application, request.user, request.build_absolute_uri("/").rstrip("/")
+        )
+        if sent:
+            messages.success(
+                request, "Die Main-Bewerbung wurde freigeschaltet und die Einladung versendet."
+            )
+        else:
+            messages.error(
+                request,
+                "Die Main-Bewerbung ist freigeschaltet, aber die E-Mail konnte nicht "
+                "versendet werden. Sie können den Versand erneut anstoßen.",
+            )
+    return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
+
+
+@employee_required
+def employee_application_invitation_resend(
+    request: HttpRequest,
+    application_id: UUID,
+) -> HttpResponse:
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    application = get_object_or_404(
+        Bewerbung.objects.select_related("person", "wohnung"), pk=application_id
+    )
+    if (
+        not application.main_application_unlocked
+        or application.submitted_at is not None
+        or application.status != BewerbungStatus.OPEN
+        or application.interest_withdrawn_at is not None
+    ):
+        messages.error(request, "Für diese Bewerbung kann keine Einladung versendet werden.")
+        return redirect(
+            "wohnungsverwaltung:employee_application_detail", application_id=application_id
+        )
+    if _send_application_invitation(
+        application, request.user, request.build_absolute_uri("/").rstrip("/")
+    ):
+        messages.success(request, "Die Einladung wurde erneut versendet.")
+    else:
+        messages.error(
+            request, "Die E-Mail konnte nicht versendet werden. Bitte versuchen Sie es erneut."
+        )
+    return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
 
 
 def _application_document_response(proof_file, download_label: str) -> FileResponse:
@@ -1232,7 +1623,12 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
         or (_draft_field_value(server_draft, "person") if server_draft else None)
     )
     form = HandoverProtocolForm(
-        request.POST or None, wohnung_id=selected_wohnung_id, employee=request.user
+        request.POST or None,
+        wohnung_id=selected_wohnung_id,
+        employee=request.user,
+        initial={"uebergabe_zeitpunkt": request.GET["uebergabe_zeitpunkt"]}
+        if "uebergabe_zeitpunkt" in request.GET
+        else None,
     )
     _set_selected_person_initial(form, selected_person_id)
     can_manage_handover_photos = _can_manage_handover_photos(request)
@@ -1254,6 +1650,7 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
     if can_manage_handover_photos:
         move_in_reference = _move_in_reference_for_apartment(
             _valid_wohnung_id(selected_wohnung_id),
+            before=_handover_time_for_form(form),
             person_id=_valid_person_id(selected_person_id),
         )
     if (
@@ -1406,6 +1803,9 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
         instance=protocol,
         wohnung_id=selected_wohnung_id or protocol.wohnung_id,
         employee=request.user,
+        initial={"uebergabe_zeitpunkt": request.GET["uebergabe_zeitpunkt"]}
+        if "uebergabe_zeitpunkt" in request.GET
+        else None,
     )
     _set_selected_person_initial(form, selected_person_id)
     form_valid = request.method == "POST" and form.is_valid()
@@ -1432,6 +1832,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
     if can_manage_handover_photos:
         move_in_reference = _move_in_reference_for_apartment(
             _valid_wohnung_id(selected_wohnung_id or protocol.wohnung_id),
+            before=_handover_time_for_form(form),
             person_id=_valid_person_id(selected_person_id),
         )
     if (
@@ -1715,6 +2116,13 @@ def _photo_return_url(
         "wohnungsverwaltung:handover_protocol_room_detail",
         kwargs={"protocol_id": protocol.pk, "room_id": room.pk},
     )
+
+
+def _handover_time_for_form(form: HandoverProtocolForm):
+    try:
+        return form.fields["uebergabe_zeitpunkt"].clean(form["uebergabe_zeitpunkt"].value())
+    except ValidationError:
+        return None
 
 
 def _move_in_reference_for_apartment(
@@ -2068,6 +2476,23 @@ def _wohnung_form(request: HttpRequest, wohnung: Wohnung, title: str) -> HttpRes
         )
         if form.is_valid() and schluessel_formset.is_valid():
             with transaction.atomic():
+                if not wohnung._state.adding:
+                    current_requirements_version = (
+                        Wohnung.objects.select_for_update()
+                        .filter(pk=wohnung.pk)
+                        .values_list("requirements_version", flat=True)
+                        .first()
+                    )
+                    if request.POST.get("requirements_version") != str(
+                        current_requirements_version
+                    ):
+                        messages.warning(
+                            request,
+                            "Die Wohnungsanforderungen wurden zwischenzeitlich geändert. "
+                            "Bitte prüfen Sie den aktuellen Stand und speichern Sie Ihre "
+                            "Änderungen erneut.",
+                        )
+                        return redirect("verwaltung:wohnung_edit", wohnung_id=wohnung.pk)
                 wohnung = form.save()
                 schluessel_formset.instance = wohnung
                 schluessel_formset.save()
@@ -2087,6 +2512,11 @@ def _wohnung_form(request: HttpRequest, wohnung: Wohnung, title: str) -> HttpRes
             "schluessel_formset": schluessel_formset,
             "title": title,
             "wohnung": wohnung,
+            "requirements_version": (
+                request.POST.get("requirements_version", "")
+                if request.method == "POST"
+                else wohnung.requirements_version
+            ),
         },
     )
 

@@ -6,10 +6,5 @@
         <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
         {{ field }}
     {% endif %}
-    {% if field.help_text %}
-        <div class="uk-text-meta uk-text-small" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>
-    {% endif %}
-    {% if field.errors %}<div id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}
-        <div class="uk-text-danger uk-text-small">{{ error }}</div>
-    {% endfor %}</div>{% endif %}
+    {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
 </div>

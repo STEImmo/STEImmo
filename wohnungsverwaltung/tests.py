@@ -37,6 +37,7 @@ from .models import (
     ApplicationProof,
     ApplicationProofCategory,
     ApplicationProofCleanup,
+    ApplicationReviewEvent,
     Bewerbung,
     BewerbungStatus,
     Merkmal,
@@ -2263,6 +2264,32 @@ class PreApplicationAuthenticationTests(TestCase):
         application = Bewerbung.objects.get()
         self.assertEqual(application.person, self.applicant)
         self.assertEqual(application.wohnung, self.free_unit)
+
+    def test_application_above_occupancy_limit_is_saved_as_declined(self) -> None:
+        self.free_unit.max_occupants = 1
+        self.free_unit.occupancy_requirement_reason = "Grundriss und nutzbare Schlafräume"
+        self.free_unit.save(update_fields=["max_occupants", "occupancy_requirement_reason"])
+        self.assertTrue(self.client.login(username=self.user.username, password="FjordTanne!4826"))
+
+        response = self.client.post(
+            reverse("wohnungsverwaltung:pre_application_create"),
+            self.valid_form_data(),
+            follow=True,
+        )
+
+        application = Bewerbung.objects.get()
+        self.assertEqual(application.status, BewerbungStatus.DECLINED)
+        self.assertFalse(application.main_application_unlocked)
+        event = ApplicationReviewEvent.objects.get(
+            application=application,
+            kind=ApplicationReviewEvent.Kind.OCCUPANCY_DECLINED,
+        )
+        self.assertIsNone(event.actor)
+        self.assertIn("Höchstzahl von 1 Personen", event.reason)
+        self.assertContains(response, "wegen der überschrittenen Personenhöchstzahl abgelehnt")
+        self.assertContains(response, "Abgelehnt")
+        self.assertContains(response, "Haushaltsgröße die zum Entscheidungszeitpunkt")
+        self.assertNotContains(response, "Grundriss und nutzbare Schlafräume")
 
     def test_viewing_request_keeps_selected_unit_and_main_application_locked(self) -> None:
         self.client.force_login(self.user)

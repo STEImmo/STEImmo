@@ -54,7 +54,7 @@
                 {% include "wohnungsverwaltung/_form_field.html" %}
             {% endfor %}
             {{ form.zusatzangaben }}
-            {% if form.zusatzangaben.errors %}<div id="{{ form.zusatzangaben.auto_id }}_error" role="alert">{% for error in form.zusatzangaben.errors %}<p class="uk-text-danger">{{ error }}</p>{% endfor %}</div>{% endif %}
+            {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.zusatzangaben only %}
             <div class="uk-flex uk-flex-right">
                 <button class="uk-button uk-button-primary" type="submit">Prüfpunkt speichern</button>
             </div>

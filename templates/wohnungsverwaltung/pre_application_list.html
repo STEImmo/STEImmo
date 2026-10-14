@@ -12,6 +12,9 @@
 <article class="uk-card uk-card-default uk-card-body application-summary application-card uk-margin-bottom" data-state="{% if application.status != 'open' or application.interest_withdrawn_at %}beendet{% elif not application.main_application_unlocked %}warten{% endif %}">
     <div class="application-summary-top"><div><p class="application-eyebrow">Ihre Wunschwohnung</p><h2>{{ application.wohnung }}</h2></div><span class="uk-label{% if application.status != 'open' or application.interest_withdrawn_at %} uk-label-warning{% endif %}">{{ application.get_applicant_status_display }}</span></div>
     <p class="uk-text-meta">{{ application.personenanzahl }} Person{{ application.personenanzahl|pluralize:"en" }} im Haushalt</p>
+    {% for event in application.occupancy_decline_events %}
+        <p class="uk-text-danger">Diese Bewerbung wurde automatisch abgelehnt, weil die angegebene Haushaltsgröße die zum Entscheidungszeitpunkt geltende Personenhöchstzahl für diese Wohnung überschritten hat.</p>
+    {% endfor %}
     <div class="application-next-step"><span uk-icon="arrow-right" aria-hidden="true"></span><div><strong>Ihr nächster Schritt</strong><p>{{ application.get_applicant_next_step }}</p></div></div>
     {% if application.main_application_accessible %}<a class="uk-button {% if application.submitted_at %}uk-button-default{% else %}uk-button-primary{% endif %}" href="{% url 'wohnungsverwaltung:main_application_status' application.pk %}">{% if application.submitted_at %}Eingereichte Unterlagen ansehen{% else %}Bewerbung vervollständigen{% endif %}</a>
     {% elif application.status == 'open' and not application.interest_withdrawn_at %}<p class="uk-text-meta uk-margin-remove-bottom">Ein Besichtigungstermin wird separat bestätigt. Die Hauptbewerbung folgt nach Besichtigung und Freigabe.</p>{% endif %}

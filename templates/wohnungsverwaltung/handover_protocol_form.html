@@ -61,6 +61,7 @@
 
         const apartmentSelect = document.getElementById("id_wohnung");
         let loadedApartmentId = apartmentSelect?.value || "";
+        let dependentFieldsRequestId = 0;
         const dependentFieldsStatus = document.querySelector("[data-dependent-fields-status]");
         const showDependentFieldsStatus = (message, failed = false) => {
             dependentFieldsStatus.textContent = message;
@@ -71,28 +72,48 @@
             if (!apartmentSelect) {
                 return false;
             }
+            const requestId = ++dependentFieldsRequestId;
             showDependentFieldsStatus("Angaben zur Auswahl werden geladen …");
             protocolForm.setAttribute("aria-busy", "true");
             try {
+                const requestedApartmentId = apartmentSelect.value;
+                const requestedPersonId = document.getElementById("id_person")?.value || "";
+                const requestedHandoverTime = document.getElementById("id_uebergabe_zeitpunkt")?.value || "";
                 const url = new URL(window.location.href);
-                if (apartmentSelect.value) {
-                    url.searchParams.set("wohnung", apartmentSelect.value);
+                if (requestedApartmentId) {
+                    url.searchParams.set("wohnung", requestedApartmentId);
                 } else {
                     url.searchParams.delete("wohnung");
                 }
-                const personSelect = document.getElementById("id_person");
-                if (personSelect?.value) {
-                    url.searchParams.set("person", personSelect.value);
+                if (requestedPersonId) {
+                    url.searchParams.set("person", requestedPersonId);
                 } else {
                     url.searchParams.delete("person");
                 }
+                if (requestedHandoverTime) {
+                    url.searchParams.set("uebergabe_zeitpunkt", requestedHandoverTime);
+                } else {
+                    url.searchParams.delete("uebergabe_zeitpunkt");
+                }
                 const response = await fetch(url);
                 if (!response.ok) {
-                    showDependentFieldsStatus("Die Angaben konnten nicht geladen werden. Bitte wählen Sie erneut aus oder laden Sie die Seite neu. Noch nicht gespeicherte Eingaben vorher prüfen.", true);
+                    if (requestId === dependentFieldsRequestId) {
+                        showDependentFieldsStatus("Die Angaben konnten nicht geladen werden. Bitte wählen Sie erneut aus oder laden Sie die Seite neu. Noch nicht gespeicherte Eingaben vorher prüfen.", true);
+                    }
                     return false;
                 }
-                const updatedPage = new DOMParser().parseFromString(await response.text(), "text/html");
-                const apartmentChanged = loadedApartmentId !== apartmentSelect.value;
+                const responseText = await response.text();
+                // The selection may change while fetching headers or the response body.
+                if (
+                    requestId !== dependentFieldsRequestId
+                    || requestedApartmentId !== apartmentSelect.value
+                    || requestedPersonId !== (document.getElementById("id_person")?.value || "")
+                    || requestedHandoverTime !== (document.getElementById("id_uebergabe_zeitpunkt")?.value || "")
+                ) {
+                    return false;
+                }
+                const updatedPage = new DOMParser().parseFromString(responseText, "text/html");
+                const apartmentChanged = loadedApartmentId !== requestedApartmentId;
                 const meterValues = new Map(Array.from(document.querySelectorAll(
                     '#meter-reading-section input[name]:not(:disabled)',
                 )).map((field) => [field.name, field.value]));
@@ -104,49 +125,73 @@
                     "room-formset-section",
                     "move-in-reference",
                 ].forEach((id) => {
-                    if (!apartmentChanged && ["key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
+                    if (!apartmentChanged && ["id_person", "key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
                         return;
                     }
                     const currentElement = document.getElementById(id);
                     const updatedElement = updatedPage.getElementById(id);
                     if (currentElement && updatedElement) {
+                        if (!apartmentChanged && id === "meter-reading-section") {
+                            // Keep live inputs, including edits made while the request was pending.
+                            const currentFields = new Map();
+                            currentElement.querySelectorAll("input[name], textarea[name]").forEach((field) => {
+                                const fields = currentFields.get(field.name) || [];
+                                fields.push(field);
+                                currentFields.set(field.name, fields);
+                            });
+                            updatedElement.querySelectorAll("input[name], textarea[name]").forEach((field) => {
+                                const currentField = currentFields.get(field.name)?.shift();
+                                if (currentField) {
+                                    field.replaceWith(currentField);
+                                }
+                            });
+                        }
                         currentElement.replaceWith(updatedElement);
                     }
                 });
-                document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
-                    if (meterValues.has(field.name)) {
-                        field.value = meterValues.get(field.name);
-                    }
-                });
-                loadedApartmentId = apartmentSelect.value;
+                if (apartmentChanged) {
+                    document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
+                        if (meterValues.has(field.name)) {
+                            field.value = meterValues.get(field.name);
+                        }
+                    });
+                }
+                loadedApartmentId = requestedApartmentId;
                 document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
                 document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
                 window.history.replaceState(null, "", url);
                 showDependentFieldsStatus("Angaben zur Auswahl wurden aktualisiert.");
                 return true;
             } catch (error) {
-                showDependentFieldsStatus("Die Angaben konnten nicht geladen werden. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.", true);
-                // Keep the existing failure behavior; this change only adds visible feedback.
+                if (requestId === dependentFieldsRequestId) {
+                    showDependentFieldsStatus("Die Angaben konnten nicht geladen werden. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.", true);
+                }
                 throw error;
             } finally {
-                protocolForm.removeAttribute("aria-busy");
+                if (requestId === dependentFieldsRequestId) {
+                    protocolForm.removeAttribute("aria-busy");
+                }
             }
         };
         if (apartmentSelect) {
             apartmentSelect.addEventListener("change", async () => {
                 saveDraft(true);
-                await updateApartmentDependentFields();
+                if (!await updateApartmentDependentFields()) {
+                    return;
+                }
                 updateTypeSpecificSections();
                 updateMeterDifferences();
                 saveDraft(true);
             });
         }
         document.addEventListener("change", async (event) => {
-            if (event.target.id !== "id_person") {
+            if (!["id_person", "id_uebergabe_zeitpunkt"].includes(event.target.id)) {
                 return;
             }
             saveDraft(true);
-            await updateApartmentDependentFields();
+            if (!await updateApartmentDependentFields()) {
+                return;
+            }
             updateTypeSpecificSections();
             updateMeterDifferences();
             saveDraft(true);
@@ -630,10 +675,17 @@
                 const savedApartment = draft.fields?.wohnung?.value;
                 if (apartmentSelect && savedApartment && apartmentSelect.value !== savedApartment) {
                     apartmentSelect.value = savedApartment;
-                    await updateApartmentDependentFields();
+                    if (!await updateApartmentDependentFields()) {
+                        return;
+                    }
+                    updateTypeSpecificSections();
                 }
                 restoreFields(protocolForm, draft.fields);
+                if (!await updateApartmentDependentFields()) {
+                    return;
+                }
                 updateTypeSpecificSections();
+                updateMeterDifferences();
                 restoreRooms(draft.rooms);
                 restoreKeys(draft.keys);
                 document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);

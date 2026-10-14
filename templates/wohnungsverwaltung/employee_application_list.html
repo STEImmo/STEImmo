@@ -13,7 +13,41 @@
             </ul>
             <h1 class="uk-heading-small">Bewerbungen</h1>
             <h2 class="uk-h3">{{ unit }}</h2>
-            <p class="uk-text-meta">{{ page_obj.paginator.count }} Bewerbung{{ page_obj.paginator.count|pluralize:"en" }} · Neueste Besichtigungsanfragen zuerst</p>
+
+            {% if requirements_open %}
+                <div class="uk-alert-warning" uk-alert>
+                    <p><strong>Anforderungen offen:</strong> Für diese Wohnung sind die Auswahlkriterien noch nicht vollständig eingerichtet. Es werden keine Bewerbungen anhand fehlender Kriterien ausgeschlossen.</p>
+                </div>
+            {% endif %}
+
+            <ul class="uk-tab" role="tablist">
+                <li class="{% if segment == 'matching' %}uk-active{% endif %}">
+                    <a href="{% querystring segment='matching' page=None %}" aria-current="{% if segment == 'matching' %}page{% endif %}">Passend</a>
+                </li>
+                <li class="{% if segment == 'review' %}uk-active{% endif %}">
+                    <a href="{% querystring segment='review' page=None %}" aria-current="{% if segment == 'review' %}page{% endif %}">Einzelfallprüfung</a>
+                </li>
+                <li class="{% if segment == 'all' %}uk-active{% endif %}">
+                    <a href="{% querystring segment='all' page=None %}" aria-current="{% if segment == 'all' %}page{% endif %}">Alle Bewerbungen</a>
+                </li>
+            </ul>
+
+            <form method="get" class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
+                <input type="hidden" name="wohnung" value="{{ unit.pk }}">
+                <input type="hidden" name="segment" value="{{ segment }}">
+                <div class="uk-grid-small uk-child-width-1-2@s uk-child-width-1-4@l" uk-grid>
+                    {% for field in filters %}
+                        <div>{% include "wohnungsverwaltung/_form_field.html" with field=field %}</div>
+                    {% endfor %}
+                </div>
+                <button class="uk-button uk-button-primary" type="submit">Filtern</button>
+                <a class="uk-button uk-button-text" href="?wohnung={{ unit.pk }}&amp;segment={{ segment }}">Filter zurücksetzen</a>
+            </form>
+
+            <p class="uk-text-meta">
+                {{ page_obj.paginator.count }} Bewerbung{{ page_obj.paginator.count|pluralize:"en" }}
+                · {% if filters.cleaned_data.sort == 'priority' %}Priorität zuerst{% else %}Neueste Pre-Bewerbungen zuerst{% endif %}
+            </p>
             {% if applications %}
                 <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Bewerbungstabelle">
                     <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
@@ -21,9 +55,12 @@
                         <thead>
                             <tr>
                                 <th scope="col">Name</th>
-                                <th scope="col">Personenanzahl</th>
+                                <th scope="col">Personen</th>
                                 <th scope="col">Haustiere</th>
                                 <th scope="col">Bearbeitungsstatus</th>
+                                <th scope="col">Main-Status</th>
+                                <th scope="col">Priorität</th>
+                                {% if segment == 'review' %}<th scope="col">Prüfgrund</th>{% endif %}
                                 <th scope="col">Anfrage eingegangen</th>
                                 <th scope="col">Details</th>
                             </tr>
@@ -32,9 +69,23 @@
                             {% for application in applications %}
                                 <tr>
                                     <th scope="row" data-label="Name">{{ application.person }}</th>
-                                    <td data-label="Personenanzahl">{{ application.personenanzahl }}</td>
+                                    <td data-label="Personen">{{ application.personenanzahl }}</td>
                                     <td data-label="Haustiere">{{ application.haustiere|yesno:"Ja,Nein" }}</td>
                                     <td data-label="Bearbeitungsstatus"><span class="uk-label">{{ application.get_applicant_status_display }}</span></td>
+                                    <td data-label="Main-Status">
+                                        {% if application.submitted_at %}Eingereicht
+                                        {% elif application.main_application_unlocked and application.latest_invitation_status == "invitation_failed" %}Einladung fehlgeschlagen
+                                        {% elif application.main_application_unlocked and application.latest_invitation_status == "invitation_sent" %}Einladung versendet
+                                        {% elif application.main_application_unlocked %}Freigeschaltet
+                                        {% else %}Noch nicht freigeschaltet{% endif %}
+                                    </td>
+                                    <td data-label="Priorität">{{ application.get_review_priority_display }}</td>
+                                    {% if segment == 'review' %}
+                                        <td data-label="Prüfgrund">
+                                            {% for flag in application.suitability_review_flags %}{{ flag }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                                            {% if application.has_current_suitability_approval %}<span class="uk-label uk-label-success">Einzelfall freigegeben</span>{% endif %}
+                                        </td>
+                                    {% endif %}
                                     <td class="uk-text-nowrap" data-label="Anfrage eingegangen">{{ application.created_at|date:"d.m.Y, H:i" }} Uhr</td>
                                     <td data-label="Details">
                                         <a class="uk-button uk-button-default uk-button-small uk-text-nowrap"
@@ -50,18 +101,24 @@
                     <nav aria-label="Seiten der Bewerbungen">
                         <ul class="uk-pagination uk-flex-center uk-flex-middle">
                             {% if page_obj.has_previous %}
-                                <li><a href="?wohnung={{ unit.pk }}&amp;page={{ page_obj.previous_page_number }}">Zurück</a></li>
+                                <li><a href="{% querystring page=page_obj.previous_page_number %}">Zurück</a></li>
                             {% endif %}
                             <li class="uk-active"><span aria-current="page">Seite {{ page_obj.number }} von {{ page_obj.paginator.num_pages }}</span></li>
                             {% if page_obj.has_next %}
-                                <li><a href="?wohnung={{ unit.pk }}&amp;page={{ page_obj.next_page_number }}">Weiter</a></li>
+                                <li><a href="{% querystring page=page_obj.next_page_number %}">Weiter</a></li>
                             {% endif %}
                         </ul>
                     </nav>
                 {% endif %}
             {% else %}
                 <div class="uk-alert-primary" uk-alert>
-                    <p>Für diese Wohnung liegen noch keine Bewerbungen vor.</p>
+                    {% if segment == 'review' %}
+                        <p>Für diese Wohnung liegen derzeit keine offenen Einzelfallprüfungen vor.</p>
+                    {% elif unit_application_count == 0 %}
+                        <p>Für diese Wohnung liegen noch keine Bewerbungen vor.</p>
+                    {% else %}
+                        <p>Für diese Auswahl liegen keine Bewerbungen vor.</p>
+                    {% endif %}
                 </div>
             {% endif %}
         {% else %}
@@ -73,9 +130,15 @@
                     <tbody>
                 {% for unit in units %}
                     <tr>
-                        <th scope="row" data-label="Wohnung">Wohnung {{ unit.display_number }}</th>
+                        <th scope="row" data-label="Wohnung">
+                            Wohnung {{ unit.display_number }}
+                            {% if unit.max_occupants is None or unit.pet_review_required is None %}
+                                <div><span class="uk-label uk-label-warning">Anforderungen offen</span></div>
+                            {% endif %}
+                        </th>
                         <td data-label="Bewerbungen">{{ unit.application_count }} Bewerbung{{ unit.application_count|pluralize:"en" }}</td>
-                        <td data-label="Aktion"><a class="uk-button uk-button-default uk-button-small" href="?wohnung={{ unit.pk }}"
+                        <td data-label="Aktion">
+                            <a class="uk-button uk-button-default uk-button-small" href="?wohnung={{ unit.pk }}"
                                aria-label="Bewerbungen für {{ unit }} ansehen">Bewerbungen ansehen</a>
                         </td>
                     </tr>

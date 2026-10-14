@@ -2,7 +2,7 @@
     {% if field.name == "wohnung" and unit_is_preselected %}{# The disabled field remains server-bound to the selected unit. #}
         {% if field.errors %}<div class="uk-alert-danger" role="alert">{{ field.errors }} <a href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Andere Wohnung wählen</a></div>{% endif %}
     {% elif field.name == "haustiere" %}
-        <fieldset class="uk-fieldset uk-margin">
+        <fieldset class="uk-fieldset uk-margin"{% if field.aria_describedby %} aria-describedby="{{ field.aria_describedby }}"{% endif %}>
             <legend class="uk-form-label">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</legend>
             <div class="uk-margin-small-top">
                 {% for choice in field %}
@@ -12,7 +12,7 @@
                     </label>
                 {% endfor %}
             </div>
-            {% if field.errors %}<div class="uk-text-danger" id="{{ field.auto_id }}_error" role="alert">{{ field.errors }}</div>{% endif %}
+            {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
         </fieldset>
     {% else %}
         <div class="uk-margin">
@@ -20,8 +20,7 @@
             <div class="uk-margin-small-top">
                 {{ field }}
             </div>
-            {% if field.help_text %}<div class="uk-text-meta" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
-            {% if field.errors %}<div class="uk-text-danger" id="{{ field.auto_id }}_error" role="alert">{{ field.errors }}</div>{% endif %}
+            {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
         </div>
     {% endif %}
 {% endfor %}

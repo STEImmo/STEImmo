@@ -21,6 +21,7 @@
         <form method="post">
             {% if apartment_is_saved %}<a class="uk-button uk-button-default uk-margin-bottom" href="{% url 'verwaltung:apartment_photos' wohnung.pk %}">Wohnungsfotos verwalten</a>{% endif %}
             {% csrf_token %}
+            <input type="hidden" name="requirements_version" value="{{ requirements_version }}">
             {% for error in form.non_field_errors %}
                 <div class="uk-alert-danger" uk-alert><p>{{ error }}</p></div>
             {% endfor %}
@@ -47,6 +48,26 @@
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.planned_move_in %}</div>
                 </div>
                 <div class="uk-margin">{% include "wohnungsverwaltung/_form_field.html" with field=form.energy_information %}</div>
+            </section>
+
+            <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
+                <h2 class="uk-h3">Anforderungen für die Bewerberauswahl</h2>
+                <p class="uk-text-meta">
+                    Eine Überschreitung der festgelegten Personenhöchstzahl führt zur Ablehnung.
+                    Haustierangaben lösen bei aktivierter Prüfung eine Einzelfallprüfung aus.
+                </p>
+                <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
+                    <div>
+                        {% include "wohnungsverwaltung/_form_field.html" with field=form.max_occupants %}
+                        <p class="uk-text-meta">Leer lassen, solange keine begründete Höchstzahl festgelegt ist. Sie wird nicht aus der Zimmerzahl abgeleitet. Beim Speichern werden offene Bewerbungen oberhalb der Grenze abgelehnt, die noch nicht zur Main-Bewerbung freigeschaltet sind.</p>
+                        {% include "wohnungsverwaltung/_form_field.html" with field=form.occupancy_requirement_reason %}
+                    </div>
+                    <div>
+                        {% include "wohnungsverwaltung/_form_field.html" with field=form.pet_review_required %}
+                        <p class="uk-text-meta">Bei „Ja“ werden Bewerbungen mit Haustierangabe zur menschlichen Einzelfallprüfung markiert.</p>
+                        {% include "wohnungsverwaltung/_form_field.html" with field=form.pet_review_reason %}
+                    </div>
+                </div>
             </section>
 
             <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
