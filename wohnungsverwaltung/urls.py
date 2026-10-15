@@ -20,6 +20,26 @@ urlpatterns = [
         name="handover_protocol_pdf_create",
     ),
     path("bewerbung/meine/", views.pre_application_list, name="pre_application_list"),
+    path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/besichtigungen/neu/",
+        views.employee_viewing_create,
+        name="employee_viewing_create",
+    ),
+    path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/besichtigungen/<uuid:appointment_id>/",
+        views.employee_viewing_update,
+        name="employee_viewing_update",
+    ),
+    path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/besichtigungen/<uuid:appointment_id>/versand/",
+        views.employee_viewing_resend,
+        name="employee_viewing_resend",
+    ),
+    path(
+        "bewerbung/<uuid:application_id>/besichtigungen/<uuid:appointment_id>/antwort/",
+        views.applicant_viewing_response,
+        name="applicant_viewing_response",
+    ),
     path("bewerbung/neu/", views.pre_application_create, name="pre_application_create"),
     path(
         "bewerbung/neu/<uuid:unit_id>/",

@@ -27,6 +27,7 @@
     --steimmo-color-success: #2D6A4F;
     --steimmo-color-success-text: #205735;
     --steimmo-color-success-surface: #EAF4EC;
+    --steimmo-color-success-surface-emphasis: #C8E2D0;
     --steimmo-color-success-border: #2D6A4F;
     --steimmo-color-warning: #825000;
     --steimmo-color-warning-text: #5E3A00;
@@ -593,6 +594,128 @@ a:active,
 
 .uk-table thead {
     background: var(--steimmo-color-surface-subtle);
+}
+
+/* Group related application fields; use cards when table columns become cramped. */
+.application-filter-actions {
+    gap: var(--steimmo-space-md) var(--steimmo-space-lg);
+}
+
+.application-filter-actions .uk-button {
+    max-width: 100%;
+    white-space: normal;
+}
+
+.application-table {
+    table-layout: fixed;
+}
+
+.application-table [data-application-row] {
+    cursor: pointer;
+}
+
+.application-table [data-application-row]:hover {
+    background: var(--steimmo-color-surface-subtle);
+}
+
+.application-table th,
+.application-table td {
+    overflow-wrap: anywhere;
+    vertical-align: top;
+}
+
+.application-table tbody th {
+    font-size: inherit;
+    font-weight: normal;
+    text-transform: none;
+}
+
+.application-cell-label {
+    display: none;
+}
+
+/* Only the processing status is colored; priority remains a separate field. */
+.application-review-summary {
+    padding: var(--steimmo-space-sm);
+    border-left: 3px solid var(--steimmo-color-info-border);
+    border-radius: var(--steimmo-radius-sm);
+    background: var(--steimmo-color-info-surface);
+}
+
+.application-review-summary-success {
+    border-left-color: var(--steimmo-color-success-border);
+    background: var(--steimmo-color-success-surface-emphasis);
+}
+
+.application-review-summary-danger {
+    border-left-color: var(--steimmo-color-danger-border);
+    background: var(--steimmo-color-danger-surface);
+}
+
+.application-review-summary-warning {
+    border-left-color: var(--steimmo-color-warning-border);
+    background: var(--steimmo-color-warning-surface);
+}
+
+.application-review-summary-neutral {
+    border-left-color: var(--steimmo-color-border-strong);
+    background: var(--steimmo-color-surface-muted);
+}
+
+@media (min-width: 1200px) {
+    .application-table thead th:first-child { width: 26%; }
+    .application-table thead th:nth-child(2) { width: 20%; }
+    .application-table thead th:nth-child(3) { width: 18%; }
+    .application-table thead th:nth-child(4) { width: 22%; }
+    .application-table thead th:nth-child(5) { width: 14%; }
+}
+
+@media (max-width: 1199px) {
+    .application-table,
+    .application-table caption,
+    .application-table tbody,
+    .application-table th,
+    .application-table td {
+        display: block;
+    }
+
+    .application-table thead {
+        display: none;
+    }
+
+    .application-table tbody tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--steimmo-space-lg);
+        margin-top: var(--steimmo-space-md);
+        padding: var(--steimmo-space-lg);
+        border: 1px solid var(--steimmo-color-border);
+        border-radius: var(--steimmo-radius-md);
+        background: var(--steimmo-color-surface);
+        box-shadow: var(--steimmo-shadow-sm);
+    }
+
+    .management-table .application-table tbody th,
+    .management-table .application-table tbody td {
+        padding: 0;
+        min-width: 0;
+    }
+
+    .application-table tbody th {
+        grid-column: 1 / -1;
+    }
+
+    .application-cell-label {
+        display: block;
+        margin-bottom: var(--steimmo-space-2xs);
+        font-weight: 600;
+    }
+}
+
+@media (max-width: 639px) {
+    .application-table tbody tr {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 .uk-table th {
@@ -1388,6 +1511,7 @@ a:active,
 .management-page .uk-form-label {
     font-weight: 600;
 }
+.employee-viewings .uk-button { max-width: 100%; min-height: 40px; padding-block: var(--steimmo-space-xs); white-space: normal; line-height: 1.4; }
 .management-page .uk-margin > label:first-child { display: block; margin-bottom: var(--steimmo-space-xs); font-weight: 600; }
 .management-page .uk-button,
 .handover-page .uk-button { text-transform: none; }
