@@ -4,13 +4,14 @@
             <span class="site-brand-name">STE Immobilien</span>
             <span class="site-brand-subtitle">eGbR · Wohnungsvermietung in Würzburg</span>
         </a>
+        {% if not minimal_header %}
         <nav class="site-desktop-navigation" aria-label="Hauptnavigation">
             <ul class="uk-navbar-nav">{% include "partials/_navigation_links.html" with navigation_mode="desktop" %}</ul>
         </nav>
         <div class="site-desktop-account">
             {% if user.is_authenticated %}
                 <button id="account-toggle" class="uk-button uk-button-text site-account-toggle" type="button">Konto <span uk-icon="icon: chevron-down; ratio: .8" aria-hidden="true"></span></button>
-                <div class="site-account-dropdown" uk-dropdown="mode: click; pos: bottom-right" aria-labelledby="account-toggle">
+                <div class="site-header-dropdown site-account-dropdown" uk-dropdown="mode: click; pos: bottom-right; offset: 0px" aria-labelledby="account-toggle">
                     {% include "partials/_account_actions.html" %}
                 </div>
             {% else %}
@@ -20,8 +21,10 @@
         <button id="site-menu-toggle" class="uk-navbar-toggle site-mobile-toggle" type="button" uk-toggle="target: #site-mobile-menu" aria-label="Menü öffnen" aria-controls="site-mobile-menu" aria-expanded="false">
             <span uk-navbar-toggle-icon aria-hidden="true"></span><span>Menü</span>
         </button>
+        {% endif %}
     </div>
 </header>
+{% if not minimal_header %}
 <div id="site-mobile-menu" uk-offcanvas="overlay: true; flip: true">
     <div class="uk-offcanvas-bar site-mobile-menu">
         <button class="uk-offcanvas-close" type="button" uk-close aria-label="Menü schließen"></button>
@@ -32,3 +35,4 @@
         <div class="site-mobile-account">{% include "partials/_account_actions.html" %}</div>
     </div>
 </div>
+{% endif %}

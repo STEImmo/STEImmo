@@ -6,18 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ heading }} · STE Immobilien eGbR</title>
     <link rel="stylesheet" href="{% static 'vendor/uikit/uikit.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=62">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=65">
 </head>
 <body class="site-shell">
     <a class="site-skip-link" href="#main-content">Zum Inhalt springen</a>
-    <header class="site-header uk-navbar-container">
-        <div class="uk-container site-header-inner">
-            <a class="site-brand" href="{% url 'home' %}" aria-label="STE Immobilien eGbR – Startseite">
-                <span class="site-brand-name">STE Immobilien</span>
-                <span class="site-brand-subtitle">eGbR · Wohnungsvermietung in Würzburg</span>
-            </a>
-        </div>
-    </header>
+    {% include "partials/_site_header.html" with minimal_header=True only %}
     <main id="main-content" class="site-main" tabindex="-1">
         <section class="uk-section uk-section-large">
             <div class="uk-container uk-container-small">

@@ -4,8 +4,8 @@ STE Immobilien eGbR
 
 STEImmo ist der interne Projektname. Der sichtbare Auftritt verwendet den
 Firmennamen **STE Immobilien eGbR**. Header, mobile Navigation und Footer bauen
-auf dem UIkit-Theme aus US-17 auf; Aufbau und Quellen stehen in den
-[UI-Mustern für US-18](docs/ui-muster.md).
+auf dem UIkit-Theme aus US-17 auf. Der gemeinsame Seitenrahmen liegt in
+`templates/base.html`, Header und Footer in `templates/partials/`.
 
 ## Projektziel
 
@@ -24,10 +24,10 @@ der lokal gespeicherten Aufnahme stehen in [Bildinformationen](static/images/REA
 und auf `/bildnachweise/`. Echte Hausfotos, Lage- und Kontaktdaten sowie freigegebene
 Rechtstexte sind noch zu ergänzen. Die frühere Entwurfsauswahl ist entfernt.
 
-Anmeldung, Registrierung und Codebestätigungen verwenden das gewählte Design A:
+Anmeldung, Registrierung und Codebestätigungen verwenden ein gemeinsames Layout:
 helles Einzugsmotiv neben den echten Formularen, Passwortanzeige/-hilfen und
-verständliche Feldfehler. Die Kontodesign-Vergleichsroute ist entfernt; das gemeinsame
-Muster ist in [US-18](docs/ui-muster.md) dokumentiert.
+verständliche Feldfehler. Das gemeinsame Template liegt in
+`templates/registration/auth_base.html`.
 
 Die Gebäudeansicht ist lokal unter [Gebäude erkunden](http://localhost:8000/wohnungen/gebaeude/)
 erreichbar: Gebäude → Etagenplan → Wohnungsdetails. Öffentliche Wohnungsfotos können im

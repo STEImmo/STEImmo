@@ -13,7 +13,7 @@
                 {% if navigation_mode == "desktop" %}
                     <li class="site-management-menu">
                         <button id="management-toggle" class="site-management-toggle{% if namespace == 'verwaltung' or 'employee_application' in route or 'handover_protocol' in route and route != 'handover_protocol_mine' and perms.immobilien.access_employee_area %} is-current{% endif %}" type="button">Verwaltung <span uk-icon="icon: chevron-down; ratio: .8" aria-hidden="true"></span></button>
-                        <div class="site-management-dropdown" uk-dropdown="mode: click; pos: bottom-right" aria-labelledby="management-toggle">
+                        <div class="site-header-dropdown site-management-dropdown" uk-dropdown="mode: click; pos: bottom-right; offset: 0px" aria-labelledby="management-toggle">
                             <ul class="uk-nav uk-dropdown-nav">{% include "partials/_management_links.html" %}</ul>
                         </div>
                     </li>
