@@ -193,8 +193,14 @@ Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfigu
 Die Mitarbeiternavigation blendet **Wohnungen finden** und **Bewerbungsvorschau** aus.
 
 Unter **Bewerbungen** sehen berechtigte Mitarbeiter alle Wohnungen mit der Anzahl
-zugeordneter Bewerbungen. Nach Auswahl einer Wohnung erscheint eine Tabelle mit
-Name, Personenanzahl, Haustieren, Bearbeitungsstatus und Pre-Eingangsdatum.
+zugeordneter Bewerbungen. Nach Auswahl einer Wohnung erscheint auf breiten
+Bildschirmen eine kompakte Tabelle. Unter 1200 Pixeln werden dieselben Angaben als
+beschriftete Bewerbungskarten angezeigt, ohne seitliches Scrollen. Name,
+Personenanzahl, Haustiere, Bearbeitungsstatus, Priorität, Main-Status,
+Besichtigung und Pre-Eingangsdatum bleiben in beiden Darstellungen sichtbar.
+Ein Klick auf die Zeile beziehungsweise Karte öffnet die Bewerbungsdetails.
+Der Link **Ansehen** bleibt für die Tastaturbedienung verfügbar; Text kann
+weiterhin markiert und kopiert werden.
 Auch abgelehnte, gesperrte und zurückgezogene Bewerbungen bleiben sichtbar.
 Die neuesten Pre-Bewerbungen stehen zuerst; pro Seite werden 20 Bewerbungen angezeigt.
 
@@ -221,6 +227,45 @@ Mitarbeiter und Zeitpunkt angezeigt; Freigaben werden ebenfalls intern protokoll
 Eine manuelle Main-Freischaltung erfordert die Bestätigung einer positiven Mitarbeiterentscheidung
 und sendet eine E-Mail. Ein fehlgeschlagener Versand hebt die Freischaltung nicht
 auf und kann erneut angestoßen werden.
+
+Besichtigungen werden je Bewerbung mit Datum, Beginn und Ende verwaltet. Mitarbeiter
+können aktive, bereits bewertete und aktuell passende Bewerbungen einladen. Pro
+Bewerbung ist höchstens ein offener Termin möglich; gemeinsame Besichtigungszeiten
+für mehrere Bewerber sind erlaubt. Die Uhrzeiten gelten in `Europe/Berlin`.
+Bewerber sehen ausschließlich eigene Termine unter **Meine Bewerbungen** und können
+vor Beginn zusagen oder absagen. Eine Terminabsage beendet die Bewerbung nicht.
+Eine Verschiebung setzt eine Zusage zurück und erfordert eine erneute Bestätigung.
+Die Terminformulare prüfen Datum und Uhrzeiten direkt bei der Eingabe. Beim Planen
+sind vergangene Tage gesperrt; für heute muss der Beginn noch zukünftig sein und
+das Ende nach dem Beginn liegen. Fehler erscheinen am Feld und sperren das
+Speichern. Beim ausdrücklich gewählten Nachtrag gelten die umgekehrten Datumsgrenzen.
+Die serverseitige Prüfung bleibt unabhängig davon verbindlich.
+Bei der Stundeneingabe in ein leeres Zeitfeld werden die Minuten tatsächlich mit
+`00` vorbelegt. Bereits eingetragene Minuten bleiben bei einer Änderung der Stunde
+erhalten.
+Neue Termine erhalten standardmäßig eine Dauer von 30 Minuten. Änderungen an
+der Endzeit legen eine neue Dauer fest, die bei Änderungen am Beginn erhalten
+bleibt – unabhängig davon, welches Feld zuerst bearbeitet wurde:
+`14:00–14:45` wird beispielsweise zu `15:00–15:45`. Bei bestehenden Terminen
+wird die gespeicherte Dauer übernommen.
+Würde die Endzeit über Mitternacht hinausgehen, muss eine Endzeit am selben Tag
+gewählt werden.
+
+Nach Terminende dokumentieren Mitarbeiter **Durchgeführt** oder **Nicht erschienen**.
+Bereits erfolgte Besichtigungen können mit Begründung nachgetragen werden.
+Neue Main-Freischaltungen verlangen eine durchgeführte Besichtigung derselben
+Bewerbung und weiterhin eine positive Mitarbeiterentscheidung. Bereits bestehende
+Main-Freischaltungen bleiben erhalten.
+
+Einladungen, Verschiebungen und Mitarbeiterabsagen senden nach erfolgreicher
+Speicherung eine E-Mail. Versandfehler ändern den Termin nicht; die aktuelle
+Benachrichtigung kann erneut gesendet werden. Interne Notizen werden nicht an
+Bewerber versendet. Rückzug und automatische Personenlimit-Ablehnung sagen offene
+Termine ebenfalls ab; bei der automatischen Ablehnung wird eine Absage versendet.
+Änderungen der Priorität oder Haustierregeln stornieren vorhandene Termine nicht,
+verlangen aber eine erneute Prüfung vor weiteren Zuweisungen oder Verschiebungen.
+Der interne Verlauf dokumentiert Termin- und Statusänderungen sowie Versandversuche.
+Es gibt keine Selbstbuchung, Kalenderintegration, Kapazitätsprüfung oder Erinnerungen.
 
 ## Lokale Entwicklung
 

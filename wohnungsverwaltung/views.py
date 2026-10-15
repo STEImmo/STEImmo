@@ -81,6 +81,8 @@ from .forms import (
     StellplatzForm,
     StellplatzZuordnungForm,
     UserAccountForm,
+    ViewingActionForm,
+    ViewingAppointmentForm,
     WohnungForm,
     photo_content_type_from_format,
     verified_photo_content_type,
@@ -117,11 +119,20 @@ from .models import (
     Raumprotokoll,
     Stellplatz,
     StellplatzZuordnung,
+    ViewingAppointment,
+    ViewingAppointmentEvent,
     Wohnung,
     WohnungStatus,
     calculate_photo_checksum,
 )
 from .upload_limits import upload_too_large_response
+from .viewings import (
+    cancel_open_viewings,
+    notification_is_current,
+    record_viewing_event,
+    send_viewing_notification,
+    viewing_eligibility_error,
+)
 
 PROTOCOL_STATUS_LABELS = {
     ProtokollStatus.OPEN: "In Bearbeitung",
@@ -482,6 +493,7 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
     )
 
 
+@never_cache
 @applicant_required
 def pre_application_list(request: HttpRequest) -> HttpResponse:
     applicant = _applicant_for_user(request)
@@ -489,13 +501,14 @@ def pre_application_list(request: HttpRequest) -> HttpResponse:
         Bewerbung.objects.filter(person=applicant)
         .select_related("wohnung")
         .prefetch_related(
+            "viewings",
             Prefetch(
                 "review_events",
                 queryset=ApplicationReviewEvent.objects.filter(
                     kind=ApplicationReviewEvent.Kind.OCCUPANCY_DECLINED
                 ).only("application_id", "reason", "created_at"),
                 to_attr="occupancy_decline_events",
-            )
+            ),
         )
         .order_by("-created_at")
     )
@@ -887,6 +900,21 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
             Bewerbung.objects.filter(wohnung=unit)
             .select_related("person", "wohnung")
             .annotate(
+                latest_viewing_status=Subquery(
+                    ViewingAppointment.objects.filter(application_id=OuterRef("pk")).values(
+                        "status"
+                    )[:1]
+                ),
+                latest_viewing_start=Subquery(
+                    ViewingAppointment.objects.filter(application_id=OuterRef("pk")).values(
+                        "starts_at"
+                    )[:1]
+                ),
+                latest_viewing_end=Subquery(
+                    ViewingAppointment.objects.filter(application_id=OuterRef("pk")).values(
+                        "ends_at"
+                    )[:1]
+                ),
                 requires_pet_review=pet_review_expression,
                 occupancy_mismatch=occupancy_mismatch_expression,
                 latest_invitation_status=Subquery(latest_invitation_status),
@@ -904,6 +932,12 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
             applications = applications.alias(
                 applicant_name=Concat("person__vorname", Value(" "), "person__nachname")
             ).filter(Q(applicant_name__icontains=query) | Q(person__email__icontains=query))
+        if cleaned_filters.get("viewing_status") == "none":
+            applications = applications.filter(latest_viewing_status__isnull=True)
+        elif cleaned_filters.get("viewing_status"):
+            applications = applications.filter(
+                latest_viewing_status=cleaned_filters["viewing_status"]
+            )
         if cleaned_filters.get("people"):
             applications = applications.filter(personenanzahl=cleaned_filters["people"])
         if cleaned_filters.get("status") == "withdrawn":
@@ -980,17 +1014,59 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
 def employee_application_detail(request: HttpRequest, application_id: UUID) -> HttpResponse:
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
+    return _employee_application_detail_response(request, application_id)
+
+
+def _employee_application_detail_response(
+    request, application_id, viewing_form=None, editing_form=None, status=200
+):
     application = get_object_or_404(
         Bewerbung.objects.select_related("person", "wohnung").prefetch_related(
             "bewerbung_stellplaetze__stellplatz"
         ),
         pk=application_id,
     )
+    viewings = list(
+        application.viewings.prefetch_related(
+            Prefetch("events", queryset=ViewingAppointmentEvent.objects.select_related("actor"))
+        )
+    )
+    for appointment in viewings:
+        appointment.application = application
+        events = list(appointment.events.all())
+        appointment.current_notice = next(
+            (
+                event
+                for event in events
+                if event.notification_status != "none"
+                and notification_is_current(
+                    event, appointment, latest_appointment_id=viewings[0].pk
+                )
+            ),
+            None,
+        )
+        appointment.edit_form = ViewingAppointmentForm(
+            appointment=appointment, auto_id=f"id_viewing_{appointment.pk}_%s"
+        )
+        if editing_form is not None and editing_form[0] == appointment.pk:
+            appointment.edit_form = editing_form[1]
     return render(
         request,
         "wohnungsverwaltung/employee_application_detail.html",
         {
             "application": application,
+            "viewings": viewings,
+            "viewing_now": timezone.now(),
+            "viewing_form": viewing_form
+            if viewing_form is not None
+            else ViewingAppointmentForm(
+                auto_id="id_viewing_create_%s", initial={"action": "schedule"}
+            ),
+            "viewing_eligibility_error": viewing_eligibility_error(application),
+            "has_open_viewing": any(appointment.is_open for appointment in viewings),
+            "has_completed_viewing": any(
+                appointment.status == "completed" for appointment in viewings
+            ),
             "suitability_flags": application.suitability_review_flags,
             "can_approve_suitability": (
                 application.status == BewerbungStatus.OPEN
@@ -1016,7 +1092,227 @@ def employee_application_detail(request: HttpRequest, application_id: UUID) -> H
                 else []
             ),
         },
+        status=status,
     )
+
+
+def _lock_viewing_application(application_id):
+    initial = get_object_or_404(Bewerbung, pk=application_id)
+    unit = Wohnung.objects.select_for_update().get(pk=initial.wohnung_id)
+    application = (
+        Bewerbung.objects.select_for_update(of=("self",))
+        .select_related("person", "wohnung")
+        .get(pk=application_id)
+    )
+    application.wohnung = unit
+    return application
+
+
+@never_cache
+@employee_required
+def employee_viewing_create(request, application_id):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    form = ViewingAppointmentForm(request.POST, auto_id="id_viewing_create_%s")
+    with transaction.atomic():
+        application = _lock_viewing_application(application_id)
+        # Acquiring the locks may take long enough for a future start to pass.
+        if not form.is_valid():
+            return _employee_application_detail_response(
+                request, application_id, viewing_form=form, status=400
+            )
+        error = viewing_eligibility_error(application)
+        if application.viewings.filter(status__in=("planned", "confirmed")).exists():
+            error = "Für diese Bewerbung besteht bereits ein offener Termin."
+        if error:
+            messages.error(request, error)
+        else:
+            historical = form.cleaned_data["action"] == "record"
+            appointment = ViewingAppointment.objects.create(
+                application=application,
+                starts_at=form.cleaned_data["starts_at"],
+                ends_at=form.cleaned_data["ends_at"],
+                status="completed" if historical else "planned",
+            )
+            record_viewing_event(
+                appointment,
+                actor=request.user,
+                kind="recorded" if historical else "created",
+                reason=form.cleaned_data["reason"],
+                notify=not historical,
+                notification_url=request.build_absolute_uri(
+                    reverse("wohnungsverwaltung:pre_application_list")
+                ),
+            )
+            messages.success(
+                request,
+                "Die Besichtigung wurde gespeichert. Den Versandstatus sehen Sie am Termin.",
+            )
+    return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
+
+
+@never_cache
+@employee_required
+def employee_viewing_update(request, application_id, appointment_id):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    with transaction.atomic():
+        application = _lock_viewing_application(application_id)
+        appointment = get_object_or_404(
+            ViewingAppointment.objects.select_for_update(),
+            pk=appointment_id,
+            application=application,
+        )
+        if request.POST.get("action") == "reschedule":
+            form = ViewingAppointmentForm(
+                request.POST, appointment=appointment, auto_id=f"id_viewing_{appointment.pk}_%s"
+            )
+        else:
+            form = ViewingActionForm(request.POST)
+        if not form.is_valid():
+            if request.POST.get("action") == "reschedule":
+                return _employee_application_detail_response(
+                    request, application_id, editing_form=(appointment.pk, form), status=400
+                )
+            messages.error(
+                request, "Bitte wählen Sie eine gültige Aktion und begründen Sie eine Absage."
+            )
+        elif form.cleaned_data["version"] != appointment.version:
+            messages.warning(
+                request,
+                "Der Termin wurde zwischenzeitlich geändert. "
+                "Bitte laden Sie den aktuellen Stand und prüfen Sie ihn erneut.",
+            )
+        elif not appointment.is_open:
+            messages.error(
+                request, "Abgeschlossene Termine können nicht erneut geöffnet oder geändert werden."
+            )
+        else:
+            action = form.cleaned_data["action"]
+            error = ""
+            before = appointment.snapshot()
+            notify = action in ("reschedule", "cancel")
+            if action == "reschedule":
+                error = viewing_eligibility_error(application)
+                if not error:
+                    if (
+                        appointment.starts_at == form.cleaned_data["starts_at"]
+                        and appointment.ends_at == form.cleaned_data["ends_at"]
+                    ):
+                        error = "Die Terminzeiten wurden nicht geändert."
+                    else:
+                        appointment.starts_at = form.cleaned_data["starts_at"]
+                        appointment.ends_at = form.cleaned_data["ends_at"]
+                        appointment.status = "planned"
+            elif action == "cancel":
+                appointment.status = "cancelled"
+            elif action in ("complete", "no_show"):
+                if not appointment.can_record_result:
+                    error = "Das Ergebnis kann erst nach Terminende erfasst werden."
+                else:
+                    appointment.status = "completed" if action == "complete" else "no_show"
+            else:
+                error = "Diese Aktion steht Mitarbeitern nicht zur Verfügung."
+            if error:
+                messages.error(request, error)
+            else:
+                appointment.version += 1
+                appointment.save(
+                    update_fields=("starts_at", "ends_at", "status", "version", "updated_at")
+                )
+                record_viewing_event(
+                    appointment,
+                    actor=request.user,
+                    kind="rescheduled" if action == "reschedule" else "status_changed",
+                    reason=form.cleaned_data["reason"],
+                    before=before,
+                    notify=notify,
+                    notification_url=request.build_absolute_uri(
+                        reverse("wohnungsverwaltung:pre_application_list")
+                    ),
+                )
+                messages.success(request, "Die Besichtigung wurde aktualisiert.")
+    return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
+
+
+@never_cache
+@applicant_required
+def applicant_viewing_response(request, application_id, appointment_id):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    with transaction.atomic():
+        application = get_object_or_404(
+            Bewerbung.objects.select_for_update(),
+            pk=application_id,
+            person=_applicant_for_user(request),
+        )
+        appointment = get_object_or_404(
+            ViewingAppointment.objects.select_for_update(),
+            pk=appointment_id,
+            application=application,
+        )
+        form = ViewingActionForm(request.POST)
+        if not form.is_valid() or form.cleaned_data["action"] not in ("confirm", "decline"):
+            messages.error(request, "Bitte wählen Sie eine gültige Rückmeldung.")
+        elif form.cleaned_data["version"] != appointment.version:
+            messages.warning(
+                request,
+                "Der Termin wurde zwischenzeitlich geändert. Bitte prüfen Sie den aktuellen Stand.",
+            )
+        elif (
+            application.status != BewerbungStatus.OPEN
+            or application.interest_withdrawn_at
+            or not appointment.can_respond
+        ):
+            messages.error(request, "Für diesen Termin ist keine Rückmeldung mehr möglich.")
+        elif form.cleaned_data["action"] == "confirm" and appointment.status != "planned":
+            messages.info(request, "Dieser Termin wurde bereits bestätigt.")
+        else:
+            before = appointment.snapshot()
+            appointment.status = (
+                "confirmed" if form.cleaned_data["action"] == "confirm" else "applicant_declined"
+            )
+            appointment.version += 1
+            appointment.save(update_fields=("status", "version", "updated_at"))
+            record_viewing_event(
+                appointment, actor=request.user, kind="status_changed", before=before
+            )
+            messages.success(request, "Ihre Rückmeldung wurde gespeichert.")
+    return redirect("wohnungsverwaltung:pre_application_list")
+
+
+@never_cache
+@employee_required
+def employee_viewing_resend(request, application_id, appointment_id):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    appointment = get_object_or_404(
+        ViewingAppointment.objects.select_related("application"),
+        pk=appointment_id,
+        application_id=application_id,
+    )
+    try:
+        event_id = UUID(request.POST.get("event", ""))
+    except (ValueError, TypeError):
+        messages.error(request, "Bitte wählen Sie die aktuelle Benachrichtigung.")
+    else:
+        event = get_object_or_404(ViewingAppointmentEvent, pk=event_id, appointment=appointment)
+        if event.notification_status in ("none", "obsolete") or not notification_is_current(
+            event, appointment
+        ):
+            messages.error(
+                request,
+                "Diese Benachrichtigung ist überholt und kann nicht erneut gesendet werden.",
+            )
+        elif send_viewing_notification(event.pk, actor=request.user):
+            messages.success(request, "Die Terminbenachrichtigung wurde versendet.")
+        else:
+            messages.error(
+                request,
+                "Die Terminbenachrichtigung konnte nicht versendet werden. "
+                "Bitte prüfen Sie den aktuellen Versandstatus.",
+            )
+    return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
 
 
 @employee_required
@@ -1164,6 +1460,13 @@ def employee_application_invite(request: HttpRequest, application_id: UUID) -> H
             )
         elif application.submitted_at is not None:
             messages.info(request, "Die Main-Bewerbung wurde bereits eingereicht.")
+        elif (
+            not application.main_application_unlocked
+            and not application.viewings.filter(status="completed").exists()
+        ):
+            messages.error(
+                request, "Bitte dokumentieren Sie zuerst eine durchgeführte Besichtigung."
+            )
         elif application.suitability_review_flags and not current_approval:
             messages.error(request, "Bitte prüfen Sie zuerst die Abweichungen zur Wohnung.")
         elif application.main_application_unlocked:
@@ -1410,6 +1713,9 @@ def application_withdraw(request: HttpRequest, application_id: UUID) -> HttpResp
         )
         application.interest_withdrawn_at = timezone.now()
         application.save(update_fields=["interest_withdrawn_at", "updated_at"])
+        cancel_open_viewings(
+            application.pk, reason="Bewerber hat die Bewerbung zurückgezogen", actor=request.user
+        )
 
     messages.success(request, "Ihr Interesse an dieser Bewerbung wurde zurückgezogen.")
     return redirect("wohnungsverwaltung:pre_application_list")

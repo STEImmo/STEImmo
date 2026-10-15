@@ -28,6 +28,7 @@ from .models import (
     Person,
     Stellplatz,
     StellplatzTyp,
+    ViewingAppointment,
     Wohnung,
 )
 
@@ -470,6 +471,15 @@ class EmployeeDashboardDisclosureTests(TestCase):
 
 
 class EmployeeApplicationSelectionTests(TestCase):
+    def record_completed_viewing(self, application):
+        start = timezone.now() - timedelta(days=1)
+        ViewingAppointment.objects.create(
+            application=application,
+            starts_at=start,
+            ends_at=start + timedelta(minutes=30),
+            status="completed",
+        )
+
     def setUp(self):
         self.employee = get_user_model().objects.create_user(username="selection-employee")
         self.employee.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
@@ -510,6 +520,10 @@ class EmployeeApplicationSelectionTests(TestCase):
             "wohnungsverwaltung:employee_application_detail", args=[self.match.pk]
         )
         response = self.client.get(open_detail_url)
+        self.assertContains(response, "Für die Main-Freischaltung fehlt")
+        self.assertNotContains(response, "Main-Bewerbung freischalten und einladen")
+        self.record_completed_viewing(self.match)
+        response = self.client.get(open_detail_url)
         self.assertContains(response, "Main-Bewerbung freischalten und einladen")
         self.assertContains(response, "Ich bestätige die positive Entscheidung")
 
@@ -524,6 +538,7 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.assertNotContains(response, "Main-Bewerbung freischalten und einladen")
 
     def test_review_forms_have_unique_reason_ids_and_matching_labels(self):
+        self.record_completed_viewing(self.pet_exception)
         self.configure_requirements()
         response = self.client.get(
             reverse("wohnungsverwaltung:employee_application_detail", args=[self.pet_exception.pk])
@@ -844,6 +859,7 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.assertEqual(self.match.review_priority, Bewerbung.Priority.UNRATED)
 
     def test_pet_invitation_requires_current_approval_and_repeated_unlock_is_idempotent(self):
+        self.record_completed_viewing(self.pet_exception)
         self.configure_requirements()
         invite_url = reverse(
             "wohnungsverwaltung:employee_application_invite", args=[self.pet_exception.pk]
@@ -904,6 +920,7 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.assertNotContains(response, "Hoch")
 
     def test_invitation_unlocks_only_selected_application_and_sends_email(self):
+        self.record_completed_viewing(self.match)
         person = self.match.person
         person.user = self.applicant_user
         person.save(update_fields=["user"])
@@ -937,6 +954,7 @@ class EmployeeApplicationSelectionTests(TestCase):
         )
 
     def test_failed_invitation_keeps_unlock_and_can_be_resent(self):
+        self.record_completed_viewing(self.match)
         self.match.person.user = self.applicant_user
         self.match.person.save(update_fields=["user"])
         invite_url = reverse("wohnungsverwaltung:employee_application_invite", args=[self.match.pk])

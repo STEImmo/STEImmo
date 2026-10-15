@@ -169,6 +169,31 @@ Formularprüfung und erneut am gesperrten aktuellen Datensatz vor dem Speichern 
 Die Anwendung kürzt Namen nicht stillschweigend.
 Das Person-Modell und bestehende Migrationen bleiben unverändert.
 
+### Besichtigungstermine (Issue #32)
+
+Termine gehören zu einer Bewerbung; die Wohnung wird aus deren Zuordnung ermittelt.
+Mitarbeiter verwenden das bestehende Mitarbeiterrecht für Zuweisung, Verschiebung,
+Absage, Ergebnisdokumentation und begründete Nachträge. Neue Zuweisungen und
+Verschiebungen verlangen eine aktive, bewertete und aktuell passende Bewerbung.
+Die Main-Freischaltung verlangt zusätzlich eine durchgeführte Besichtigung derselben
+Bewerbung. Bereits vorhandene Freischaltungen behalten ihre Gültigkeit.
+
+Bewerber sehen Termine ausschließlich über ihre eigene Personen-/Bewerbungszuordnung.
+Sie können vor Beginn zusagen oder den Termin absagen, ohne die Bewerbung zu beenden.
+Fremde Terminkennungen sowie gemischte Bewerbungs-/Terminkennungen liefern 404.
+Interne Gründe, Mitarbeiterdaten und der vollständige Änderungsverlauf bleiben
+dem Mitarbeiterbereich vorbehalten. Terminansichten verwenden private `no-store`-Header.
+Alle Änderungen benötigen POST und CSRF; eine Terminversion verhindert das
+Überschreiben zwischenzeitlicher Antworten. Zeilensperren und ein bedingter
+Unique-Constraint erlauben höchstens einen offenen Termin je Bewerbung.
+
+Einladungen, Verschiebungen und Mitarbeiterabsagen werden nach erfolgreichem Commit
+per E-Mail mitgeteilt. Der Termin bleibt bei Versandfehler erhalten; nur die aktuelle,
+weiterhin zutreffende Benachrichtigung kann wiederholt werden. Eine Personenlimit-
+Ablehnung sagt offene Termine in derselben Transaktion ab und benachrichtigt den
+Bewerber. Ein Rückzug sagt ebenfalls offene Termine ab, versendet aber keine
+zusätzliche Nachricht. Historische abgeschlossene Termine bleiben erhalten.
+
 ## Erweiterungsroutine
 
 Für eine neue geschützte Seite wird in dieser Reihenfolge vorgegangen:
