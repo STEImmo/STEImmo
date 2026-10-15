@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Bildnachweise – STE Immobilien eGbR{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <a class="uk-button uk-button-text" href="{% url 'home' %}">Zur Startseite</a>
+        <h1>Bildnachweise</h1>
+        <div class="uk-card uk-card-default uk-card-body">
+            <h2 class="uk-card-title">Würzburg aus der Luft</h2>
+            <p>„Würzburg – Alte Mainbrücke“, © <a href="https://commons.wikimedia.org/wiki/User:SimonWaldherr">Simon Waldherr</a>, aufgenommen am 2. April 2018.</p>
+            <p>Quelle: <a href="https://commons.wikimedia.org/wiki/File:W%C3%BCrzburg_-_Alte_Mainbr%C3%BCcke.jpg">Wikimedia Commons</a>. Lizenz: <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.</p>
+            <p>Verwendet wird die verkleinerte Bildversion. Auf der Startseite wird je nach Bildschirm ein Ausschnitt mit einer dunklen Überlagerung angezeigt. Das Bild zeigt die Stadt Würzburg; es zeigt weder unser Mietgebäude noch dessen genaue Lage.</p>
+        </div>
+        <div class="uk-card uk-card-default uk-card-body uk-margin-top">
+            <h2 id="einzug" class="uk-card-title">Einzugsmotiv auf den Kontoseiten</h2>
+            <p>Das Motiv mit Umzugskartons, Schlüsseln und einer Pflanze wurde mit KI erstellt. Es dient als Sinnbild für den Einzug und zeigt keine tatsächliche Mietwohnung oder deren Ausstattung.</p>
+        </div>
+    </div>
+</section>
+{% endblock %}

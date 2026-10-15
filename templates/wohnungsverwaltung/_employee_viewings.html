@@ -1,4 +1,4 @@
-<article class="uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
+<article class="management-panel employee-viewings uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
     <h2 class="uk-card-title">Besichtigung</h2>
     {% if viewing_eligibility_error %}
         <div class="uk-alert-warning" uk-alert><p>{{ viewing_eligibility_error }} Neue Termine oder Verschiebungen sind erst nach Klärung möglich.</p></div>
@@ -20,7 +20,8 @@
                         <summary>Termin verschieben</summary>
                         <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_update' application.pk appointment.pk %}" class="uk-form-stacked uk-margin-top" data-viewing-time-form data-current-time="{{ viewing_now|date:'c' }}">
                             {% csrf_token %}
-                            {{ appointment.edit_form.as_p }}
+                            {% if appointment.edit_form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ appointment.edit_form.non_field_errors }}</div>{% endif %}
+                            {% for field in appointment.edit_form %}{% if field.is_hidden %}{{ field }}{% else %}{% include "wohnungsverwaltung/_form_field.html" with field=field only %}{% endif %}{% endfor %}
                             <p class="uk-text-meta">Eine bestehende Zusage wird bei Verschiebung zurückgesetzt. Der Bewerber erhält eine neue E-Mail.</p>
                             <button type="submit" class="uk-button uk-button-default">Verschiebung speichern</button>
                         </form>
@@ -62,7 +63,8 @@
         <h3 class="uk-h4">Termin planen oder Besichtigung nachtragen</h3>
         <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_create' application.pk %}" class="uk-form-stacked" data-viewing-time-form data-current-time="{{ viewing_now|date:'c' }}">
             {% csrf_token %}
-            {{ viewing_form.as_p }}
+            {% if viewing_form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ viewing_form.non_field_errors }}</div>{% endif %}
+                            {% for field in viewing_form %}{% if field.is_hidden %}{{ field }}{% else %}{% include "wohnungsverwaltung/_form_field.html" with field=field only %}{% endif %}{% endfor %}
             <p class="uk-text-meta">Standarddauer: 30 Minuten. Eine geänderte Dauer bleibt bei Änderungen am Beginn erhalten.</p>
             <p class="uk-text-meta">Geplante Termine müssen zukünftig sein. Nachträge erfordern einen vergangenen Termin und eine Begründung. Die Zeiten gelten in Europe/Berlin.</p>
             <button type="submit" class="uk-button uk-button-primary">Besichtigung speichern</button>

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="uk-section application-area">
+    <div class="uk-container">
+        <header class="application-heading">
+            <div><p class="application-eyebrow">Ihr Bewerberbereich</p><h1>{% block application_heading %}{% endblock %}</h1><p>{% block application_intro %}{% endblock %}</p></div>
+            <div>{% block application_actions %}<a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:pre_application_list' %}">Zurück zu meinen Bewerbungen</a>{% endblock %}</div>
+        </header>
+        <div class="application-layout">
+            <aside class="application-sidebar">
+                <p class="application-eyebrow">So geht es weiter</p>
+                {% block application_progress %}{% include "wohnungsverwaltung/_application_progress.html" %}{% endblock %}
+                <div class="application-sidebar-note"><span uk-icon="info" aria-hidden="true"></span><p>Die Hauptbewerbung wird erst nach Besichtigung und Freigabe geöffnet.</p></div>
+            </aside>
+            <div class="application-main">{% block application_content %}{% endblock %}</div>
+        </div>
+    </div>
+</section>
+{% endblock %}

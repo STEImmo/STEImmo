@@ -1,63 +1,52 @@
 {% extends "base.html" %}
-
-{% block title %}Wohnungen finden – STEImmo{% endblock %}
-
+{% block title %}Wohnungen finden – STE Immobilien eGbR{% endblock %}
 {% block content %}
-<section class="uk-section uk-section-default">
+<section class="uk-section apartment-search">
     <div class="uk-container">
-        <h1 class="uk-heading-medium">Wohnungen finden</h1>
-        <p class="uk-text-lead">Filtern Sie die verfügbaren Wohnungen nach Ihren Wünschen.</p>
-        <a class="uk-button uk-button-default uk-margin-bottom" href="{% url 'wohnungsverwaltung_public:building_view' %}">Gebäude und Etagen erkunden</a>
-
-        <form method="get" action="{% url 'wohnungsverwaltung_public:apartment_search' %}" class="uk-card uk-card-default uk-card-body uk-margin-large-bottom" novalidate>
-            <div class="uk-grid-small uk-child-width-1-2@s uk-child-width-1-4@m" uk-grid>
-                {% for field in form %}
-                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=field %}</div>
-                {% endfor %}
+        <header class="apartment-search-heading">
+            <div><p class="application-eyebrow">STE Immobilien eGbR · Würzburg</p><h1>Wohnungen finden</h1><p>Vergleichen Sie die verfügbaren Wohnungen in unserem Gebäude.</p></div>
+            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:building_view' %}"><span uk-icon="home" aria-hidden="true"></span> Gebäude erkunden</a>
+        </header>
+        <div class="apartment-search-layout">
+            <div class="apartment-search-filter-column">
+            <aside class="apartment-search-filter-panel" aria-labelledby="apartment-filter-title" uk-sticky="offset: 24; end: .apartment-search-layout; media: 960">
+                <h2 id="apartment-filter-title">Filter</h2>
+                <button class="uk-button uk-button-default apartment-search-filter-toggle" type="button" hidden aria-controls="apartment-filter-body" aria-expanded="true" data-mobile-filter-toggle>Filter anzeigen{% if has_filters %} · Filter aktiv{% endif %}</button>
+                <div id="apartment-filter-body" class="apartment-search-filter-body" data-filter-errors="{% if form.errors %}true{% else %}false{% endif %}">
+                <form method="get" action="{% url 'wohnungsverwaltung_public:apartment_search' %}" novalidate>
+    <div class="apartment-search-fields">
+        <fieldset class="uk-fieldset"><legend>Wohnfläche · m²</legend><div class="apartment-search-range">{% include "wohnungsverwaltung/_apartment_search_field.html" with field=form.groesse_min label="Von" %}{% include "wohnungsverwaltung/_apartment_search_field.html" with field=form.groesse_max label="Bis" %}</div></fieldset>
+        <fieldset class="uk-fieldset"><legend>Kaltmiete · € / Monat</legend><div class="apartment-search-range">{% include "wohnungsverwaltung/_apartment_search_field.html" with field=form.kaltmiete_min label="Von" %}{% include "wohnungsverwaltung/_apartment_search_field.html" with field=form.kaltmiete_max label="Bis" %}</div></fieldset>
+        <fieldset class="uk-fieldset"><legend>Zimmer</legend><div class="apartment-search-range">{% include "wohnungsverwaltung/_apartment_search_field.html" with field=form.zimmer_min label="Von" %}{% include "wohnungsverwaltung/_apartment_search_field.html" with field=form.zimmer_max label="Bis" %}</div></fieldset>
+        <div>{% include "wohnungsverwaltung/_apartment_search_field.html" with field=form.etage label="Etage" %}</div>
+    </div>
+    <div class="apartment-search-filter-actions"><button class="uk-button uk-button-primary" type="submit">Wohnungen anzeigen <span uk-icon="search" aria-hidden="true"></span></button><a href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Filter zurücksetzen</a></div>
+    <p class="uk-text-meta apartment-search-filter-note">Wohnungen ohne hinterlegte Miete oder Zimmerzahl werden bei entsprechenden Filtern nicht berücksichtigt.</p>
+</form>
+                </div>
+            </aside>
             </div>
-            <div class="uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
-                <div><button class="uk-button uk-button-primary" type="submit">Filter anwenden</button></div>
-                <div><a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Filter zurücksetzen</a></div>
-            </div>
-        </form>
-
-        <h2 class="uk-h3">Verfügbare Wohnungen</h2>
-        {% if wohnungen %}
-            <div class="uk-grid-medium uk-child-width-1-2@m uk-child-width-1-3@l" uk-grid>
-                {% for wohnung in wohnungen %}
-                    <article>
-                        <div class="uk-card uk-card-default uk-card-body">
-                            {% include "wohnungsverwaltung/_apartment_image_placeholder.html" with wohnung=wohnung %}
-                            <div class="uk-flex uk-flex-between uk-flex-middle">
-                                <h3 class="uk-card-title">Wohnung {{ wohnung.display_number }}</h3>
-                                <span class="uk-label uk-label-success">Verfügbar</span>
-                            </div>
-                            <dl class="uk-description-list uk-description-list-divider">
-                                <dt>Gebäude und Etage</dt>
-                                <dd>{{ wohnung.gebaeudenummer }}, {% if wohnung.etage == 0 %}Erdgeschoss{% else %}Etage {{ wohnung.etage }}{% endif %}</dd>
-                                <dt>Wohnfläche</dt>
-                                <dd>{% if wohnung.groesse_qm > 0 %}{{ wohnung.groesse_qm }} m²{% else %}Wohnfläche noch nicht angegeben{% endif %}</dd>
-                                <dt>Zimmer</dt>
-                                <dd>{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl }}{% else %}Noch nicht angegeben{% endif %}</dd>
-                                <dt>Kaltmiete</dt>
-                                <dd>{% if wohnung.kaltmiete > 0 %}{{ wohnung.kaltmiete }} €{% else %}Noch nicht angegeben{% endif %}</dd>
-                            </dl>
-                            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' wohnung.pk %}">
-                                Details ansehen
-                            </a>
-                        </div>
-                    </article>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="uk-alert-primary" uk-alert>
-                {% if request.GET %}
-                    <p>Keine verfügbaren Wohnungen passen zu diesen Filtern.</p>
+            <div class="apartment-search-results">
+                {% if form.errors %}
+                <div class="uk-alert-danger" role="alert">Bitte prüfen Sie die markierten Filterwerte. Danach können Sie die Suche erneut starten.</div>
                 {% else %}
-                    <p>Zurzeit sind keine Wohnungen verfügbar.</p>
+                <div class="apartment-search-result-heading"><h2>{{ result_count }} Wohnung{{ result_count|pluralize:"en" }} {% if has_filters %}gefunden{% else %}verfügbar{% endif %}</h2><span>Nur verfügbare Wohnungen</span></div>
+                {% if rows %}<div class="apartment-search-result-grid">
+                    {% for row in rows %}<article class="uk-card uk-card-default apartment-search-card">
+    <a class="apartment-search-image" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' row.unit.pk %}" aria-label="Wohnung {{ row.unit.display_number }} ansehen">
+        {% if row.photo %}<img src="{% url 'wohnungsverwaltung_public:apartment_photo' row.photo.pk %}" alt="{{ row.photo.caption|default:'Wohnungsfoto' }}" loading="lazy" width="800" height="600"><span class="apartment-search-caption">{{ row.photo.caption|default:'Wohnungsfoto' }}</span>{% else %}<span class="apartment-search-photo-placeholder"><span uk-icon="icon: image; ratio: 2" aria-hidden="true"></span><span>Wohnungsfoto folgt</span></span>{% endif %}
+    </a>
+    <div class="uk-card-body apartment-search-card-content">
+        <div class="apartment-search-card-heading"><div><p class="uk-text-meta">{{ row.floor }}</p><h3>Wohnung {{ row.unit.display_number }}</h3></div><span class="uk-label uk-label-success">Verfügbar</span></div>
+        <dl class="apartment-search-facts"><div><dt>Wohnfläche</dt><dd>{% if row.unit.groesse_qm > 0 %}{{ row.unit.groesse_qm }} m²{% else %}Wohnfläche noch nicht angegeben{% endif %}</dd></div><div><dt>Zimmer</dt><dd>{% if row.unit.zimmeranzahl > 0 %}{{ row.unit.zimmeranzahl }}{% else %}Noch nicht angegeben{% endif %}</dd></div></dl>
+        <div class="apartment-search-card-bottom"><div><span class="uk-text-meta">Kaltmiete / Monat</span><p>{% if row.unit.kaltmiete > 0 %}<strong>{{ row.unit.kaltmiete }} €</strong>{% else %}Noch nicht angegeben{% endif %}</p></div><a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' row.unit.pk %}">Details ansehen <span uk-icon="arrow-right" aria-hidden="true"></span></a></div>
+    </div>
+</article>{% endfor %}
+                </div>{% else %}<article class="uk-card uk-card-default uk-card-body apartment-search-empty"><span uk-icon="icon: search; ratio: 2" aria-hidden="true"></span><h3>{% if has_filters %}Keine verfügbaren Wohnungen passen zu diesen Filtern.{% else %}Zurzeit sind keine Wohnungen verfügbar.{% endif %}</h3><p>{% if has_filters %}Passen Sie Ihre Filter an oder sehen Sie sich alle verfügbaren Wohnungen an.{% else %}Sie können unser Gebäude und die Etagen weiterhin erkunden.{% endif %}</p>{% if has_filters %}<a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Filter zurücksetzen</a>{% else %}<a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:building_view' %}">Gebäude erkunden</a>{% endif %}</article>{% endif %}
                 {% endif %}
+                <p class="apartment-search-journey"><span uk-icon="info" aria-hidden="true"></span> Erst die Wohnung ansehen, dann „Zur Besichtigung anmelden“ wählen. Die Wohnung wird in Ihre Anfrage übernommen.</p>
             </div>
-        {% endif %}
+        </div>
     </div>
 </section>
 {% endblock %}

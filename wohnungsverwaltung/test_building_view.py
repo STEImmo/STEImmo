@@ -23,6 +23,50 @@ from .models import ApartmentPhoto, HandoverPhotoCleanup, Person, Wohnung, Wohnu
 
 
 class BuildingViewTests(TestCase):
+    def test_selected_architecture_layouts_use_live_inventory_in_all_environments(self):
+        unit = self.create_unit("001", 0)
+        taken = self.create_unit("002", 0, WohnungStatus.TAKEN)
+        for debug in (True, False):
+            for name, args in (("building_view", []), ("floor_view", [0])):
+                with self.subTest(page=name, debug=debug), override_settings(DEBUG=debug):
+                    response = self.client.get(
+                        reverse("wohnungsverwaltung_public:" + name, args=args)
+                    )
+                    self.assertContains(response, "architecture-view")
+                    self.assertNotContains(response, "Designvergleich")
+                    self.assertNotContains(response, "?entwurf=")
+                    if name == "floor_view":
+                        self.assertContains(
+                            response,
+                            reverse(
+                                "wohnungsverwaltung_public:apartment_detail_placeholder",
+                                args=[unit.pk],
+                            ),
+                        )
+                        self.assertNotContains(
+                            response,
+                            reverse(
+                                "wohnungsverwaltung_public:apartment_detail_placeholder",
+                                args=[taken.pk],
+                            ),
+                        )
+                        self.assertContains(
+                            response, "uk-button-default architecture-apartment-link"
+                        )
+                    else:
+                        self.assertEqual(response.context["total_units"], 2)
+                        self.assertEqual(response.context["total_available"], 1)
+
+    def test_old_design_links_show_the_selected_layout_without_comparison(self):
+        self.create_unit("001", 0)
+        for name, args in (("building_view", []), ("floor_view", [0])):
+            for variant in ("a", "b", "c", "unknown"):
+                response = self.client.get(
+                    reverse("wohnungsverwaltung_public:" + name, args=args), {"entwurf": variant}
+                )
+                self.assertContains(response, "architecture-view")
+                self.assertNotContains(response, "Designvergleich")
+
     def test_missing_area_is_not_advertised_on_public_pages(self):
         for status in (WohnungStatus.FREE, WohnungStatus.TAKEN):
             with self.subTest(status=status):
@@ -51,7 +95,9 @@ class BuildingViewTests(TestCase):
         response = self.client.get(
             reverse("wohnungsverwaltung_public:apartment_detail_placeholder", args=[unit.pk])
         )
-        self.assertContains(response, "Noch nicht angegeben", count=9)
+        self.assertContains(response, "Noch nicht angegeben")
+        self.assertContains(response, "Preis folgt")
+        self.assertContains(response, "Noch offen")
         self.assertNotContains(response, "0,00 €")
         floor = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[0]))
         self.assertContains(floor, "Zimmerzahl noch nicht angegeben")
@@ -178,7 +224,7 @@ class BuildingViewTests(TestCase):
         self.assertContains(
             response,
             reverse("wohnungsverwaltung_public:floor_view", args=[2]) + "#etagenplan",
-            count=1,
+            count=2,
         )
         response = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[2]))
         self.assertContains(response, 'id="etagenplan"', count=1)
@@ -361,6 +407,21 @@ class BuildingViewTests(TestCase):
             reverse("wohnungsverwaltung_public:viewing_request", args=[unit.pk]),
         )
 
+    @override_settings(DEBUG=False)
+    def test_selected_detail_keeps_real_actions_without_design_controls(self):
+        unit = self.create_unit("001", 0)
+        response = self.client.get(
+            reverse("wohnungsverwaltung_public:apartment_detail_placeholder", args=[unit.pk])
+        )
+        self.assertContains(response, 'aria-label="Mietangaben"')
+        self.assertContains(
+            response,
+            'href="' + reverse("wohnungsverwaltung_public:viewing_request", args=[unit.pk]) + '"',
+        )
+        self.assertNotContains(response, "Ihre monatlichen Kosten")
+        self.assertNotContains(response, "Designvergleich")
+        self.assertNotContains(response, "Anfrage ist deaktiviert")
+
     def test_unavailable_detail_is_not_public(self):
         unit = self.create_unit("A-18", 2, WohnungStatus.TAKEN)
         response = self.client.get(
@@ -443,7 +504,9 @@ class ViewingRequestEntryTests(TestCase):
         self.user.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
         self.client.force_login(self.user)
         response = self.client.get(self.url)
-        self.assertContains(response, "Für diese Anfrage benötigen Sie ein Bewerberkonto")
+        self.assertContains(response, "Mit diesem Konto können Sie keine Besichtigung anfragen")
+        self.assertContains(response, "Mit Bewerberkonto anmelden")
+        self.assertNotContains(response, "Designvergleich")
         protected = reverse(
             "wohnungsverwaltung:pre_application_create_for_unit", args=[self.unit.pk]
         )

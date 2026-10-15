@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}{{ title }} – STEImmo{% endblock %}
+{% block title %}{{ title }} – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section uk-section-default">
+<section class="uk-section uk-section-default management-page">
     <div class="uk-container uk-container-small">
-        <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
+        <div class="management-page__heading uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-margin-bottom">
             <h1 class="uk-heading-small uk-margin-remove">{{ title }}</h1>
             <a class="uk-button uk-button-default" href="{% url 'verwaltung:stellplatz_list' %}">Zur Übersicht</a>
         </div>
@@ -17,13 +18,19 @@
             {% for error in zuordnung_form.non_field_errors %}
                 <div class="uk-alert-danger" uk-alert><p>{{ error }}</p></div>
             {% endfor %}
-            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+            <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
                 <h2 class="uk-h3">Stellplatzstammdaten</h2>
+                <div class="management-form-grid">
+                <div>
                 {% include "wohnungsverwaltung/_form_field.html" with field=form.name %}
+                </div><div>
                 {% include "wohnungsverwaltung/_form_field.html" with field=form.stellplatz_typ %}
+                </div><div>
                 {% include "wohnungsverwaltung/_form_field.html" with field=form.miete %}
+                </div>
+                </div>
             </section>
-            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+            <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
                 <h2 class="uk-h3">Zuordnung zur Wohnung</h2>
                 <p class="uk-text-muted uk-text-small">Optional. Ohne Auswahl bleibt der Stellplatz unzugeordnet.</p>
                 {% include "wohnungsverwaltung/_form_field.html" with field=zuordnung_form.wohnung %}

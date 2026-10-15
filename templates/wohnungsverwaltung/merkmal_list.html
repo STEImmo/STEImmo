@@ -1,31 +1,32 @@
 {% extends "base.html" %}
 
-{% block title %}Merkmalvorlagen verwalten – STEImmo{% endblock %}
+{% block title %}Prüfvorlagen verwalten – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section uk-section-default">
+<section class="uk-section uk-section-default management-page">
     <div class="uk-container">
-        <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-margin-bottom">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
+        <div class="management-page__heading uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-margin-bottom">
             <div>
-                <h1 class="uk-heading-small uk-margin-remove-bottom">Merkmalvorlagen</h1>
-                <p class="uk-text-muted uk-margin-small-top">Globale Vorlagen für Raumprüfungen.</p>
+                <h1 class="uk-heading-small uk-margin-remove-bottom">Prüfvorlagen</h1>
+                <p class="uk-text-muted uk-margin-small-top">Legen Sie fest, was bei Wohnungsübergaben in den einzelnen Räumen geprüft und dokumentiert wird.</p>
             </div>
-            <a class="uk-button uk-button-primary uk-margin-small-top" href="{% url 'verwaltung:merkmal_create' %}">Merkmalvorlage anlegen</a>
+            <a class="uk-button uk-button-primary uk-margin-small-top" href="{% url 'verwaltung:merkmal_create' %}">Prüfvorlage anlegen</a>
         </div>
-        <div class="uk-overflow-auto">
-            <table class="uk-table uk-table-divider uk-table-middle">
-                <thead><tr><th>Wo wird geprüft?</th><th>Was wird geprüft?</th><th>Vorgegebene Bewertung</th><th>Zusätzliche Angaben</th><th><span class="uk-hidden">Aktion</span></th></tr></thead>
+        <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Verwaltungstabelle">
+            <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
+                <thead><tr><th>Wo wird geprüft?</th><th>Was wird geprüft?</th><th>Vorgegebene Bewertung</th><th>Zusätzliche Angaben</th><th><span class="uk-hidden-visually">Aktion</span></th></tr></thead>
                 <tbody>
                     {% for merkmal in merkmale %}
                         <tr>
-                            <td>{{ merkmal.bereich }}</td>
-                            <td>{{ merkmal.bezeichnung }}</td>
-                            <td><span class="uk-label">{{ merkmal.datentyp }}</span></td>
-                            <td>{{ merkmal.optionen|join:", " }}</td>
-                            <td class="uk-text-right"><a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:merkmal_edit' merkmal.pk %}">Bearbeiten</a></td>
+                            <td data-label="Wo wird geprüft?">{{ merkmal.bereich }}</td>
+                            <td data-label="Was wird geprüft?">{{ merkmal.bezeichnung }}</td>
+                            <td data-label="Vorgegebene Bewertung"><span class="uk-label">{{ merkmal.datentyp }}</span></td>
+                            <td data-label="Zusätzliche Angaben">{{ merkmal.optionen|join:", " }}</td>
+                            <td class="uk-text-right" data-label="Aktion"><a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:merkmal_edit' merkmal.pk %}">Bearbeiten</a></td>
                         </tr>
                     {% empty %}
-                        <tr><td colspan="5" class="uk-text-muted">Noch keine Merkmalvorlagen angelegt.</td></tr>
+                        <tr><td colspan="5" class="uk-text-muted">Noch keine Prüfvorlagen angelegt.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

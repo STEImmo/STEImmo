@@ -1,15 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}{{ title }} – STEImmo{% endblock %}
+{% block title %}{{ title }} – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section uk-section-default">
+<section class="uk-section uk-section-default management-page">
     <div class="uk-container uk-container-small">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
         <a class="uk-button uk-button-text" href="{% url 'verwaltung:wohnung_edit' wohnung.pk %}">Zur Wohnung</a>
         <h1 class="uk-heading-small">{{ title }}</h1>
         <p class="uk-text-meta">{{ wohnung }}</p>
-        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top">
+        <form method="post" class="management-panel uk-card uk-card-default uk-card-body uk-margin-top">
             {% csrf_token %}
+            {% if form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
             {% include "wohnungsverwaltung/_form_field.html" with field=form.name %}
             <button class="uk-button uk-button-primary" type="submit">Speichern</button>
         </form>

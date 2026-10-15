@@ -1,22 +1,29 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}Übergabe prüfen und unterschreiben – STEImmo{% endblock %}
+{% block title %}Übergabe prüfen und unterschreiben – STE Immobilien eGbR{% endblock %}
 {% block content %}
-<section class="uk-section"><div class="uk-container uk-container-small">
+<section class="uk-section handover-page"><div class="uk-container">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="handover" %}
     <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}">Zurück zum Protokoll</a>
     <h1>Übergabe prüfen und unterschreiben</h1>
     <p>Bitte prüfen Sie gemeinsam den vollständigen Inhalt. Die Unterschriften gelten für den hier angezeigten Stand.</p>
+    {% if completion_errors %}
+        {% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk as protocol_url %}
+        {% with rooms_url=protocol_url|add:"#protocol-rooms" %}
+        {% include "partials/_status_notice.html" with notice_tone="danger" notice_role="alert" notice_label="Abschluss blockiert" notice_title="Das Protokoll ist noch nicht vollständig" notice_errors=completion_errors notice_next="Ergänzen Sie die genannten Angaben und prüfen Sie anschließend den Abschluss erneut." notice_primary_url=protocol_url notice_primary_label="Fehlende Angaben ergänzen" notice_secondary_url=rooms_url notice_secondary_label="Zu Räumen und Prüfpunkten" only %}
+        {% endwith %}
+    {% endif %}
+    <div class="handover-document-grid">
     {% for section in snapshot.sections %}
-        <article class="uk-card uk-card-default uk-card-body uk-margin">
+        <article class="uk-card uk-card-default uk-card-body handover-card uk-margin">
             <h2 class="uk-card-title">{{ section.title }}</h2>
             <dl class="uk-description-list uk-description-list-divider">{% for label, value in section.rows %}<dt>{{ label }}</dt><dd>{{ value|linebreaksbr }}</dd>{% endfor %}</dl>
         </article>
     {% endfor %}
+    </div>
     {% include "wohnungsverwaltung/_handover_snapshot_rooms.html" with snapshot=snapshot only %}
-    {% if completion_errors %}
-        <div class="uk-alert-danger" role="alert"><ul>{% for error in completion_errors %}<li>{{ error }}</li>{% endfor %}</ul></div>
-    {% else %}
-        <form id="handover-signing-form" method="post" enctype="multipart/form-data" action="{% url 'wohnungsverwaltung:handover_protocol_confirm' protocol.pk %}" class="uk-card uk-card-default uk-card-body uk-margin">
+    {% if not completion_errors %}
+        <form id="handover-signing-form" method="post" enctype="multipart/form-data" action="{% url 'wohnungsverwaltung:handover_protocol_confirm' protocol.pk %}" class="uk-card uk-card-default uk-card-body handover-card uk-margin">
             {% csrf_token %}{{ form.content_token }}
             <h2>Unterschriften</h2>
             <div class="uk-margin"><label>{{ form.schluessel_ueberprueft }} {{ form.schluessel_ueberprueft.label }}</label></div>

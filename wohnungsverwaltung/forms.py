@@ -11,7 +11,10 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import Group, Permission
-from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.password_validation import (
+    password_validators_help_text_html,
+    validate_password,
+)
 from django.contrib.sessions.models import Session
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.storage import Storage
@@ -174,6 +177,7 @@ class RegistrationForm(forms.Form):
     password1 = forms.CharField(
         label="Passwort",
         strip=False,
+        help_text=password_validators_help_text_html(),
         widget=forms.PasswordInput(attrs={"class": "uk-input", "autocomplete": "new-password"}),
     )
     password2 = forms.CharField(
@@ -661,7 +665,7 @@ class BewerbungForm(forms.ModelForm):
     def __init__(self, *args, applicant: Person, unit: Wohnung | None = None, **kwargs) -> None:
         self.applicant = applicant
         super().__init__(*args, **kwargs)
-        available_units = Wohnung.objects.available().order_by("gebaeudenummer", "wohnungsnummer")
+        available_units = Wohnung.objects.available().order_by("etage", "wohnungsnummer")
         self.fields["wohnung"].queryset = available_units
         if unit is not None:
             self.fields["wohnung"].queryset = available_units.filter(pk=unit.pk)
@@ -788,7 +792,7 @@ class MainApplicationForm(forms.Form):
             if has_duplicate_name:
                 self.add_error(
                     field_name,
-                    "Eine Datei mit dieser Bezeichnung wird bereits in dieser Main-Bewerbung "
+                    "Eine Datei mit dieser Bezeichnung wird bereits in dieser Hauptbewerbung "
                     "verwendet. Bitte benennen Sie sie um.",
                 )
 
@@ -1983,12 +1987,12 @@ class EmployeeApplicationFilterForm(UIkitFormMixin, forms.Form):
     main_status = forms.ChoiceField(
         required=False,
         choices=(
-            ("", "Alle Main-Status"),
+            ("", "Alle Hauptbewerbungsstatus"),
             ("pending", "Noch nicht freigeschaltet"),
             ("unlocked", "Freigeschaltet"),
             ("submitted", "Eingereicht"),
         ),
-        label="Main-Status",
+        label="Hauptbewerbungsstatus",
     )
     priority = forms.ChoiceField(
         required=False,
@@ -2191,6 +2195,13 @@ MerkmalOptionFormSet = forms.formset_factory(MerkmalOptionForm, extra=1, can_del
 
 
 class SchluesselForm(UIkitFormMixin, forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        labels = {"lost": "Verloren", "in_use": "In Gebrauch", "blocked": "Gesperrt"}
+        self.fields["status"].choices = [
+            (value, labels.get(value, label)) for value, label in self.fields["status"].choices
+        ]
+
     class Meta:
         model = Schluessel
         fields = ["bezeichnung", "anzahl", "aufschrift", "status"]

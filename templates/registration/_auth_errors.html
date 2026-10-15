@@ -1,0 +1,6 @@
+{% if form.non_field_errors %}
+<div class="uk-alert-danger auth-form-errors" role="alert">
+    <p class="uk-margin-small-bottom"><strong>Bitte prüfen Sie Ihre Angaben.</strong></p>
+    {{ form.non_field_errors }}
+</div>
+{% endif %}

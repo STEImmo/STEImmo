@@ -1,18 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}{{ title }} – STEImmo{% endblock %}
+{% block title %}{{ title }} – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section uk-section-default">
+<section class="uk-section uk-section-default management-page">
     <div class="uk-container uk-container-small">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
         <a class="uk-button uk-button-text" href="{% url 'verwaltung:merkmal_list' %}">Zur Übersicht</a>
         <h1 class="uk-heading-small">{{ title }}</h1>
         <p class="uk-text-lead">Legen Sie fest, wo und was bei einer Raumprüfung dokumentiert wird.</p>
-        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top">
+        <form method="post" class="management-panel uk-card uk-card-default uk-card-body uk-margin-top">
             {% csrf_token %}
+            {% if form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+            <div class="management-form-grid">
             {% for field in form.visible_fields %}
+                <div>
                 {% include "wohnungsverwaltung/_form_field.html" with field=field %}
+                </div>
             {% endfor %}
+            </div>
 
             <section class="uk-margin-large-top">
                 <div class="uk-flex uk-flex-between uk-flex-middle">
@@ -21,21 +27,14 @@
             </div>
                 <p class="uk-text-meta">Erfassen Sie Angaben, die bei diesem Prüfpunkt zusätzlich dokumentiert werden sollen.</p>
                 {{ option_formset.management_form }}
+                {% if option_formset.non_form_errors %}<div class="uk-alert-danger" role="alert">{{ option_formset.non_form_errors }}</div>{% endif %}
                 <div id="option-formset">
                     {% for option_form in option_formset %}
-                        <div class="uk-flex uk-flex-middle uk-margin-small-bottom" data-option-row>
-                            <div class="uk-width-expand">{% include "wohnungsverwaltung/_form_field.html" with field=option_form.wert %}</div>
-                            <div class="uk-margin-left"><button class="uk-button uk-button-danger uk-button-small" type="button" data-remove-option>Entfernen</button></div>
-                            <div hidden>{{ option_form.DELETE }}</div>
-                        </div>
+                        {% include "wohnungsverwaltung/_merkmal_option_row.html" with option_form=option_form only %}
                     {% endfor %}
                 </div>
                 <template id="option-empty-form">
-                    <div class="uk-flex uk-flex-middle uk-margin-small-bottom" data-option-row>
-                        <div class="uk-width-expand">{% include "wohnungsverwaltung/_form_field.html" with field=option_formset.empty_form.wert %}</div>
-                        <div class="uk-margin-left"><button class="uk-button uk-button-danger uk-button-small" type="button" data-remove-option>Entfernen</button></div>
-                        <div hidden>{{ option_formset.empty_form.DELETE }}</div>
-                    </div>
+                    {% include "wohnungsverwaltung/_merkmal_option_row.html" with option_form=option_formset.empty_form only %}
                 </template>
             </section>
             <button class="uk-button uk-button-primary uk-margin-top" type="submit">Speichern</button>

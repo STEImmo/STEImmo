@@ -1,5 +1,7 @@
 """Drawing coordinates and labels for the single building; apartment facts live in the database."""
 
+from .models import WohnungStatus
+
 # Ground geometry regularizes the user's sketch into aligned architectural lines.
 # Provisional user assignment: 1 upper middle, 2 right, 3 lower middle,
 # 4 lower left, 5 upper left. Exact locations still require confirmation.
@@ -73,3 +75,30 @@ def floor_label(number):
     if number in FLOOR_SHAPES:
         return f"{number}. Obergeschoss"
     return f"Etage {number}"
+
+
+def building_overview(units):
+    """Share the public facade facts between the homepage and building view."""
+    floors_by_number = {}
+    for unit in units:
+        if unit.etage not in FLOOR_SHAPES:
+            continue
+        floor = floors_by_number.setdefault(
+            unit.etage,
+            {
+                "number": unit.etage,
+                "label": floor_label(unit.etage),
+                "units": [],
+                "available_count": 0,
+                "facade_y": 244 + (3 - unit.etage) * 112,
+            },
+        )
+        floor["units"].append(unit)
+        if unit.status == WohnungStatus.FREE:
+            floor["available_count"] += 1
+    floors = list(floors_by_number.values())
+    return {
+        "floors": floors,
+        "total_units": sum(len(floor["units"]) for floor in floors),
+        "total_available": sum(floor["available_count"] for floor in floors),
+    }

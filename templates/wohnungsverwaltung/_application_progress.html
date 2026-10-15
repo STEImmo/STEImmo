@@ -1,0 +1,6 @@
+<ol class="application-progress" aria-label="Ablauf der Bewerbung">
+    <li{% if not application %} class="is-current" aria-current="step"{% endif %}><span>01</span><div><strong>Besichtigungsanfrage</strong><small>Wohnung auswählen und Interesse senden</small></div></li>
+    <li{% if application.status == 'open' and not application.interest_withdrawn_at and not application.main_application_unlocked %} class="is-current" aria-current="step"{% endif %}><span>02</span><div><strong>Besichtigung & Freigabe</strong><small>Termin und Rückmeldung durch das Unternehmen</small></div></li>
+    <li{% if application.main_application_accessible and not application.submitted_at %} class="is-current" aria-current="step"{% endif %}><span>03</span><div><strong>Hauptbewerbung</strong><small>Alle drei Nachweise einreichen</small></div></li>
+    <li{% if application.main_application_accessible and application.submitted_at %} class="is-current" aria-current="step"{% endif %}><span>04</span><div><strong>Rückmeldung</strong><small>Entscheidung zur Bewerbung abwarten</small></div></li>
+</ol>

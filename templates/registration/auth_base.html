@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block message_container_class %}uk-container uk-container-expand uk-padding-remove-horizontal{% endblock %}
+
+{% block content %}
+<section class="auth-section" aria-labelledby="auth-title">
+    <div class="auth-layout">
+        <aside class="auth-image" aria-label="Symbolisches Einzugsmotiv">
+            <img src="{% static 'images/auth-moving-in.webp' %}" alt="Umzugskartons, Schlüssel und eine Pflanze als Sinnbild für den Einzug" width="1024" height="1280">
+            <p class="auth-image-caption">Sinnbild: Einziehen · <a href="{% url 'image_credits' %}#einzug">KI-generiertes Motiv</a></p>
+        </aside>
+        <div class="auth-card">
+            {% block auth_back %}<a class="auth-back" href="{% url 'wohnungsverwaltung_public:apartment_search' %}"><span uk-icon="arrow-left" aria-hidden="true"></span> Zur Wohnungssuche</a>{% endblock %}
+            <p class="auth-eyebrow">{% block auth_eyebrow %}Ihr persönlicher Bereich{% endblock %}</p>
+            <h1 id="auth-title">{% block auth_heading %}{% endblock %}</h1>
+            <p class="auth-intro">{% block auth_intro %}{% endblock %}</p>
+            {% block auth_content %}{% endblock %}
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}<script src="{% static 'js/auth-password.js' %}" defer></script>{% endblock %}

@@ -1,58 +1,41 @@
-{% extends "base.html" %}
-
-{% block title %}Meine Bewerbungen – STEImmo{% endblock %}
-
-{% block content %}
-<section class="uk-section">
-    <div class="uk-container uk-container-small">
-        <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
-            <div><h1 class="uk-heading-medium">Meine Bewerbungen</h1></div>
-            <div>
-                {% if has_open_application %}
-                    <button class="uk-button uk-button-default" type="button" disabled>Neue Pre-Bewerbung</button>
-                    <p class="uk-text-meta uk-margin-small-top">Sie haben bereits eine offene Pre-Bewerbung.</p>
-                {% else %}
-                    <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:pre_application_create' %}">Neue Pre-Bewerbung</a>
-                {% endif %}
-            </div>
-        </div>
-        {% for application in applications %}
-            <article class="uk-card uk-card-default uk-card-body uk-margin-top">
-                <span class="uk-label">{{ application.get_applicant_status_display }}</span>
-                <h2 class="uk-card-title">{{ application.wohnung }}</h2>
-                <p>{{ application.personenanzahl }} Person{{ application.personenanzahl|pluralize:"en" }} im Haushalt</p>
-                <p>{{ application.get_applicant_next_step }}</p>
-                {% for appointment in application.viewings.all %}
-                    <section class="uk-margin">
-                        {% include "wohnungsverwaltung/_viewing_summary.html" with appointment=appointment only %}
-                        {% if appointment.can_respond and application.status == "open" and not application.interest_withdrawn_at %}
-                            <form method="post" action="{% url 'wohnungsverwaltung:applicant_viewing_response' application.pk appointment.pk %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="version" value="{{ appointment.version }}">
-                                <div class="uk-flex uk-flex-wrap uk-grid-small" uk-grid>
-                                    {% if appointment.status == "planned" %}<div><button type="submit" class="uk-button uk-button-primary" name="action" value="confirm">Termin zusagen</button></div>{% endif %}
-                                    <div><button type="submit" class="uk-button uk-button-default" name="action" value="decline">Termin absagen</button></div>
-                                </div>
-                            </form>
-                            <p class="uk-text-meta">Eine Terminabsage beendet Ihre Bewerbung nicht. Ein neuer Termin wird durch die Verwaltung vergeben.</p>
-                        {% endif %}
-                    </section>
-                {% endfor %}
-                {% for event in application.occupancy_decline_events %}
-                    <p class="uk-text-danger">Diese Bewerbung wurde automatisch abgelehnt, weil die angegebene Haushaltsgröße die zum Entscheidungszeitpunkt geltende Personenhöchstzahl für diese Wohnung überschritten hat.</p>
-                {% endfor %}
-                {% if application.main_application_accessible %}
-                    <a class="uk-button uk-button-primary"
-                       href="{% url 'wohnungsverwaltung:main_application_status' application.pk %}">
-                        Main-Bewerbung öffnen
-                    </a>
-                {% endif %}
-            </article>
-        {% empty %}
-            <div class="uk-alert-primary uk-margin-top" uk-alert>
-                <p>Sie haben noch keine Pre-Bewerbung abgegeben.</p>
-            </div>
-        {% endfor %}
-    </div>
-</section>
+{% extends "wohnungsverwaltung/application_base.html" %}
+{% block title %}Meine Bewerbungen – STE Immobilien eGbR{% endblock %}
+{% block application_heading %}Meine Bewerbungen{% endblock %}
+{% block application_intro %}Ihr aktueller Stand und der nächste Schritt – an einem Ort.{% endblock %}
+{% block application_progress %}{% include "wohnungsverwaltung/_application_progress.html" with application=active_application %}{% endblock %}
+{% block application_actions %}
+{% if active_application %}<button class="uk-button uk-button-default" type="button" disabled>Neue Bewerbung</button><p class="uk-text-meta uk-margin-small-top">Sie haben bereits eine offene Bewerbung.</p>
+{% else %}<a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Neue Bewerbung</a>{% endif %}
+{% endblock %}
+{% block application_content %}
+{% for application in applications %}
+<article class="uk-card uk-card-default uk-card-body application-summary application-card uk-margin-bottom" data-state="{% if application.status != 'open' or application.interest_withdrawn_at %}beendet{% elif not application.main_application_unlocked %}warten{% endif %}">
+    <div class="application-summary-top"><div><p class="application-eyebrow">Ihre Wunschwohnung</p><h2>{{ application.wohnung }}</h2></div><span class="uk-label{% if application.status == 'declined' or application.status == 'blocked' %} uk-label-danger{% endif %}">{{ application.get_applicant_status_display }}</span></div>
+    <p class="uk-text-meta">{{ application.personenanzahl }} Person{{ application.personenanzahl|pluralize:"en" }} im Haushalt</p>
+    {% for event in application.occupancy_decline_events %}
+        {% include "partials/_status_notice.html" with notice_tone="danger" notice_label="Bewerbung abgelehnt" notice_title="Die Haushaltsgröße überschreitet die Personenhöchstzahl" notice_message="Diese Bewerbung wurde automatisch abgelehnt, weil die angegebene Haushaltsgröße die zum Entscheidungszeitpunkt geltende Personenhöchstzahl für diese Wohnung überschritten hat." notice_next=application.get_applicant_next_step only %}
+    {% endfor %}
+    <div class="application-next-step"><span uk-icon="arrow-right" aria-hidden="true"></span><div><strong>Ihr nächster Schritt</strong><p>{{ application.get_applicant_next_step }}</p></div></div>
+    {% for appointment in application.viewings.all %}
+        <section class="uk-margin">
+            {% include "wohnungsverwaltung/_viewing_summary.html" with appointment=appointment only %}
+            {% if appointment.can_respond and application.status == "open" and not application.interest_withdrawn_at %}
+                <form method="post" action="{% url 'wohnungsverwaltung:applicant_viewing_response' application.pk appointment.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="version" value="{{ appointment.version }}">
+                    <div class="uk-flex uk-flex-wrap uk-grid-small" uk-grid>
+                        {% if appointment.status == "planned" %}<div><button type="submit" class="uk-button uk-button-primary" name="action" value="confirm">Termin zusagen</button></div>{% endif %}
+                        <div><button type="submit" class="uk-button uk-button-default" name="action" value="decline">Termin absagen</button></div>
+                    </div>
+                </form>
+                <p class="uk-text-meta">Eine Terminabsage beendet Ihre Bewerbung nicht. Ein neuer Termin wird durch die Verwaltung vergeben.</p>
+            {% endif %}
+        </section>
+    {% endfor %}
+    {% if application.main_application_accessible %}<a class="uk-button {% if application.submitted_at %}uk-button-default{% else %}uk-button-primary{% endif %}" href="{% url 'wohnungsverwaltung:main_application_status' application.pk %}">{% if application.submitted_at %}Eingereichte Unterlagen ansehen{% else %}Bewerbung vervollständigen{% endif %}</a>
+    {% elif application.status == 'open' and not application.interest_withdrawn_at %}<p class="uk-text-meta uk-margin-remove-bottom">Die Hauptbewerbung folgt nach Besichtigung und Freigabe.</p>{% endif %}
+</article>
+{% empty %}
+<article class="uk-card uk-card-default uk-card-body application-empty"><span class="application-empty-icon" uk-icon="icon: home; ratio: 2" aria-hidden="true"></span><h2>Noch keine Bewerbung</h2><p>Sie haben noch keine Bewerbung abgegeben.</p><p>Entdecken Sie verfügbare Wohnungen und fragen Sie bei Ihrer Wunschwohnung eine Besichtigung an.</p><a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Wohnungen finden</a></article>
+{% endfor %}
 {% endblock %}

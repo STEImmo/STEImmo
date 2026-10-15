@@ -1,7 +1,9 @@
 {% for field in form %}
-    {% if field.name == "haustiere" %}
+    {% if field.name == "wohnung" and unit_is_preselected %}{# The disabled field remains server-bound to the selected unit. #}
+        {% if field.errors %}<div class="uk-alert-danger" role="alert">{{ field.errors }} <a href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Andere Wohnung wählen</a></div>{% endif %}
+    {% elif field.name == "haustiere" %}
         <fieldset class="uk-fieldset uk-margin"{% if field.aria_describedby %} aria-describedby="{{ field.aria_describedby }}"{% endif %}>
-            <legend class="uk-form-label">{{ field.label }}</legend>
+            <legend class="uk-form-label">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</legend>
             <div class="uk-margin-small-top">
                 {% for choice in field %}
                     <label class="uk-margin-right">
@@ -14,7 +16,7 @@
         </fieldset>
     {% else %}
         <div class="uk-margin">
-            {{ field.label_tag }}
+            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
             <div class="uk-margin-small-top">
                 {{ field }}
             </div>

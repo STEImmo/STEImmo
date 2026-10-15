@@ -1,27 +1,14 @@
-{% extends "base.html" %}
-
-{% block title %}Mitarbeiteranmeldung bestätigen – STEImmo{% endblock %}
-
-{% block content %}
-<section class="uk-section">
-    <div class="uk-container uk-container-small">
-        <h1 class="uk-heading-medium">Mitarbeiteranmeldung bestätigen</h1>
-        <p class="uk-text-lead">Geben Sie den sechsstelligen Einmalcode aus Ihrer E-Mail ein. Der Code ist 15 Minuten gültig.</p>
-        <form method="post" autocomplete="on" class="uk-card uk-card-default uk-card-body uk-margin-top">
-            {% csrf_token %}
-            {% if form.non_field_errors %}
-                <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>
-            {% endif %}
-            <div class="uk-margin">
-                <label class="uk-form-label" for="{{ form.code.id_for_label }}">{{ form.code.label }}</label>
-                <div class="uk-form-controls">{{ form.code }}</div>
-                {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.code only %}
-            </div>
-            <div class="uk-margin-large-top uk-flex uk-flex-between">
-                <a class="uk-button uk-button-default" href="{% url 'login' %}">Zurück zur Anmeldung</a>
-                <button class="uk-button uk-button-primary" type="submit">Anmeldung bestätigen</button>
-            </div>
-        </form>
-    </div>
-</section>
+{% extends "registration/auth_base.html" %}
+{% block title %}Mitarbeiteranmeldung bestätigen – STE Immobilien eGbR{% endblock %}
+{% block auth_back %}<a class="auth-back" href="{% url 'login' %}"><span uk-icon="arrow-left" aria-hidden="true"></span> Zurück zur Anmeldung</a>{% endblock %}
+{% block auth_eyebrow %}Mitarbeiterzugang{% endblock %}
+{% block auth_heading %}Anmeldung bestätigen.{% endblock %}
+{% block auth_intro %}Geben Sie den sechsstelligen Einmalcode aus Ihrer E-Mail ein. Der Code ist 15 Minuten gültig.{% endblock %}
+{% block auth_content %}
+<form method="post" autocomplete="on" class="uk-form-stacked">
+    {% csrf_token %}
+    {% include "registration/_auth_errors.html" %}
+    <div class="auth-fields">{% include "registration/_auth_field.html" with field=form.code %}</div>
+    <button class="uk-button uk-button-primary auth-submit" type="submit">Anmeldung bestätigen <span uk-icon="arrow-right" aria-hidden="true"></span></button>
+</form>
 {% endblock %}

@@ -95,7 +95,7 @@ class EmployeeDashboardTests(TestCase):
         self.assertContains(response, "Berta Bewerber")
         self.assertContains(response, "Personenanzahl")
         self.assertContains(response, "Haustiere")
-        self.assertContains(response, "Pre-Eingang")
+        self.assertContains(response, "Anfrage eingegangen")
         self.assertNotContains(response, self.application.person.email)
 
     def test_all_application_statuses_remain_visible(self):
@@ -114,8 +114,8 @@ class EmployeeDashboardTests(TestCase):
             "Abgelehnt",
             "Gesperrt",
             "Zurückgezogen",
-            "Main-Bewerbung freigeschaltet",
-            "Main-Bewerbung eingereicht",
+            "Hauptbewerbung freigeschaltet",
+            "Hauptbewerbung eingereicht",
         ):
             self.assertContains(response, status)
 
@@ -166,8 +166,8 @@ class EmployeeDashboardTests(TestCase):
             original_name="geheimer-entwurf.png",
         )
         response = self.client.get(self.detail_url)
-        self.assertContains(response, "Pre-Bewerbung")
-        self.assertContains(response, "Main-Bewerbung")
+        self.assertContains(response, "Besichtigungsanfrage")
+        self.assertContains(response, "Hauptbewerbung")
         self.assertContains(response, "Noch nicht eingereicht")
         for value in ("Ich studiere Informatik.", "0123456789", "02.01.2000", "Haustiere"):
             self.assertContains(response, value)
@@ -193,7 +193,7 @@ class EmployeeDashboardTests(TestCase):
         self.assertContains(response, "eingereicht.png")
         self.assertContains(response, "Sicher herunterladen")
         self.assertNotContains(response, "/media/")
-        self.assertContains(response, "Main-Eingang")
+        self.assertContains(response, "Eingang der Hauptbewerbung")
 
     def test_unknown_application_returns_404(self):
         self.assertEqual(
@@ -520,11 +520,11 @@ class EmployeeApplicationSelectionTests(TestCase):
             "wohnungsverwaltung:employee_application_detail", args=[self.match.pk]
         )
         response = self.client.get(open_detail_url)
-        self.assertContains(response, "Für die Main-Freischaltung fehlt")
-        self.assertNotContains(response, "Main-Bewerbung freischalten und einladen")
+        self.assertContains(response, "Für die Freischaltung der Hauptbewerbung fehlt")
+        self.assertNotContains(response, "Hauptbewerbung freischalten und einladen")
         self.record_completed_viewing(self.match)
         response = self.client.get(open_detail_url)
-        self.assertContains(response, "Main-Bewerbung freischalten und einladen")
+        self.assertContains(response, "Hauptbewerbung freischalten und einladen")
         self.assertContains(response, "Ich bestätige die positive Entscheidung")
 
         declined = EmployeeDashboardTests.create_application(
@@ -535,7 +535,7 @@ class EmployeeApplicationSelectionTests(TestCase):
         )
         response = self.client.get(declined_detail_url)
         self.assertContains(response, "Aktueller Status: Abgelehnt")
-        self.assertNotContains(response, "Main-Bewerbung freischalten und einladen")
+        self.assertNotContains(response, "Hauptbewerbung freischalten und einladen")
 
     def test_review_forms_have_unique_reason_ids_and_matching_labels(self):
         self.record_completed_viewing(self.pet_exception)
@@ -785,11 +785,11 @@ class EmployeeApplicationSelectionTests(TestCase):
 
     def test_name_filter_matches_full_name_and_email(self):
         person = self.match.person
-        person.vorname = "Ada"
+        person.vorname = "Anna"
         person.nachname = "Muster"
         person.save(update_fields=("vorname", "nachname"))
 
-        for query in ("Ada", "Muster", "ada muster", person.email):
+        for query in ("Anna", "Muster", "anna muster", person.email):
             with self.subTest(query=query):
                 response = self.client.get(
                     self.list_url,

@@ -1,20 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Besichtigungsanfrage – STEImmo{% endblock %}
+{% block title %}Besichtigungsanfrage – STE Immobilien eGbR{% endblock %}
 {% block content %}
-<section class="uk-section uk-section-default">
+<section class="uk-section apartment-detail">
     <div class="uk-container uk-container-small">
-        <h1 class="uk-heading-small">Besichtigung für Wohnung {{ wohnung.display_number }}</h1>
-        <div class="uk-alert-primary" uk-alert>
-            {% if missing_profile %}
-                <h2 class="uk-h4">Ihr Personenprofil fehlt</h2>
-                <p>Ihr Konto hat Bewerberzugang, aber die persönlichen Angaben sind noch nicht mit dem Konto verknüpft. Bitte lassen Sie die Zuordnung von der Verwaltung prüfen.</p>
-            {% else %}
-                <h2 class="uk-h4">Für diese Anfrage benötigen Sie ein Bewerberkonto</h2>
-                <p>Ihr aktuell angemeldetes Konto hat keinen Bewerberzugang. Melden Sie sich für Ihre eigene Besichtigungsanfrage mit Ihrem registrierten Bewerberkonto an.</p>
-            {% endif %}
-        </div>
-        <p>Eine Anfrage reserviert noch keinen Termin. Die Hauptbewerbung folgt erst nach der Besichtigung und Freigabe durch die Verwaltung.</p>
-        <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' wohnung.pk %}">Zurück zur Wohnung</a>
+        <header class="apartment-detail-heading"><p class="application-eyebrow">Besichtigungsanfrage</p><h1>Wohnung {{ wohnung.display_number }}</h1></header>
+        {% url 'wohnungsverwaltung_public:apartment_detail_placeholder' wohnung.pk as back_url %}
+        {% if missing_profile %}
+            {% include "partials/_status_notice.html" with notice_title="Ihr Personenprofil fehlt" notice_message="Ihr Konto hat Bewerberzugang. Es fehlt jedoch die Verknüpfung mit Ihren persönlichen Angaben." notice_next="Bitte lassen Sie die Zuordnung Ihres Kontos von der Verwaltung prüfen. Danach können Sie Ihre Besichtigungsanfrage stellen." notice_secondary_url=back_url notice_secondary_label="Zurück zur Wohnung" only %}
+        {% else %}
+            {% url 'login' as login_url %}
+            {% with next_path=request.path|urlencode %}{% with login_target=login_url|add:"?next="|add:next_path %}
+            {% include "partials/_status_notice.html" with notice_title="Mit diesem Konto können Sie keine Besichtigung anfragen" notice_message="Sie sind angemeldet. Dieses Konto hat jedoch keinen Bewerberzugang." notice_next="Melden Sie sich mit Ihrem registrierten Bewerberkonto an, um eine eigene Besichtigung anzufragen." notice_primary_url=login_target notice_primary_label="Mit Bewerberkonto anmelden" notice_secondary_url=back_url notice_secondary_label="Zurück zur Wohnung" only %}
+            {% endwith %}{% endwith %}
+        {% endif %}
+        <p class="uk-text-meta uk-margin-top">Eine Anfrage reserviert noch keinen Termin. Die Hauptbewerbung folgt nach Besichtigung und Freigabe durch die Verwaltung.</p>
     </div>
 </section>
 {% endblock %}

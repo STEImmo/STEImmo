@@ -1,42 +1,42 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Bewerbungen – STEImmo{% endblock %}
+{% block title %}Bewerbungen – STE Immobilien eGbR{% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'js/application-row-navigation.js' %}" defer></script>
 {% endblock %}
 
 {% block content %}
-<section class="uk-section">
+<section class="uk-section management-page">
     <div class="uk-container">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
         {% if unit %}
             <ul class="uk-breadcrumb">
                 <li><a href="{% url 'wohnungsverwaltung:employee_application_list' %}">Bewerbungen je Wohnung</a></li>
                 <li><span>{{ unit }}</span></li>
             </ul>
-            <h1 class="uk-heading-medium">Bewerbungen</h1>
+            <h1 class="uk-heading-small">Bewerbungen</h1>
             <h2 class="uk-h3">{{ unit }}</h2>
 
             {% if requirements_open %}
-                <div class="uk-alert-warning" uk-alert>
-                    <p><strong>Anforderungen offen:</strong> Für diese Wohnung sind die Auswahlkriterien noch nicht vollständig eingerichtet. Es werden keine Bewerbungen anhand fehlender Kriterien ausgeschlossen.</p>
-                </div>
+                {% url 'verwaltung:wohnung_edit' unit.pk as requirements_url %}
+                {% include "partials/_status_notice.html" with notice_label="Anforderungen offen" notice_title="Auswahlkriterien noch nicht vollständig" notice_message="Für diese Wohnung sind die Auswahlkriterien noch nicht vollständig eingerichtet. Es werden keine Bewerbungen anhand fehlender Kriterien ausgeschlossen." notice_primary_url=requirements_url notice_primary_label="Auswahlkriterien bearbeiten" only %}
             {% endif %}
 
-            <ul class="uk-tab" role="tablist">
+            <nav aria-label="Bewerbungsansichten"><ul class="uk-tab">
                 <li class="{% if segment == 'matching' %}uk-active{% endif %}">
-                    <a href="{% querystring segment='matching' page=None %}" aria-current="{% if segment == 'matching' %}page{% endif %}">Passend</a>
+                    <a href="{% querystring segment='matching' page=None %}" {% if segment == 'matching' %}aria-current="page"{% endif %}>Passend</a>
                 </li>
                 <li class="{% if segment == 'review' %}uk-active{% endif %}">
-                    <a href="{% querystring segment='review' page=None %}" aria-current="{% if segment == 'review' %}page{% endif %}">Einzelfallprüfung</a>
+                    <a href="{% querystring segment='review' page=None %}" {% if segment == 'review' %}aria-current="page"{% endif %}>Einzelfallprüfung</a>
                 </li>
                 <li class="{% if segment == 'all' %}uk-active{% endif %}">
-                    <a href="{% querystring segment='all' page=None %}" aria-current="{% if segment == 'all' %}page{% endif %}">Alle Bewerbungen</a>
+                    <a href="{% querystring segment='all' page=None %}" {% if segment == 'all' %}aria-current="page"{% endif %}>Alle Bewerbungen</a>
                 </li>
-            </ul>
+            </ul></nav>
 
-            <form method="get" class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+            <form method="get" class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
                 <input type="hidden" name="wohnung" value="{{ unit.pk }}">
                 <input type="hidden" name="segment" value="{{ segment }}">
                 <div class="uk-grid-small uk-child-width-1-2@s uk-child-width-1-4@l" uk-grid>
@@ -52,18 +52,19 @@
 
             <p class="uk-text-meta">
                 {{ page_obj.paginator.count }} Bewerbung{{ page_obj.paginator.count|pluralize:"en" }}
-                · {% if filters.cleaned_data.sort == 'priority' %}Priorität zuerst{% else %}Neueste Pre-Bewerbungen zuerst{% endif %}
+                · {% if filters.cleaned_data.sort == 'priority' %}Priorität zuerst{% else %}Neueste Bewerbungen zuerst{% endif %}
             </p>
             {% if applications %}
+                <div class="management-table">
                 <table class="application-table uk-table uk-table-divider" role="table">
                     <caption class="uk-text-left">Bewerbungen für {{ unit }}</caption>
                     <thead role="rowgroup">
                         <tr role="row">
                             <th scope="col" role="columnheader">Bewerber</th>
                             <th scope="col" role="columnheader">Bearbeitung</th>
-                            <th scope="col" role="columnheader">Main-Status</th>
+                            <th scope="col" role="columnheader">Hauptbewerbungsstatus</th>
                             <th scope="col" role="columnheader">Besichtigung</th>
-                            <th scope="col" role="columnheader">Pre-Eingang</th>
+                            <th scope="col" role="columnheader">Anfrage eingegangen</th>
                         </tr>
                     </thead>
                     <tbody role="rowgroup">
@@ -72,6 +73,7 @@
                         {% endfor %}
                     </tbody>
                 </table>
+                </div>
                 {% if page_obj.has_other_pages %}
                     <nav aria-label="Seiten der Bewerbungen">
                         <ul class="uk-pagination uk-flex-center uk-flex-middle">
@@ -97,24 +99,31 @@
                 </div>
             {% endif %}
         {% else %}
-            <h1 class="uk-heading-medium">Bewerbungen je Wohnung</h1>
+            <h1 class="uk-heading-small">Bewerbungen je Wohnung</h1>
             <p>Wählen Sie eine Wohnung, um ihre Bewerbungen anzusehen.</p>
-            <div class="uk-grid-small uk-child-width-1-2@s uk-child-width-1-3@l" uk-grid>
+            <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Wohnungen und Bewerbungen">
+                <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
+                    <thead><tr><th scope="col">Wohnung</th><th scope="col">Bewerbungen</th><th scope="col">Aktion</th></tr></thead>
+                    <tbody>
                 {% for unit in units %}
-                    <div>
-                        <article class="uk-card uk-card-default uk-card-body">
-                            <h2 class="uk-card-title">{{ unit }}</h2>
-                            <p>{{ unit.application_count }} Bewerbung{{ unit.application_count|pluralize:"en" }}</p>
+                    <tr>
+                        <th scope="row" data-label="Wohnung">
+                            Wohnung {{ unit.display_number }}
                             {% if unit.max_occupants is None or unit.pet_review_required is None %}
-                                <span class="uk-label uk-label-warning">Anforderungen offen</span>
+                                <div><span class="uk-label uk-label-warning">Anforderungen offen</span></div>
                             {% endif %}
-                            <a class="uk-button uk-button-primary uk-margin-small-top" href="?wohnung={{ unit.pk }}"
+                        </th>
+                        <td data-label="Bewerbungen">{{ unit.application_count }} Bewerbung{{ unit.application_count|pluralize:"en" }}</td>
+                        <td data-label="Aktion">
+                            <a class="uk-button uk-button-default uk-button-small" href="?wohnung={{ unit.pk }}"
                                aria-label="Bewerbungen für {{ unit }} ansehen">Bewerbungen ansehen</a>
-                        </article>
-                    </div>
+                        </td>
+                    </tr>
                 {% empty %}
-                    <div><p>Es sind noch keine Wohnungen angelegt.</p></div>
+                    <tr><td colspan="3">Es sind noch keine Wohnungen angelegt.</td></tr>
                 {% endfor %}
+                    </tbody>
+                </table>
             </div>
         {% endif %}
     </div>

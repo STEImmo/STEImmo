@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Stellplätze verwalten – STEImmo{% endblock %}
+{% block title %}Stellplätze verwalten – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section uk-section-default">
+<section class="uk-section uk-section-default management-page">
     <div class="uk-container">
-        <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
+        <div class="management-page__heading uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-margin-bottom">
             <div>
                 <h1 class="uk-heading-small uk-margin-remove-bottom">Stellplätze</h1>
                 <p class="uk-text-muted uk-margin-small-top">Wohnungsunabhängige Stellplatzstammdaten.</p>
@@ -15,23 +16,23 @@
             </a>
         </div>
 
-        <div class="uk-overflow-auto">
-            <table class="uk-table uk-table-divider uk-table-middle">
-                <thead><tr><th>Name</th><th>Typ</th><th>Wohnung</th><th>Miete</th><th><span class="uk-hidden">Aktion</span></th></tr></thead>
+        <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Verwaltungstabelle">
+            <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
+                <thead><tr><th>Name</th><th>Typ</th><th>Wohnung</th><th>Miete</th><th><span class="uk-hidden-visually">Aktion</span></th></tr></thead>
                 <tbody>
                     {% for stellplatz in stellplaetze %}
                         <tr>
-                            <td>{{ stellplatz.name }}</td>
-                            <td>{{ stellplatz.stellplatz_typ }}</td>
-                            <td>
+                            <td data-label="Name">{{ stellplatz.name }}</td>
+                            <td data-label="Typ">{{ stellplatz.stellplatz_typ }}</td>
+                            <td data-label="Wohnung">
                                 {% for zuordnung in stellplatz.zuordnungen.all %}
-                                    {{ zuordnung.wohnung.gebaeudenummer }} / {{ zuordnung.wohnung.wohnungsnummer }}
+                                    Wohnung {{ zuordnung.wohnung.display_number }}
                                 {% empty %}
                                     <span class="uk-text-muted">Nicht zugeordnet</span>
                                 {% endfor %}
                             </td>
-                            <td>{{ stellplatz.miete }} €</td>
-                            <td class="uk-text-right">
+                            <td data-label="Miete">{{ stellplatz.miete }} €</td>
+                            <td class="uk-text-right" data-label="Aktion">
                                 <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:stellplatz_edit' stellplatz.stellplatz_id %}">
                                     Bearbeiten
                                 </a>

@@ -1709,7 +1709,8 @@ class HandoverProtocolViewsTests(TestCase):
             )
             self.assertContains(response, "Einzug (alt)")
             self.assertContains(response, "Auszug (neu)")
-            self.assertContains(response, "Einzug (alt)</th><th>Auszug (neu)")
+            self.assertContains(response, '<th scope="col">Einzug (alt)</th>', html=True)
+            self.assertContains(response, '<th scope="col">Auszug (neu)</th>', html=True)
             self.assertContains(response, "handover-photo-modal")
             self.assertContains(response, "data-handover-photo")
             self.assertContains(response, matching_photo_url)
@@ -1752,7 +1753,8 @@ class HandoverProtocolViewsTests(TestCase):
         )
 
         self.assertEqual(response.context["move_in_reference"].pk, move_in.pk)
-        self.assertContains(response, "Einzug (alt)</th><th>Auszug (neu)")
+        self.assertContains(response, '<th scope="col">Einzug (alt)</th>', html=True)
+        self.assertContains(response, '<th scope="col">Auszug (neu)</th>', html=True)
         self.assertContains(response, "Einzug (alt)")
 
     def test_move_out_form_shows_the_signed_move_in_as_a_reference(self) -> None:
@@ -2213,6 +2215,26 @@ class PreApplicationAuthenticationTests(TestCase):
             "ueber_mich": "Ich möchte mich für diese Wohnung bewerben.",
         }
 
+    def test_applicant_pages_use_plain_german_application_terms(self) -> None:
+        self.client.force_login(self.user)
+        for name, args in (
+            ("pre_application_list", []),
+            ("pre_application_create_for_unit", [self.free_unit.pk]),
+        ):
+            with self.subTest(page=name):
+                response = self.client.get(reverse(f"wohnungsverwaltung:{name}", args=args))
+                self.assertNotContains(response, "Pre-Bewerbung")
+                self.assertNotContains(response, "Main-Bewerbung")
+
+        Bewerbung.objects.create(
+            person=self.applicant, wohnung=self.free_unit, main_application_unlocked=True
+        )
+        listing = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+        self.assertContains(listing, "Hauptbewerbung freigeschaltet")
+        self.assertContains(listing, "Bewerbung vervollständigen")
+        self.assertNotContains(listing, "Pre-Bewerbung")
+        self.assertNotContains(listing, "Main-Bewerbung")
+
     def test_create_page_requires_login(self) -> None:
         application_url = reverse("wohnungsverwaltung:pre_application_create")
 
@@ -2332,13 +2354,13 @@ class PreApplicationAuthenticationTests(TestCase):
             reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
         )
 
-        self.assertContains(list_response, "Main-Bewerbung freigeschaltet")
+        self.assertContains(list_response, "Hauptbewerbung freigeschaltet")
         self.assertContains(
             list_response,
             reverse("wohnungsverwaltung:main_application_status", args=[application.pk]),
         )
         self.assertEqual(main_response.status_code, 200)
-        self.assertContains(main_response, "Die Main-Bewerbung ist freigeschaltet.")
+        self.assertContains(main_response, "Die Hauptbewerbung ist freigeschaltet.")
         self.assertContains(main_response, "Interesse zurückziehen")
 
     def test_main_application_access_state_is_scoped_to_each_application(self) -> None:
@@ -2373,7 +2395,7 @@ class PreApplicationAuthenticationTests(TestCase):
             ),
         )
         self.assertContains(response, "Abgelehnt")
-        self.assertContains(response, "Main-Bewerbung freigeschaltet")
+        self.assertContains(response, "Hauptbewerbung freigeschaltet")
 
     def test_locked_application_has_no_main_access(self) -> None:
         application = Bewerbung.objects.create(
@@ -2568,9 +2590,9 @@ class PreApplicationAuthenticationTests(TestCase):
 
         self.assertContains(
             response,
-            'type="button" disabled>Neue Pre-Bewerbung</button>',
+            'type="button" disabled>Neue Bewerbung</button>',
         )
-        self.assertContains(response, "Sie haben bereits eine offene Pre-Bewerbung.")
+        self.assertContains(response, "Sie haben bereits eine offene Bewerbung.")
 
 
 class MainApplicationUploadTests(TestCase):
@@ -2760,7 +2782,7 @@ class MainApplicationUploadTests(TestCase):
             self.assertNotIn(original_name, proof.file.name)
             self.assertEqual(Path(proof.file.path).stat().st_mode & 0o777, 0o600)
             self.assertEqual(Path(proof.file.path).parent.stat().st_mode & 0o777, 0o700)
-        self.assertContains(self.client.get(self.main_url), "Main-Bewerbung eingereicht")
+        self.assertContains(self.client.get(self.main_url), "Hauptbewerbung eingereicht")
 
     def test_final_submission_requires_every_proof(self) -> None:
         data = self.complete_upload_data()
@@ -3409,7 +3431,7 @@ class MainApplicationUploadTests(TestCase):
 
         self.assertEqual(duplicate_response.status_code, 200)
         self.assertIn("identity_proof", duplicate_response.context["form"].errors)
-        self.assertContains(duplicate_response, "bereits in dieser Main-Bewerbung verwendet")
+        self.assertContains(duplicate_response, "bereits in dieser Hauptbewerbung verwendet")
         self.assertContains(duplicate_response, "wird dabei nicht unterschieden.")
         self.assertEqual(ApplicationProof.objects.filter(application=self.application).count(), 1)
 

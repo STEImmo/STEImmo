@@ -1,26 +1,28 @@
 {% extends "base.html" %}
 
-{% block title %}{{ page_title }} – STEImmo{% endblock %}
+{% block title %}{{ page_title }} – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section">
-    <div class="uk-container uk-container-small">
+<section class="uk-section handover-page">
+    <div class="uk-container">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="handover" %}
         <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Zur Übersicht</a>
-        <h1 class="uk-heading-medium uk-text-break">{{ page_title }}</h1>
+        <h1 class="handover-title">{{ page_title }}</h1>
         <p class="uk-text-lead">Wählen Sie zuerst die Wohnung. Anschließend stehen nur die dieser Wohnung direkt zugeordneten Personen zur Auswahl.</p>
 
-        <form method="post" enctype="multipart/form-data" class="uk-card uk-card-default uk-card-body uk-margin-top" id="handover-protocol-form" data-draft-scope="{{ draft_scope }}" data-draft-storage-key="{{ draft_storage_key }}" data-draft-save-url="{% url 'wohnungsverwaltung:handover_protocol_draft_save' %}" data-draft-delete-url="{{ server_draft_delete_url }}">
+        <form method="post" enctype="multipart/form-data" class="uk-card uk-card-default uk-card-body handover-card handover-protocol-editor uk-margin-top" id="handover-protocol-form" data-draft-scope="{{ draft_scope }}" data-draft-storage-key="{{ draft_storage_key }}" data-draft-save-url="{% url 'wohnungsverwaltung:handover_protocol_draft_save' %}" data-draft-delete-url="{{ server_draft_delete_url }}">
             {% csrf_token %}
             <div class="uk-alert-warning" hidden data-protocol-draft-notice>
                 <p>Ein Entwurf vom <span data-protocol-draft-time></span> ist verfügbar.</p>
-                <div class="uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
+                <div class="notice-actions">
                     <div><button class="uk-button uk-button-primary uk-button-small" type="button" data-restore-protocol-draft>Entwurf wiederherstellen</button></div>
                     <div><button class="uk-button uk-button-default uk-button-small" type="button" data-discard-protocol-draft>Entwurf verwerfen</button></div>
                 </div>
             </div>
             <p class="uk-text-meta" aria-live="polite" data-protocol-draft-status></p>
+            <p class="uk-text-meta" role="status" aria-live="polite" data-dependent-fields-status></p>
             {% include "wohnungsverwaltung/_handover_protocol_fields.html" %}
-            <div class="uk-margin-large-top uk-flex uk-flex-right uk-flex-middle">
+            <div class="uk-margin-large-top uk-flex uk-flex-right uk-flex-middle handover-form-actions">
                 <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Abbrechen</a>
                 <div class="uk-margin-small-left">
                     <button class="uk-button uk-button-primary" type="submit">{{ submit_label }}</button>
@@ -60,93 +62,116 @@
         const apartmentSelect = document.getElementById("id_wohnung");
         let loadedApartmentId = apartmentSelect?.value || "";
         let dependentFieldsRequestId = 0;
+        const dependentFieldsStatus = document.querySelector("[data-dependent-fields-status]");
+        const showDependentFieldsStatus = (message, failed = false) => {
+            dependentFieldsStatus.textContent = message;
+            dependentFieldsStatus.classList.toggle("uk-text-danger", failed);
+            dependentFieldsStatus.classList.toggle("uk-text-meta", !failed);
+        };
         const updateApartmentDependentFields = async () => {
             if (!apartmentSelect) {
                 return false;
             }
             const requestId = ++dependentFieldsRequestId;
-            const requestedApartmentId = apartmentSelect.value;
-            const requestedPersonId = document.getElementById("id_person")?.value || "";
-            const requestedHandoverTime = document.getElementById("id_uebergabe_zeitpunkt")?.value || "";
-            const url = new URL(window.location.href);
-            if (requestedApartmentId) {
-                url.searchParams.set("wohnung", requestedApartmentId);
-            } else {
-                url.searchParams.delete("wohnung");
-            }
-            if (requestedPersonId) {
-                url.searchParams.set("person", requestedPersonId);
-            } else {
-                url.searchParams.delete("person");
-            }
-            if (requestedHandoverTime) {
-                url.searchParams.set("uebergabe_zeitpunkt", requestedHandoverTime);
-            } else {
-                url.searchParams.delete("uebergabe_zeitpunkt");
-            }
-            const response = await fetch(url);
-            if (!response.ok) {
-                return false;
-            }
-            const responseText = await response.text();
-            // The selection may change while fetching headers or the response body.
-            if (
-                requestId !== dependentFieldsRequestId
-                || requestedApartmentId !== apartmentSelect.value
-                || requestedPersonId !== (document.getElementById("id_person")?.value || "")
-                || requestedHandoverTime !== (document.getElementById("id_uebergabe_zeitpunkt")?.value || "")
-            ) {
-                return false;
-            }
-            const updatedPage = new DOMParser().parseFromString(responseText, "text/html");
-            const apartmentChanged = loadedApartmentId !== requestedApartmentId;
-            const meterValues = new Map(Array.from(document.querySelectorAll(
-                '#meter-reading-section input[name]:not(:disabled)',
-            )).map((field) => [field.name, field.value]));
-            [
-                "id_person",
-                "meter-reading-section",
-                "key-formset-management",
-                "key-formset",
-                "room-formset-section",
-                "move-in-reference",
-            ].forEach((id) => {
-                if (!apartmentChanged && ["id_person", "key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
-                    return;
+            showDependentFieldsStatus("Angaben zur Auswahl werden geladen …");
+            protocolForm.setAttribute("aria-busy", "true");
+            try {
+                const requestedApartmentId = apartmentSelect.value;
+                const requestedPersonId = document.getElementById("id_person")?.value || "";
+                const requestedHandoverTime = document.getElementById("id_uebergabe_zeitpunkt")?.value || "";
+                const url = new URL(window.location.href);
+                if (requestedApartmentId) {
+                    url.searchParams.set("wohnung", requestedApartmentId);
+                } else {
+                    url.searchParams.delete("wohnung");
                 }
-                const currentElement = document.getElementById(id);
-                const updatedElement = updatedPage.getElementById(id);
-                if (currentElement && updatedElement) {
-                    if (!apartmentChanged && id === "meter-reading-section") {
-                        // Keep live inputs, including edits made while the request was pending.
-                        const currentFields = new Map();
-                        currentElement.querySelectorAll("input[name], textarea[name]").forEach((field) => {
-                            const fields = currentFields.get(field.name) || [];
-                            fields.push(field);
-                            currentFields.set(field.name, fields);
-                        });
-                        updatedElement.querySelectorAll("input[name], textarea[name]").forEach((field) => {
-                            const currentField = currentFields.get(field.name)?.shift();
-                            if (currentField) {
-                                field.replaceWith(currentField);
-                            }
-                        });
+                if (requestedPersonId) {
+                    url.searchParams.set("person", requestedPersonId);
+                } else {
+                    url.searchParams.delete("person");
+                }
+                if (requestedHandoverTime) {
+                    url.searchParams.set("uebergabe_zeitpunkt", requestedHandoverTime);
+                } else {
+                    url.searchParams.delete("uebergabe_zeitpunkt");
+                }
+                const response = await fetch(url);
+                if (!response.ok) {
+                    if (requestId === dependentFieldsRequestId) {
+                        showDependentFieldsStatus("Die Angaben konnten nicht geladen werden. Bitte wählen Sie erneut aus oder laden Sie die Seite neu. Noch nicht gespeicherte Eingaben vorher prüfen.", true);
                     }
-                    currentElement.replaceWith(updatedElement);
+                    return false;
                 }
-            });
-            if (apartmentChanged) {
-                document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
-                    if (meterValues.has(field.name)) {
-                        field.value = meterValues.get(field.name);
+                const responseText = await response.text();
+                // The selection may change while fetching headers or the response body.
+                if (
+                    requestId !== dependentFieldsRequestId
+                    || requestedApartmentId !== apartmentSelect.value
+                    || requestedPersonId !== (document.getElementById("id_person")?.value || "")
+                    || requestedHandoverTime !== (document.getElementById("id_uebergabe_zeitpunkt")?.value || "")
+                ) {
+                    return false;
+                }
+                const updatedPage = new DOMParser().parseFromString(responseText, "text/html");
+                const apartmentChanged = loadedApartmentId !== requestedApartmentId;
+                const meterValues = new Map(Array.from(document.querySelectorAll(
+                    '#meter-reading-section input[name]:not(:disabled)',
+                )).map((field) => [field.name, field.value]));
+                [
+                    "id_person",
+                    "meter-reading-section",
+                    "key-formset-management",
+                    "key-formset",
+                    "room-formset-section",
+                    "move-in-reference",
+                ].forEach((id) => {
+                    if (!apartmentChanged && ["id_person", "key-formset-management", "key-formset", "room-formset-section"].includes(id)) {
+                        return;
+                    }
+                    const currentElement = document.getElementById(id);
+                    const updatedElement = updatedPage.getElementById(id);
+                    if (currentElement && updatedElement) {
+                        if (!apartmentChanged && id === "meter-reading-section") {
+                            // Keep live inputs, including edits made while the request was pending.
+                            const currentFields = new Map();
+                            currentElement.querySelectorAll("input[name], textarea[name]").forEach((field) => {
+                                const fields = currentFields.get(field.name) || [];
+                                fields.push(field);
+                                currentFields.set(field.name, fields);
+                            });
+                            updatedElement.querySelectorAll("input[name], textarea[name]").forEach((field) => {
+                                const currentField = currentFields.get(field.name)?.shift();
+                                if (currentField) {
+                                    field.replaceWith(currentField);
+                                }
+                            });
+                        }
+                        currentElement.replaceWith(updatedElement);
                     }
                 });
+                if (apartmentChanged) {
+                    document.querySelectorAll('#meter-reading-section input[name]').forEach((field) => {
+                        if (meterValues.has(field.name)) {
+                            field.value = meterValues.get(field.name);
+                        }
+                    });
+                }
+                loadedApartmentId = requestedApartmentId;
+                document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
+                document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
+                window.history.replaceState(null, "", url);
+                showDependentFieldsStatus("Angaben zur Auswahl wurden aktualisiert.");
+                return true;
+            } catch (error) {
+                if (requestId === dependentFieldsRequestId) {
+                    showDependentFieldsStatus("Die Angaben konnten nicht geladen werden. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.", true);
+                }
+                throw error;
+            } finally {
+                if (requestId === dependentFieldsRequestId) {
+                    protocolForm.removeAttribute("aria-busy");
+                }
             }
-            loadedApartmentId = requestedApartmentId;
-            document.querySelectorAll("[data-room-checklist-form]").forEach(filterFeatureNames);
-            document.querySelectorAll("[data-room-card]").forEach(synchronizeRoomCard);
-            window.history.replaceState(null, "", url);
-            return true;
         };
         if (apartmentSelect) {
             apartmentSelect.addEventListener("change", async () => {

@@ -373,7 +373,7 @@ class Wohnung(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"Gebäude {self.gebaeudenummer}, Wohnung {self.wohnungsnummer}"
+        return f"Gebäude {self.gebaeudenummer}, Wohnung {self.display_number}"
 
     def occupancy_decline_reason(self, people_count: int) -> str:
         return (
@@ -563,9 +563,9 @@ class Bewerbung(models.Model):
         if self.status == BewerbungStatus.BLOCKED:
             return "Gesperrt"
         if self.submitted_at is not None:
-            return "Main-Bewerbung eingereicht"
+            return "Hauptbewerbung eingereicht"
         if self.main_application_unlocked:
-            return "Main-Bewerbung freigeschaltet"
+            return "Hauptbewerbung freigeschaltet"
         return "In Bearbeitung"
 
     def get_latest_viewing_status_display(self):
@@ -583,7 +583,7 @@ class Bewerbung(models.Model):
         if self.submitted_at is not None:
             return "Bitte warten Sie auf die Rückmeldung des Mitarbeiters."
         if self.main_application_unlocked:
-            return "Bitte reichen Sie die Main-Bewerbung mit allen drei Nachweisen ein."
+            return "Bitte reichen Sie die Hauptbewerbung mit allen drei Nachweisen ein."
         return "Warten Sie auf die nächste Rückmeldung zu Ihrer Bewerbung."
 
 

@@ -1,27 +1,23 @@
-{% extends "base.html" %}
-
-{% block title %}{% if unit_is_preselected %}Zur Besichtigung anmelden{% else %}Pre-Bewerbung{% endif %} – STEImmo{% endblock %}
-
-{% block content %}
-<section class="uk-section">
-    <div class="uk-container uk-container-small">
-        <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:pre_application_list' %}">Meine Pre-Bewerbungen</a>
-        <h1 class="uk-heading-medium">{% if unit_is_preselected %}Zur Besichtigung anmelden{% else %}Pre-Bewerbung abgeben{% endif %}</h1>
-        {% if unit_is_preselected %}
-            <div class="uk-alert-primary" uk-alert>
-                <p>Die gewünschte Wohnung ist bereits ausgewählt. Mit diesem Formular stellen Sie eine Besichtigungsanfrage. Ein Termin wird separat bestätigt; die vollständige Bewerbung folgt erst nach Besichtigung und Freigabe.</p>
-            </div>
-        {% endif %}
-        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top">
-            {% csrf_token %}
-            {% if form.non_field_errors %}
-                <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>
-            {% endif %}
-            {% include "wohnungsverwaltung/_pre_application_fields.html" %}
-            <div class="uk-margin-large-top uk-flex uk-flex-right">
-                <button class="uk-button uk-button-primary" type="submit">{% if unit_is_preselected %}Besichtigungsanfrage senden{% else %}Pre-Bewerbung abgeben{% endif %}</button>
-            </div>
-        </form>
+{% extends "wohnungsverwaltung/application_base.html" %}
+{% block title %}Besichtigungsanfrage – STE Immobilien eGbR{% endblock %}
+{% block application_heading %}{% if unit_is_preselected %}Zur Besichtigung anmelden{% else %}Bewerbung abgeben{% endif %}{% endblock %}
+{% block application_intro %}Teilen Sie uns mit, wer einziehen möchte. Den Termin bestätigen wir separat.{% endblock %}
+{% block application_content %}
+<article class="uk-card uk-card-default uk-card-body application-form-card">
+    <h2>Ihre Besichtigungsanfrage</h2>
+    {% if unit_is_preselected %}
+    <div class="application-unit">
+        <span uk-icon="home" aria-hidden="true"></span>
+        <div><strong>Wohnung {{ selected_unit.display_number }}</strong><span>{{ selected_floor_label }}{% if selected_unit.groesse_qm > 0 %} · {{ selected_unit.groesse_qm }} m²{% endif %}</span><a class="uk-text-small" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' selected_unit.pk %}">Wohnungsdetails ansehen</a></div>
+        <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Andere Wohnung wählen</a>
     </div>
-</section>
+    <p class="uk-text-meta">Die gewünschte Wohnung ist bereits ausgewählt. Mit diesem Formular stellen Sie eine Besichtigungsanfrage. Ein Termin wird separat bestätigt; die vollständige Bewerbung folgt erst nach Besichtigung und Freigabe.</p>
+    {% endif %}
+    <form method="post" class="application-fields" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+        {% include "wohnungsverwaltung/_pre_application_fields.html" %}
+        <div class="application-form-actions"><a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:pre_application_list' %}">Abbrechen</a><button class="uk-button uk-button-primary" type="submit">{% if unit_is_preselected %}Besichtigungsanfrage senden{% else %}Bewerbung abgeben{% endif %}</button></div>
+    </form>
+</article>
 {% endblock %}

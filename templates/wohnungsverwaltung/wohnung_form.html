@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}{{ title }} – STEImmo{% endblock %}
+{% block title %}{{ title }} – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section uk-section-default">
+<section class="uk-section uk-section-default management-page">
     <div class="uk-container">
-        <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
+        <div class="management-page__heading uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-margin-bottom">
             <div>
                 <h1 class="uk-heading-small uk-margin-remove-bottom">{{ title }}</h1>
                 {% if apartment_is_saved %}
@@ -25,7 +26,7 @@
                 <div class="uk-alert-danger" uk-alert><p>{{ error }}</p></div>
             {% endfor %}
 
-            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+            <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
                 <h2 class="uk-h3">Wohnungsstammdaten</h2>
                 <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.gebaeudenummer %}</div>
@@ -37,7 +38,7 @@
                 </div>
             </section>
 
-            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+            <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
                 <h2 class="uk-h3">Öffentliche Detailangaben</h2>
                 <p class="uk-text-meta">Diese Angaben erscheinen auf der Wohnungsdetailseite. Alle Felder sind optional; fehlende Informationen werden dort als „Noch nicht angegeben“ angezeigt.</p>
                 <div class="uk-margin">{% include "wohnungsverwaltung/_form_field.html" with field=form.description %}</div>
@@ -49,7 +50,7 @@
                 <div class="uk-margin">{% include "wohnungsverwaltung/_form_field.html" with field=form.energy_information %}</div>
             </section>
 
-            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+            <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
                 <h2 class="uk-h3">Anforderungen für die Bewerberauswahl</h2>
                 <p class="uk-text-meta">
                     Eine Überschreitung der festgelegten Personenhöchstzahl führt zur Ablehnung.
@@ -58,7 +59,7 @@
                 <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
                     <div>
                         {% include "wohnungsverwaltung/_form_field.html" with field=form.max_occupants %}
-                        <p class="uk-text-meta">Leer lassen, solange keine begründete Höchstzahl festgelegt ist. Sie wird nicht aus der Zimmerzahl abgeleitet. Beim Speichern werden offene Bewerbungen oberhalb der Grenze abgelehnt, die noch nicht zur Main-Bewerbung freigeschaltet sind.</p>
+                        <p class="uk-text-meta">Leer lassen, solange keine begründete Höchstzahl festgelegt ist. Sie wird nicht aus der Zimmerzahl abgeleitet. Beim Speichern werden offene Bewerbungen oberhalb der Grenze abgelehnt, die noch nicht zur Hauptbewerbung freigeschaltet sind.</p>
                         {% include "wohnungsverwaltung/_form_field.html" with field=form.occupancy_requirement_reason %}
                     </div>
                     <div>
@@ -69,7 +70,7 @@
                 </div>
             </section>
 
-            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+            <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
                 <h2 class="uk-h3">Miete</h2>
                 <div class="uk-child-width-1-3@m uk-grid-small" uk-grid>
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.kaltmiete %}</div>
@@ -78,7 +79,7 @@
                 </div>
             </section>
 
-            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+            <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
                 <h2 class="uk-h3">Zählernummern</h2>
                 <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=form.zaehlernummer_wasser_kalt %}</div>
@@ -88,7 +89,7 @@
                 </div>
             </section>
 
-            <section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+            <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
                 <div class="uk-flex uk-flex-between uk-flex-middle">
                     <h2 class="uk-h3">Schlüssel</h2>
                     <button class="uk-button uk-button-default uk-button-small" type="button" data-add-form="schluessel">
@@ -112,7 +113,7 @@
             <button class="uk-button uk-button-primary" type="submit">Speichern</button>
         </form>
 
-        <section class="uk-card uk-card-default uk-card-body uk-margin-top">
+        <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-top">
             <div class="uk-flex uk-flex-between uk-flex-middle">
                 <h2 class="uk-h3">Räume</h2>
                 {% if apartment_is_saved %}
@@ -121,13 +122,14 @@
             </div>
             {% if apartment_is_saved %}
                 {% if raeume %}
-                    <table class="uk-table uk-table-divider uk-table-small uk-margin-top">
-                        <thead><tr><th>Name</th><th><span class="uk-hidden">Aktion</span></th></tr></thead>
+                    <div class="management-table uk-overflow-auto uk-margin-top" tabindex="0" role="region" aria-label="Räume der Wohnung">
+                    <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-small uk-margin-top">
+                        <thead><tr><th>Name</th><th><span class="uk-hidden-visually">Aktion</span></th></tr></thead>
                         <tbody>
                             {% for raum in raeume %}
                                 <tr>
-                                    <td>{{ raum.name }}</td>
-                                    <td class="uk-text-right">
+                                    <td data-label="Name">{{ raum.name }}</td>
+                                    <td class="uk-text-right" data-label="Aktion">
                                         <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:raum_edit' wohnung.pk raum.pk %}">Bearbeiten</a>
                                         <form class="uk-display-inline" method="post" action="{% url 'verwaltung:raum_delete' wohnung.pk raum.pk %}">
                                             {% csrf_token %}
@@ -138,6 +140,7 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                    </div>
                 {% else %}
                     <p class="uk-text-muted uk-margin-top">Noch keine Räume angelegt.</p>
                 {% endif %}

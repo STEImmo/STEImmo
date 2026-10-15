@@ -1,27 +1,28 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Bewerbung ansehen – STEImmo{% endblock %}
+{% block title %}Bewerbung ansehen – STE Immobilien eGbR{% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'js/viewing-time-validation.js' %}?v=5" defer></script>
 {% endblock %}
 
 {% block content %}
-<section class="uk-section">
+<section class="uk-section management-page">
     <div class="uk-container uk-container-small">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
         <p>
             <a class="uk-button uk-button-text"
                href="{% url 'wohnungsverwaltung:employee_application_list' %}?wohnung={{ application.wohnung.pk }}">
                 Zurück zu den Bewerbungen dieser Wohnung
             </a>
         </p>
-        <article class="uk-card uk-card-default uk-card-body uk-text-break">
-            <span class="uk-label">{{ application.get_applicant_status_display }}</span>
+        <article class="management-panel uk-card uk-card-default uk-card-body uk-text-break">
+            <span class="uk-label{% if not application.interest_withdrawn_at %}{% if application.status == 'declined' or application.status == 'blocked' %} uk-label-danger{% endif %}{% endif %}">{{ application.get_applicant_status_display }}</span>
             <h1 class="uk-card-title">{{ application.person }} – {{ application.wohnung }}</h1>
-            <h2 class="uk-h3">Pre-Bewerbung</h2>
-            <p>Pre-Eingang: {{ application.created_at|date:"d.m.Y, H:i" }} Uhr</p>
-            <dl class="uk-description-list">
+            <h2 class="uk-h3">Besichtigungsanfrage</h2>
+            <p>Eingang der Besichtigungsanfrage: {{ application.created_at|date:"d.m.Y, H:i" }} Uhr</p>
+            <dl class="management-facts uk-description-list">
                 <dt>Titel</dt>
                 <dd>{{ application.person.titel|default:"Nicht angegeben" }}</dd>
                 <dt>Geburtsdatum</dt>
@@ -51,13 +52,14 @@
 
         {% include "wohnungsverwaltung/_employee_viewings.html" %}
 
-        <article class="uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
+        <article class="management-panel uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
             <h2 class="uk-card-title">Interne Prüfung</h2>
             <p>Priorität: <strong>{{ application.get_review_priority_display }}</strong></p>
             {% if application.review_priority_reason %}<p>{{ application.review_priority_reason|linebreaksbr }}</p>{% endif %}
             <form method="post" action="{% url 'wohnungsverwaltung:employee_application_priority_update' application.pk %}" class="uk-form-stacked uk-margin">
                 {% csrf_token %}
-                {{ priority_form.as_p }}
+                {% if priority_form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ priority_form.non_field_errors }}</div>{% endif %}
+                        {% for field in priority_form %}{% if field.is_hidden %}{{ field }}{% else %}{% include "wohnungsverwaltung/_form_field.html" with field=field only %}{% endif %}{% endfor %}
                 <button class="uk-button uk-button-default" type="submit">Priorität speichern</button>
             </form>
 
@@ -65,13 +67,14 @@
             {% if suitability_flags %}
                 <ul class="uk-list uk-list-bullet">{% for flag in suitability_flags %}<li>{{ flag }}</li>{% endfor %}</ul>
                 {% if not can_approve_suitability %}
-                    <p>Für eine nicht mehr aktive Bewerbung ist keine Einzelfallfreigabe möglich.</p>
+                    {% include "partials/_status_notice.html" with notice_title="Einzelfallfreigabe nicht möglich" notice_message="Für eine nicht mehr aktive Bewerbung ist keine Einzelfallfreigabe möglich." notice_next="Prüfen Sie den angezeigten Bewerbungsstatus. Eine Freigabe ist nur für eine aktive Bewerbung möglich." only %}
                 {% elif has_current_suitability_approval %}
                     <p class="uk-alert-success" uk-alert>Für die aktuellen Wohnungsanforderungen freigegeben.</p>
                 {% else %}
                     <form method="post" action="{% url 'wohnungsverwaltung:employee_application_suitability_approve' application.pk %}" class="uk-form-stacked">
                         {% csrf_token %}
-                        {{ eligibility_form.as_p }}
+                        {% if eligibility_form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ eligibility_form.non_field_errors }}</div>{% endif %}
+                        {% for field in eligibility_form %}{% if field.is_hidden %}{{ field }}{% else %}{% include "wohnungsverwaltung/_form_field.html" with field=field only %}{% endif %}{% endfor %}
                         <button class="uk-button uk-button-primary" type="submit">Einzelfall begründet freigeben</button>
                     </form>
                 {% endif %}
@@ -79,9 +82,9 @@
                 <p>Keine Abweichung von den eingerichteten Anforderungen.</p>
             {% endif %}
 
-            <h3 class="uk-h4">Main-Bewerbung freischalten</h3>
+            <h3 class="uk-h4">Hauptbewerbung freischalten</h3>
             {% if application.main_application_unlocked %}
-                <p>Die Main-Bewerbung ist freigeschaltet.</p>
+                <p>Die Hauptbewerbung ist freigeschaltet.</p>
                 {% if not application.submitted_at and application.status == "open" and not application.interest_withdrawn_at %}
                     <form method="post" action="{{ invitation_url }}">
                         {% csrf_token %}
@@ -90,19 +93,17 @@
                 {% endif %}
             {% elif application.status == "open" and not application.interest_withdrawn_at and not application.submitted_at %}
                 {% if not has_completed_viewing %}
-                    <p class="uk-alert-warning" uk-alert>Für die Main-Freischaltung fehlt eine dokumentierte, durchgeführte Besichtigung.</p>
+                    <p class="uk-alert-warning" uk-alert>Für die Freischaltung der Hauptbewerbung fehlt eine dokumentierte, durchgeführte Besichtigung.</p>
                 {% else %}
                 <form method="post" action="{% url 'wohnungsverwaltung:employee_application_invite' application.pk %}" class="uk-form-stacked">
                     {% csrf_token %}
-                    {{ invitation_form.as_p }}
-                    <button class="uk-button uk-button-primary" type="submit">Main-Bewerbung freischalten und einladen</button>
+                    {% if invitation_form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ invitation_form.non_field_errors }}</div>{% endif %}
+                        {% for field in invitation_form %}{% if field.is_hidden %}{{ field }}{% else %}{% include "wohnungsverwaltung/_form_field.html" with field=field only %}{% endif %}{% endfor %}
+                    <button class="uk-button uk-button-primary" type="submit">Hauptbewerbung freischalten und einladen</button>
                 </form>
                 {% endif %}
             {% else %}
-                <p class="uk-alert-warning" uk-alert>
-                    Eine Main-Bewerbung kann nur für eine aktive, offene Pre-Bewerbung freigeschaltet werden.
-                    Aktueller Status: {{ application.get_applicant_status_display }}.
-                </p>
+                {% include "partials/_status_notice.html" with notice_title="Freischaltung nicht möglich" notice_message="Eine Hauptbewerbung kann nur für eine aktive, offene Bewerbung freigeschaltet werden." notice_status=application.get_applicant_status_display notice_next=application.get_applicant_next_step only %}
             {% endif %}
 
             <h3 class="uk-h4">Änderungsverlauf</h3>
@@ -110,7 +111,7 @@
                 <ul class="uk-list uk-list-divider">
                     {% for event in review_events %}
                         <li>
-                            <strong>{{ event.get_kind_display }}</strong>
+                            <strong>{% if event.kind == "main_unlocked" %}Hauptbewerbung freigeschaltet{% else %}{{ event.get_kind_display }}{% endif %}</strong>
                             {% if event.kind == "priority_changed" %} · {{ event.get_priority_change_display }}{% endif %}
                             · {{ event.created_at|date:"d.m.Y, H:i" }} Uhr · {{ event.actor|default:"Unbekannt" }}
                             {% if event.reason %}<br>{{ event.reason|linebreaksbr }}{% endif %}
@@ -120,10 +121,10 @@
             {% else %}<p>Noch keine internen Änderungen dokumentiert.</p>{% endif %}
         </article>
 
-        <article class="uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
-            <h2 class="uk-card-title">Main-Bewerbung</h2>
+        <article class="management-panel uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
+            <h2 class="uk-card-title">Hauptbewerbung</h2>
             {% if application.submitted_at %}
-                <p>Main-Eingang: {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr</p>
+                <p>Eingang der Hauptbewerbung: {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr</p>
                 <h3 class="uk-h4">Nachweise</h3>
                 {% for group in proof_groups %}
                     <h4 class="uk-h5">{{ group.label }}</h4>
@@ -147,7 +148,7 @@
                     {% endif %}
                 {% endfor %}
             {% else %}
-                <p>Noch nicht eingereicht. Main-Nachweise sind erst nach der Einreichung verfügbar.</p>
+                <p>Noch nicht eingereicht. Nachweise zur Hauptbewerbung sind erst nach der Einreichung verfügbar.</p>
             {% endif %}
         </article>
     </div>

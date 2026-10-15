@@ -1,37 +1,25 @@
-{% extends "base.html" %}
-
-{% block title %}Registrierung bestätigen – STEImmo{% endblock %}
-
-{% block content %}
-<section class="uk-section">
-    <div class="uk-container uk-container-small">
-        <h1 class="uk-heading-medium">Registrierung bestätigen</h1>
-        <p class="uk-text-lead">Geben Sie den sechsstelligen Code aus der E-Mail ein. Der Code ist 15 Minuten gültig.</p>
-        <form method="post" autocomplete="on" class="uk-card uk-card-default uk-card-body uk-margin-top">
-            {% csrf_token %}
-            {% if form.non_field_errors %}
-                <div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>
-            {% endif %}
-            {% for field in form %}
-                <div class="uk-margin">
-                    <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    <div class="uk-form-controls">{{ field }}</div>
-                    {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
-                </div>
-            {% endfor %}
-            <div class="uk-margin-large-top uk-flex uk-flex-right">
-                <button class="uk-button uk-button-primary" type="submit">Konto bestätigen</button>
-            </div>
-        </form>
-        <form method="post" action="{% url 'resend_registration_code' %}" class="uk-margin-top">
-            {% csrf_token %}
-            <label class="uk-form-label" for="{{ resend_form.email.id_for_label }}">{{ resend_form.email.label }}</label>
-            <div class="uk-flex uk-flex-middle uk-flex-wrap uk-grid-small" uk-grid>
-                <div class="uk-width-expand">{{ resend_form.email }}</div>
-                <div class="uk-width-auto"><button class="uk-button uk-button-default" type="submit">Code erneut senden</button></div>
-            </div>
-            {% include "wohnungsverwaltung/_form_field_feedback.html" with field=resend_form.email only %}
-        </form>
+{% extends "registration/auth_base.html" %}
+{% block title %}Registrierung bestätigen – STE Immobilien eGbR{% endblock %}
+{% block auth_eyebrow %}Noch ein Schritt zu Ihrem Konto{% endblock %}
+{% block auth_heading %}E-Mail-Adresse bestätigen.{% endblock %}
+{% block auth_intro %}Geben Sie den sechsstelligen Bestätigungscode aus Ihrer E-Mail ein. Der Code ist 15 Minuten gültig.{% endblock %}
+{% block auth_content %}
+<form method="post" autocomplete="on" class="uk-form-stacked">
+    {% csrf_token %}
+    {% include "registration/_auth_errors.html" %}
+    <div class="auth-fields">
+        {% for field in form %}{% include "registration/_auth_field.html" %}{% endfor %}
     </div>
-</section>
+    <button class="uk-button uk-button-primary auth-submit" type="submit">Konto bestätigen <span uk-icon="arrow-right" aria-hidden="true"></span></button>
+</form>
+<div class="auth-resend">
+    <h2>Keinen Code erhalten?</h2>
+    <p class="uk-text-meta">Prüfen Sie auch den Spamordner. Einen neuen Code können Sie frühestens eine Minute nach dem letzten Versandversuch anfordern.</p>
+    <form method="post" action="{% url 'resend_registration_code' %}" class="uk-form-stacked">
+        {% csrf_token %}
+        {% include "registration/_auth_field.html" with field=resend_form.email %}
+        <button class="uk-button uk-button-default auth-submit" type="submit">Code erneut senden</button>
+    </form>
+</div>
+<p class="auth-switch"><a href="{% url 'login' %}">Zur Anmeldung</a></p>
 {% endblock %}

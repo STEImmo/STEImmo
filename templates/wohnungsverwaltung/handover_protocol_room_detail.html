@@ -1,17 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}{{ room.name }} – Übergabeprotokoll – STEImmo{% endblock %}
+{% block title %}{{ room.name }} – Übergabeprotokoll – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section">
-    <div class="uk-container uk-container-small">
+<section class="uk-section handover-page">
+    <div class="uk-container">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="handover" %}
         <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}">Zum Übergabeprotokoll</a>
-        <h1 class="uk-heading-medium">{{ room.name }}: Prüfpunkte</h1>
+        <h1 class="handover-title">{{ room.name }}: Prüfpunkte</h1>
         <p class="uk-text-lead">Übertragen Sie alle für diesen Raum vorgesehenen Prüfpunkte aus dem bisherigen Übergabebogen und halten Sie die Feststellung fest.</p>
 
+        <div class="handover-room-workspace">
         {% if room.raum_merkmale.all %}
-            <div class="uk-card uk-card-default uk-card-body uk-margin-top">
-                <h2 class="uk-heading-divider">Erfasste Prüfpunkte</h2>
+            <div class="uk-card uk-card-default uk-card-body handover-card uk-margin-top">
+                <h2 class="handover-section-title">Erfasste Prüfpunkte</h2>
                 {% include "wohnungsverwaltung/_room_move_in_unmatched_references.html" with room=room einzugspruefpunkte=room.einzugspruefpunkte_ohne_match einzugsprotokoll=move_in_reference %}
                 <dl class="uk-description-list uk-description-list-divider">
                     {% for item in room.raum_merkmale.all %}
@@ -45,14 +47,11 @@
             </div>
         {% endif %}
 
-        <form method="post" class="uk-card uk-card-default uk-card-body uk-margin-top" data-room-checklist-form>
+        <form method="post" class="uk-card uk-card-default uk-card-body handover-card uk-margin-top" data-room-checklist-form>
             {% csrf_token %}
-            <h2 class="uk-heading-divider">Prüfpunkt hinzufügen</h2>
+            <h2 class="handover-section-title">Prüfpunkt hinzufügen</h2>
             {% for field in form.visible_fields %}
-                <div class="uk-margin">
-                    <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    <div class="uk-form-controls">{{ field }}{% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}</div>
-                </div>
+                {% include "wohnungsverwaltung/_form_field.html" %}
             {% endfor %}
             {{ form.zusatzangaben }}
             {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.zusatzangaben only %}
@@ -60,6 +59,7 @@
                 <button class="uk-button uk-button-primary" type="submit">Prüfpunkt speichern</button>
             </div>
         </form>
+        </div>
     </div>
 </section>
 <script>

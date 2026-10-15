@@ -2,6 +2,11 @@
 
 STE Immobilien eGbR
 
+STEImmo ist der interne Projektname. Der sichtbare Auftritt verwendet den
+Firmennamen **STE Immobilien eGbR**. Header, mobile Navigation und Footer bauen
+auf dem UIkit-Theme aus US-17 auf. Der gemeinsame Seitenrahmen liegt in
+`templates/base.html`, Header und Footer in `templates/partials/`.
+
 ## Projektziel
 
 STEImmo ist eine serverseitig gerenderte Webanwendung für die Verwaltung und Vermarktung einer Immobilie mit 25 Wohneinheiten.
@@ -9,6 +14,20 @@ STEImmo ist eine serverseitig gerenderte Webanwendung für die Verwaltung und Ve
 Studierende können verfügbare Einheiten suchen, filtern, ansehen und sich darauf bewerben. Die Immobiliengesellschaft verwaltet die Einheiten sowie eingehende Anfragen und Bewerbungen.
 
 ## Projektstatus
+
+Die [Startseite](http://localhost:8000/) verwendet das gewählte Unternehmensdesign
+mit einer echten Würzburg-Luftaufnahme, Wohnungssuche, Gebäudevorschau, aktuellen
+Bestandszahlen, großen Etagenlinks und Zugang zu den persönlichen Bereichen.
+Unternehmen, Besichtigungsablauf und Kontakt sind als Abschnitte direkt erreichbar.
+Header und Footer ergänzen diese Einstiege sowie Bildnachweise. Quelle und Lizenz
+der lokal gespeicherten Aufnahme stehen in [Bildinformationen](static/images/README.md)
+und auf `/bildnachweise/`. Echte Hausfotos, Lage- und Kontaktdaten sowie freigegebene
+Rechtstexte sind noch zu ergänzen. Die frühere Entwurfsauswahl ist entfernt.
+
+Anmeldung, Registrierung und Codebestätigungen verwenden ein gemeinsames Layout:
+helles Einzugsmotiv neben den echten Formularen, Passwortanzeige/-hilfen und
+verständliche Feldfehler. Das gemeinsame Template liegt in
+`templates/registration/auth_base.html`.
 
 Die Gebäudeansicht ist lokal unter [Gebäude erkunden](http://localhost:8000/wohnungen/gebaeude/)
 erreichbar: Gebäude → Etagenplan → Wohnungsdetails. Öffentliche Wohnungsfotos können im
@@ -186,11 +205,31 @@ Mit dem Development-Override wird beim Containerstart außerdem ein ausschließl
 
 Der lokale Bootstrap reaktiviert dieses fiktive Konto und setzt sein Passwort bei jedem Entwicklungsstart auf den dokumentierten Wert zurück. Die Zugangsdaten sind absichtlich öffentlich und dürfen niemals außerhalb der lokalen Entwicklungsumgebung verwendet werden.
 
+Für die lokale Bewerberansicht kann ein separates fiktives Konto mit dem bestehenden
+Command angelegt werden:
+
+~~~bash
+docker compose exec web python manage.py create_test_applicant \
+  --email ui-bewerber@example.test \
+  --password 'WaldBlick!4826'
+~~~
+
+Dieses Beispielkonto ist sofort aktiv und hat ausschließlich Bewerberzugriff.
+Es wird nicht automatisch beim Entwicklungsstart angelegt. Über **Wohnungen finden →
+Details → Zur Besichtigung anmelden** kann eine Bewerbung erfasst werden; danach ist
+sie beim Mitarbeiter unter **Bewerbungen → betreffende Wohnung** sichtbar. Eine
+Hauptbewerbung wird erst nach Freigabe im Mitarbeiterbereich zugänglich. Auch diese
+absichtlich öffentlichen Beispielzugangsdaten sind ausschließlich für die lokale Entwicklung.
+
 Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD`, `DJANGO_EMAIL_USE_TLS` und `DJANGO_EMAIL_TIMEOUT`. Der SMTP-Timeout beträgt standardmäßig zehn Sekunden und kann über `DJANGO_EMAIL_TIMEOUT` in Sekunden angepasst werden. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
 
 ## Bewerbungen im Betreiberbereich
 
-Die Mitarbeiternavigation blendet **Wohnungen finden** und **Bewerbungsvorschau** aus.
+Die Mitarbeiternavigation zeigt **Wohnungen finden** und **Gebäudeansicht**
+weiterhin an. Mitarbeiter können das öffentliche Angebot direkt prüfen und
+zusätzlich ihre freigeschalteten Verwaltungsbereiche aufrufen.
+Besichtigungsanfragen werden aus dem Kontext der jeweiligen Wohnung gestartet;
+die technische Bewerbungsvorschau ist kein Navigationspunkt der Website.
 
 Unter **Bewerbungen** sehen berechtigte Mitarbeiter alle Wohnungen mit der Anzahl
 zugeordneter Bewerbungen. Nach Auswahl einer Wohnung erscheint auf breiten
@@ -386,3 +425,5 @@ docker/                 Compose, Umgebungsvariablen und EntryPoint
 ## Portierbarkeit
 
 Die Anwendung bleibt durch Docker Compose, PostgreSQL, Umgebungsvariablen und persistente Volumes auf andere Server portierbar. 
+
+Die persönlichen Bewerbungsseiten verwenden das gewählte Design A mit Ablaufübersicht, Statuskarten und getrennten Nachweisbereichen. Die Designvergleichsroute ist entfernt; Anmeldung und fachliche Freigabe bleiben erforderlich.

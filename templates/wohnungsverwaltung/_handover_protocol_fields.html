@@ -6,7 +6,7 @@
 <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
     {% for field in form.main_fields %}
         <div>
-            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
             <div class="uk-form-controls">
                 {{ field }}
                 {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
@@ -16,7 +16,7 @@
 </div>
 
 <div class="uk-margin-top" data-protocol-types="move_out">
-    <label class="uk-form-label" for="{{ form.mieter_zukuenftige_anschrift.id_for_label }}">{{ form.mieter_zukuenftige_anschrift.label }}</label>
+    <label class="uk-form-label" for="{{ form.mieter_zukuenftige_anschrift.id_for_label }}">{{ form.mieter_zukuenftige_anschrift.label }}{% if form.mieter_zukuenftige_anschrift.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
     <div class="uk-form-controls">
         {{ form.mieter_zukuenftige_anschrift }}
         {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.mieter_zukuenftige_anschrift only %}
@@ -50,21 +50,21 @@
             <p class="uk-text-meta">Für die gewählte Wohnung und Person liegt noch kein bestätigter Einzug als Vergleich vor.</p>
         {% endif %}
     </div>
-    <div class="uk-overflow-auto">
+    <div class="uk-overflow-auto" tabindex="0" role="region" aria-label="Übergabetabelle – seitlich scrollbar">
         <table class="uk-table uk-table-divider uk-table-small" data-meter-comparison>
             <thead>
                 <tr>
-                    <th>Zähler</th>
-                    <th>Zählernummer aus den Stammdaten</th>
-                    <th data-protocol-types="move_out">Einzug (alt)</th>
-                    <th><span data-protocol-types="move_in">Zählerstand</span><span data-protocol-types="move_out">Auszug (neu)</span></th>
-                    <th data-protocol-types="move_out">Differenz (neu − alt)</th>
+                    <th scope="col">Zähler</th>
+                    <th scope="col">Zählernummer aus den Stammdaten</th>
+                    <th data-protocol-types="move_out" scope="col">Einzug (alt)</th>
+                    <th scope="col"><span data-protocol-types="move_in">Zählerstand</span><span data-protocol-types="move_out">Auszug (neu)</span></th>
+                    <th data-protocol-types="move_out" scope="col">Differenz (neu − alt)</th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in meter_comparison_rows %}
                     <tr data-meter-comparison-row data-old-meter-reading="{{ row.old_reading|default_if_none:'' }}">
-                        <td><label for="{{ row.field.id_for_label }}">{{ row.label }}</label></td>
+                        <td><label for="{{ row.field.id_for_label }}">{{ row.label }}{% if row.field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label></td>
                         <td>{{ row.number|default:"Nicht gepflegt" }}</td>
                         <td data-protocol-types="move_out">{% if row.old_reading is not None %}{{ row.old_reading|floatformat:2 }}{% else %}—{% endif %}</td>
                         <td>{{ row.field }}{% include "wohnungsverwaltung/_form_field_feedback.html" with field=row.field only %}</td>
@@ -75,7 +75,7 @@
         </table>
     </div>
     <div class="uk-margin-small-top">
-        <label class="uk-form-label" for="{{ form.heizungsablesungen.id_for_label }}">{{ form.heizungsablesungen.label }}</label>
+        <label class="uk-form-label" for="{{ form.heizungsablesungen.id_for_label }}">{{ form.heizungsablesungen.label }}{% if form.heizungsablesungen.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
         <div class="uk-form-controls">
             {{ form.heizungsablesungen }}
             {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.heizungsablesungen only %}
@@ -88,7 +88,7 @@
     <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
         {% for field in form.move_in_fields %}
             <div>
-                <label>{{ field }} {{ field.label }}</label>
+                <label>{{ field }} {{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                 {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
             </div>
         {% endfor %}
@@ -101,7 +101,7 @@
     <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
         {% for field in form.move_out_fields %}
             <div>
-                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                 <div class="uk-form-controls">
                     {{ field }}
                     {% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}
@@ -132,7 +132,7 @@
                         <button class="uk-button uk-button-danger uk-button-small" type="button" data-remove-room>Raum entfernen</button>
                     </div>
                     <div class="uk-margin-small-top">
-                        <label class="uk-form-label" for="{{ group.room_form.raum.id_for_label }}">{{ group.room_form.raum.label }}</label>
+                        <label class="uk-form-label" for="{{ group.room_form.raum.id_for_label }}">{{ group.room_form.raum.label }}{% if group.room_form.raum.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                         <div class="uk-form-controls">
                             {{ group.room_form.raum }}
                             {% include "wohnungsverwaltung/_form_field_feedback.html" with field=group.room_form.raum only %}
@@ -159,7 +159,7 @@
                                     {% for field in checklist_form.visible_fields %}
                                         {% if field.name != "raum" and field.name != "DELETE" and field.name != "fotos" or field.name == "fotos" and checklist_form.allow_photo_upload %}
                                             <div{% if field.name == "wert" or field.name == "fotos" %} class="uk-width-1-1"{% endif %}>
-                                                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                                                 <div class="uk-form-controls">
                                                     {% if field.name == "fotos" %}
                                                         {% include "wohnungsverwaltung/_photo_picker.html" with field=field %}
@@ -192,7 +192,7 @@
                     <button class="uk-button uk-button-danger uk-button-small" type="button" data-remove-room>Raum entfernen</button>
                 </div>
                 <div class="uk-margin-small-top">
-                    <label class="uk-form-label" for="{{ room_formset.empty_form.raum.id_for_label }}">{{ room_formset.empty_form.raum.label }}</label>
+                    <label class="uk-form-label" for="{{ room_formset.empty_form.raum.id_for_label }}">{{ room_formset.empty_form.raum.label }}{% if room_formset.empty_form.raum.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                     <div class="uk-form-controls">{{ room_formset.empty_form.raum }}</div>
                 </div>
             </header>
@@ -207,7 +207,7 @@
                             {% for field in room_formset.empty_form.visible_fields %}
                                 {% if field.name != "raum" and field.name != "DELETE" and field.name != "fotos" or field.name == "fotos" and room_formset.empty_form.allow_photo_upload %}
                                     <div{% if field.name == "wert" or field.name == "fotos" %} class="uk-width-1-1"{% endif %}>
-                                        <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                        <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                                         <div class="uk-form-controls">
                                             {% if field.name == "fotos" %}
                                                 {% include "wohnungsverwaltung/_photo_picker.html" with field=field %}
@@ -238,7 +238,7 @@
                 {% for field in room_formset.empty_form.visible_fields %}
                     {% if field.name != "raum" and field.name != "DELETE" and field.name != "fotos" or field.name == "fotos" and room_formset.empty_form.allow_photo_upload %}
                         <div{% if field.name == "wert" or field.name == "fotos" %} class="uk-width-1-1"{% endif %}>
-                            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                             <div class="uk-form-controls">
                                 {% if field.name == "fotos" %}
                                     {% include "wohnungsverwaltung/_photo_picker.html" with field=field %}
@@ -272,7 +272,7 @@
                     {% for field in inline_form.visible_fields %}
                         {% if field.name != "DELETE" %}
                             <div>
-                                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                                 <div class="uk-form-controls">{{ field }}{% include "wohnungsverwaltung/_form_field_feedback.html" with field=field only %}</div>
                             </div>
                         {% endif %}
@@ -290,7 +290,7 @@
                 {% for field in key_formset.empty_form.visible_fields %}
                     {% if field.name != "DELETE" %}
                         <div>
-                            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="uk-text-danger" aria-label="Pflichtfeld">*</span>{% endif %}</label>
                             <div class="uk-form-controls">{{ field }}</div>
                         </div>
                     {% endif %}

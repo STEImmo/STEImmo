@@ -1,0 +1,9 @@
+<div class="auth-field{% if field.name == 'vorname' or field.name == 'nachname' %} auth-name{% endif %}">
+    <label class="uk-form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="auth-required" aria-label="Pflichtfeld">*</span>{% endif %}</label>
+    <div class="uk-form-controls{% if field.field.widget.input_type == 'password' %} auth-password-control{% endif %}">
+        {{ field }}
+        {% if field.field.widget.input_type == 'password' %}<button class="uk-button uk-button-default auth-password-toggle" type="button" hidden data-password-toggle="{{ field.id_for_label }}" data-password-label="{{ field.label }}" aria-controls="{{ field.id_for_label }}" aria-pressed="false" aria-label="{{ field.label }} anzeigen">Anzeigen</button>{% endif %}
+    </div>
+    {% if field.help_text %}<div class="auth-help uk-text-meta" id="{{ field.auto_id }}_helptext">{{ field.help_text|safe }}</div>{% endif %}
+    {% if field.errors %}<ul class="auth-field-errors" id="{{ field.auto_id }}_error" role="alert">{% for error in field.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+</div>

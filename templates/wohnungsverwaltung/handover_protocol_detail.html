@@ -1,23 +1,25 @@
 {% extends "base.html" %}
 
-{% block title %}Übergabeprotokoll – STEImmo{% endblock %}
+{% block title %}Übergabeprotokoll – STE Immobilien eGbR{% endblock %}
 
 {% block content %}
-<section class="uk-section">
+<section class="uk-section handover-page">
     <div class="uk-container">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="handover" %}
         <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:handover_protocol_list' %}">Zur Übersicht</a>
         <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-grid-small uk-margin-small-top handover-page-header" uk-grid>
             <div class="uk-width-expand">
                 <span class="uk-label">{{ protocol_status_label }}</span>
-                <h1 class="uk-heading-medium uk-margin-small-top">Übergabeprotokoll: {{ protocol_type_label }}</h1>
+                <h1 class="handover-title uk-margin-small-top">Übergabeprotokoll: {{ protocol_type_label }}</h1>
             </div>
             {% if protocol.status == "open" %}
                 <div class="uk-width-auto"><a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_edit' protocol.pk %}">Bearbeiten</a></div>
             {% endif %}
         </div>
 
-        <div class="uk-card uk-card-default uk-card-body uk-margin-top">
-            <h2 class="uk-heading-divider">Zuordnung</h2>
+        <div class="handover-detail-grid">
+        <div class="uk-card uk-card-default uk-card-body handover-card uk-margin-top">
+            <h2 class="handover-section-title">Zuordnung</h2>
             <dl class="uk-description-list uk-description-list-divider">
                 <dt>Datum und Uhrzeit</dt>
                 <dd>{{ protocol.uebergabe_zeitpunkt|date:"d.m.Y H:i" }}</dd>
@@ -51,14 +53,16 @@
                 <dd>{{ acceptance_status_label }}</dd>
             </dl>
 
-            <h2 class="uk-heading-divider uk-margin-large-top">Zählerstände</h2>
-            <div class="uk-overflow-auto">
+        </div>
+        <div class="uk-card uk-card-default uk-card-body handover-card uk-margin-top">
+            <h2 class="handover-section-title">Zählerstände</h2>
+            <div class="uk-overflow-auto" tabindex="0" role="region" aria-label="Übergabetabelle – seitlich scrollbar">
                 <table class="uk-table uk-table-divider uk-table-small">
                     <thead>
                         <tr>
-                            <th>Zähler</th>
-                            <th>Zählernummer</th>
-                            {% if move_in_reference %}<th>Einzug (alt)</th><th>Auszug (neu)</th>{% else %}<th>Zählerstand</th>{% endif %}
+                            <th scope="col">Zähler</th>
+                            <th scope="col">Zählernummer</th>
+                            {% if move_in_reference %}<th scope="col">Einzug (alt)</th><th scope="col">Auszug (neu)</th>{% else %}<th scope="col">Zählerstand</th>{% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -81,7 +85,7 @@
             </dl>
 
             {% if protocol.protokoll_typ == "move_in" %}
-                <h2 class="uk-heading-divider uk-margin-large-top">Nachweise zum Einzug</h2>
+                <h2 class="handover-section-title uk-margin-large-top">Nachweise zum Einzug</h2>
                 <dl class="uk-description-list uk-description-list-divider">
                     <dt>Kautionsbeleg</dt>
                     <dd>{% if protocol.kaution_nachweis_vorhanden %}Liegt vor{% else %}Liegt nicht vor{% endif %}</dd>
@@ -89,7 +93,7 @@
                     <dd>{% if protocol.erste_miete_nachweis_vorhanden %}Liegt vor{% else %}Liegt nicht vor{% endif %}</dd>
                 </dl>
             {% else %}
-                <h2 class="uk-heading-divider uk-margin-large-top">Nachbesserungen zum Auszug</h2>
+                <h2 class="handover-section-title uk-margin-large-top">Nachbesserungen zum Auszug</h2>
                 <dl class="uk-description-list uk-description-list-divider">
                     <dt>Nachbesserung</dt>
                     <dd>{% if protocol.nachbesserung_beschreibung %}{{ protocol.nachbesserung_beschreibung|linebreaksbr }}{% if protocol.nachbesserung_bis %}<br>Frist: {{ protocol.nachbesserung_bis|date:"d.m.Y" }}{% endif %}{% else %}Keine vereinbart{% endif %}</dd>
@@ -97,15 +101,16 @@
             {% endif %}
         </div>
 
-        <div class="uk-card uk-card-default uk-card-body uk-margin-top">
+        </div>
+        <div class="uk-card uk-card-default uk-card-body handover-card uk-margin-top">
             <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-grid-small handover-section-header" uk-grid>
-                <div class="uk-width-expand"><h2 class="uk-heading-divider uk-margin-remove">Schlüsselübergabe</h2></div>
+                <div class="uk-width-expand"><h2 id="protocol-keys" tabindex="-1" class="handover-section-title uk-margin-remove">Schlüsselübergabe</h2></div>
                 {% if protocol.status == "open" %}<div class="uk-width-auto"><a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:handover_protocol_key_create' protocol.pk %}">Schlüssel erfassen</a></div>{% endif %}
             </div>
             {% if protocol.protokoll_schluessel.all %}
-                <div class="uk-overflow-auto">
+                <div class="uk-overflow-auto" tabindex="0" role="region" aria-label="Übergabetabelle – seitlich scrollbar">
                     <table class="uk-table uk-table-divider uk-table-small">
-                        <thead><tr><th>Stück</th><th>Raum / Bezeichnung</th><th>Aufschrift / Nummer</th><th>Status</th>{% if protocol.status == "open" %}<th></th>{% endif %}</tr></thead>
+                        <thead><tr><th scope="col">Stück</th><th scope="col">Raum / Bezeichnung</th><th scope="col">Aufschrift / Nummer</th><th scope="col">Status</th>{% if protocol.status == "open" %}<th scope="col"></th>{% endif %}</tr></thead>
                         <tbody>
                             {% for key in protocol.protokoll_schluessel.all %}
                                 <tr>
@@ -130,9 +135,9 @@
             {% endif %}
         </div>
 
-        <div class="uk-card uk-card-default uk-card-body uk-margin-top">
+        <div class="uk-card uk-card-default uk-card-body handover-card uk-margin-top">
             <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap uk-grid-small handover-section-header" uk-grid>
-                <div class="uk-width-expand"><h2 class="uk-heading-divider uk-margin-remove">Räume und Prüfpunkte</h2></div>
+                <div class="uk-width-expand"><h2 id="protocol-rooms" tabindex="-1" class="handover-section-title uk-margin-remove">Räume und Prüfpunkte</h2></div>
                 {% if protocol.status == "open" %}<div class="uk-width-auto"><a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:handover_protocol_room_create' protocol.pk %}">Raum hinzufügen</a></div>{% endif %}
             </div>
             {% if archived_snapshot %}
@@ -211,7 +216,7 @@
         </div>
 
         {% if protocol.status == "open" %}
-            <div class="uk-card uk-card-default uk-card-body uk-margin-top">
+            <div class="uk-card uk-card-default uk-card-body handover-card uk-margin-top">
                 <h2 class="uk-card-title">Nächster Schritt: Unterschriften</h2>
                 <p>Nach der Prüfung unterschreiben Mitarbeiter und Mieter. Anschließend bestätigen Sie das Protokoll verbindlich und erhalten das PDF.</p>
                 <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_finalize' protocol.pk %}">Weiter zu den Unterschriften</a>

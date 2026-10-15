@@ -1,0 +1,35 @@
+{% load static %}
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ heading }} · STE Immobilien eGbR</title>
+    <link rel="stylesheet" href="{% static 'vendor/uikit/uikit.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=66">
+</head>
+<body class="site-shell">
+    <a class="site-skip-link" href="#main-content">Zum Inhalt springen</a>
+    {% include "partials/_site_header.html" with minimal_header=True only %}
+    <main id="main-content" class="site-main" tabindex="-1">
+        <section class="uk-section uk-section-large">
+            <div class="uk-container uk-container-small">
+                <h1>{{ heading }}</h1>
+                {% url 'home' as home_url %}
+                {% url 'wohnungsverwaltung_public:apartment_search' as search_url %}
+                {% url 'login' as login_url %}
+                {% with status_text=status|stringformat:"s" %}{% with label="Fehler "|add:status_text %}
+                {% if status == 403 %}
+                    {% include "partials/_status_notice.html" with notice_label=label notice_message=message notice_primary_url=login_url notice_primary_label="Zur Anmeldung" notice_secondary_url=home_url notice_secondary_label="Zur Startseite" only %}
+                {% else %}
+                    {% include "partials/_status_notice.html" with notice_tone="danger" notice_label=label notice_message=message notice_primary_url=home_url notice_primary_label="Zur Startseite" notice_secondary_url=search_url notice_secondary_label="Wohnungen finden" only %}
+                {% endif %}
+                {% endwith %}{% endwith %}
+            </div>
+        </section>
+    </main>
+    {% include "partials/_site_footer.html" %}
+    <script src="{% static 'vendor/uikit/uikit.min.js' %}"></script>
+    <script src="{% static 'vendor/uikit/uikit-icons.min.js' %}"></script>
+</body>
+</html>

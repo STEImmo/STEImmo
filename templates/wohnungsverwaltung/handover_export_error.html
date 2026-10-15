@@ -1,7 +1,10 @@
 {% extends "base.html" %}
+{% block title %}PDF derzeit nicht verfügbar – STE Immobilien eGbR{% endblock %}
 {% block content %}
-<section class="uk-section"><div class="uk-container">
+<section class="uk-section handover-page"><div class="uk-container">
+    {% include "wohnungsverwaltung/_workspace_navigation.html" with area="handover" %}
     <h1>PDF derzeit nicht verfügbar</h1>
-    <div class="uk-alert-danger" role="alert">Das Dokument oder eines seiner Bilder konnte nicht vollständig gelesen oder gespeichert werden. Bitte wenden Sie sich an die Verwaltung. Eine vorhandene bestätigte Fassung wird nicht überschrieben.</div>
+    {% if perms.immobilien.access_employee_area %}{% url 'wohnungsverwaltung:handover_protocol_list' as back_url %}{% else %}{% url 'wohnungsverwaltung:handover_protocol_mine' as back_url %}{% endif %}
+    {% include "partials/_status_notice.html" with notice_tone="danger" notice_role="alert" notice_label="Dokument nicht verfügbar" notice_title="Das PDF konnte nicht bereitgestellt werden" notice_message="Das Dokument oder eines seiner Bilder konnte nicht vollständig gelesen oder gespeichert werden. Eine vorhandene bestätigte Fassung wird nicht überschrieben." notice_next="Bitte wenden Sie sich an die Verwaltung. Sie können zur Übersicht Ihrer Übergaben zurückkehren." notice_secondary_url=back_url notice_secondary_label="Zur Übergabeübersicht" only %}
 </div></section>
 {% endblock %}

@@ -25,7 +25,7 @@
         {% endif %}
     </td>
     <td role="cell">
-        <span class="application-cell-label uk-text-meta">Main-Status</span>
+        <span class="application-cell-label uk-text-meta">Hauptbewerbungsstatus</span>
         {% if application.submitted_at %}Eingereicht
         {% elif application.main_application_unlocked and application.latest_invitation_status == "invitation_failed" %}Einladung fehlgeschlagen
         {% elif application.main_application_unlocked and application.latest_invitation_status == "invitation_sent" %}Einladung versendet
@@ -43,7 +43,7 @@
         {{ application.get_latest_viewing_status_display }}
     </td>
     <td role="cell">
-        <span class="application-cell-label uk-text-meta">Pre-Eingang</span>
+        <span class="application-cell-label uk-text-meta">Anfrage eingegangen</span>
         <div>{{ application.created_at|date:"d.m.Y" }}</div>
         <div>{{ application.created_at|date:"H:i" }} Uhr</div>
     </td>

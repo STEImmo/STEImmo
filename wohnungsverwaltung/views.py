@@ -51,6 +51,7 @@ from .access import (
 from .building_plans import (
     FLOOR_SHAPES,
     PLAN_REFERENCES,
+    building_overview,
     floor_label,
 )
 from .forms import (
@@ -189,7 +190,25 @@ def apartment_search(request: HttpRequest) -> HttpResponse:
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
 
-    form = ApartmentSearchForm(request.GET)
+    context = _apartment_search_context(request.GET)
+    units = list(context["wohnungen"].prefetch_related("photos"))
+    context.update(
+        rows=[
+            {
+                "unit": unit,
+                "floor": floor_label(unit.etage),
+                "photo": next(iter(unit.photos.all()), None),
+            }
+            for unit in units
+        ],
+        result_count=len(units),
+        has_filters=any(request.GET.get(name) for name in context["form"].fields),
+    )
+    return render(request, "wohnungsverwaltung/apartment_search.html", context)
+
+
+def _apartment_search_context(query) -> dict:
+    form = ApartmentSearchForm(query)
     wohnungen = Wohnung.objects.available()
     if form.is_valid():
         filter_fields = {
@@ -216,42 +235,16 @@ def apartment_search(request: HttpRequest) -> HttpResponse:
     else:
         wohnungen = wohnungen.none()
 
-    return render(
-        request,
-        "wohnungsverwaltung/apartment_search.html",
-        {
-            "form": form,
-            "wohnungen": wohnungen.order_by("etage", "wohnungsnummer"),
-        },
-    )
+    return {"form": form, "wohnungen": wohnungen.order_by("etage", "wohnungsnummer")}
 
 
 def building_view(request: HttpRequest) -> HttpResponse:
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
-    floors_by_number = {}
-    for unit in Wohnung.objects.filter(etage__in=FLOOR_SHAPES).order_by("-etage", "wohnungsnummer"):
-        floor = floors_by_number.setdefault(
-            unit.etage,
-            {
-                "number": unit.etage,
-                "label": floor_label(unit.etage),
-                "units": [],
-                "available_count": 0,
-                "facade_y": 244 + (3 - unit.etage) * 112,
-            },
-        )
-        floor["units"].append(unit)
-        if unit.status == WohnungStatus.FREE:
-            floor["available_count"] += 1
     return render(
         request,
         "wohnungsverwaltung/building_view.html",
-        {
-            "floors": list(floors_by_number.values()),
-            "total_units": sum(len(f["units"]) for f in floors_by_number.values()),
-            "total_available": sum(f["available_count"] for f in floors_by_number.values()),
-        },
+        building_overview(Wohnung.objects.order_by("-etage", "wohnungsnummer")),
     )
 
 
@@ -427,6 +420,8 @@ def _applicant_for_user(request: HttpRequest) -> Person:
 @applicant_required
 def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) -> HttpResponse:
     applicant = _applicant_for_user(request)
+    if unit_id is None and request.method == "GET":
+        return redirect("wohnungsverwaltung_public:apartment_search")
     unit = None
     if unit_id is not None:
         unit = get_object_or_404(Wohnung.objects.available(), pk=unit_id)
@@ -467,13 +462,13 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
         except IntegrityError:
             form.add_error(
                 None,
-                "Sie haben bereits eine offene Pre-Bewerbung. Bitte warten Sie deren Abschluss ab.",
+                "Sie haben bereits eine offene Bewerbung. Bitte warten Sie deren Abschluss ab.",
             )
         if application_created:
             if exceeds_occupancy_limit:
                 messages.warning(
                     request,
-                    "Ihre Pre-Bewerbung wurde gespeichert und wegen der überschrittenen "
+                    "Ihre Bewerbung wurde gespeichert und wegen der überschrittenen "
                     "Personenhöchstzahl abgelehnt.",
                 )
             else:
@@ -481,7 +476,7 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
                     "Ihre Besichtigungsanfrage wurde gespeichert. "
                     "Ein Termin wird separat bestätigt."
                     if unit is not None
-                    else "Ihre Pre-Bewerbung wurde erfolgreich gespeichert."
+                    else "Ihre Bewerbung wurde erfolgreich gespeichert."
                 )
                 messages.success(request, success_message)
             return redirect("wohnungsverwaltung:pre_application_list")
@@ -489,7 +484,12 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
     return render(
         request,
         "wohnungsverwaltung/pre_application_form.html",
-        {"form": form, "unit_is_preselected": unit is not None},
+        {
+            "form": form,
+            "unit_is_preselected": unit is not None,
+            "selected_unit": unit,
+            "selected_floor_label": floor_label(unit.etage) if unit else "",
+        },
     )
 
 
@@ -517,12 +517,22 @@ def pre_application_list(request: HttpRequest) -> HttpResponse:
         "wohnungsverwaltung/pre_application_list.html",
         {
             "applications": applications,
-            "has_open_application": applications.filter(
+            "active_application": applications.filter(
                 status=BewerbungStatus.OPEN,
                 interest_withdrawn_at__isnull=True,
-            ).exists(),
+            ).first(),
         },
     )
+
+
+def _main_application_context(application, form):
+    groups = _application_proof_groups(application)
+    return {
+        "application": application,
+        "form": form,
+        "proof_groups": groups,
+        "proof_count": sum(bool(group["documents"]) for group in groups),
+    }
 
 
 def _stored_file_size_display(file_field) -> str:
@@ -746,7 +756,7 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
                 )
                 if application.submitted_at is not None:
                     raise PermissionDenied(
-                        "Eine eingereichte Main-Bewerbung kann nicht mehr geändert werden."
+                        "Eine eingereichte Hauptbewerbung kann nicht mehr geändert werden."
                     )
                 if upload_error:
                     return upload_too_large_response(upload_error)
@@ -811,26 +821,18 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
             return render(
                 request,
                 "wohnungsverwaltung/main_application_status.html",
-                {
-                    "application": application,
-                    "form": form,
-                    "proof_groups": _application_proof_groups(application),
-                },
+                _main_application_context(application, form),
             )
 
         if not form_is_valid:
             return render(
                 request,
                 "wohnungsverwaltung/main_application_status.html",
-                {
-                    "application": application,
-                    "form": form,
-                    "proof_groups": _application_proof_groups(application),
-                },
+                _main_application_context(application, form),
             )
 
         if action == "submit":
-            messages.success(request, "Ihre Main-Bewerbung wurde erfolgreich eingereicht.")
+            messages.success(request, "Ihre Hauptbewerbung wurde erfolgreich eingereicht.")
         else:
             messages.success(request, "Ihr Entwurf wurde gespeichert.")
         return redirect(
@@ -838,16 +840,10 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
             application_id=application.pk,
         )
 
-    proof_groups = _application_proof_groups(application)
-
     return render(
         request,
         "wohnungsverwaltung/main_application_status.html",
-        {
-            "application": application,
-            "form": form,
-            "proof_groups": proof_groups,
-        },
+        _main_application_context(application, form),
     )
 
 
@@ -1401,12 +1397,12 @@ def employee_application_suitability_approve(
 def _send_application_invitation(application: Bewerbung, actor, base_url: str) -> bool:
     recipient = application.person.email
     detail_url = reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
-    subject = "Ihre Main-Bewerbung bei STEImmo"
+    subject = "Ihre Hauptbewerbung bei STE Immobilien eGbR"
     body = (
         f"Guten Tag {application.person.vorname} {application.person.nachname},\n\n"
         f"Sie können nun Ihre Bewerbung für {application.wohnung} im geschützten Bereich "
         "vervollständigen.\n\n"
-        f"Zur Main-Bewerbung: {base_url}{detail_url}\n"
+        f"Zur Hauptbewerbung: {base_url}{detail_url}\n"
     )
     try:
         sent = send_mail(subject, body, None, [recipient], fail_silently=False)
@@ -1459,7 +1455,7 @@ def employee_application_invite(request: HttpRequest, application_id: UUID) -> H
                 request, "Diese Bewerbung ist nicht mehr aktiv und kann nicht eingeladen werden."
             )
         elif application.submitted_at is not None:
-            messages.info(request, "Die Main-Bewerbung wurde bereits eingereicht.")
+            messages.info(request, "Die Hauptbewerbung wurde bereits eingereicht.")
         elif (
             not application.main_application_unlocked
             and not application.viewings.filter(status="completed").exists()
@@ -1472,7 +1468,7 @@ def employee_application_invite(request: HttpRequest, application_id: UUID) -> H
         elif application.main_application_unlocked:
             messages.info(
                 request,
-                "Die Main-Bewerbung ist bereits freigeschaltet. "
+                "Die Hauptbewerbung ist bereits freigeschaltet. "
                 "Sie können die E-Mail erneut senden.",
             )
         else:
@@ -1493,12 +1489,12 @@ def employee_application_invite(request: HttpRequest, application_id: UUID) -> H
         )
         if sent:
             messages.success(
-                request, "Die Main-Bewerbung wurde freigeschaltet und die Einladung versendet."
+                request, "Die Hauptbewerbung wurde freigeschaltet und die Einladung versendet."
             )
         else:
             messages.error(
                 request,
-                "Die Main-Bewerbung ist freigeschaltet, aber die E-Mail konnte nicht "
+                "Die Hauptbewerbung ist freigeschaltet, aber die E-Mail konnte nicht "
                 "versendet werden. Sie können den Versand erneut anstoßen.",
             )
     return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
@@ -2887,13 +2883,13 @@ def merkmal_list(request: HttpRequest) -> HttpResponse:
 
 @employee_required
 def merkmal_create(request: HttpRequest) -> HttpResponse:
-    return _merkmal_form(request, Merkmal(), "Merkmalvorlage anlegen")
+    return _merkmal_form(request, Merkmal(), "Prüfvorlage anlegen")
 
 
 @employee_required
 def merkmal_edit(request: HttpRequest, merkmal_id) -> HttpResponse:
     merkmal = get_object_or_404(Merkmal, pk=merkmal_id)
-    return _merkmal_form(request, merkmal, "Merkmalvorlage bearbeiten")
+    return _merkmal_form(request, merkmal, "Prüfvorlage bearbeiten")
 
 
 def _merkmal_form(request: HttpRequest, merkmal: Merkmal, title: str) -> HttpResponse:
@@ -2910,7 +2906,7 @@ def _merkmal_form(request: HttpRequest, merkmal: Merkmal, title: str) -> HttpRes
                 and option_form.cleaned_data["wert"].strip()
             ]
             saved_feature.save()
-            messages.success(request, "Die Merkmalvorlage wurde gespeichert.")
+            messages.success(request, "Die Prüfvorlage wurde gespeichert.")
             return redirect("verwaltung:merkmal_edit", merkmal_id=saved_feature.pk)
     else:
         form = MerkmalForm(instance=merkmal)
