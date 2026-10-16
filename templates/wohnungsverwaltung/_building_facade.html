@@ -31,18 +31,19 @@
     <ellipse cx="546" cy="717" rx="435" ry="17" fill="#e8e8e5"/>
     <rect x="200" y="686" width="694" height="25" fill="#b4b1a5"/>
     {% for floor in floors %}
-    <a href="{% url 'wohnungsverwaltung_public:floor_view' floor.number %}#etagenplan" class="facade-floor" aria-label="{{ floor.label }}: {{ floor.units|length }} Wohnungen, {{ floor.available_count }} verfügbar">
+    <a href="{% url 'wohnungsverwaltung_public:floor_view' floor.number %}#etagenplan" class="facade-floor" data-floor="{{ floor.number }}" aria-label="{{ floor.label }}: {{ floor.units|length }} Wohnungen, {{ floor.available_count }} verfügbar">
         {% if floor.number == 4 %}
         <path d="M179 239L301 133H558L575 146H874L897 239Z" fill="url(#roof-lines)" stroke="#424541" stroke-width="3"/>
         <path d="M329 170H527V222H329Z M703 177H826V224H703Z" fill="#b5b6ae" stroke="#343c3d" stroke-width="4"/>
         <path d="M336 177H520V214H336Z M710 184H819V216H710Z" fill="url(#glass)"/>
         <path d="M361 177V214M389 177V214M417 177V214M445 177V214M473 177V214M501 177V214M733 184V216M760 184V216M788 184V216" stroke="#e7e5dd" stroke-width="6"/>
         <path d="M321 167H535M696 175H833M180 240H901" stroke="#d6d5ce" stroke-width="7"/>
-        <path class="facade-hit" d="M179 239L301 133H558L575 146H874L897 239Z"/>
+        <path class="facade-hit" d="M183 237L302 135H557L574 148H872L894 237Z"/>
         <g class="facade-floor-label"><rect x="22" y="163" width="152" height="53" rx="3"/><text x="34" y="184">Dachgeschoss</text><text class="facade-floor-summary" x="34" y="203">{{ floor.units|length }} Wohnungen · {{ floor.available_count }} frei</text><path d="M174 189H236"/></g>
         {% else %}
         <g transform="translate(0 {{ floor.facade_y }})"><use href="#floor-front"/>
-            <rect class="facade-hit" x="200" y="0" width="694" height="112"/>
+            {# Keep the full 3-unit stroke inside this floor so the next floor cannot cover it. #}
+            <rect class="facade-hit" x="201.5" y="1.5" width="691" height="109"/>
             <g class="facade-floor-label"><rect x="22" y="30" width="152" height="53" rx="3"/><text x="34" y="51">{% if floor.number == 0 %}Erdgeschoss{% else %}{{ floor.number }}. Obergeschoss{% endif %}</text><text class="facade-floor-summary" x="34" y="70">{{ floor.units|length }} Wohnungen · {{ floor.available_count }} frei</text><path d="M174 56H200"/></g>
         </g>
         {% endif %}

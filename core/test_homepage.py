@@ -42,6 +42,16 @@ class HomePageTests(TestCase):
                 self.assertNotContains(response, 'aria-label="Startseitenentwürfe"')
                 self.assertNotContains(response, "Ein Haus. Viele Möglichkeiten.")
 
+    def test_each_floor_has_matching_preview_links_to_its_floor_plan(self):
+        for floor in (2, 3):
+            Wohnung.objects.create(wohnungsnummer=f"{floor}01", gebaeudenummer="1", etage=floor)
+        response = self.client.get(reverse("home"))
+        for floor in range(5):
+            with self.subTest(floor=floor):
+                url = reverse("wohnungsverwaltung_public:floor_view", args=[floor])
+                self.assertContains(response, f'data-floor="{floor}"', count=2)
+                self.assertContains(response, f'href="{url}#etagenplan"', count=2)
+
     def test_empty_inventory_offers_search_without_advertising_available_apartments(self):
         Wohnung.objects.all().delete()
         response = self.client.get(reverse("home"))
