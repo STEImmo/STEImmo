@@ -61,6 +61,7 @@ from .models import (
     RegistrationVerification,
     Schluessel,
     Stellplatz,
+    StellplatzTyp,
     StellplatzZuordnung,
     UebergabeStatus,
     ViewingAppointment,
@@ -1961,6 +1962,47 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
         ):
             self.add_error("pet_review_reason", "Bitte begründen Sie die Tierhaltungsregel.")
         return cleaned_data
+
+
+class ApartmentManagementFilterForm(UIkitFormMixin, forms.Form):
+    status = forms.ChoiceField(
+        required=False,
+        label="Verfügbarkeitsstatus",
+        choices=(
+            ("", "Alle Status"),
+            (WohnungStatus.FREE, "Verfügbar"),
+            (WohnungStatus.TAKEN, "Vermietet"),
+            (WohnungStatus.BLOCKED, "Gesperrt"),
+        ),
+    )
+    floor = forms.ChoiceField(required=False, label="Etage")
+
+    def __init__(self, *args, floors=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["floor"].choices = [
+            ("", "Alle Etagen"),
+            *(
+                (str(floor), "Erdgeschoss (0)" if floor == 0 else f"Etage {floor}")
+                for floor in floors
+            ),
+        ]
+
+
+class ParkingManagementFilterForm(UIkitFormMixin, forms.Form):
+    assignment = forms.ChoiceField(
+        required=False,
+        label="Zuordnung",
+        choices=(
+            ("", "Alle Zuordnungen"),
+            ("unassigned", "Nicht zugeordnet"),
+            ("assigned", "Zugeordnet"),
+        ),
+    )
+    type = forms.ChoiceField(
+        required=False,
+        label="Stellplatztyp",
+        choices=(("", "Alle Stellplatztypen"), *StellplatzTyp.choices),
+    )
 
 
 class EmployeeApplicationFilterForm(UIkitFormMixin, forms.Form):

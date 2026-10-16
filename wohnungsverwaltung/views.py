@@ -1,6 +1,8 @@
 import json
 import logging
 from collections import Counter
+from copy import copy
+from urllib.parse import urlencode
 from uuid import UUID
 
 from django.conf import settings
@@ -32,6 +34,7 @@ from django.http import (
     HttpResponse,
     HttpResponseNotAllowed,
     JsonResponse,
+    QueryDict,
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -59,6 +62,7 @@ from .forms import (
     HANDOVER_STATUS_LABELS,
     HANDOVER_TYPE_LABELS,
     METER_READING_FIELDS,
+    ApartmentManagementFilterForm,
     ApartmentPhotoForm,
     ApartmentSearchForm,
     ApplicationPriorityForm,
@@ -74,6 +78,7 @@ from .forms import (
     MainApplicationInvitationForm,
     MerkmalForm,
     MerkmalOptionFormSet,
+    ParkingManagementFilterForm,
     RaumForm,
     RoomChecklistItemForm,
     RoomChecklistPhotoUploadForm,
@@ -847,6 +852,64 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
     )
 
 
+def _table_filter_context(form, groups, *, persistent=None, inline_fields=()):
+    """Share GET form state and presentation across the three management lists."""
+    persistent = {key: str(value) for key, value in (persistent or {}).items() if value != ""}
+    values = {field.name: str(field.value()) for field in form if field.value() not in (None, "")}
+    params = persistent | values
+
+    def query_url(parameters):
+        return "?" + urlencode(parameters) if parameters else "?"
+
+    active_filters = []
+    for field in form:
+        if field.name not in values or field.name == "sort":
+            continue
+        value = values[field.name]
+        choices = {str(key): label for key, label in getattr(field.field, "choices", ())}
+        display = choices.get(value, value)
+        if field.errors:
+            display = f"{value} (ungültig)"
+        active_filters.append(
+            {
+                "name": field.name,
+                "label": field.label,
+                "value": display,
+                "remove_url": query_url(
+                    {key: val for key, val in params.items() if key != field.name}
+                ),
+            }
+        )
+
+    filter_groups = {}
+    for name, label, field_names in groups:
+        group = {
+            "name": name,
+            "label": label,
+            "active": any(field_name in values for field_name in field_names),
+            "hidden_values": {key: val for key, val in params.items() if key not in field_names},
+        }
+        for placement in ("desktop", "mobile"):
+            # BoundField caches refer to their parent form, so each placement gets
+            # its own cache and IDs while sharing the validated fields and errors.
+            placed_form = copy(form)
+            placed_form.auto_id = f"{placement}_filter_%s"
+            placed_form._bound_fields_cache = {}
+            group[placement + "_fields"] = [placed_form[field] for field in field_names]
+        filter_groups[name] = group
+    filter_query = QueryDict(mutable=True)
+    filter_query.update(params)
+    return {
+        "filter_groups": filter_groups,
+        "active_filters": active_filters,
+        "reset_filters_url": query_url(persistent),
+        "filter_query": filter_query,
+        "inline_hidden_values": {
+            key: val for key, val in params.items() if key not in inline_fields
+        },
+    }
+
+
 @never_cache
 @employee_required
 def employee_application_list(request: HttpRequest) -> HttpResponse:
@@ -984,6 +1047,24 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
             applications = applications.order_by("-created_at", "pk")
 
         page = Paginator(applications, 20).get_page(request.GET.get("page"))
+        context.update(
+            _table_filter_context(
+                filters,
+                (
+                    ("applicant", "Bewerber", ("people", "priority")),
+                    ("status", "Bearbeitung", ("status",)),
+                    ("main", "Hauptbewerbungsstatus", ("main_status",)),
+                    ("viewing", "Besichtigung", ("viewing_status",)),
+                    ("created", "Anfrage eingegangen", ("created_from", "created_to")),
+                ),
+                persistent={
+                    "wohnung": unit.pk,
+                    "segment": segment if "segment" in request.GET else "",
+                    "sort": cleaned_filters.get("sort", ""),
+                },
+                inline_fields=("q", "sort"),
+            )
+        )
         context.update(
             unit=unit,
             applications=page,
@@ -2757,8 +2838,25 @@ def _room_form_groups(room_formset, removed_rooms=()) -> list[dict[str, object]]
 
 @employee_required
 def wohnung_list(request: HttpRequest) -> HttpResponse:
-    wohnungen = Wohnung.objects.order_by("etage", "wohnungsnummer")
-    return render(request, "wohnungsverwaltung/wohnung_list.html", {"wohnungen": wohnungen})
+    wohnungen = Wohnung.objects.order_by("etage", "wohnungsnummer", "pk")
+    filters = ApartmentManagementFilterForm(
+        request.GET,
+        floors=Wohnung.objects.order_by("etage").values_list("etage", flat=True).distinct(),
+    )
+    filters.is_valid()
+    if filters.cleaned_data.get("status"):
+        wohnungen = wohnungen.filter(status=filters.cleaned_data["status"])
+    if filters.cleaned_data.get("floor"):
+        wohnungen = wohnungen.filter(etage=filters.cleaned_data["floor"])
+    context = _table_filter_context(
+        filters,
+        (
+            ("floor", "Etage", ("floor",)),
+            ("status", "Status", ("status",)),
+        ),
+    )
+    context.update(wohnungen=wohnungen, filters=filters, inventory_exists=Wohnung.objects.exists())
+    return render(request, "wohnungsverwaltung/wohnung_list.html", context)
 
 
 @employee_required
@@ -2924,12 +3022,28 @@ def _merkmal_form(request: HttpRequest, merkmal: Merkmal, title: str) -> HttpRes
 
 @employee_required
 def stellplatz_list(request: HttpRequest) -> HttpResponse:
-    stellplaetze = Stellplatz.objects.order_by("name").prefetch_related("zuordnungen__wohnung")
-    return render(
-        request,
-        "wohnungsverwaltung/stellplatz_list.html",
-        {"stellplaetze": stellplaetze},
+    stellplaetze = Stellplatz.objects.order_by("name", "pk").prefetch_related(
+        "zuordnungen__wohnung"
     )
+    filters = ParkingManagementFilterForm(request.GET)
+    filters.is_valid()
+    if filters.cleaned_data.get("type"):
+        stellplaetze = stellplaetze.filter(stellplatz_typ=filters.cleaned_data["type"])
+    if filters.cleaned_data.get("assignment"):
+        stellplaetze = stellplaetze.filter(
+            zuordnungen__isnull=filters.cleaned_data["assignment"] == "unassigned"
+        )
+    context = _table_filter_context(
+        filters,
+        (
+            ("type", "Typ", ("type",)),
+            ("assignment", "Zuordnung", ("assignment",)),
+        ),
+    )
+    context.update(
+        stellplaetze=stellplaetze, filters=filters, inventory_exists=Stellplatz.objects.exists()
+    )
+    return render(request, "wohnungsverwaltung/stellplatz_list.html", context)
 
 
 @employee_required

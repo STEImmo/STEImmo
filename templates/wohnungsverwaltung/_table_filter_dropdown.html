@@ -1,0 +1,17 @@
+<span class="table-filter-heading-mobile">{{ group.label }}</span>
+<div class="table-filter">
+    <button id="filter-{{ placement|default:'desktop' }}-{{ group.name }}-toggle" class="uk-button uk-button-default uk-button-small{% if group.active %} table-filter-active{% endif %}" type="button" aria-label="{{ group.label }} filtern{% if group.active %}, aktiv{% endif %}">
+        {{ group.label }} <span uk-icon="icon: settings; ratio: 0.7" aria-hidden="true"></span>{% if group.active %} <span class="uk-label">Aktiv</span>{% endif %}
+    </button>
+    <div data-table-filter-dropdown aria-labelledby="filter-{{ placement|default:'desktop' }}-{{ group.name }}-toggle" class="table-filter-dropdown" uk-dropdown="mode: click; pos: bottom-left; container: body">
+        <form method="get">
+            {% for name, value in group.hidden_values.items %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+            {% if placement == 'mobile' %}
+                {% for field in group.mobile_fields %}{% include "wohnungsverwaltung/_form_field.html" with field=field only %}{% endfor %}
+            {% else %}
+                {% for field in group.desktop_fields %}{% include "wohnungsverwaltung/_form_field.html" with field=field only %}{% endfor %}
+            {% endif %}
+            <button type="submit" class="uk-button uk-button-primary uk-button-small">Anwenden</button>
+        </form>
+    </div>
+</div>

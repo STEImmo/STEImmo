@@ -1832,3 +1832,61 @@ a:active,
     .status-notice-heading h2 { font-size: var(--steimmo-font-size-xl); }
     .status-notice .notice-actions .uk-button { width: 100%; padding-inline: var(--steimmo-space-xs); }
 }
+
+/* Shared management table filters; dropdowns attach to body to avoid overflow clipping. */
+.table-filter {
+    display: inline-block;
+    max-width: 100%;
+}
+.table-filter > .uk-button {
+    white-space: normal;
+    text-align: left;
+}
+.table-filter-active {
+    border-color: var(--steimmo-color-primary);
+}
+.table-filter-dropdown {
+    width: 20rem;
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    text-transform: none;
+    font-weight: 400;
+}
+.table-filter-summary,
+.table-filters-mobile {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--steimmo-space-sm);
+}
+@media (min-width: 960px) {
+    .table-filters-mobile {
+        display: none;
+    }
+}
+@media (max-width: 959px) {
+    .management-table thead .table-filter {
+        display: none;
+    }
+}
+.table-filter-heading-mobile {
+    display: none;
+}
+@media (max-width: 959px) {
+    .management-table .table-filter-heading-mobile {
+        display: inline;
+    }
+    .table-filters-mobile .table-filter-heading-mobile {
+        display: none;
+    }
+}
+
+@media (min-width: 960px) and (max-width: 1199px) {
+    .table-filters-applications {
+        display: flex;
+    }
+}
+.application-empty-state {
+    grid-column: 1 / -1;
+}
