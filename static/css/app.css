@@ -1,28 +1,28 @@
 :root {
     color-scheme: light;
 
-    --steimmo-color-primary: #2D5A43;
-    --steimmo-color-primary-hover: #244B37;
-    --steimmo-color-primary-active: #1F402F;
+    --steimmo-color-primary: #195D89;
+    --steimmo-color-primary-hover: #124B70;
+    --steimmo-color-primary-active: #103D5C;
     --steimmo-color-primary-contrast: #FFFFFF;
-    --steimmo-color-action-secondary: #3F4345;
-    --steimmo-color-action-secondary-hover: #292B2C;
+    --steimmo-color-action-secondary: #243F55;
+    --steimmo-color-action-secondary-hover: #172F43;
 
-    --steimmo-color-text: #292B2C;
-    --steimmo-color-text-muted: #595959;
+    --steimmo-color-text: #172F43;
+    --steimmo-color-text-muted: #526779;
     --steimmo-color-text-inverse: #FFFFFF;
-    --steimmo-color-text-inverse-muted: #E2E0DE;
+    --steimmo-color-text-inverse-muted: #DCEAF4;
 
     --steimmo-color-surface: #FFFFFF;
-    --steimmo-color-surface-page: #F5F2EF;
-    --steimmo-color-surface-muted: #EEEBE7;
-    --steimmo-color-surface-subtle: #F2EFEC;
-    --steimmo-color-surface-brand: #DFD7CE;
-    --steimmo-color-surface-inverse: #3F4345;
-    --steimmo-color-accent-muted: #AB9F94;
+    --steimmo-color-surface-page: #F5F9FC;
+    --steimmo-color-surface-muted: #EAF3FA;
+    --steimmo-color-surface-subtle: #F0F6FB;
+    --steimmo-color-surface-brand: #E0F0FC;
+    --steimmo-color-surface-inverse: #243F55;
+    --steimmo-color-accent-muted: #94BEDA;
 
-    --steimmo-color-border: #D4CEC8;
-    --steimmo-color-border-strong: #77716C;
+    --steimmo-color-border: #D4E2EC;
+    --steimmo-color-border-strong: #73899B;
 
     --steimmo-color-success: #2D6A4F;
     --steimmo-color-success-text: #205735;
@@ -43,9 +43,9 @@
     --steimmo-color-info-surface: #EAF3F5;
     --steimmo-color-info-border: #174957;
 
-    --steimmo-color-disabled-text: #595959;
-    --steimmo-color-disabled-surface: #ECEAE6;
-    --steimmo-color-disabled-border: #C9C4BE;
+    --steimmo-color-disabled-text: #526779;
+    --steimmo-color-disabled-surface: #EAF0F4;
+    --steimmo-color-disabled-border: #B9C9D5;
     --steimmo-color-focus-ring: #155EEF;
     --steimmo-color-focus-ring-inverse: #FFFFFF;
     --steimmo-color-overlay: rgb(0 0 0 / 60%);
@@ -71,12 +71,12 @@
     --steimmo-space-xl: 2rem;
     --steimmo-space-2xl: 3rem;
 
-    --steimmo-radius-sm: 4px;
-    --steimmo-radius-md: 8px;
-    --steimmo-radius-lg: 10px;
+    --steimmo-radius-sm: 6px;
+    --steimmo-radius-md: 12px;
+    --steimmo-radius-lg: 16px;
     --steimmo-radius-pill: 999px;
-    --steimmo-shadow-sm: 0 2px 10px rgb(41 43 44 / 8%);
-    --steimmo-shadow-md: 0 8px 26px rgb(41 43 44 / 12%);
+    --steimmo-shadow-sm: 0 2px 10px rgb(24 65 96 / 5%);
+    --steimmo-shadow-md: 0 8px 26px rgb(24 65 96 / 9%);
     --steimmo-focus-width: 3px;
     --steimmo-focus-offset: 2px;
 }
@@ -160,14 +160,12 @@ a.plan-apartment:focus-visible .plan-apartment-shape { fill: #d1e6f7; stroke: va
 .apartment-gallery-pair { grid-template-columns: 1fr 1fr; }
 .apartment-gallery-pair .apartment-gallery-main { grid-row: auto; grid-column: auto; }
 .apartment-gallery-pair .apartment-gallery-photo.apartment-gallery-main img { min-height: 0; }
-.apartment-gallery-photo { display: block; position: relative; min-height: 180px; overflow: hidden; }
+.apartment-gallery-photo { border-radius: var(--steimmo-radius-md); display: block; position: relative; min-height: 180px; overflow: hidden; }
 .apartment-gallery-photo img { width: 100%; height: 100%; max-height: 650px; object-fit: cover; aspect-ratio: 4 / 3; }
-.apartment-gallery-photo.apartment-gallery-main img { min-height: 420px; }
+.apartment-gallery-photo.apartment-gallery-main img { min-height: 280px; }
 .apartment-gallery-more { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: #18221a99; color: #fff; font-size: 20px; }
 .apartment-gallery-stack .apartment-gallery-more::before { content: ""; position: absolute; inset: 12px; border: 1px solid #ffffff99; border-radius: 3px; box-shadow: 0 0 0 4px #ffffff33; }
 .apartment-gallery-photo:focus-visible { outline: 3px solid var(--steimmo-color-focus-ring); outline-offset: 3px; }
-.apartment-gallery .uk-cover-container { margin: 0 !important; height: 100%; min-height: 180px; }
-.apartment-gallery .apartment-gallery-main .uk-cover-container { min-height: 420px; }
 .apartment-photo-thumbnail { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
 
 @media (max-width: 639px) {
@@ -310,8 +308,8 @@ a:active,
 }
 
 .uk-navbar-container:not(.uk-navbar-transparent) {
-    background: var(--steimmo-color-surface-inverse);
-    color: var(--steimmo-color-text-inverse);
+    background: var(--steimmo-color-surface);
+    color: var(--steimmo-color-text);
 }
 
 .uk-navbar-container .uk-navbar-item,
@@ -319,16 +317,16 @@ a:active,
 .uk-navbar-container .uk-navbar-toggle,
 .uk-navbar-container .uk-logo,
 .uk-navbar-container .uk-button-text {
-    color: var(--steimmo-color-text-inverse);
+    color: var(--steimmo-color-text);
 }
 
 .uk-navbar-container .uk-text-meta {
-    color: var(--steimmo-color-text-inverse-muted) !important;
+    color: var(--steimmo-color-text-muted) !important;
 }
 
 .uk-navbar-container a:hover,
 .uk-navbar-container a:focus {
-    color: var(--steimmo-color-text-inverse);
+    color: var(--steimmo-color-text);
     text-decoration: underline;
     text-underline-offset: var(--steimmo-space-2xs);
 }
@@ -336,6 +334,10 @@ a:active,
 .uk-button {
     border-radius: var(--steimmo-radius-sm);
     font-weight: 600;
+    min-height: 44px;
+    line-height: 42px;
+    text-transform: none;
+    white-space: normal;
 }
 
 .uk-button-primary {
@@ -749,7 +751,7 @@ a:active,
 }
 
 .uk-navbar-container :focus-visible {
-    outline-color: var(--steimmo-color-focus-ring-inverse);
+    outline-color: var(--steimmo-color-focus-ring);
 }
 
 /* Shared page frame for US-18; uses the corporate theme from US-17. */
@@ -786,7 +788,7 @@ a:active,
 
 .site-header .site-brand,
 .site-header .site-brand:hover {
-    color: var(--steimmo-color-text-inverse);
+    color: var(--steimmo-color-text);
     text-decoration: none;
 }
 
@@ -800,8 +802,8 @@ a:active,
 .site-brand-subtitle {
     margin-top: var(--steimmo-space-2xs);
     font-size: var(--steimmo-font-size-xs);
-    color: var(--steimmo-color-text-inverse-muted);
-    letter-spacing: .03em;
+    color: var(--steimmo-color-text-muted);
+    letter-spacing: 0;
 }
 
 .site-desktop-navigation { flex: 1; }
@@ -834,7 +836,7 @@ a:active,
     bottom: 18px;
     left: 0;
     height: 2px;
-    background: var(--steimmo-color-text-inverse);
+    background: var(--steimmo-color-text);
     content: "";
 }
 
@@ -844,11 +846,11 @@ a:active,
     gap: var(--steimmo-space-xs);
     border: 0;
     background: transparent;
-    color: var(--steimmo-color-text-inverse);
+    color: var(--steimmo-color-text);
     cursor: pointer;
 }
 
-.site-management-toggle:hover { color: var(--steimmo-color-text-inverse-muted); }
+.site-management-toggle:hover { color: var(--steimmo-color-text-muted); }
 .site-management-toggle:not(.is-current):hover { text-decoration: underline; }
 .site-management-toggle[aria-expanded="true"] > [uk-icon],
 .site-account-toggle[aria-expanded="true"] > [uk-icon] { transform: rotate(180deg); }
@@ -907,12 +909,12 @@ a:active,
 
 .site-header .site-login-link,
 .site-header .site-account-toggle {
-    color: var(--steimmo-color-text-inverse);
+    color: var(--steimmo-color-text);
     font-size: var(--steimmo-font-size-sm);
 }
 
 .site-header .site-account-toggle { display: inline-flex; align-items: center; gap: var(--steimmo-space-xs); }
-.site-header .site-account-toggle::before { bottom: 18px; border-color: var(--steimmo-color-text-inverse); }
+.site-header .site-account-toggle::before { bottom: 18px; border-color: var(--steimmo-color-text); }
 .site-header .uk-button { text-transform: none; }
 .site-login-link[aria-current] { text-decoration: underline; }
 .site-account-name { overflow-wrap: anywhere; margin-top: 0; }
@@ -1000,13 +1002,13 @@ a:active,
 .site-footer {
     padding-top: var(--steimmo-space-xl);
     border-top: 1px solid var(--steimmo-color-border);
-    background: var(--steimmo-color-surface-inverse);
-    color: var(--steimmo-color-text-inverse);
+    background: var(--steimmo-color-surface-muted);
+    color: var(--steimmo-color-text);
 }
 
-.site-footer a { color: var(--steimmo-color-text-inverse); }
-.site-footer a:hover { color: var(--steimmo-color-text-inverse-muted); text-decoration: underline; }
-.site-footer :focus-visible { outline-color: var(--steimmo-color-focus-ring-inverse); }
+.site-footer a { color: var(--steimmo-color-text); }
+.site-footer a:hover { color: var(--steimmo-color-text-muted); text-decoration: underline; }
+.site-footer :focus-visible { outline-color: var(--steimmo-color-focus-ring); }
 
 .site-footer-top {
     display: grid;
@@ -1021,7 +1023,7 @@ a:active,
 
 .site-footer-heading {
     margin: 0 0 var(--steimmo-space-sm);
-    color: var(--steimmo-color-text-inverse-muted);
+    color: var(--steimmo-color-text-muted);
     font-size: var(--steimmo-font-size-xs);
     font-weight: 600;
     letter-spacing: .08em;
@@ -1047,7 +1049,7 @@ a:active,
     gap: var(--steimmo-space-md);
     padding-block: var(--steimmo-space-md);
     border-top: 1px solid var(--steimmo-color-border-strong);
-    color: var(--steimmo-color-text-inverse-muted);
+    color: var(--steimmo-color-text-muted);
     font-size: var(--steimmo-font-size-xs);
 }
 
@@ -1065,7 +1067,7 @@ a:active,
 
 @media (max-width: 639px) {
     .site-brand-name { font-size: var(--steimmo-font-size-xl); }
-    .site-brand-subtitle { letter-spacing: 0; }
+
     .site-brand { flex-shrink: 1; }
     .site-brand-subtitle { max-width: 205px; }
     .site-header-inner { gap: var(--steimmo-space-xs); }
@@ -1094,49 +1096,24 @@ a:active,
     overflow-wrap: break-word;
 }
 
-.home-company-hero {
-    position: relative;
-    isolation: isolate;
-    padding-block: clamp(3rem, 7vw, 6rem) var(--steimmo-space-lg);
-    background: var(--steimmo-color-action-secondary);
-    color: var(--steimmo-color-text-inverse);
-}
-
-.home-city-image {
-    position: absolute;
-    inset: 0;
-    z-index: -2;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center 65%;
-}
-
-.home-company-hero::before {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: linear-gradient(90deg, rgb(25 37 31 / 95%) 0%, rgb(25 37 31 / 82%) 42%, rgb(25 37 31 / 18%) 100%);
-    content: "";
-}
-
-.home-company-hero .home-title { max-width: 48rem; color: var(--steimmo-color-text-inverse); }
-.home-company-hero .home-title > span,
-.home-company-hero .home-eyebrow { color: var(--steimmo-color-surface-brand); }
-.home-company-hero .home-copy { max-width: 34rem; }
-.home-company-hero .home-intro { max-width: 32rem; color: inherit; }
-.home-company-hero .uk-button-default { background: var(--steimmo-color-surface); }
-.home-company-hero .home-status-dot { background: var(--steimmo-color-surface-brand); }
-.home-company-hero :focus-visible { outline-color: var(--steimmo-color-text-inverse); }
-.home-hero-content { position: relative; }
-.home-image-credit { margin: var(--steimmo-space-xl) 0 0; font-size: var(--steimmo-font-size-xs); color: var(--steimmo-color-text-inverse); }
+.home-company-hero { padding-block: 48px 32px; background: var(--steimmo-color-surface-brand); }
+.home-hero-content { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: center; }
+.home-hero-copy { padding-block: 12px; }
+.home-company-hero .home-title { max-width: 44rem; font-size: clamp(2.25rem, 4.2vw, 3.8rem); }
+.home-company-hero .home-title > span { color: var(--steimmo-color-primary); }
+.home-company-hero .home-copy { max-width: 34rem; color: var(--steimmo-color-text-muted); }
+.home-hero-figure { position: relative; margin: 0; }
+.home-city-image { display: block; width: 100%; aspect-ratio: 5 / 4; object-fit: cover; object-position: center 65%; border-radius: 80px 16px 16px 16px; }
+.home-image-credit { margin: 8px 0 0; font-size: var(--steimmo-font-size-xs); color: var(--steimmo-color-text-muted); }
 .home-image-credit a { color: inherit; text-decoration: underline; }
+.home-offer-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; padding: 24px 32px; margin-top: 28px; background: var(--steimmo-color-surface); border-radius: var(--steimmo-radius-md); border: 1px solid var(--steimmo-color-border); }
+.home-offer-bar h2 { margin: 0 0 4px; font-size: var(--steimmo-font-size-xl); }
+.home-offer-bar p { margin: 0; color: var(--steimmo-color-text-muted); font-size: var(--steimmo-font-size-sm); }
+.home-offer-bar .uk-button { text-transform: none; }
 .home-intro { max-width: 28rem; font-size: var(--steimmo-font-size-xl); }
 .home-copy { max-width: 42rem; }
 .home-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--steimmo-space-sm); }
 .home-actions .uk-button { text-transform: none; }
-.home-availability { display: flex; align-items: center; gap: var(--steimmo-space-xs); margin-top: var(--steimmo-space-lg); font-size: var(--steimmo-font-size-sm); }
-.home-status-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--steimmo-color-primary); }
 
 .home-building-figure {
     padding: var(--steimmo-space-lg);
@@ -1159,7 +1136,7 @@ a:active,
 .home-floor-availability { display: block; padding-right: var(--steimmo-space-lg); color: var(--steimmo-color-text-muted); font-size: var(--steimmo-font-size-xs); }
 .home-floor-arrow { position: absolute; right: var(--steimmo-space-xs); bottom: var(--steimmo-space-xs); }
 .home-building-figure .facade-floor:hover .facade-hit,
-.home-building-figure .facade-floor:focus-visible .facade-hit { fill: rgb(45 90 67 / 15%); stroke: var(--steimmo-color-primary); }
+.home-building-figure .facade-floor:focus-visible .facade-hit { fill: rgb(25 93 137 / 12%); stroke: var(--steimmo-color-primary); }
 .home-building-empty { min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--steimmo-color-primary); text-align: center; }
 .home-company-band { background: var(--steimmo-color-surface-brand); padding-block: var(--steimmo-space-2xl); }
 .home-company-band h2 { margin-bottom: 0; font-size: var(--steimmo-font-size-2xl); }
@@ -1183,7 +1160,9 @@ a:active,
 .home-portal-inner h2 { font-size: var(--steimmo-font-size-2xl); }
 
 @media (max-width: 639px) {
-    .home-company-hero::before { background: rgb(25 37 31 / 84%); }
+    .home-hero-content { grid-template-columns: 1fr; gap: 24px; }
+    .home-offer-bar { padding: 20px; }
+    .home-offer-bar .uk-button { width: 100%; }
     .home-actions { flex-direction: column; align-items: stretch; }
     .home-actions .uk-button { width: 100%; box-sizing: border-box; }
     .home-building-figure { padding: var(--steimmo-space-md); }
@@ -1195,9 +1174,9 @@ a:active,
 }
 
 /* Shared account pages. */
-.auth-section { padding: 0; background: var(--steimmo-color-surface); }
-.auth-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin: 0; overflow: hidden; background: var(--steimmo-color-surface); }
-.auth-card { padding: clamp(24px, 3vw, 64px); max-width: 760px; width: 100%; box-sizing: border-box; margin-inline: auto; align-self: center; }
+.auth-section { padding: 40px; background: var(--steimmo-color-surface-brand); }
+.auth-layout { max-width: 1160px; border: 1px solid var(--steimmo-color-border); border-radius: var(--steimmo-radius-lg); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin: 0 auto; overflow: hidden; background: var(--steimmo-color-surface); }
+.auth-card { padding: clamp(24px, 3vw, 64px); max-width: 620px; width: 100%; box-sizing: border-box; margin-inline: auto; align-self: center; }
 .auth-back { display: inline-flex; gap: var(--steimmo-space-xs); align-items: center; margin-bottom: var(--steimmo-space-lg); font-size: var(--steimmo-font-size-sm); }
 .auth-eyebrow, .application-eyebrow { margin: 0 0 var(--steimmo-space-xs); color: var(--steimmo-color-primary); font-size: var(--steimmo-font-size-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .auth-card h1 { font-size: clamp(1.75rem, 3vw, 2.5rem); font-weight: 600; letter-spacing: -.035em; margin-top: 0; }
@@ -1308,7 +1287,7 @@ a:active,
 .apartment-search-heading h1 { margin: 0 0 var(--steimmo-space-sm); font-size: clamp(1.8rem, 3vw, 2.25rem); letter-spacing: -.035em; font-weight: 600; }
 .apartment-search-heading p:last-child { margin: 0; color: var(--steimmo-color-text-muted); }
 .apartment-search-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: var(--steimmo-space-xl); align-items: start; }
-.apartment-search-filter-panel { padding: 0; background: transparent; border: 0; border-radius: 0; box-sizing: border-box; }
+.apartment-search-filter-panel { padding: 24px; background: var(--steimmo-color-surface); border: 1px solid var(--steimmo-color-border); border-radius: var(--steimmo-radius-md); box-sizing: border-box; }
 .apartment-search-filter-panel h2 { margin: 0 0 var(--steimmo-space-lg); padding-bottom: var(--steimmo-space-sm); border-bottom: 3px solid var(--steimmo-color-primary); font-size: var(--steimmo-font-size-xl); font-weight: 600; }
 .apartment-search-fields { display: grid; gap: var(--steimmo-space-lg); }
 .apartment-search-fields > fieldset { min-width: 0; margin: 0; padding: 0 0 var(--steimmo-space-md); border: 0; border-bottom: 1px solid var(--steimmo-color-border); }
@@ -1317,6 +1296,7 @@ a:active,
 .apartment-search-field { min-width: 0; }
 .apartment-search-field .uk-form-label { font-size: var(--steimmo-font-size-sm); display: block; margin-bottom: var(--steimmo-space-xs); }
 .apartment-search-field [aria-invalid=true] { border-color: var(--steimmo-color-danger); }
+.apartment-search-field [role="alert"] { list-style: none; padding-left: 0; line-height: 1.4; }
 .apartment-search-filter-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--steimmo-space-sm); margin-top: var(--steimmo-space-lg); }
 .apartment-search-filter-actions .uk-button { padding-inline: var(--steimmo-space-md); width: 100%; min-height: 48px; }
 .apartment-search-filter-actions a { font-size: var(--steimmo-font-size-sm); }
@@ -1325,21 +1305,22 @@ a:active,
 .apartment-search-result-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--steimmo-space-sm); margin-bottom: var(--steimmo-space-lg); }
 .apartment-search-result-heading h2 { font-size: var(--steimmo-font-size-lg); margin: 0; font-weight: 600; }
 .apartment-search-result-heading > span { color: var(--steimmo-color-text-muted); font-size: var(--steimmo-font-size-xs); }
-.apartment-search-result-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--steimmo-space-lg); }
-.apartment-search-card { overflow: hidden; border-radius: var(--steimmo-radius-lg); border: 1px solid var(--steimmo-color-border); box-shadow: var(--steimmo-shadow-sm); min-width: 0; }
-.apartment-search-image { display: block; position: relative; aspect-ratio: 16 / 10; background: var(--steimmo-color-surface-subtle); overflow: hidden; }
+.apartment-search-result-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--steimmo-space-lg); }
+.apartment-search-card { display: grid; grid-template-columns: minmax(180px, .85fr) minmax(0, 1.15fr); overflow: hidden; border-radius: var(--steimmo-radius-lg); border: 1px solid var(--steimmo-color-border); box-shadow: none; min-width: 0; }
+.apartment-search-image { display: block; position: relative; min-height: 240px; height: 100%; background: var(--steimmo-color-surface-subtle); overflow: hidden; }
 .apartment-search-image img { width: 100%; height: 100%; object-fit: cover; }
 .apartment-search-caption { position: absolute; bottom: var(--steimmo-space-sm); left: var(--steimmo-space-sm); right: var(--steimmo-space-sm); width: fit-content; padding: 4px 8px; border-radius: var(--steimmo-radius-sm); background: var(--steimmo-color-surface); color: var(--steimmo-color-text-muted); font-size: var(--steimmo-font-size-xs); }
-.apartment-search-photo-placeholder { display: flex; flex-direction: column; gap: var(--steimmo-space-sm); align-items: center; justify-content: center; height: 100%; color: var(--steimmo-color-text-muted); font-size: var(--steimmo-font-size-sm); }
-.apartment-search-card-content { padding: var(--steimmo-space-lg); }
+.apartment-search-photo-placeholder { min-height: 240px; background: linear-gradient(145deg, var(--steimmo-color-surface-brand), var(--steimmo-color-surface-page)); display: flex; flex-direction: column; gap: var(--steimmo-space-sm); align-items: center; justify-content: center; height: 100%; color: var(--steimmo-color-text-muted); font-size: var(--steimmo-font-size-sm); }
+.apartment-search-card-content { display: flex; flex-direction: column; padding: var(--steimmo-space-lg); }
 .apartment-search-card-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--steimmo-space-sm); }
 .apartment-search-card-heading h3 { margin: 0; font-size: var(--steimmo-font-size-xl); font-weight: 600; }
 .apartment-search-card-heading p { margin: 0 0 4px; }
+.apartment-search-card-heading > div { min-width: 0; max-width: 100%; }
 .apartment-search-facts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--steimmo-space-sm); margin-block: var(--steimmo-space-lg); }
 .apartment-search-facts dt { color: var(--steimmo-color-text-muted); font-size: var(--steimmo-font-size-xs); }
-.apartment-search-facts dd { margin: var(--steimmo-space-xs) 0 0; font-size: var(--steimmo-font-size-sm); }
-.apartment-search-card-bottom { border-top: 1px solid var(--steimmo-color-border); padding-top: var(--steimmo-space-md); }
-.apartment-search-card-bottom p { margin: 4px 0 var(--steimmo-space-md); font-size: var(--steimmo-font-size-sm); }
+.apartment-search-facts dd { margin: var(--steimmo-space-xs) 0 0; font-size: var(--steimmo-font-size-lg); font-weight: 600; }
+.apartment-search-card-bottom { margin-top: auto; border-top: 1px solid var(--steimmo-color-border); padding-top: var(--steimmo-space-md); }
+.apartment-search-card-bottom p { margin: 4px 0 var(--steimmo-space-md); font-size: var(--steimmo-font-size-xl); }
 .apartment-search-card-bottom .uk-button { display: block; width: 100%; box-sizing: border-box; padding-inline: var(--steimmo-space-sm); }
 .apartment-search-empty { text-align: center; border-radius: var(--steimmo-radius-lg); }
 .apartment-search-empty h3 { font-size: var(--steimmo-font-size-xl); }
@@ -1364,8 +1345,8 @@ a:active,
 .apartment-detail-heading { margin-bottom: var(--steimmo-space-xl); }
 .apartment-detail-heading h1 { margin: var(--steimmo-space-sm) 0; font-size: clamp(var(--steimmo-font-size-3xl), 4vw, var(--steimmo-font-size-4xl)); }
 .apartment-detail-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: var(--steimmo-space-xl); align-items: start; }
-.apartment-detail-photos { grid-column: 1 / -1; }
-.apartment-detail-cost { grid-column: 2; grid-row: 2; position: static; border: 1px solid var(--steimmo-color-border); border-radius: var(--steimmo-radius-lg); box-shadow: none; }
+.apartment-detail-photos { grid-column: 1; min-width: 0; }
+.apartment-detail-cost { grid-column: 2; grid-row: 1 / 3; position: static; border: 1px solid var(--steimmo-color-border); border-top: 4px solid var(--steimmo-color-primary); border-radius: var(--steimmo-radius-lg); box-shadow: none; }
 .apartment-detail-cost h2 { font-size: var(--steimmo-font-size-3xl); margin: 0; }
 .apartment-detail-cost h2 + p { margin-top: var(--steimmo-space-2xs); }
 .apartment-detail-cost .uk-button { white-space: nowrap; text-transform: none; padding-inline: var(--steimmo-space-sm); }
@@ -1379,7 +1360,7 @@ a:active,
 .apartment-detail-facts > div { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(0, 1.4fr); padding: var(--steimmo-space-sm) 0; border-bottom: 1px solid var(--steimmo-color-border); gap: var(--steimmo-space-md); }
 .apartment-detail-facts dt { font-weight: 600; }
 .apartment-detail-facts dd { margin: 0; overflow-wrap: anywhere; }
-.workspace-navigation { display: flex; flex-wrap: wrap; gap: var(--steimmo-space-xs) var(--steimmo-space-lg); padding: var(--steimmo-space-md) var(--steimmo-space-lg); margin-bottom: var(--steimmo-space-lg); background: var(--steimmo-color-surface); border: 1px solid var(--steimmo-color-border); border-radius: var(--steimmo-radius-md); }
+.workspace-navigation { display: flex; flex-wrap: wrap; gap: var(--steimmo-space-xs) var(--steimmo-space-lg); padding: var(--steimmo-space-md) 0; margin-bottom: var(--steimmo-space-lg); border-bottom: 1px solid var(--steimmo-color-border); border-radius: var(--steimmo-radius-md); }
 .workspace-navigation a { color: var(--steimmo-color-text); padding: var(--steimmo-space-2xs) 0; }
 .workspace-navigation a[aria-current] { color: var(--steimmo-color-primary); font-weight: 700; border-bottom: 2px solid currentColor; text-decoration: none; }
 .workspace-navigation-list { gap: var(--steimmo-space-xs) var(--steimmo-space-lg); }
@@ -1389,7 +1370,8 @@ a:active,
 @media (max-width: 959px) {
     .apartment-detail-layout { display: flex; flex-direction: column; }
     .apartment-detail-layout > * { width: 100%; box-sizing: border-box; }
-    .apartment-detail-cost { order: 3; }
+    .apartment-detail-cost { order: 1; }
+    .apartment-detail-content { order: 2; }
 }
 @media (max-width: 639px) {
     .apartment-detail-facts > div { grid-template-columns: 1fr; gap: .3rem; }
@@ -1423,7 +1405,6 @@ a:active,
 }
 .management-panel {
     border: 1px solid var(--steimmo-color-border);
-    border-top: 3px solid var(--steimmo-color-primary);
     border-radius: var(--steimmo-radius-sm);
     box-shadow: none;
     padding: var(--steimmo-space-lg);
@@ -1433,9 +1414,9 @@ a:active,
     border-bottom-color: var(--steimmo-color-border);
 }
 .management-table {
+    border-radius: var(--steimmo-radius-md);
     background: var(--steimmo-color-surface);
     border: 1px solid var(--steimmo-color-border);
-    border-top: 3px solid var(--steimmo-color-primary);
     padding: var(--steimmo-space-sm) var(--steimmo-space-lg);
 }
 .management-table .uk-table {
@@ -1832,3 +1813,57 @@ a:active,
     .status-notice-heading h2 { font-size: var(--steimmo-font-size-xl); }
     .status-notice .notice-actions .uk-button { width: 100%; padding-inline: var(--steimmo-space-xs); }
 }
+
+/* Shared light-blue frame and responsive refinements. */
+.site-header { border-bottom: 1px solid var(--steimmo-color-border); }
+.site-brand-symbol { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: var(--steimmo-color-surface-brand); color: var(--steimmo-color-primary); vertical-align: middle; margin-right: 4px; }
+
+h1, h2, h3 { letter-spacing: -.025em; overflow-wrap: anywhere; }
+h1 { font-weight: 650; }
+.uk-section { padding-block: 48px; }
+.site-main > .uk-section > .uk-container > header:first-child { padding-bottom: 24px; border-bottom: 1px solid var(--steimmo-color-border); }
+.search-active-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 20px; font-size: var(--steimmo-font-size-sm); }
+.search-active-filters > span { min-width: 0; max-width: 100%; overflow-wrap: anywhere; padding: 5px 10px; background: var(--steimmo-color-surface-brand); border-radius: var(--steimmo-radius-sm); }
+.search-active-filters a { margin-left: auto; }
+
+.apartment-search-card:hover { border-color: var(--steimmo-color-border-strong); }
+
+.apartment-detail-content > section + section { border-top: 1px solid var(--steimmo-color-border); }
+
+.application-progress li + li { border-top: 1px solid var(--steimmo-color-border); }
+
+@media (min-width: 960px) {
+    .architecture-building-layout { grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); align-items: start; }
+    .architecture-building-drawing { grid-column: 1; grid-row: 1 / 3; }
+    .architecture-building-stats { grid-column: 2; justify-content: flex-start; padding: 24px; background: var(--steimmo-color-surface-brand); border-radius: var(--steimmo-radius-md); }
+    .architecture-building-selection { grid-column: 2; }
+    .architecture-floor-cards { grid-template-columns: 1fr; }
+    .architecture-floor-card { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 14px 18px; }
+    .architecture-floor-card h3 { min-height: 0; font-size: 1rem; margin: 0; }
+    .architecture-floor-card .uk-text-meta { grid-column: 1 / -1; }
+    .architecture-building-search { grid-column: 1 / -1; }
+}
+@media (max-width: 959px) {
+    .apartment-search-filter-panel { padding: 20px; }
+    .auth-section { padding: 24px; }
+}
+@media (max-width: 639px) {
+    .uk-section { padding-block: 32px; }
+    .site-brand-name { font-size: 1.2rem; }
+    .site-brand-subtitle { font-size: .65rem; }
+    .site-header-inner { gap: 8px; }
+    .apartment-search-card { grid-template-columns: 1fr; }
+    .apartment-search-image { min-height: 0; aspect-ratio: 16 / 9; }
+    .apartment-search-photo-placeholder { min-height: 0; }
+    .apartment-search-filter-panel { padding: 16px; }
+    .auth-section { padding: 20px 0; }
+    .auth-layout { border-radius: 0; border-inline: 0; }
+    .search-active-filters a { margin-left: 0; }
+    .home-offer-bar { margin-top: 24px; }
+    .home-hero-figure { display: none; }
+    .site-main > .uk-section > .uk-container > header:first-child { padding-bottom: 16px; }
+}
+.apartment-gallery-empty { grid-template-columns: 1fr; }
+.apartment-gallery-empty .apartment-gallery-main { grid-row: auto; }
+.apartment-gallery-empty .apartment-gallery-main .uk-cover-container { border-radius: var(--steimmo-radius-md); overflow: hidden; height: 144px; min-height: 0; }
+.apartment-gallery-empty canvas { display: none; }

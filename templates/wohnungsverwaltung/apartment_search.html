@@ -27,6 +27,13 @@
             </aside>
             </div>
             <div class="apartment-search-results">
+                {% if has_filters %}
+                <div class="search-active-filters" aria-label="Aktive Filter">
+                    <strong>Ihre Auswahl</strong>
+                    {% for field in form %}{% if field.value %}<span>{{ field.label }}: {{ field.value }}</span>{% endif %}{% endfor %}
+                    <a href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Alle zurücksetzen</a>
+                </div>
+                {% endif %}
                 {% if form.errors %}
                 <div class="uk-alert-danger" role="alert">Bitte prüfen Sie die markierten Filterwerte. Danach können Sie die Suche erneut starten.</div>
                 {% else %}

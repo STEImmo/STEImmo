@@ -1,7 +1,7 @@
 <header class="site-header uk-navbar-container">
     <div class="uk-container site-header-inner">
         <a class="site-brand" href="{% url 'home' %}" aria-label="STE Immobilien eGbR – Startseite"{% if request.resolver_match.url_name == "home" %} aria-current="page"{% endif %}>
-            <span class="site-brand-name">STE Immobilien</span>
+            <span class="site-brand-name"><span class="site-brand-symbol" aria-hidden="true" uk-icon="home"></span> STE Immobilien</span>
             <span class="site-brand-subtitle">eGbR · Wohnungsvermietung in Würzburg</span>
         </a>
         {% if not minimal_header %}

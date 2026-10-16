@@ -11,22 +11,30 @@
 </nav>
 {% endif %}
 <section class="uk-section home-company-hero" aria-labelledby="home-title">
-    <img class="home-city-image" src="{% static 'images/wuerzburg-aerial.jpg' %}" alt="" width="1920" height="1536" fetchpriority="high">
-    <div class="uk-container home-hero-content">
-        <p class="home-eyebrow">STE Immobilien eGbR · Wohnungsvermietung</p>
-        <h1 id="home-title" class="home-title">Wohnen in Würzburg.<br><span>Ihr nächstes Kapitel.</span></h1>
-        <p class="uk-text-lead home-intro">Ein neues Zuhause beginnt mit einem guten Überblick.</p>
-        <p class="home-copy">Entdecken Sie unser Gebäude, vergleichen Sie verfügbare Wohnungen und fragen Sie Ihre Besichtigung direkt online an.</p>
-        <div class="home-actions uk-margin-medium-top">
-            <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Wohnungen finden <span uk-icon="arrow-right" aria-hidden="true"></span></a>
-            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:building_view' %}">Gebäude erkunden</a>
+    <div class="uk-container">
+        <div class="home-hero-content">
+            <div class="home-hero-copy">
+                <p class="home-eyebrow">Wohnen in Würzburg.</p>
+                <h1 id="home-title" class="home-title">Platz für Ihr<br><span>nächstes Kapitel.</span></h1>
+                <p class="uk-text-lead home-intro">Finden Sie die Wohnung, die zu Ihnen passt.</p>
+                <p class="home-copy">Entdecken Sie unser Gebäude, vergleichen Sie verfügbare Wohnungen und fragen Sie Ihre Besichtigung direkt online an.</p>
+                <div class="home-actions uk-margin-medium-top">
+                    <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Wohnungen finden <span uk-icon="arrow-right" aria-hidden="true"></span></a>
+                    <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:building_view' %}">Gebäude erkunden</a>
+                </div>
+            </div>
+            <figure class="home-hero-figure">
+                <img class="home-city-image" src="{% static 'images/wuerzburg-aerial.jpg' %}" alt="Blick über Würzburg und den Main" width="1920" height="1536" fetchpriority="high">
+                <figcaption class="home-image-credit">Würzburg aus der Luft · © Simon Waldherr · <a href="{% url 'image_credits' %}">CC BY-SA 4.0 / Bildnachweis</a></figcaption>
+            </figure>
         </div>
-        {% if total_available %}
-<p class="home-availability"><span class="home-status-dot" aria-hidden="true"></span><strong>{{ total_available }} Wohnung{% if total_available != 1 %}en{% endif %} verfügbar</strong></p>
-{% else %}
-<p class="home-availability">Aktuell sind keine Wohnungen verfügbar.</p>
-{% endif %}
-        <p class="home-image-credit">Würzburg aus der Luft · © Simon Waldherr · <a href="{% url 'image_credits' %}">CC BY-SA 4.0 / Bildnachweis</a></p>
+        <div class="home-offer-bar">
+            <div>
+                <h2>{% if total_available %}{{ total_available }} Wohnung{% if total_available != 1 %}en{% endif %} verfügbar{% else %}Aktuell sind keine Wohnungen verfügbar.{% endif %}</h2>
+                <p>Fläche, Zimmer und Kaltmiete vergleichen · Besichtigung mit Bewerberkonto anfragen</p>
+            </div>
+            <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Zum Wohnungsangebot <span uk-icon="arrow-right" aria-hidden="true"></span></a>
+        </div>
     </div>
 </section>
 <section class="uk-section uk-section-default home-building-section" aria-labelledby="home-building-title">
