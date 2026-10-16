@@ -1842,6 +1842,10 @@ a:active,
     white-space: normal;
     text-align: left;
 }
+.application-table thead .table-filter--main-status > .uk-button {
+    white-space: nowrap;
+    overflow-wrap: normal;
+}
 .table-filter-active {
     border-color: var(--steimmo-color-primary);
 }
