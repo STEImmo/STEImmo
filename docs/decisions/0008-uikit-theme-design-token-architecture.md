@@ -34,6 +34,8 @@ Die Kontrastwerte wurden mit der relativen Luminanzformel aus WCAG 2.2 geprüft.
 
 ## Warum
 
+Ergänzung zu #130: Auf ausdrücklichen Gestaltungswunsch verwenden die Gebäudevorschau auf der Startseite sowie die Gebäude- und Etagenansichten einheitlich Waldgrün für Hover und Tastaturfokus. Der Fokus-Token wird dafür gemeinsam auf diesen Bereichen überschrieben; Etagenlinks, Etagenkarten, Fassadenmarkierungen, Grundriss und Wohnungslinks erhalten dadurch dieselbe Fokusfarbe. Die Hervorhebung im Grundriss verwendet ebenfalls eine grüne Fläche. Außerhalb der Gebäudeerkundung bleibt die allgemeine Fokuspalette bestehen.
+
 Das Repository verwendet bereits Django-Templates und lokal eingebundenes UIkit. Die Lösung knüpft daran an, hält die Zahl der Werkzeuge klein und konkretisiert in #45 die abschließenden Farb- und Typografieentscheidungen. Es werden durch diese Entscheidung keine Datenmodelle, URLs, Berechtigungen oder fachlichen Abläufe geändert.
 
 ## Spike-Kriterien und Ergebnis
