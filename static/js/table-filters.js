@@ -6,13 +6,38 @@
 
     const filterForms = () => document.querySelectorAll("form[data-table-filter-form]");
 
-    function updateApplicationSegmentLinks() {
+    function updateNavigationLinks() {
         for (const link of document.querySelectorAll("a[data-application-segment]")) {
             const url = new URL(link.href, window.location.href);
             const params = new URLSearchParams(currentParams);
             params.set("segment", link.dataset.applicationSegment);
             params.delete("page");
             url.search = params.toString();
+            link.href = url.href;
+        }
+
+        for (const link of document.querySelectorAll('[data-table-filter-fragment="pagination"] a')) {
+            const url = new URL(link.href, window.location.href);
+            const page = url.searchParams.get("page");
+            url.search = currentParams.toString();
+            if (page) url.searchParams.set("page", page);
+            link.href = url.href;
+        }
+
+        const sortField = document.querySelector('#application-search-filter-form select[name="sort"]');
+        for (const link of document.querySelectorAll("a[data-table-filter-navigation]")) {
+            const url = new URL(link.href, window.location.href);
+            if (link.hasAttribute("data-remove-filter")) {
+                url.search = currentParams.toString();
+                url.searchParams.delete(link.dataset.removeFilter);
+                url.searchParams.delete("page");
+            } else if (sortField) {
+                // Reset links retain the application context and the latest valid sort.
+                const sort = Array.from(sortField.options).find(
+                    (option) => option.value === currentParams.get("sort"),
+                ) || sortField.options[0];
+                url.searchParams.set("sort", sort.value);
+            }
             link.href = url.href;
         }
     }
@@ -33,7 +58,7 @@
             }
         }
         currentParams.delete("page");
-        updateApplicationSegmentLinks();
+        updateNavigationLinks();
     }
 
     function buildUrl(form) {
@@ -78,12 +103,11 @@
 
     async function refreshResults(url, {pushHistory = true} = {}) {
         currentParams = new URLSearchParams(url.searchParams);
-        updateApplicationSegmentLinks();
+        updateNavigationLinks();
         const currentNumber = ++requestNumber;
         activeRequest?.abort();
         const controller = new AbortController();
         activeRequest = controller;
-        const focusedId = document.activeElement?.id;
         setResultsBusy(true);
 
         try {
@@ -99,14 +123,25 @@
             }
             const responseDocument = new DOMParser().parseFromString(await response.text(), "text/html");
             if (currentNumber !== requestNumber) return;
+            // Preserve the focus at response time, including a text field's selection.
+            const focusedElement = document.activeElement;
+            const selectionStart = focusedElement?.selectionStart;
+            const selectionEnd = focusedElement?.selectionEnd;
+            const selectionDirection = focusedElement?.selectionDirection;
             if (!updateFragments(responseDocument)) {
                 window.location.assign(url.href);
                 return;
             }
             updateForms(responseDocument);
             if (pushHistory) window.history.pushState({}, "", url.href);
-            updateApplicationSegmentLinks();
-            if (focusedId) document.getElementById(focusedId)?.focus({preventScroll: true});
+            updateNavigationLinks();
+            if (focusedElement?.id && !focusedElement.isConnected) {
+                const replacement = document.getElementById(focusedElement.id);
+                replacement?.focus({preventScroll: true});
+                if (typeof selectionStart === "number" && replacement?.setSelectionRange) {
+                    replacement.setSelectionRange(selectionStart, selectionEnd, selectionDirection);
+                }
+            }
         } catch (error) {
             if (error.name !== "AbortError" && currentNumber === requestNumber) {
                 window.location.assign(url.href);
@@ -123,7 +158,7 @@
         refreshResults(buildUrl(form));
     }
 
-    updateApplicationSegmentLinks();
+    updateNavigationLinks();
 
     document.addEventListener("shown", (event) => {
         if (!event.target.matches?.("[data-table-filter-dropdown]")) return;
@@ -159,6 +194,7 @@
 
     document.addEventListener("click", (event) => {
         if (!(event.target instanceof Element)) return;
+        if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         const link = event.target.closest("a[data-table-filter-navigation]");
         if (!link || link.origin !== window.location.origin) return;
         event.preventDefault();
