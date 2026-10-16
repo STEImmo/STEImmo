@@ -105,6 +105,13 @@ class TableFilterTests(TestCase):
         self.assertContains(response, "Etage filtern")
         self.assertNotContains(response, "Noch keine Wohnungen angelegt")
 
+    def test_active_filters_are_shown_above_without_active_badge_on_filter_buttons(self):
+        response = self.client.get(self.unit_url, {"status": "free"})
+        self.assertContains(response, 'data-remove-filter="status"')
+        self.assertContains(response, "Verfügbarkeitsstatus: Verfügbar")
+        self.assertNotContains(response, ">Aktiv</span>")
+        self.assertNotContains(response, "table-filter-active")
+
     def test_application_unit_list_filters_by_floor_and_room_count(self):
         response = self.client.get(self.application_url, {"floor": "2", "rooms": "2.00"})
         self.assertEqual(list(response.context["units"]), [self.upstairs])

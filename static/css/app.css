@@ -1846,9 +1846,6 @@ a:active,
     white-space: nowrap;
     overflow-wrap: normal;
 }
-.table-filter-active {
-    border-color: var(--steimmo-color-primary);
-}
 .table-filter-dropdown {
     width: 20rem;
     max-width: calc(100vw - 2rem);

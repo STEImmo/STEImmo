@@ -887,7 +887,6 @@ def _table_filter_context(form, groups, *, persistent=None, inline_fields=()):
         group = {
             "name": name,
             "label": label,
-            "active": any(field_name in values for field_name in field_names),
             "hidden_values": {key: val for key, val in params.items() if key not in field_names},
         }
         for placement in ("desktop", "mobile"):
