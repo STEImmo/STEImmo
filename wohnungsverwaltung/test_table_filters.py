@@ -31,6 +31,7 @@ class FilterMarkupParser(HTMLParser):
         super().__init__()
         self.ids = []
         self.links = {}
+        self.segment_links = {}
         self.form_depth = 0
         self.nested_form = False
         self.forms = []
@@ -41,6 +42,8 @@ class FilterMarkupParser(HTMLParser):
             self.ids.append(attrs["id"])
         if tag == "a" and "data-remove-filter" in attrs:
             self.links[attrs["data-remove-filter"]] = attrs["href"]
+        if tag == "a" and "data-application-segment" in attrs:
+            self.segment_links[attrs["data-application-segment"]] = attrs["href"]
         if tag == "form":
             self.forms.append({})
             self.nested_form |= self.form_depth > 0
@@ -456,6 +459,23 @@ class TableFilterTests(TestCase):
                 "sort": ["priority"],
             },
         )
+
+    def test_application_segment_links_expose_their_segment_for_filter_state_sync(self):
+        response = self.client.get(
+            self.application_url,
+            {"wohnung": self.free.pk, "segment": "matching", "q": "Berta"},
+        )
+        parser = FilterMarkupParser()
+        parser.feed(response.content.decode())
+
+        self.assertEqual(set(parser.segment_links), {"matching", "review", "all"})
+        for segment, href in parser.segment_links.items():
+            with self.subTest(segment=segment):
+                params = parse_qs(urlsplit(href).query)
+                self.assertEqual(params["wohnung"], [str(self.free.pk)])
+                self.assertEqual(params["segment"], [segment])
+                self.assertEqual(params["q"], ["Berta"])
+                self.assertNotIn("page", params)
 
     def test_contradictory_application_filters_explain_empty_result_without_mutation(self):
         response = self.client.get(

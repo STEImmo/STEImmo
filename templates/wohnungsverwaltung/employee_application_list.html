@@ -26,13 +26,13 @@
 
             <nav aria-label="Bewerbungsansichten"><ul class="uk-tab">
                 <li class="{% if segment == 'matching' %}uk-active{% endif %}">
-                    <a href="{% querystring filter_query segment='matching' page=None %}" {% if segment == 'matching' %}aria-current="page"{% endif %}>Passend</a>
+                    <a data-application-segment="matching" href="{% querystring filter_query segment='matching' page=None %}" {% if segment == 'matching' %}aria-current="page"{% endif %}>Passend</a>
                 </li>
                 <li class="{% if segment == 'review' %}uk-active{% endif %}">
-                    <a href="{% querystring filter_query segment='review' page=None %}" {% if segment == 'review' %}aria-current="page"{% endif %}>Einzelfallprüfung</a>
+                    <a data-application-segment="review" href="{% querystring filter_query segment='review' page=None %}" {% if segment == 'review' %}aria-current="page"{% endif %}>Einzelfallprüfung</a>
                 </li>
                 <li class="{% if segment == 'all' %}uk-active{% endif %}">
-                    <a href="{% querystring filter_query segment='all' page=None %}" {% if segment == 'all' %}aria-current="page"{% endif %}>Alle Bewerbungen</a>
+                    <a data-application-segment="all" href="{% querystring filter_query segment='all' page=None %}" {% if segment == 'all' %}aria-current="page"{% endif %}>Alle Bewerbungen</a>
                 </li>
             </ul></nav>
 

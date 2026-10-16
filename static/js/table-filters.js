@@ -2,17 +2,43 @@
     let activeRequest;
     let requestNumber = 0;
     let searchTimer;
+    let currentParams = new URLSearchParams(window.location.search);
 
     const filterForms = () => document.querySelectorAll("form[data-table-filter-form]");
 
+    function updateApplicationSegmentLinks() {
+        for (const link of document.querySelectorAll("a[data-application-segment]")) {
+            const url = new URL(link.href, window.location.href);
+            const params = new URLSearchParams(currentParams);
+            params.set("segment", link.dataset.applicationSegment);
+            params.delete("page");
+            url.search = params.toString();
+            link.href = url.href;
+        }
+    }
+
+    function updateCurrentParamsFromForm(form, changedControl = null) {
+        const formData = new FormData(form);
+        const editableControls = Array.from(form.elements).filter(
+            (control) => control.name && control.type !== "hidden" && !control.disabled,
+        );
+        const names = changedControl
+            ? new Set([changedControl.name])
+            : new Set(editableControls.map((control) => control.name));
+
+        for (const name of names) {
+            currentParams.delete(name);
+            for (const value of formData.getAll(name)) {
+                if (typeof value === "string" && value !== "") currentParams.append(name, value);
+            }
+        }
+        currentParams.delete("page");
+        updateApplicationSegmentLinks();
+    }
+
     function buildUrl(form) {
         const url = new URL(form.action || window.location.href, window.location.href);
-        const params = new URLSearchParams();
-        for (const [name, value] of new FormData(form).entries()) {
-            if (typeof value === "string" && value !== "") params.append(name, value);
-        }
-        params.delete("page");
-        url.search = params.toString();
+        url.search = currentParams.toString();
         return url;
     }
 
@@ -36,43 +62,68 @@
         }
     }
 
+    function setResultsBusy(isBusy) {
+        document.querySelectorAll('[data-table-filter-fragment="table-body"]').forEach((tableBody) => {
+            if (isBusy) tableBody.setAttribute("aria-busy", "true");
+            else tableBody.removeAttribute("aria-busy");
+        });
+    }
+
+    function cancelPendingRequest() {
+        requestNumber += 1;
+        activeRequest?.abort();
+        activeRequest = undefined;
+        setResultsBusy(false);
+    }
+
     async function refreshResults(url, {pushHistory = true} = {}) {
+        currentParams = new URLSearchParams(url.searchParams);
+        updateApplicationSegmentLinks();
         const currentNumber = ++requestNumber;
         activeRequest?.abort();
-        activeRequest = new AbortController();
+        const controller = new AbortController();
+        activeRequest = controller;
         const focusedId = document.activeElement?.id;
-        document.querySelectorAll('[data-table-filter-fragment="table-body"]').forEach((tableBody) => {
-            tableBody.setAttribute("aria-busy", "true");
-        });
+        setResultsBusy(true);
 
         try {
             const response = await fetch(url, {
                 credentials: "same-origin",
                 headers: {"X-Requested-With": "XMLHttpRequest"},
-                signal: activeRequest.signal,
+                signal: controller.signal,
             });
+            if (currentNumber !== requestNumber) return;
             if (!response.ok || response.redirected) {
                 window.location.assign(url.href);
                 return;
             }
             const responseDocument = new DOMParser().parseFromString(await response.text(), "text/html");
+            if (currentNumber !== requestNumber) return;
             if (!updateFragments(responseDocument)) {
                 window.location.assign(url.href);
                 return;
             }
             updateForms(responseDocument);
             if (pushHistory) window.history.pushState({}, "", url.href);
+            updateApplicationSegmentLinks();
             if (focusedId) document.getElementById(focusedId)?.focus({preventScroll: true});
         } catch (error) {
-            if (error.name !== "AbortError") window.location.assign(url.href);
+            if (error.name !== "AbortError" && currentNumber === requestNumber) {
+                window.location.assign(url.href);
+            }
         } finally {
-            if (currentNumber === requestNumber) activeRequest = undefined;
+            if (currentNumber === requestNumber) {
+                activeRequest = undefined;
+                setResultsBusy(false);
+            }
         }
     }
 
     function requestForm(form) {
         refreshResults(buildUrl(form));
     }
+
+    updateApplicationSegmentLinks();
 
     document.addEventListener("shown", (event) => {
         if (!event.target.matches?.("[data-table-filter-dropdown]")) return;
@@ -84,6 +135,7 @@
         const form = event.target.closest("form[data-table-filter-form]");
         if (!form || event.target.matches('input[name="q"]')) return;
         window.clearTimeout(searchTimer);
+        updateCurrentParamsFromForm(form, event.target);
         requestForm(form);
     });
 
@@ -92,6 +144,8 @@
         const form = event.target.closest("form[data-table-filter-form]");
         if (!form) return;
         window.clearTimeout(searchTimer);
+        updateCurrentParamsFromForm(form, event.target);
+        cancelPendingRequest();
         searchTimer = window.setTimeout(() => requestForm(form), 350);
     });
 
@@ -99,6 +153,7 @@
         if (!(event.target instanceof HTMLFormElement) || !event.target.matches("form[data-table-filter-form]")) return;
         event.preventDefault();
         window.clearTimeout(searchTimer);
+        updateCurrentParamsFromForm(event.target);
         requestForm(event.target);
     });
 
@@ -119,5 +174,8 @@
         document.getElementById(dropdown.getAttribute("aria-labelledby"))?.focus();
     });
 
-    window.addEventListener("popstate", () => refreshResults(new URL(window.location.href), {pushHistory: false}));
+    window.addEventListener("popstate", () => {
+        window.clearTimeout(searchTimer);
+        refreshResults(new URL(window.location.href), {pushHistory: false});
+    });
 })();
