@@ -30,7 +30,7 @@
                         <th><span class="uk-hidden-visually">Aktion</span></th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody data-table-filter-fragment="table-body">
                     {% for wohnung in wohnungen %}
                         <tr>
                             <td data-label="Gebäude">{{ wohnung.gebaeudenummer }}</td>
@@ -51,7 +51,7 @@
                         </tr>
                     {% empty %}
                         <tr><td colspan="7" class="uk-text-muted">
-                            {% if inventory_exists %}Keine Wohnungen für diese Filterauswahl. <a href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>{% else %}Noch keine Wohnungen angelegt.{% endif %}
+                            {% if inventory_exists %}Keine Wohnungen für diese Filterauswahl. <a data-table-filter-navigation href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>{% else %}Noch keine Wohnungen angelegt.{% endif %}
                         </td></tr>
                     {% endfor %}
                 </tbody>

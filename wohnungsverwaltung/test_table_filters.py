@@ -75,6 +75,15 @@ class TableFilterTests(TestCase):
                 response = self.client.get(self.unit_url, params)
                 self.assertEqual(list(response.context["wohnungen"]), expected)
 
+    def test_apartment_floor_filter_accepts_multiple_checkbox_values(self):
+        response = self.client.get(self.unit_url, {"floor": ["0", "2"]})
+        self.assertEqual(
+            list(response.context["wohnungen"]), [self.free, self.upstairs, self.taken]
+        )
+        self.assertContains(response, 'name="floor"')
+        self.assertContains(response, 'type="checkbox"')
+        self.assertNotContains(response, ">Anwenden</button>")
+
     def test_invalid_apartment_filter_keeps_other_valid_criteria(self):
         for params, expected in (
             ({"status": "invalid", "floor": "2"}, [self.upstairs, self.taken]),
@@ -117,6 +126,26 @@ class TableFilterTests(TestCase):
         self.assertEqual(list(response.context["units"]), [self.upstairs])
         self.assertContains(response, "Etage: Etage 2")
         self.assertContains(response, "Zimmeranzahl: 2 Zimmer")
+
+    def test_application_unit_list_matches_multiple_floors_and_room_counts(self):
+        response = self.client.get(
+            self.application_url,
+            {"floor": ["0", "2"], "rooms": ["1.50", "3.00"]},
+        )
+        self.assertEqual(list(response.context["units"]), [self.free, self.taken])
+        self.assertContains(response, "Etage: Erdgeschoss (0), Etage 2")
+        self.assertContains(response, "Zimmeranzahl: 1,5 Zimmer, 3 Zimmer")
+        self.assertNotContains(response, ">Anwenden</button>")
+        parser = FilterMarkupParser()
+        parser.feed(response.content.decode())
+        self.assertEqual(
+            parse_qs(urlsplit(parser.links["floor"]).query),
+            {"rooms": ["1.50", "3.00"]},
+        )
+        self.assertEqual(
+            parse_qs(urlsplit(parser.links["rooms"]).query),
+            {"floor": ["0", "2"]},
+        )
 
     def test_application_unit_list_sorts_by_application_count_in_both_directions(self):
         test_employee_dashboard.EmployeeDashboardTests.create_application(self.upstairs)
@@ -195,6 +224,8 @@ class TableFilterTests(TestCase):
                 self.assertEqual(len(parser.ids), len(set(parser.ids)))
                 self.assertContains(response, "table-filters-mobile")
                 self.assertContains(response, "mode: click")
+                self.assertContains(response, "data-table-filter-form")
+                self.assertNotContains(response, ">Anwenden</button>")
 
     def test_application_reset_preserves_context_and_sorting(self):
         response = self.client.get(

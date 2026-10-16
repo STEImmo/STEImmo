@@ -1855,6 +1855,18 @@ class UIkitFormMixin:
                 widget.attrs.setdefault("class", "uk-input")
 
 
+class UIkitCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
+    def __init__(self, *args, **kwargs):
+        attrs = kwargs.pop("attrs", None) or {}
+        attrs = {**attrs, "class": "table-filter-checkbox-group"}
+        super().__init__(*args, attrs=attrs, **kwargs)
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        option["attrs"]["class"] = "uk-checkbox"
+        return option
+
+
 class WohnungForm(UIkitFormMixin, forms.ModelForm):
     status = forms.ChoiceField(
         choices=(
@@ -1975,22 +1987,30 @@ class ApartmentManagementFilterForm(UIkitFormMixin, forms.Form):
             (WohnungStatus.BLOCKED, "Gesperrt"),
         ),
     )
-    floor = forms.ChoiceField(required=False, label="Etage")
+    floor = forms.MultipleChoiceField(
+        required=False,
+        label="Etage",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
 
     def __init__(self, *args, floors=(), **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["floor"].choices = [
-            ("", "Alle Etagen"),
-            *(
-                (str(floor), "Erdgeschoss (0)" if floor == 0 else f"Etage {floor}")
-                for floor in floors
-            ),
+            (str(floor), "Erdgeschoss (0)" if floor == 0 else f"Etage {floor}") for floor in floors
         ]
 
 
 class EmployeeApplicationUnitFilterForm(UIkitFormMixin, forms.Form):
-    floor = forms.ChoiceField(required=False, label="Etage")
-    rooms = forms.ChoiceField(required=False, label="Zimmeranzahl")
+    floor = forms.MultipleChoiceField(
+        required=False,
+        label="Etage",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+    rooms = forms.MultipleChoiceField(
+        required=False,
+        label="Zimmeranzahl",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
     application_sort = forms.ChoiceField(
         required=False,
         label="Bewerbungsanzahl sortieren",
@@ -2004,21 +2024,14 @@ class EmployeeApplicationUnitFilterForm(UIkitFormMixin, forms.Form):
     def __init__(self, *args, floors=(), room_counts=(), **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["floor"].choices = [
-            ("", "Alle Etagen"),
-            *(
-                (str(floor), "Erdgeschoss (0)" if floor == 0 else f"Etage {floor}")
-                for floor in floors
-            ),
+            (str(floor), "Erdgeschoss (0)" if floor == 0 else f"Etage {floor}") for floor in floors
         ]
         self.fields["rooms"].choices = [
-            ("", "Alle Zimmeranzahlen"),
-            *(
-                (
-                    str(room_count),
-                    f"{str(room_count).rstrip('0').rstrip('.').replace('.', ',')} Zimmer",
-                )
-                for room_count in room_counts
-            ),
+            (
+                str(room_count),
+                f"{str(room_count).rstrip('0').rstrip('.').replace('.', ',')} Zimmer",
+            )
+            for room_count in room_counts
         ]
 
 

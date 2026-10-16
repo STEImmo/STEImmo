@@ -36,17 +36,16 @@
                 </li>
             </ul></nav>
 
-            <form method="get" class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
-                {% for name, value in inline_hidden_values.items %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+            <form id="application-search-filter-form" data-table-filter-form method="get" class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
+                {% for name, value in inline_hidden_values %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
                 <div class="uk-grid-small uk-child-width-1-2@s" uk-grid>
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=filters.q only %}</div>
                     <div>{% include "wohnungsverwaltung/_form_field.html" with field=filters.sort only %}</div>
                 </div>
-                <button class="uk-button uk-button-primary uk-margin-small-top" type="submit">Anwenden</button>
             </form>
             {% include "wohnungsverwaltung/_table_filter_summary.html" with application_filters=True %}
 
-            <p class="uk-text-meta">
+            <p class="uk-text-meta" data-table-filter-fragment="application-count">
                 {{ page_obj.paginator.count }} Bewerbung{{ page_obj.paginator.count|pluralize:"en" }}
                 · {% if filters.cleaned_data.sort == 'priority' %}Priorität zuerst{% else %}Neueste Bewerbungen zuerst{% endif %}
             </p>
@@ -62,7 +61,7 @@
                             <th scope="col" role="columnheader">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.created only %}</th>
                         </tr>
                     </thead>
-                    <tbody role="rowgroup">
+                    <tbody role="rowgroup" data-table-filter-fragment="table-body">
                         {% for application in applications %}
                             {% include "wohnungsverwaltung/_employee_application_row.html" %}
                         {% empty %}
@@ -71,7 +70,7 @@
                                     Für diese Wohnung liegen noch keine Bewerbungen vor.
                                 {% else %}
                                     Keine Bewerbungen für die aktuelle Ansicht und Filterauswahl.
-                                    <a href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>.
+                                    <a data-table-filter-navigation href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>.
                                     {% if segment != 'all' %}<a href="{% querystring filter_query segment='all' page=None %}">Alle Bewerbungen ansehen</a>.{% endif %}
                                 {% endif %}
                             </td></tr>
@@ -79,6 +78,7 @@
                     </tbody>
                 </table>
             </div>
+            <div data-table-filter-fragment="pagination">
             {% if page_obj.has_other_pages %}
                 <nav aria-label="Seiten der Bewerbungen">
                     <ul class="uk-pagination uk-flex-center uk-flex-middle">
@@ -92,6 +92,7 @@
                     </ul>
                 </nav>
             {% endif %}
+            </div>
 
         {% else %}
             <h1 class="uk-heading-small">Bewerbungen je Wohnung</h1>
@@ -104,7 +105,7 @@
                         <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.application_count only %}</th>
                         <th scope="col">Aktion</th>
                     </tr></thead>
-                    <tbody>
+                    <tbody data-table-filter-fragment="table-body">
                 {% for unit in units %}
                     <tr>
                         <th scope="row" data-label="Wohnung">
@@ -122,7 +123,7 @@
                 {% empty %}
                     <tr><td colspan="3" class="uk-text-muted">
                         {% if inventory_exists %}
-                            Keine Wohnungen für diese Filterauswahl. <a href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>
+                            Keine Wohnungen für diese Filterauswahl. <a data-table-filter-navigation href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>
                         {% else %}
                             Es sind noch keine Wohnungen angelegt.
                         {% endif %}

@@ -856,11 +856,28 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
 def _table_filter_context(form, groups, *, persistent=None, inline_fields=()):
     """Share GET form state and presentation across the three management lists."""
     persistent = {key: str(value) for key, value in (persistent or {}).items() if value != ""}
-    values = {field.name: str(field.value()) for field in form if field.value() not in (None, "")}
+    values = {}
+    for field in form:
+        value = field.value()
+        if isinstance(value, (list, tuple)):
+            value = [str(item) for item in value if item not in (None, "")]
+        elif value not in (None, ""):
+            value = str(value)
+        if value not in (None, "", []):
+            values[field.name] = value
     params = persistent | values
 
     def query_url(parameters):
-        return "?" + urlencode(parameters) if parameters else "?"
+        return "?" + urlencode(parameters, doseq=True) if parameters else "?"
+
+    def hidden_pairs(parameters):
+        pairs = []
+        for name, value in parameters.items():
+            if isinstance(value, (list, tuple)):
+                pairs.extend((name, item) for item in value)
+            else:
+                pairs.append((name, value))
+        return pairs
 
     active_filters = []
     for field in form:
@@ -868,9 +885,13 @@ def _table_filter_context(form, groups, *, persistent=None, inline_fields=()):
             continue
         value = values[field.name]
         choices = {str(key): label for key, label in getattr(field.field, "choices", ())}
-        display = choices.get(value, value)
+        if isinstance(value, list):
+            display = ", ".join(str(choices.get(item, item)) for item in value)
+        else:
+            display = choices.get(value, value)
         if field.errors:
-            display = f"{value} (ungültig)"
+            raw_value = ", ".join(value) if isinstance(value, list) else value
+            display = f"{raw_value} (ungültig)"
         active_filters.append(
             {
                 "name": field.name,
@@ -887,7 +908,9 @@ def _table_filter_context(form, groups, *, persistent=None, inline_fields=()):
         group = {
             "name": name,
             "label": label,
-            "hidden_values": {key: val for key, val in params.items() if key not in field_names},
+            "hidden_values": hidden_pairs(
+                {key: val for key, val in params.items() if key not in field_names}
+            ),
         }
         for placement in ("desktop", "mobile"):
             # BoundField caches refer to their parent form, so each placement gets
@@ -898,15 +921,16 @@ def _table_filter_context(form, groups, *, persistent=None, inline_fields=()):
             group[placement + "_fields"] = [placed_form[field] for field in field_names]
         filter_groups[name] = group
     filter_query = QueryDict(mutable=True)
-    filter_query.update(params)
+    for name, value in params.items():
+        filter_query.setlist(name, value if isinstance(value, (list, tuple)) else [value])
     return {
         "filter_groups": filter_groups,
         "active_filters": active_filters,
         "reset_filters_url": query_url(persistent),
         "filter_query": filter_query,
-        "inline_hidden_values": {
-            key: val for key, val in params.items() if key not in inline_fields
-        },
+        "inline_hidden_values": hidden_pairs(
+            {key: val for key, val in params.items() if key not in inline_fields}
+        ),
     }
 
 
@@ -1086,9 +1110,9 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
         cleaned_filters = filters.cleaned_data
         units = Wohnung.objects.annotate(application_count=Count("bewerbungen"))
         if cleaned_filters.get("floor"):
-            units = units.filter(etage=cleaned_filters["floor"])
+            units = units.filter(etage__in=cleaned_filters["floor"])
         if cleaned_filters.get("rooms"):
-            units = units.filter(zimmeranzahl=cleaned_filters["rooms"])
+            units = units.filter(zimmeranzahl__in=cleaned_filters["rooms"])
 
         default_order = ("gebaeudenummer", "wohnungsnummer", "pk")
         if cleaned_filters.get("application_sort") == "asc":
@@ -2881,7 +2905,7 @@ def wohnung_list(request: HttpRequest) -> HttpResponse:
     if filters.cleaned_data.get("status"):
         wohnungen = wohnungen.filter(status=filters.cleaned_data["status"])
     if filters.cleaned_data.get("floor"):
-        wohnungen = wohnungen.filter(etage=filters.cleaned_data["floor"])
+        wohnungen = wohnungen.filter(etage__in=filters.cleaned_data["floor"])
     context = _table_filter_context(
         filters,
         (
