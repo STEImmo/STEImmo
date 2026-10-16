@@ -2076,6 +2076,36 @@ class MerkmalManagementFilterForm(UIkitFormMixin, forms.Form):
         self.fields["datentyp"].choices = [(value, value) for value in datentypen]
 
 
+class HandoverProtocolFilterForm(UIkitFormMixin, forms.Form):
+    wohnung = forms.MultipleChoiceField(
+        required=False,
+        label="Wohnung",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+    protokoll_typ = forms.MultipleChoiceField(
+        required=False,
+        label="Übergabeart",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+    q = forms.CharField(
+        required=False,
+        strip=True,
+        label="Beteiligte Person",
+        widget=forms.TextInput(attrs={"placeholder": "Name oder E-Mail"}),
+    )
+    status = forms.MultipleChoiceField(
+        required=False,
+        label="Bearbeitungsstand",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+
+    def __init__(self, *args, wohnungen=(), typen=(), statuswerte=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["wohnung"].choices = wohnungen
+        self.fields["protokoll_typ"].choices = typen
+        self.fields["status"].choices = statuswerte
+
+
 class EmployeeApplicationFilterForm(UIkitFormMixin, forms.Form):
     viewing_status = forms.ChoiceField(
         required=False,

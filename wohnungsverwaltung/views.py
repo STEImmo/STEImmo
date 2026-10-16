@@ -73,6 +73,7 @@ from .forms import (
     EmployeeApplicationUnitFilterForm,
     HandoverKeyForm,
     HandoverKeyFormSet,
+    HandoverProtocolFilterForm,
     HandoverProtocolForm,
     InlineRoomChecklistFormSet,
     MainApplicationForm,
@@ -2046,12 +2047,63 @@ def handover_protocol_draft_delete(request: HttpRequest, draft_id) -> JsonRespon
 
 @employee_required
 def handover_protocol_list(request: HttpRequest) -> HttpResponse:
-    protocols = Protokoll.objects.select_related("wohnung", "person").order_by("-updated_at")
-    return render(
-        request,
-        "wohnungsverwaltung/handover_protocol_list.html",
-        {"protocols": protocols, "draft_entries": _draft_overview_entries(request)},
+    protocols = Protokoll.objects.select_related("wohnung", "person")
+    apartment_choices = [
+        (
+            str(apartment.pk),
+            f"Gebäude {apartment.gebaeudenummer}, Wohnung {apartment.display_number}",
+        )
+        for apartment in Wohnung.objects.filter(protokolle__isnull=False)
+        .distinct()
+        .order_by("gebaeudenummer", "wohnungsnummer")
+    ]
+    type_choices = [
+        (value, HANDOVER_TYPE_LABELS.get(value, str(value)))
+        for value in Protokoll.objects.order_by("protokoll_typ")
+        .values_list("protokoll_typ", flat=True)
+        .distinct()
+    ]
+    status_choices = [
+        (value, PROTOCOL_STATUS_LABELS.get(value, str(value)))
+        for value in Protokoll.objects.order_by("status")
+        .values_list("status", flat=True)
+        .distinct()
+    ]
+    filters = HandoverProtocolFilterForm(
+        request.GET,
+        wohnungen=apartment_choices,
+        typen=type_choices,
+        statuswerte=status_choices,
     )
+    filters.is_valid()
+    if filters.cleaned_data.get("wohnung"):
+        protocols = protocols.filter(wohnung_id__in=filters.cleaned_data["wohnung"])
+    if filters.cleaned_data.get("protokoll_typ"):
+        protocols = protocols.filter(protokoll_typ__in=filters.cleaned_data["protokoll_typ"])
+    if filters.cleaned_data.get("status"):
+        protocols = protocols.filter(status__in=filters.cleaned_data["status"])
+    if filters.cleaned_data.get("q"):
+        query = filters.cleaned_data["q"]
+        protocols = protocols.alias(
+            participant_name=Concat("person__vorname", Value(" "), "person__nachname")
+        ).filter(Q(participant_name__icontains=query) | Q(person__email__icontains=query))
+    protocols = protocols.order_by("-updated_at")
+    context = _table_filter_context(
+        filters,
+        (
+            ("apartment", "Wohnung", ("wohnung",)),
+            ("type", "Übergabeart", ("protokoll_typ",)),
+            ("person", "Beteiligte Person", ("q",)),
+            ("status", "Bearbeitungsstand", ("status",)),
+        ),
+    )
+    context.update(
+        protocols=protocols,
+        draft_entries=_draft_overview_entries(request),
+        filters=filters,
+        protocol_inventory_exists=Protokoll.objects.exists(),
+    )
+    return render(request, "wohnungsverwaltung/handover_protocol_list.html", context)
 
 
 @employee_required

@@ -10,11 +10,17 @@ from django.urls import reverse
 from . import test_employee_dashboard
 from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
 from .models import (
+    AbnahmeStatus,
     Merkmal,
     MerkmalDatentyp,
+    Person,
+    Protokoll,
+    ProtokollStatus,
+    ProtokollTyp,
     Stellplatz,
     StellplatzTyp,
     StellplatzZuordnung,
+    UebergabeStatus,
     Wohnung,
     WohnungStatus,
 )
@@ -81,10 +87,37 @@ class TableFilterTests(TestCase):
             bezeichnung="Fenster",
             datentyp=MerkmalDatentyp.OK,
         )
+        cls.protocol_person = Person.objects.create(
+            vorname="Mara",
+            nachname="Muster",
+            email="mara.filter@example.test",
+        )
+        cls.other_protocol_person = Person.objects.create(
+            vorname="Nora",
+            nachname="Neumann",
+            email="nora.filter@example.test",
+        )
+        cls.protocol_open = Protokoll.objects.create(
+            wohnung=cls.free,
+            person=cls.protocol_person,
+            protokoll_typ=ProtokollTyp.MOVE_IN,
+            status=ProtokollStatus.OPEN,
+            uebergabe_status=UebergabeStatus.RENOVATED,
+            abnahme_status=AbnahmeStatus.ACCEPTED,
+        )
+        cls.protocol_signed = Protokoll.objects.create(
+            wohnung=cls.upstairs,
+            person=cls.other_protocol_person,
+            protokoll_typ=ProtokollTyp.MOVE_OUT,
+            status=ProtokollStatus.SIGNED,
+            uebergabe_status=UebergabeStatus.UNRENOVATED,
+            abnahme_status=AbnahmeStatus.ACCEPTED,
+        )
         cls.unit_url = reverse("verwaltung:wohnung_list")
         cls.parking_url = reverse("verwaltung:stellplatz_list")
         cls.application_url = reverse("wohnungsverwaltung:employee_application_list")
         cls.feature_url = reverse("verwaltung:merkmal_list")
+        cls.handover_url = reverse("wohnungsverwaltung:handover_protocol_list")
 
     def setUp(self):
         self.client.force_login(self.employee)
@@ -191,6 +224,83 @@ class TableFilterTests(TestCase):
         self.assertContains(response, "Alle Filter zurücksetzen")
         self.assertContains(response, "Wo wird geprüft? filtern")
         self.assertNotContains(response, "Noch keine Prüfvorlagen angelegt")
+
+    def test_handover_filters_combine_apartment_type_person_and_status(self):
+        response = self.client.get(
+            self.handover_url,
+            {
+                "wohnung": [str(self.free.pk), str(self.upstairs.pk)],
+                "protokoll_typ": [ProtokollTyp.MOVE_IN, ProtokollTyp.MOVE_OUT],
+                "q": "nora",
+                "status": [ProtokollStatus.OPEN, ProtokollStatus.SIGNED],
+            },
+        )
+
+        self.assertEqual(list(response.context["protocols"]), [self.protocol_signed])
+
+    def test_handover_filter_choices_use_existing_protocol_values(self):
+        response = self.client.get(self.handover_url)
+        filters = response.context["filters"]
+
+        self.assertEqual(
+            list(filters.fields["wohnung"].choices),
+            [
+                (
+                    str(self.free.pk),
+                    f"Gebäude {self.free.gebaeudenummer}, Wohnung {self.free.display_number}",
+                ),
+                (
+                    str(self.upstairs.pk),
+                    f"Gebäude {self.upstairs.gebaeudenummer}, "
+                    f"Wohnung {self.upstairs.display_number}",
+                ),
+            ],
+        )
+        self.assertEqual(
+            list(filters.fields["protokoll_typ"].choices),
+            [(ProtokollTyp.MOVE_IN, "Einzug"), (ProtokollTyp.MOVE_OUT, "Auszug")],
+        )
+        self.assertEqual(
+            list(filters.fields["status"].choices),
+            [(ProtokollStatus.OPEN, "In Bearbeitung"), (ProtokollStatus.SIGNED, "Bestätigt")],
+        )
+        self.assertContains(response, 'name="q"')
+
+    def test_invalid_handover_filter_keeps_valid_criteria_and_reset_link(self):
+        response = self.client.get(
+            self.handover_url,
+            {"wohnung": str(self.free.pk), "status": "unknown"},
+        )
+
+        self.assertEqual(list(response.context["protocols"]), [self.protocol_open])
+        self.assertTrue(response.context["filters"].errors)
+        self.assertContains(response, "Filter enthalten ungültige Angaben")
+        parser = FilterMarkupParser()
+        parser.feed(response.content.decode())
+        self.assertEqual(
+            parse_qs(urlsplit(parser.links["wohnung"]).query),
+            {"status": ["unknown"]},
+        )
+
+    def test_empty_handover_filter_results_keep_filters_and_reset_available(self):
+        response = self.client.get(
+            self.handover_url,
+            {"wohnung": str(self.free.pk), "status": ProtokollStatus.SIGNED},
+        )
+
+        self.assertContains(response, "Keine Übergabeprotokolle für diese Filterauswahl")
+        self.assertContains(response, "Alle Filter zurücksetzen")
+        self.assertContains(response, "Wohnung filtern")
+        self.assertNotContains(response, "Noch kein Übergabeprotokoll angelegt")
+
+    def test_empty_handover_inventory_has_a_different_message(self):
+        Protokoll.objects.all().delete()
+
+        response = self.client.get(self.handover_url)
+
+        self.assertContains(response, "Noch kein Übergabeprotokoll angelegt")
+        self.assertNotContains(response, "Keine Übergabeprotokolle für diese Filterauswahl")
+        self.assertContains(response, "Wohnung filtern")
 
     def test_empty_results_keep_table_filters_and_reset_available(self):
         response = self.client.get(self.unit_url, {"status": "taken", "floor": "0"})

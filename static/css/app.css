@@ -1890,12 +1890,18 @@ a:active,
     .management-table thead .table-filter {
         display: none;
     }
+    .handover-filter-table thead .table-filter {
+        display: none;
+    }
 }
 .table-filter-heading-mobile {
     display: none;
 }
 @media (max-width: 959px) {
     .management-table .table-filter-heading-mobile {
+        display: inline;
+    }
+    .handover-filter-table .table-filter-heading-mobile {
         display: inline;
     }
     .table-filters-mobile .table-filter-heading-mobile {
