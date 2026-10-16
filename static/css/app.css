@@ -95,6 +95,9 @@ body {
 }
 
 /* Project-specific architectural diagrams; surrounding controls remain UIkit. */
+.home-facade-preview,
+.architecture-view { --steimmo-color-focus-ring: var(--steimmo-color-primary); }
+
 .building-facade,
 .floor-plan {
     display: block;
@@ -109,7 +112,7 @@ body {
 .facade-floor-label .facade-floor-summary { font-size: 11px; fill: var(--steimmo-color-text-muted); }
 .facade-floor-label path { stroke: #aaa; }
 .facade-floor:hover .facade-hit,
-.facade-floor:focus-visible .facade-hit { fill: color-mix(in srgb, var(--steimmo-color-focus-ring) 20%, transparent); stroke: var(--steimmo-color-focus-ring); }
+.facade-floor:focus-visible .facade-hit { fill: color-mix(in srgb, var(--steimmo-color-focus-ring) 15%, transparent); stroke: var(--steimmo-color-focus-ring); }
 .facade-floor:hover .facade-floor-label rect,
 .facade-floor:focus-visible .facade-floor-label rect { stroke: var(--steimmo-color-focus-ring); stroke-width: 2; }
 .floor-navigation { scroll-margin-top: 18px; }
@@ -122,7 +125,7 @@ body {
 .plan-apartment-shape { fill: #edf3e8; stroke: #596254; stroke-width: 2; stroke-linejoin: round; transition: fill .15s, stroke .15s; }
 a.plan-apartment { cursor: pointer; }
 a.plan-apartment:hover .plan-apartment-shape,
-a.plan-apartment:focus-visible .plan-apartment-shape { fill: #d1e6f7; stroke: var(--steimmo-color-focus-ring); }
+a.plan-apartment:focus-visible .plan-apartment-shape { fill: color-mix(in srgb, var(--steimmo-color-primary) 15%, var(--steimmo-color-surface)); stroke: var(--steimmo-color-focus-ring); }
 .is-unavailable .plan-apartment-shape { fill: url(#plan-unavailable-hatch); stroke: #999e96; }
 .plan-unavailable-caption rect { fill: #f2f2ef; stroke: #b4b8b0; stroke-width: 1; }
 .plan-unavailable-caption text { fill: #5e645a; font: 12px Arial, sans-serif; }
@@ -1155,11 +1158,17 @@ a:active,
 .home-floor-links { margin: 0; }
 .home-floor-links > li:nth-child(n + 2) { margin-top: var(--steimmo-space-xs); }
 .home-floor-links a { display: block; position: relative; min-height: 44px; padding: var(--steimmo-space-xs); border: 1px solid var(--steimmo-color-border); border-radius: var(--steimmo-radius-sm); background: var(--steimmo-color-surface-page); color: var(--steimmo-color-text); font-size: var(--steimmo-font-size-sm); }
-.home-floor-links a:hover { border-color: var(--steimmo-color-primary); text-decoration: none; }
+.home-floor-links a:hover,
+.home-floor-links a:focus-visible { border-color: var(--steimmo-color-primary); text-decoration: none; }
 .home-floor-availability { display: block; padding-right: var(--steimmo-space-lg); color: var(--steimmo-color-text-muted); font-size: var(--steimmo-font-size-xs); }
 .home-floor-arrow { position: absolute; right: var(--steimmo-space-xs); bottom: var(--steimmo-space-xs); }
 .home-building-figure .facade-floor:hover .facade-hit,
-.home-building-figure .facade-floor:focus-visible .facade-hit { fill: rgb(45 90 67 / 15%); stroke: var(--steimmo-color-primary); }
+.home-building-figure .facade-floor:focus-visible .facade-hit,
+.home-facade-preview:has(.home-floor-links [data-floor="0"]:is(:hover, :focus-visible)) .facade-floor[data-floor="0"] .facade-hit,
+.home-facade-preview:has(.home-floor-links [data-floor="1"]:is(:hover, :focus-visible)) .facade-floor[data-floor="1"] .facade-hit,
+.home-facade-preview:has(.home-floor-links [data-floor="2"]:is(:hover, :focus-visible)) .facade-floor[data-floor="2"] .facade-hit,
+.home-facade-preview:has(.home-floor-links [data-floor="3"]:is(:hover, :focus-visible)) .facade-floor[data-floor="3"] .facade-hit,
+.home-facade-preview:has(.home-floor-links [data-floor="4"]:is(:hover, :focus-visible)) .facade-floor[data-floor="4"] .facade-hit { fill: rgb(45 90 67 / 15%); stroke: var(--steimmo-color-primary); }
 .home-building-empty { min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--steimmo-color-primary); text-align: center; }
 .home-company-band { background: var(--steimmo-color-surface-brand); padding-block: var(--steimmo-space-2xl); }
 .home-company-band h2 { margin-bottom: 0; font-size: var(--steimmo-font-size-2xl); }
