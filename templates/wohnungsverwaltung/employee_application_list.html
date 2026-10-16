@@ -96,9 +96,14 @@
         {% else %}
             <h1 class="uk-heading-small">Bewerbungen je Wohnung</h1>
             <p>Wählen Sie eine Wohnung, um ihre Bewerbungen anzusehen.</p>
+            {% include "wohnungsverwaltung/_table_filter_summary.html" %}
             <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Wohnungen und Bewerbungen">
                 <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
-                    <thead><tr><th scope="col">Wohnung</th><th scope="col">Bewerbungen</th><th scope="col">Aktion</th></tr></thead>
+                    <thead><tr>
+                        <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.apartment only %}</th>
+                        <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.application_count only %}</th>
+                        <th scope="col">Aktion</th>
+                    </tr></thead>
                     <tbody>
                 {% for unit in units %}
                     <tr>
@@ -115,7 +120,13 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="3">Es sind noch keine Wohnungen angelegt.</td></tr>
+                    <tr><td colspan="3" class="uk-text-muted">
+                        {% if inventory_exists %}
+                            Keine Wohnungen für diese Filterauswahl. <a href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>
+                        {% else %}
+                            Es sind noch keine Wohnungen angelegt.
+                        {% endif %}
+                    </td></tr>
                 {% endfor %}
                     </tbody>
                 </table>

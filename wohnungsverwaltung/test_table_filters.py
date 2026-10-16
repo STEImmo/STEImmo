@@ -46,9 +46,11 @@ class TableFilterTests(TestCase):
         cls.employee.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
         cls.applicant = get_user_model().objects.create_user(username="filter-applicant")
         cls.applicant.groups.add(Group.objects.get(name=ROLE_APPLICANT))
-        cls.free = Wohnung.objects.create(wohnungsnummer="01", etage=0)
-        cls.upstairs = Wohnung.objects.create(wohnungsnummer="02", etage=2)
-        cls.taken = Wohnung.objects.create(wohnungsnummer="03", etage=2, status=WohnungStatus.TAKEN)
+        cls.free = Wohnung.objects.create(wohnungsnummer="01", etage=0, zimmeranzahl="1.50")
+        cls.upstairs = Wohnung.objects.create(wohnungsnummer="02", etage=2, zimmeranzahl="2.00")
+        cls.taken = Wohnung.objects.create(
+            wohnungsnummer="03", etage=2, zimmeranzahl="3.00", status=WohnungStatus.TAKEN
+        )
         cls.car = Stellplatz.objects.create(name="A", stellplatz_typ=StellplatzTyp.CAR)
         cls.assigned_car = Stellplatz.objects.create(name="B", stellplatz_typ=StellplatzTyp.CAR)
         cls.bike = Stellplatz.objects.create(name="C", stellplatz_typ=StellplatzTyp.BIKE)
@@ -103,6 +105,65 @@ class TableFilterTests(TestCase):
         self.assertContains(response, "Etage filtern")
         self.assertNotContains(response, "Noch keine Wohnungen angelegt")
 
+    def test_application_unit_list_filters_by_floor_and_room_count(self):
+        response = self.client.get(self.application_url, {"floor": "2", "rooms": "2.00"})
+        self.assertEqual(list(response.context["units"]), [self.upstairs])
+        self.assertContains(response, "Etage: Etage 2")
+        self.assertContains(response, "Zimmeranzahl: 2 Zimmer")
+
+    def test_application_unit_list_sorts_by_application_count_in_both_directions(self):
+        test_employee_dashboard.EmployeeDashboardTests.create_application(self.upstairs)
+        for params, expected in (
+            ({}, [self.free, self.upstairs, self.taken]),
+            ({"application_sort": "asc"}, [self.taken, self.free, self.upstairs]),
+            ({"application_sort": "desc"}, [self.free, self.upstairs, self.taken]),
+        ):
+            with self.subTest(params=params):
+                response = self.client.get(self.application_url, params)
+                self.assertEqual(list(response.context["units"]), expected)
+
+    def test_invalid_application_unit_filter_keeps_other_valid_criteria(self):
+        response = self.client.get(self.application_url, {"floor": "2", "rooms": "invalid"})
+        self.assertEqual(list(response.context["units"]), [self.upstairs, self.taken])
+        self.assertIn("rooms", response.context["filters"].errors)
+        self.assertContains(response, "Filter enthalten ungültige Angaben")
+
+    def test_application_unit_filter_reset_links_preserve_other_filters(self):
+        response = self.client.get(
+            self.application_url,
+            {
+                "floor": "2",
+                "rooms": "2.00",
+                "application_sort": "asc",
+                "page": "3",
+                "unknown": "ignored",
+            },
+        )
+        parser = FilterMarkupParser()
+        parser.feed(response.content.decode())
+        self.assertEqual(
+            parse_qs(urlsplit(parser.links["floor"]).query),
+            {"rooms": ["2.00"], "application_sort": ["asc"]},
+        )
+        self.assertEqual(
+            parse_qs(urlsplit(parser.links["rooms"]).query),
+            {"floor": ["2"], "application_sort": ["asc"]},
+        )
+        self.assertEqual(
+            parse_qs(urlsplit(parser.links["application_sort"]).query),
+            {"floor": ["2"], "rooms": ["2.00"]},
+        )
+        self.assertEqual(
+            parse_qs(urlsplit(unescape(response.context["reset_filters_url"])).query), {}
+        )
+
+    def test_empty_application_unit_filter_results_keep_reset_visible(self):
+        response = self.client.get(self.application_url, {"floor": "0", "rooms": "3.00"})
+        self.assertContains(response, "Keine Wohnungen für diese Filterauswahl")
+        self.assertContains(response, "Alle Filter zurücksetzen")
+        self.assertContains(response, "Wohnung filtern")
+        self.assertNotContains(response, "Es sind noch keine Wohnungen angelegt")
+
     def test_individual_reset_preserves_other_filters_and_removes_page(self):
         response = self.client.get(
             self.unit_url, {"status": "free", "floor": "2", "page": "3", "unknown": "x"}
@@ -116,6 +177,7 @@ class TableFilterTests(TestCase):
         for url, params in (
             (self.unit_url, {}),
             (self.parking_url, {}),
+            (self.application_url, {}),
             (self.application_url, {"wohnung": self.free.pk}),
         ):
             with self.subTest(url=url):

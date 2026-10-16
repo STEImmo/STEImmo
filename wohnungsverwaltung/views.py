@@ -70,6 +70,7 @@ from .forms import (
     BewerbungForm,
     EligibilityApprovalForm,
     EmployeeApplicationFilterForm,
+    EmployeeApplicationUnitFilterForm,
     HandoverKeyForm,
     HandoverKeyFormSet,
     HandoverProtocolForm,
@@ -1075,9 +1076,43 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
             unit_application_count=Bewerbung.objects.filter(wohnung=unit).count(),
         )
     else:
-        context["units"] = Wohnung.objects.annotate(
-            application_count=Count("bewerbungen")
-        ).order_by("gebaeudenummer", "wohnungsnummer", "pk")
+        filters = EmployeeApplicationUnitFilterForm(
+            request.GET,
+            floors=Wohnung.objects.order_by("etage").values_list("etage", flat=True).distinct(),
+            room_counts=Wohnung.objects.order_by("zimmeranzahl")
+            .values_list("zimmeranzahl", flat=True)
+            .distinct(),
+        )
+        filters.is_valid()
+        cleaned_filters = filters.cleaned_data
+        units = Wohnung.objects.annotate(application_count=Count("bewerbungen"))
+        if cleaned_filters.get("floor"):
+            units = units.filter(etage=cleaned_filters["floor"])
+        if cleaned_filters.get("rooms"):
+            units = units.filter(zimmeranzahl=cleaned_filters["rooms"])
+
+        default_order = ("gebaeudenummer", "wohnungsnummer", "pk")
+        if cleaned_filters.get("application_sort") == "asc":
+            units = units.order_by("application_count", *default_order)
+        elif cleaned_filters.get("application_sort") == "desc":
+            units = units.order_by("-application_count", *default_order)
+        else:
+            units = units.order_by(*default_order)
+
+        context.update(
+            _table_filter_context(
+                filters,
+                (
+                    ("apartment", "Wohnung", ("floor", "rooms")),
+                    ("application_count", "Bewerbungen", ("application_sort",)),
+                ),
+            )
+        )
+        context.update(
+            units=units,
+            filters=filters,
+            inventory_exists=Wohnung.objects.exists(),
+        )
 
     return render(
         request,

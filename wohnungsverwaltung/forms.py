@@ -1988,6 +1988,40 @@ class ApartmentManagementFilterForm(UIkitFormMixin, forms.Form):
         ]
 
 
+class EmployeeApplicationUnitFilterForm(UIkitFormMixin, forms.Form):
+    floor = forms.ChoiceField(required=False, label="Etage")
+    rooms = forms.ChoiceField(required=False, label="Zimmeranzahl")
+    application_sort = forms.ChoiceField(
+        required=False,
+        label="Bewerbungsanzahl sortieren",
+        choices=(
+            ("", "Wohnungsnummer (Standard)"),
+            ("asc", "Aufsteigend"),
+            ("desc", "Absteigend"),
+        ),
+    )
+
+    def __init__(self, *args, floors=(), room_counts=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["floor"].choices = [
+            ("", "Alle Etagen"),
+            *(
+                (str(floor), "Erdgeschoss (0)" if floor == 0 else f"Etage {floor}")
+                for floor in floors
+            ),
+        ]
+        self.fields["rooms"].choices = [
+            ("", "Alle Zimmeranzahlen"),
+            *(
+                (
+                    str(room_count),
+                    f"{str(room_count).rstrip('0').rstrip('.').replace('.', ',')} Zimmer",
+                )
+                for room_count in room_counts
+            ),
+        ]
+
+
 class ParkingManagementFilterForm(UIkitFormMixin, forms.Form):
     assignment = forms.ChoiceField(
         required=False,
