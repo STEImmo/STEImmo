@@ -1148,7 +1148,7 @@ a:active,
 .home-figure-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--steimmo-space-xs); }
 .home-figure-heading > span:first-child { font-size: var(--steimmo-font-size-sm); font-weight: 600; }
 .home-figure-heading .home-eyebrow { margin: 0; letter-spacing: .06em; }
-.home-facade-preview { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; gap: var(--steimmo-space-md); margin-block: var(--steimmo-space-lg); padding: var(--steimmo-space-md); border-radius: var(--steimmo-radius-md); background: var(--steimmo-color-surface); }
+.home-facade-preview { --steimmo-color-focus-ring: var(--steimmo-color-primary); display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; gap: var(--steimmo-space-md); margin-block: var(--steimmo-space-lg); padding: var(--steimmo-space-md); border-radius: var(--steimmo-radius-md); background: var(--steimmo-color-surface); }
 .home-building-figure .building-facade { margin: 0; }
 .home-building-figure .facade-floor-label { display: none; }
 .home-building-figure figcaption { color: var(--steimmo-color-text-muted); font-size: var(--steimmo-font-size-xs); }
