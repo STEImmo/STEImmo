@@ -409,6 +409,7 @@ class TableFilterTests(TestCase):
             (self.unit_url, {}),
             (self.parking_url, {}),
             (self.feature_url, {}),
+            (self.handover_url, {}),
             (self.application_url, {}),
             (self.application_url, {"wohnung": self.free.pk}),
         ):
@@ -475,7 +476,13 @@ class TableFilterTests(TestCase):
 
     def test_filters_do_not_grant_access_to_applicants(self):
         self.client.force_login(self.applicant)
-        for url in (self.unit_url, self.parking_url, self.feature_url, self.application_url):
+        for url in (
+            self.unit_url,
+            self.parking_url,
+            self.feature_url,
+            self.handover_url,
+            self.application_url,
+        ):
             self.assertEqual(self.client.get(url, {"status": "free"}).status_code, 403)
 
     def test_dropdown_submission_preserves_other_filters_without_page_or_unknown_parameters(self):
@@ -526,7 +533,13 @@ class TableFilterTests(TestCase):
 
     def test_filter_urls_require_login(self):
         self.client.logout()
-        for url in (self.unit_url, self.parking_url, self.feature_url, self.application_url):
+        for url in (
+            self.unit_url,
+            self.parking_url,
+            self.feature_url,
+            self.handover_url,
+            self.application_url,
+        ):
             response = self.client.get(url, {"status": "free"})
             self.assertEqual(response.status_code, 302)
             self.assertTrue(response.url.startswith(reverse("login") + "?next="))
