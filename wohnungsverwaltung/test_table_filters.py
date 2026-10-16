@@ -9,7 +9,15 @@ from django.urls import reverse
 
 from . import test_employee_dashboard
 from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
-from .models import Stellplatz, StellplatzTyp, StellplatzZuordnung, Wohnung, WohnungStatus
+from .models import (
+    Merkmal,
+    MerkmalDatentyp,
+    Stellplatz,
+    StellplatzTyp,
+    StellplatzZuordnung,
+    Wohnung,
+    WohnungStatus,
+)
 
 
 class FilterMarkupParser(HTMLParser):
@@ -58,9 +66,25 @@ class TableFilterTests(TestCase):
         cls.application = test_employee_dashboard.EmployeeDashboardTests.create_application(
             cls.free
         )
+        cls.wall_window = Merkmal.objects.create(
+            bereich="Wände",
+            bezeichnung="Fenster",
+            datentyp=MerkmalDatentyp.OK,
+        )
+        cls.wall_floor = Merkmal.objects.create(
+            bereich="Wände",
+            bezeichnung="Boden",
+            datentyp=MerkmalDatentyp.FLIESEN,
+        )
+        cls.living_room_window = Merkmal.objects.create(
+            bereich="Wohnzimmer",
+            bezeichnung="Fenster",
+            datentyp=MerkmalDatentyp.OK,
+        )
         cls.unit_url = reverse("verwaltung:wohnung_list")
         cls.parking_url = reverse("verwaltung:stellplatz_list")
         cls.application_url = reverse("wohnungsverwaltung:employee_application_list")
+        cls.feature_url = reverse("verwaltung:merkmal_list")
 
     def setUp(self):
         self.client.force_login(self.employee)
@@ -106,6 +130,67 @@ class TableFilterTests(TestCase):
             with self.subTest(params=params):
                 response = self.client.get(self.parking_url, params)
                 self.assertEqual(list(response.context["stellplaetze"]), expected)
+
+    def test_feature_filters_combine_dynamic_values_with_or_within_each_column(self):
+        response = self.client.get(
+            self.feature_url,
+            {
+                "bereich": ["Wände", "Wohnzimmer"],
+                "bezeichnung": ["Fenster", "Boden"],
+                "datentyp": [MerkmalDatentyp.OK],
+            },
+        )
+
+        self.assertEqual(
+            list(response.context["merkmale"]),
+            [self.wall_window, self.living_room_window],
+        )
+
+    def test_feature_filter_choices_are_derived_from_existing_templates(self):
+        response = self.client.get(self.feature_url)
+
+        self.assertEqual(
+            list(response.context["filters"].fields["bereich"].choices),
+            [("Wände", "Wände"), ("Wohnzimmer", "Wohnzimmer")],
+        )
+        self.assertEqual(
+            list(response.context["filters"].fields["bezeichnung"].choices),
+            [("Boden", "Boden"), ("Fenster", "Fenster")],
+        )
+        self.assertEqual(
+            list(response.context["filters"].fields["datentyp"].choices),
+            [
+                (MerkmalDatentyp.FLIESEN, MerkmalDatentyp.FLIESEN),
+                (MerkmalDatentyp.OK, MerkmalDatentyp.OK),
+            ],
+        )
+
+    def test_invalid_feature_filter_keeps_other_valid_filters_and_reset_links(self):
+        response = self.client.get(
+            self.feature_url,
+            {"bereich": "Wände", "bezeichnung": "not-a-template", "datentyp": MerkmalDatentyp.OK},
+        )
+
+        self.assertEqual(list(response.context["merkmale"]), [self.wall_window])
+        self.assertTrue(response.context["filters"].errors)
+        self.assertContains(response, "Filter enthalten ungültige Angaben")
+        parser = FilterMarkupParser()
+        parser.feed(response.content.decode())
+        self.assertEqual(
+            parse_qs(urlsplit(parser.links["bereich"]).query),
+            {"bezeichnung": ["not-a-template"], "datentyp": [MerkmalDatentyp.OK]},
+        )
+
+    def test_empty_feature_filter_results_keep_filters_and_reset_available(self):
+        response = self.client.get(
+            self.feature_url,
+            {"bereich": "Wohnzimmer", "datentyp": MerkmalDatentyp.FLIESEN},
+        )
+
+        self.assertContains(response, "Keine Prüfvorlagen für diese Filterauswahl")
+        self.assertContains(response, "Alle Filter zurücksetzen")
+        self.assertContains(response, "Wo wird geprüft? filtern")
+        self.assertNotContains(response, "Noch keine Prüfvorlagen angelegt")
 
     def test_empty_results_keep_table_filters_and_reset_available(self):
         response = self.client.get(self.unit_url, {"status": "taken", "floor": "0"})
@@ -213,6 +298,7 @@ class TableFilterTests(TestCase):
         for url, params in (
             (self.unit_url, {}),
             (self.parking_url, {}),
+            (self.feature_url, {}),
             (self.application_url, {}),
             (self.application_url, {"wohnung": self.free.pk}),
         ):
@@ -279,7 +365,7 @@ class TableFilterTests(TestCase):
 
     def test_filters_do_not_grant_access_to_applicants(self):
         self.client.force_login(self.applicant)
-        for url in (self.unit_url, self.parking_url, self.application_url):
+        for url in (self.unit_url, self.parking_url, self.feature_url, self.application_url):
             self.assertEqual(self.client.get(url, {"status": "free"}).status_code, 403)
 
     def test_dropdown_submission_preserves_other_filters_without_page_or_unknown_parameters(self):
@@ -330,7 +416,7 @@ class TableFilterTests(TestCase):
 
     def test_filter_urls_require_login(self):
         self.client.logout()
-        for url in (self.unit_url, self.parking_url, self.application_url):
+        for url in (self.unit_url, self.parking_url, self.feature_url, self.application_url):
             response = self.client.get(url, {"status": "free"})
             self.assertEqual(response.status_code, 302)
             self.assertTrue(response.url.startswith(reverse("login") + "?next="))

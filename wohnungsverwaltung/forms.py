@@ -2052,6 +2052,30 @@ class ParkingManagementFilterForm(UIkitFormMixin, forms.Form):
     )
 
 
+class MerkmalManagementFilterForm(UIkitFormMixin, forms.Form):
+    bereich = forms.MultipleChoiceField(
+        required=False,
+        label="Wo wird geprüft?",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+    bezeichnung = forms.MultipleChoiceField(
+        required=False,
+        label="Was wird geprüft?",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+    datentyp = forms.MultipleChoiceField(
+        required=False,
+        label="Vorgegebene Bewertung",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+
+    def __init__(self, *args, bereiche=(), bezeichnungen=(), datentypen=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["bereich"].choices = [(value, value) for value in bereiche]
+        self.fields["bezeichnung"].choices = [(value, value) for value in bezeichnungen]
+        self.fields["datentyp"].choices = [(value, value) for value in datentypen]
+
+
 class EmployeeApplicationFilterForm(UIkitFormMixin, forms.Form):
     viewing_status = forms.ChoiceField(
         required=False,

@@ -13,10 +13,17 @@
             </div>
             <a class="uk-button uk-button-primary uk-margin-small-top" href="{% url 'verwaltung:merkmal_create' %}">Prüfvorlage anlegen</a>
         </div>
+        {% include "wohnungsverwaltung/_table_filter_summary.html" %}
         <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Verwaltungstabelle">
             <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
-                <thead><tr><th>Wo wird geprüft?</th><th>Was wird geprüft?</th><th>Vorgegebene Bewertung</th><th>Zusätzliche Angaben</th><th><span class="uk-hidden-visually">Aktion</span></th></tr></thead>
-                <tbody>
+                <thead><tr>
+                    <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.area only %}</th>
+                    <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.feature only %}</th>
+                    <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.rating only %}</th>
+                    <th scope="col">Zusätzliche Angaben</th>
+                    <th scope="col"><span class="uk-hidden-visually">Aktion</span></th>
+                </tr></thead>
+                <tbody data-table-filter-fragment="table-body">
                     {% for merkmal in merkmale %}
                         <tr>
                             <td data-label="Wo wird geprüft?">{{ merkmal.bereich }}</td>
@@ -26,7 +33,13 @@
                             <td class="uk-text-right" data-label="Aktion"><a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:merkmal_edit' merkmal.pk %}">Bearbeiten</a></td>
                         </tr>
                     {% empty %}
-                        <tr><td colspan="5" class="uk-text-muted">Noch keine Prüfvorlagen angelegt.</td></tr>
+                        <tr><td colspan="5" class="uk-text-muted">
+                            {% if inventory_exists %}
+                                Keine Prüfvorlagen für diese Filterauswahl. <a data-table-filter-navigation href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>
+                            {% else %}
+                                Noch keine Prüfvorlagen angelegt.
+                            {% endif %}
+                        </td></tr>
                     {% endfor %}
                 </tbody>
             </table>

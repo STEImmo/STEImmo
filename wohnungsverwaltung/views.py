@@ -78,6 +78,7 @@ from .forms import (
     MainApplicationForm,
     MainApplicationInvitationForm,
     MerkmalForm,
+    MerkmalManagementFilterForm,
     MerkmalOptionFormSet,
     ParkingManagementFilterForm,
     RaumForm,
@@ -854,7 +855,7 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
 
 
 def _table_filter_context(form, groups, *, persistent=None, inline_fields=()):
-    """Share GET form state and presentation across the three management lists."""
+    """Share GET form state and presentation across management tables."""
     persistent = {key: str(value) for key, value in (persistent or {}).items() if value != ""}
     values = {}
     for field in form:
@@ -3034,7 +3035,33 @@ def raum_delete(request: HttpRequest, wohnung_id, raum_id) -> HttpResponse:
 @employee_required
 def merkmal_list(request: HttpRequest) -> HttpResponse:
     merkmale = Merkmal.objects.order_by("bereich", "bezeichnung")
-    return render(request, "wohnungsverwaltung/merkmal_list.html", {"merkmale": merkmale})
+    filters = MerkmalManagementFilterForm(
+        request.GET,
+        bereiche=Merkmal.objects.order_by("bereich").values_list("bereich", flat=True).distinct(),
+        bezeichnungen=Merkmal.objects.order_by("bezeichnung")
+        .values_list("bezeichnung", flat=True)
+        .distinct(),
+        datentypen=Merkmal.objects.order_by("datentyp")
+        .values_list("datentyp", flat=True)
+        .distinct(),
+    )
+    filters.is_valid()
+    if filters.cleaned_data.get("bereich"):
+        merkmale = merkmale.filter(bereich__in=filters.cleaned_data["bereich"])
+    if filters.cleaned_data.get("bezeichnung"):
+        merkmale = merkmale.filter(bezeichnung__in=filters.cleaned_data["bezeichnung"])
+    if filters.cleaned_data.get("datentyp"):
+        merkmale = merkmale.filter(datentyp__in=filters.cleaned_data["datentyp"])
+    context = _table_filter_context(
+        filters,
+        (
+            ("area", "Wo wird geprüft?", ("bereich",)),
+            ("feature", "Was wird geprüft?", ("bezeichnung",)),
+            ("rating", "Vorgegebene Bewertung", ("datentyp",)),
+        ),
+    )
+    context.update(merkmale=merkmale, filters=filters, inventory_exists=Merkmal.objects.exists())
+    return render(request, "wohnungsverwaltung/merkmal_list.html", context)
 
 
 @employee_required

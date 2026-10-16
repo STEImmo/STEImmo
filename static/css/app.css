@@ -1860,11 +1860,19 @@ a:active,
 .table-filter-dropdown .table-filter-checkbox-group > div + div {
     margin-top: var(--steimmo-space-xs);
 }
+.table-filter-dropdown .table-filter-checkbox-group > div {
+    min-width: 0;
+}
 .table-filter-dropdown .table-filter-checkbox-group label {
     cursor: pointer;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--steimmo-space-xs);
+    overflow-wrap: anywhere;
 }
 .table-filter-dropdown .table-filter-checkbox-group input[type="checkbox"] {
-    margin-right: var(--steimmo-space-xs);
+    flex: 0 0 auto;
+    margin: 0.2em 0 0;
 }
 .table-filter-summary,
 .table-filters-mobile {
