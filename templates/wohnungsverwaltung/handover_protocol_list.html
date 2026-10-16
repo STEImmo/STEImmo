@@ -49,37 +49,41 @@
             </div>
         {% endif %}
 
-        {% if protocols %}
-            <div class="uk-overflow-auto uk-card uk-card-default" tabindex="0" role="region" aria-label="Übergabetabelle – seitlich scrollbar">
-                <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-margin-remove">
-                    <thead>
+        <h2 class="handover-section-title">Übergabeprotokolle</h2>
+        {% include "wohnungsverwaltung/_table_filter_summary.html" %}
+        <div class="handover-filter-table uk-overflow-auto uk-card uk-card-default" tabindex="0" role="region" aria-label="Übergabetabelle – seitlich scrollbar">
+            <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-margin-remove">
+                <thead>
+                    <tr>
+                        <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.apartment only %}</th>
+                        <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.type only %}</th>
+                        <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.person only %}</th>
+                        <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.status only %}</th>
+                        <th scope="col"><span class="uk-hidden-visually">Aktion</span></th>
+                    </tr>
+                </thead>
+                <tbody data-table-filter-fragment="table-body">
+                    {% for protocol in protocols %}
                         <tr>
-                            <th scope="col">Wohnung</th>
-                            <th scope="col">Übergabeart</th>
-                            <th scope="col">Beteiligte Person</th>
-                            <th scope="col">Bearbeitungsstand</th>
-                            <th scope="col"><span class="uk-hidden-visually">Aktion</span></th>
+                            <td data-label="Wohnung">Gebäude {{ protocol.wohnung.gebaeudenummer }}, Wohnung {{ protocol.wohnung.display_number }}</td>
+                            <td data-label="Übergabeart">{% if protocol.protokoll_typ == "move_in" %}Einzug{% else %}Auszug{% endif %}</td>
+                            <td data-label="Beteiligte Person">{{ protocol.person.vorname }} {{ protocol.person.nachname }}</td>
+                            <td data-label="Bearbeitungsstand">{% if protocol.status == "open" %}<span class="uk-label">In Bearbeitung</span>{% elif protocol.status == "signed" %}<span class="uk-label uk-label-success">Bestätigt</span>{% else %}<span class="uk-label uk-label-danger">Gesperrt</span>{% endif %}</td>
+                            <td data-label="Aktion"><a class="uk-button uk-button-default uk-button-small" href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}">Öffnen</a></td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        {% for protocol in protocols %}
-                            <tr>
-                                <td data-label="Wohnung">Gebäude {{ protocol.wohnung.gebaeudenummer }}, Wohnung {{ protocol.wohnung.display_number }}</td>
-                                <td data-label="Übergabeart">{% if protocol.protokoll_typ == "move_in" %}Einzug{% else %}Auszug{% endif %}</td>
-                                <td data-label="Beteiligte Person">{{ protocol.person.vorname }} {{ protocol.person.nachname }}</td>
-                                <td data-label="Bearbeitungsstand">{% if protocol.status == "open" %}<span class="uk-label">In Bearbeitung</span>{% elif protocol.status == "signed" %}<span class="uk-label uk-label-success">Bestätigt</span>{% else %}<span class="uk-label uk-label-danger">Gesperrt</span>{% endif %}</td>
-                                <td data-label="Aktion"><a class="uk-button uk-button-default uk-button-small" href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}">Öffnen</a></td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <div class="uk-card uk-card-default uk-card-body handover-card uk-text-center">
-                <p>Noch kein Übergabeprotokoll angelegt.</p>
-                <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_create' %}">Erstes Protokoll anlegen</a>
-            </div>
-        {% endif %}
+                    {% empty %}
+                        <tr><td colspan="5" class="uk-text-muted">
+                            {% if protocol_inventory_exists %}
+                                Keine Übergabeprotokolle für diese Filterauswahl. <a data-table-filter-navigation href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>
+                            {% else %}
+                                Noch kein Übergabeprotokoll angelegt.
+                                <a class="uk-button uk-button-primary uk-button-small uk-margin-small-left" href="{% url 'wohnungsverwaltung:handover_protocol_create' %}">Erstes Protokoll anlegen</a>
+                            {% endif %}
+                        </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </section>
 {% endblock %}

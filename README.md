@@ -13,6 +13,32 @@ STEImmo ist eine serverseitig gerenderte Webanwendung für die Verwaltung und Ve
 
 Studierende können verfügbare Einheiten suchen, filtern, ansehen und sich darauf bewerben. Die Immobiliengesellschaft verwaltet die Einheiten sowie eingehende Anfragen und Bewerbungen.
 
+## Filter in den Verwaltungslisten
+
+Mitarbeiter können Wohnungen nach Verfügbarkeitsstatus und Etage, Stellplätze nach
+Typ und Wohnungszuordnung sowie Prüfvorlagen nach ihren drei festen Merkmalen
+eingrenzen. Auch die Übergabeprotokoll-Liste kann nach Wohnung, Übergabeart,
+beteiligter Person und Bearbeitungsstand gefiltert werden. „Nicht zugeordnet“
+bezeichnet einen Stellplatz ohne Wohnungszuordnung und ist keine zusätzliche
+Vermietbarkeitszusage.
+
+Die beschrifteten Filter im Tabellenkopf öffnen sich per Klick oder Tastatur;
+auf Mobilgeräten stehen sie oberhalb der Liste. Auswahländerungen werden unmittelbar
+ohne vollständiges Neuladen angewendet und mit der URL sowie Browser-Zurück/Vor
+synchronisiert. Die Name-/E-Mail-Suche wird mit kurzer Verzögerung ausgeführt.
+Aktive Filter lassen sich einzeln oder gemeinsam entfernen. Ungültige Angaben werden
+angezeigt und nicht angewendet; andere gültige Filter bleiben wirksam. Leere
+Trefferlisten behalten ihre Filterbedienung.
+
+Bei Bewerbungen gelten die Filter innerhalb der gewählten Wohnung und Ansicht
+(„Passend“, „Einzelfallprüfung“, „Alle Bewerbungen“). Die Personenanzahl sucht nach
+der exakten Haushaltsgröße. Beim Seitenwechsel bleiben Filter erhalten; eine neue
+Auswahl beginnt auf Seite 1. Das Zurücksetzen erhält Wohnung, Ansicht und Sortierung.
+Die Wohnungs-Auswahlliste lässt sich nach Etage und Zimmeranzahl filtern sowie nach
+der Bewerbungsanzahl sortieren. Bei Übergabeprotokollen bleiben gespeicherte Entwürfe
+vom Listenfilter getrennt.
+Filteraufrufe verändern keine Bewerbungsstatus oder Wohnungsanforderungen.
+
 ## Projektstatus
 
 Die [Startseite](http://localhost:8000/) verwendet das gewählte Unternehmensdesign

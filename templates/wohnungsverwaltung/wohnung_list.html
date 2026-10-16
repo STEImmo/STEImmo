@@ -16,20 +16,21 @@
             </a>
         </div>
 
+        {% include "wohnungsverwaltung/_table_filter_summary.html" %}
         <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Verwaltungstabelle">
             <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
                 <thead>
                     <tr>
                         <th>Gebäude</th>
                         <th>Wohnung</th>
-                        <th>Etage</th>
+                        <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.floor only %}</th>
                         <th>Größe</th>
                         <th>Zimmer</th>
-                        <th>Status</th>
+                        <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.status only %}</th>
                         <th><span class="uk-hidden-visually">Aktion</span></th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody data-table-filter-fragment="table-body">
                     {% for wohnung in wohnungen %}
                         <tr>
                             <td data-label="Gebäude">{{ wohnung.gebaeudenummer }}</td>
@@ -49,7 +50,9 @@
                             </td>
                         </tr>
                     {% empty %}
-                        <tr><td colspan="7" class="uk-text-muted">Noch keine Wohnungen angelegt.</td></tr>
+                        <tr><td colspan="7" class="uk-text-muted">
+                            {% if inventory_exists %}Keine Wohnungen für diese Filterauswahl. <a data-table-filter-navigation href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>{% else %}Noch keine Wohnungen angelegt.{% endif %}
+                        </td></tr>
                     {% endfor %}
                 </tbody>
             </table>

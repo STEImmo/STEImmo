@@ -26,85 +26,86 @@
 
             <nav aria-label="Bewerbungsansichten"><ul class="uk-tab">
                 <li class="{% if segment == 'matching' %}uk-active{% endif %}">
-                    <a href="{% querystring segment='matching' page=None %}" {% if segment == 'matching' %}aria-current="page"{% endif %}>Passend</a>
+                    <a data-application-segment="matching" href="{% querystring filter_query segment='matching' page=None %}" {% if segment == 'matching' %}aria-current="page"{% endif %}>Passend</a>
                 </li>
                 <li class="{% if segment == 'review' %}uk-active{% endif %}">
-                    <a href="{% querystring segment='review' page=None %}" {% if segment == 'review' %}aria-current="page"{% endif %}>Einzelfallprüfung</a>
+                    <a data-application-segment="review" href="{% querystring filter_query segment='review' page=None %}" {% if segment == 'review' %}aria-current="page"{% endif %}>Einzelfallprüfung</a>
                 </li>
                 <li class="{% if segment == 'all' %}uk-active{% endif %}">
-                    <a href="{% querystring segment='all' page=None %}" {% if segment == 'all' %}aria-current="page"{% endif %}>Alle Bewerbungen</a>
+                    <a data-application-segment="all" href="{% querystring filter_query segment='all' page=None %}" {% if segment == 'all' %}aria-current="page"{% endif %}>Alle Bewerbungen</a>
                 </li>
             </ul></nav>
 
-            <form method="get" class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
-                <input type="hidden" name="wohnung" value="{{ unit.pk }}">
-                <input type="hidden" name="segment" value="{{ segment }}">
-                <div class="uk-grid-small uk-child-width-1-2@s uk-child-width-1-4@l" uk-grid>
-                    {% for field in filters %}
-                        <div>{% include "wohnungsverwaltung/_form_field.html" with field=field %}</div>
-                    {% endfor %}
-                </div>
-                <div class="application-filter-actions uk-flex uk-flex-wrap uk-flex-middle uk-margin-top">
-                    <button class="uk-button uk-button-primary" type="submit">Filtern</button>
-                    <a class="uk-button uk-button-text" href="?wohnung={{ unit.pk }}&amp;segment={{ segment }}">Filter zurücksetzen</a>
+            <form id="application-search-filter-form" data-table-filter-form method="get" class="management-panel uk-card uk-card-default uk-card-body uk-margin-bottom">
+                {% for name, value in inline_hidden_values %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+                <div class="uk-grid-small uk-child-width-1-2@s" uk-grid>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=filters.q only %}</div>
+                    <div>{% include "wohnungsverwaltung/_form_field.html" with field=filters.sort only %}</div>
                 </div>
             </form>
+            {% include "wohnungsverwaltung/_table_filter_summary.html" with application_filters=True %}
 
-            <p class="uk-text-meta">
+            <p class="uk-text-meta" data-table-filter-fragment="application-count">
                 {{ page_obj.paginator.count }} Bewerbung{{ page_obj.paginator.count|pluralize:"en" }}
                 · {% if filters.cleaned_data.sort == 'priority' %}Priorität zuerst{% else %}Neueste Bewerbungen zuerst{% endif %}
             </p>
-            {% if applications %}
-                <div class="management-table">
+            <div class="management-table">
                 <table class="application-table uk-table uk-table-divider" role="table">
                     <caption class="uk-text-left">Bewerbungen für {{ unit }}</caption>
                     <thead role="rowgroup">
                         <tr role="row">
-                            <th scope="col" role="columnheader">Bewerber</th>
-                            <th scope="col" role="columnheader">Bearbeitung</th>
-                            <th scope="col" role="columnheader">Hauptbewerbungsstatus</th>
-                            <th scope="col" role="columnheader">Besichtigung</th>
-                            <th scope="col" role="columnheader">Anfrage eingegangen</th>
+                            <th scope="col" role="columnheader">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.applicant only %}</th>
+                            <th scope="col" role="columnheader">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.status only %}</th>
+                            <th scope="col" role="columnheader">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.main only %}</th>
+                            <th scope="col" role="columnheader">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.viewing only %}</th>
+                            <th scope="col" role="columnheader">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.created only %}</th>
                         </tr>
                     </thead>
-                    <tbody role="rowgroup">
+                    <tbody role="rowgroup" data-table-filter-fragment="table-body">
                         {% for application in applications %}
                             {% include "wohnungsverwaltung/_employee_application_row.html" %}
+                        {% empty %}
+                            <tr><td colspan="5" class="application-empty-state">
+                                {% if unit_application_count == 0 %}
+                                    Für diese Wohnung liegen noch keine Bewerbungen vor.
+                                {% else %}
+                                    Keine Bewerbungen für die aktuelle Ansicht und Filterauswahl.
+                                    <a data-table-filter-navigation href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>.
+                                    {% if segment != 'all' %}<a href="{% querystring filter_query segment='all' page=None %}">Alle Bewerbungen ansehen</a>.{% endif %}
+                                {% endif %}
+                            </td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
-                </div>
-                {% if page_obj.has_other_pages %}
-                    <nav aria-label="Seiten der Bewerbungen">
-                        <ul class="uk-pagination uk-flex-center uk-flex-middle">
-                            {% if page_obj.has_previous %}
-                                <li><a href="{% querystring page=page_obj.previous_page_number %}">Zurück</a></li>
-                            {% endif %}
-                            <li class="uk-active"><span aria-current="page">Seite {{ page_obj.number }} von {{ page_obj.paginator.num_pages }}</span></li>
-                            {% if page_obj.has_next %}
-                                <li><a href="{% querystring page=page_obj.next_page_number %}">Weiter</a></li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                {% endif %}
-            {% else %}
-                <div class="uk-alert-primary" uk-alert>
-                    {% if segment == 'review' %}
-                        <p>Für diese Wohnung liegen derzeit keine offenen Einzelfallprüfungen vor.</p>
-                    {% elif unit_application_count == 0 %}
-                        <p>Für diese Wohnung liegen noch keine Bewerbungen vor.</p>
-                    {% else %}
-                        <p>Für diese Auswahl liegen keine Bewerbungen vor.</p>
-                    {% endif %}
-                </div>
+            </div>
+            <div data-table-filter-fragment="pagination">
+            {% if page_obj.has_other_pages %}
+                <nav aria-label="Seiten der Bewerbungen">
+                    <ul class="uk-pagination uk-flex-center uk-flex-middle">
+                        {% if page_obj.has_previous %}
+                            <li><a href="{% querystring filter_query page=page_obj.previous_page_number %}">Zurück</a></li>
+                        {% endif %}
+                        <li class="uk-active"><span aria-current="page">Seite {{ page_obj.number }} von {{ page_obj.paginator.num_pages }}</span></li>
+                        {% if page_obj.has_next %}
+                            <li><a href="{% querystring filter_query page=page_obj.next_page_number %}">Weiter</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
             {% endif %}
+            </div>
+
         {% else %}
             <h1 class="uk-heading-small">Bewerbungen je Wohnung</h1>
             <p>Wählen Sie eine Wohnung, um ihre Bewerbungen anzusehen.</p>
+            {% include "wohnungsverwaltung/_table_filter_summary.html" %}
             <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Wohnungen und Bewerbungen">
                 <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
-                    <thead><tr><th scope="col">Wohnung</th><th scope="col">Bewerbungen</th><th scope="col">Aktion</th></tr></thead>
-                    <tbody>
+                    <thead><tr>
+                        <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.apartment only %}</th>
+                        <th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.application_count only %}</th>
+                        <th scope="col">Aktion</th>
+                    </tr></thead>
+                    <tbody data-table-filter-fragment="table-body">
                 {% for unit in units %}
                     <tr>
                         <th scope="row" data-label="Wohnung">
@@ -120,7 +121,13 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="3">Es sind noch keine Wohnungen angelegt.</td></tr>
+                    <tr><td colspan="3" class="uk-text-muted">
+                        {% if inventory_exists %}
+                            Keine Wohnungen für diese Filterauswahl. <a data-table-filter-navigation href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>
+                        {% else %}
+                            Es sind noch keine Wohnungen angelegt.
+                        {% endif %}
+                    </td></tr>
                 {% endfor %}
                     </tbody>
                 </table>

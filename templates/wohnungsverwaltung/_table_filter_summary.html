@@ -1,0 +1,27 @@
+{% load static %}
+<div data-table-filter-fragment="filter-summary" aria-live="polite">
+{% if filters.errors %}
+    <div class="uk-alert-danger" role="alert">
+        <p>Filter enthalten ungültige Angaben. Bitte korrigieren Sie die markierten Felder. Andere gültige Filter bleiben wirksam.</p>
+        <ul>
+            {% for field in filters %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+            {% for error in filters.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+    </div>
+{% endif %}
+{% if active_filters %}
+<div class="table-filter-summary uk-margin-bottom" aria-label="Aktive Filter">
+    {% for filter in active_filters %}
+        <a class="uk-button uk-button-default uk-button-small" data-remove-filter="{{ filter.name }}" data-table-filter-navigation href="{{ filter.remove_url }}" aria-label="{{ filter.label }}: {{ filter.value }} – Filter entfernen">{{ filter.label }}: {{ filter.value }} <span aria-hidden="true">×</span></a>
+    {% endfor %}
+    <a class="uk-button uk-button-text" data-table-filter-navigation href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>
+</div>
+{% endif %}
+</div>
+<div class="table-filters-mobile{% if application_filters %} table-filters-applications{% endif %} uk-margin-bottom" aria-label="Tabellenfilter">
+    {% for name, group in filter_groups.items %}
+        {% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=group placement='mobile' only %}
+    {% endfor %}
+</div>
+
+<script src="{% static 'js/table-filters.js' %}?v=4" defer></script>

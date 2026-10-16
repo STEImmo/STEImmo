@@ -61,6 +61,7 @@ from .models import (
     RegistrationVerification,
     Schluessel,
     Stellplatz,
+    StellplatzTyp,
     StellplatzZuordnung,
     UebergabeStatus,
     ViewingAppointment,
@@ -1854,6 +1855,18 @@ class UIkitFormMixin:
                 widget.attrs.setdefault("class", "uk-input")
 
 
+class UIkitCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
+    def __init__(self, *args, **kwargs):
+        attrs = kwargs.pop("attrs", None) or {}
+        attrs = {**attrs, "class": "table-filter-checkbox-group"}
+        super().__init__(*args, attrs=attrs, **kwargs)
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        option["attrs"]["class"] = "uk-checkbox"
+        return option
+
+
 class WohnungForm(UIkitFormMixin, forms.ModelForm):
     status = forms.ChoiceField(
         choices=(
@@ -1961,6 +1974,136 @@ class WohnungForm(UIkitFormMixin, forms.ModelForm):
         ):
             self.add_error("pet_review_reason", "Bitte begründen Sie die Tierhaltungsregel.")
         return cleaned_data
+
+
+class ApartmentManagementFilterForm(UIkitFormMixin, forms.Form):
+    status = forms.ChoiceField(
+        required=False,
+        label="Verfügbarkeitsstatus",
+        choices=(
+            ("", "Alle Status"),
+            (WohnungStatus.FREE, "Verfügbar"),
+            (WohnungStatus.TAKEN, "Vermietet"),
+            (WohnungStatus.BLOCKED, "Gesperrt"),
+        ),
+    )
+    floor = forms.MultipleChoiceField(
+        required=False,
+        label="Etage",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+
+    def __init__(self, *args, floors=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["floor"].choices = [
+            (str(floor), "Erdgeschoss (0)" if floor == 0 else f"Etage {floor}") for floor in floors
+        ]
+
+
+class EmployeeApplicationUnitFilterForm(UIkitFormMixin, forms.Form):
+    floor = forms.MultipleChoiceField(
+        required=False,
+        label="Etage",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+    rooms = forms.MultipleChoiceField(
+        required=False,
+        label="Zimmeranzahl",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+    application_sort = forms.ChoiceField(
+        required=False,
+        label="Bewerbungsanzahl sortieren",
+        choices=(
+            ("", "Wohnungsnummer (Standard)"),
+            ("asc", "Aufsteigend"),
+            ("desc", "Absteigend"),
+        ),
+    )
+
+    def __init__(self, *args, floors=(), room_counts=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["floor"].choices = [
+            (str(floor), "Erdgeschoss (0)" if floor == 0 else f"Etage {floor}") for floor in floors
+        ]
+        self.fields["rooms"].choices = [
+            (
+                str(room_count),
+                f"{str(room_count).rstrip('0').rstrip('.').replace('.', ',')} Zimmer",
+            )
+            for room_count in room_counts
+        ]
+
+
+class ParkingManagementFilterForm(UIkitFormMixin, forms.Form):
+    assignment = forms.ChoiceField(
+        required=False,
+        label="Zuordnung",
+        choices=(
+            ("", "Alle Zuordnungen"),
+            ("unassigned", "Nicht zugeordnet"),
+            ("assigned", "Zugeordnet"),
+        ),
+    )
+    type = forms.ChoiceField(
+        required=False,
+        label="Stellplatztyp",
+        choices=(("", "Alle Stellplatztypen"), *StellplatzTyp.choices),
+    )
+
+
+class MerkmalManagementFilterForm(UIkitFormMixin, forms.Form):
+    bereich = forms.MultipleChoiceField(
+        required=False,
+        label="Wo wird geprüft?",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+    bezeichnung = forms.MultipleChoiceField(
+        required=False,
+        label="Was wird geprüft?",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+    datentyp = forms.MultipleChoiceField(
+        required=False,
+        label="Vorgegebene Bewertung",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+
+    def __init__(self, *args, bereiche=(), bezeichnungen=(), datentypen=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["bereich"].choices = [(value, value) for value in bereiche]
+        self.fields["bezeichnung"].choices = [(value, value) for value in bezeichnungen]
+        self.fields["datentyp"].choices = [(value, value) for value in datentypen]
+
+
+class HandoverProtocolFilterForm(UIkitFormMixin, forms.Form):
+    wohnung = forms.MultipleChoiceField(
+        required=False,
+        label="Wohnung",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+    protokoll_typ = forms.MultipleChoiceField(
+        required=False,
+        label="Übergabeart",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+    q = forms.CharField(
+        required=False,
+        strip=True,
+        label="Beteiligte Person",
+        widget=forms.TextInput(attrs={"placeholder": "Name oder E-Mail"}),
+    )
+    status = forms.MultipleChoiceField(
+        required=False,
+        label="Bearbeitungsstand",
+        widget=UIkitCheckboxSelectMultiple(),
+    )
+
+    def __init__(self, *args, wohnungen=(), typen=(), statuswerte=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["wohnung"].choices = wohnungen
+        self.fields["protokoll_typ"].choices = typen
+        self.fields["status"].choices = statuswerte
 
 
 class EmployeeApplicationFilterForm(UIkitFormMixin, forms.Form):

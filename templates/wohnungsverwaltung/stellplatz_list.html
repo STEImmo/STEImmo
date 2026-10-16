@@ -16,10 +16,11 @@
             </a>
         </div>
 
+        {% include "wohnungsverwaltung/_table_filter_summary.html" %}
         <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Verwaltungstabelle">
             <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
-                <thead><tr><th>Name</th><th>Typ</th><th>Wohnung</th><th>Miete</th><th><span class="uk-hidden-visually">Aktion</span></th></tr></thead>
-                <tbody>
+                <thead><tr><th>Name</th><th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.type only %}</th><th scope="col">{% include "wohnungsverwaltung/_table_filter_dropdown.html" with group=filter_groups.assignment only %}</th><th>Miete</th><th><span class="uk-hidden-visually">Aktion</span></th></tr></thead>
+                <tbody data-table-filter-fragment="table-body">
                     {% for stellplatz in stellplaetze %}
                         <tr>
                             <td data-label="Name">{{ stellplatz.name }}</td>
@@ -39,7 +40,9 @@
                             </td>
                         </tr>
                     {% empty %}
-                        <tr><td colspan="5" class="uk-text-muted">Noch keine Stellplätze angelegt.</td></tr>
+                        <tr><td colspan="5" class="uk-text-muted">
+                            {% if inventory_exists %}Keine Stellplätze für diese Filterauswahl. <a data-table-filter-navigation href="{{ reset_filters_url }}">Alle Filter zurücksetzen</a>{% else %}Noch keine Stellplätze angelegt.{% endif %}
+                        </td></tr>
                     {% endfor %}
                 </tbody>
             </table>

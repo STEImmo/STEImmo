@@ -1,6 +1,8 @@
 import json
 import logging
 from collections import Counter
+from copy import copy
+from urllib.parse import urlencode
 from uuid import UUID
 
 from django.conf import settings
@@ -32,6 +34,7 @@ from django.http import (
     HttpResponse,
     HttpResponseNotAllowed,
     JsonResponse,
+    QueryDict,
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -59,6 +62,7 @@ from .forms import (
     HANDOVER_STATUS_LABELS,
     HANDOVER_TYPE_LABELS,
     METER_READING_FIELDS,
+    ApartmentManagementFilterForm,
     ApartmentPhotoForm,
     ApartmentSearchForm,
     ApplicationPriorityForm,
@@ -66,14 +70,18 @@ from .forms import (
     BewerbungForm,
     EligibilityApprovalForm,
     EmployeeApplicationFilterForm,
+    EmployeeApplicationUnitFilterForm,
     HandoverKeyForm,
     HandoverKeyFormSet,
+    HandoverProtocolFilterForm,
     HandoverProtocolForm,
     InlineRoomChecklistFormSet,
     MainApplicationForm,
     MainApplicationInvitationForm,
     MerkmalForm,
+    MerkmalManagementFilterForm,
     MerkmalOptionFormSet,
+    ParkingManagementFilterForm,
     RaumForm,
     RoomChecklistItemForm,
     RoomChecklistPhotoUploadForm,
@@ -847,6 +855,87 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
     )
 
 
+def _table_filter_context(form, groups, *, persistent=None, inline_fields=()):
+    """Share GET form state and presentation across management tables."""
+    persistent = {key: str(value) for key, value in (persistent or {}).items() if value != ""}
+    values = {}
+    for field in form:
+        value = field.value()
+        if isinstance(value, (list, tuple)):
+            value = [str(item) for item in value if item not in (None, "")]
+        elif value not in (None, ""):
+            value = str(value)
+        if value not in (None, "", []):
+            values[field.name] = value
+    params = persistent | values
+
+    def query_url(parameters):
+        return "?" + urlencode(parameters, doseq=True) if parameters else "?"
+
+    def hidden_pairs(parameters):
+        pairs = []
+        for name, value in parameters.items():
+            if isinstance(value, (list, tuple)):
+                pairs.extend((name, item) for item in value)
+            else:
+                pairs.append((name, value))
+        return pairs
+
+    active_filters = []
+    for field in form:
+        if field.name not in values or field.name == "sort":
+            continue
+        value = values[field.name]
+        choices = {str(key): label for key, label in getattr(field.field, "choices", ())}
+        if isinstance(value, list):
+            display = ", ".join(str(choices.get(item, item)) for item in value)
+        else:
+            display = choices.get(value, value)
+        if field.errors:
+            raw_value = ", ".join(value) if isinstance(value, list) else value
+            display = f"{raw_value} (ungültig)"
+        active_filters.append(
+            {
+                "name": field.name,
+                "label": field.label,
+                "value": display,
+                "remove_url": query_url(
+                    {key: val for key, val in params.items() if key != field.name}
+                ),
+            }
+        )
+
+    filter_groups = {}
+    for name, label, field_names in groups:
+        group = {
+            "name": name,
+            "label": label,
+            "hidden_values": hidden_pairs(
+                {key: val for key, val in params.items() if key not in field_names}
+            ),
+        }
+        for placement in ("desktop", "mobile"):
+            # BoundField caches refer to their parent form, so each placement gets
+            # its own cache and IDs while sharing the validated fields and errors.
+            placed_form = copy(form)
+            placed_form.auto_id = f"{placement}_filter_%s"
+            placed_form._bound_fields_cache = {}
+            group[placement + "_fields"] = [placed_form[field] for field in field_names]
+        filter_groups[name] = group
+    filter_query = QueryDict(mutable=True)
+    for name, value in params.items():
+        filter_query.setlist(name, value if isinstance(value, (list, tuple)) else [value])
+    return {
+        "filter_groups": filter_groups,
+        "active_filters": active_filters,
+        "reset_filters_url": query_url(persistent),
+        "filter_query": filter_query,
+        "inline_hidden_values": hidden_pairs(
+            {key: val for key, val in params.items() if key not in inline_fields}
+        ),
+    }
+
+
 @never_cache
 @employee_required
 def employee_application_list(request: HttpRequest) -> HttpResponse:
@@ -985,6 +1074,24 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
 
         page = Paginator(applications, 20).get_page(request.GET.get("page"))
         context.update(
+            _table_filter_context(
+                filters,
+                (
+                    ("applicant", "Bewerber", ("people", "priority")),
+                    ("status", "Bearbeitung", ("status",)),
+                    ("main", "Hauptbewerbungsstatus", ("main_status",)),
+                    ("viewing", "Besichtigung", ("viewing_status",)),
+                    ("created", "Anfrage eingegangen", ("created_from", "created_to")),
+                ),
+                persistent={
+                    "wohnung": unit.pk,
+                    "segment": segment if "segment" in request.GET else "",
+                    "sort": cleaned_filters.get("sort", ""),
+                },
+                inline_fields=("q", "sort"),
+            )
+        )
+        context.update(
             unit=unit,
             applications=page,
             page_obj=page,
@@ -994,9 +1101,43 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
             unit_application_count=Bewerbung.objects.filter(wohnung=unit).count(),
         )
     else:
-        context["units"] = Wohnung.objects.annotate(
-            application_count=Count("bewerbungen")
-        ).order_by("gebaeudenummer", "wohnungsnummer", "pk")
+        filters = EmployeeApplicationUnitFilterForm(
+            request.GET,
+            floors=Wohnung.objects.order_by("etage").values_list("etage", flat=True).distinct(),
+            room_counts=Wohnung.objects.order_by("zimmeranzahl")
+            .values_list("zimmeranzahl", flat=True)
+            .distinct(),
+        )
+        filters.is_valid()
+        cleaned_filters = filters.cleaned_data
+        units = Wohnung.objects.annotate(application_count=Count("bewerbungen"))
+        if cleaned_filters.get("floor"):
+            units = units.filter(etage__in=cleaned_filters["floor"])
+        if cleaned_filters.get("rooms"):
+            units = units.filter(zimmeranzahl__in=cleaned_filters["rooms"])
+
+        default_order = ("gebaeudenummer", "wohnungsnummer", "pk")
+        if cleaned_filters.get("application_sort") == "asc":
+            units = units.order_by("application_count", *default_order)
+        elif cleaned_filters.get("application_sort") == "desc":
+            units = units.order_by("-application_count", *default_order)
+        else:
+            units = units.order_by(*default_order)
+
+        context.update(
+            _table_filter_context(
+                filters,
+                (
+                    ("apartment", "Wohnung", ("floor", "rooms")),
+                    ("application_count", "Bewerbungen", ("application_sort",)),
+                ),
+            )
+        )
+        context.update(
+            units=units,
+            filters=filters,
+            inventory_exists=Wohnung.objects.exists(),
+        )
 
     return render(
         request,
@@ -1906,12 +2047,63 @@ def handover_protocol_draft_delete(request: HttpRequest, draft_id) -> JsonRespon
 
 @employee_required
 def handover_protocol_list(request: HttpRequest) -> HttpResponse:
-    protocols = Protokoll.objects.select_related("wohnung", "person").order_by("-updated_at")
-    return render(
-        request,
-        "wohnungsverwaltung/handover_protocol_list.html",
-        {"protocols": protocols, "draft_entries": _draft_overview_entries(request)},
+    protocols = Protokoll.objects.select_related("wohnung", "person")
+    apartment_choices = [
+        (
+            str(apartment.pk),
+            f"Gebäude {apartment.gebaeudenummer}, Wohnung {apartment.display_number}",
+        )
+        for apartment in Wohnung.objects.filter(protokolle__isnull=False)
+        .distinct()
+        .order_by("gebaeudenummer", "wohnungsnummer")
+    ]
+    type_choices = [
+        (value, HANDOVER_TYPE_LABELS.get(value, str(value)))
+        for value in Protokoll.objects.order_by("protokoll_typ")
+        .values_list("protokoll_typ", flat=True)
+        .distinct()
+    ]
+    status_choices = [
+        (value, PROTOCOL_STATUS_LABELS.get(value, str(value)))
+        for value in Protokoll.objects.order_by("status")
+        .values_list("status", flat=True)
+        .distinct()
+    ]
+    filters = HandoverProtocolFilterForm(
+        request.GET,
+        wohnungen=apartment_choices,
+        typen=type_choices,
+        statuswerte=status_choices,
     )
+    filters.is_valid()
+    if filters.cleaned_data.get("wohnung"):
+        protocols = protocols.filter(wohnung_id__in=filters.cleaned_data["wohnung"])
+    if filters.cleaned_data.get("protokoll_typ"):
+        protocols = protocols.filter(protokoll_typ__in=filters.cleaned_data["protokoll_typ"])
+    if filters.cleaned_data.get("status"):
+        protocols = protocols.filter(status__in=filters.cleaned_data["status"])
+    if filters.cleaned_data.get("q"):
+        query = filters.cleaned_data["q"]
+        protocols = protocols.alias(
+            participant_name=Concat("person__vorname", Value(" "), "person__nachname")
+        ).filter(Q(participant_name__icontains=query) | Q(person__email__icontains=query))
+    protocols = protocols.order_by("-updated_at")
+    context = _table_filter_context(
+        filters,
+        (
+            ("apartment", "Wohnung", ("wohnung",)),
+            ("type", "Übergabeart", ("protokoll_typ",)),
+            ("person", "Beteiligte Person", ("q",)),
+            ("status", "Bearbeitungsstand", ("status",)),
+        ),
+    )
+    context.update(
+        protocols=protocols,
+        draft_entries=_draft_overview_entries(request),
+        filters=filters,
+        protocol_inventory_exists=Protokoll.objects.exists(),
+    )
+    return render(request, "wohnungsverwaltung/handover_protocol_list.html", context)
 
 
 @employee_required
@@ -2757,8 +2949,25 @@ def _room_form_groups(room_formset, removed_rooms=()) -> list[dict[str, object]]
 
 @employee_required
 def wohnung_list(request: HttpRequest) -> HttpResponse:
-    wohnungen = Wohnung.objects.order_by("etage", "wohnungsnummer")
-    return render(request, "wohnungsverwaltung/wohnung_list.html", {"wohnungen": wohnungen})
+    wohnungen = Wohnung.objects.order_by("etage", "wohnungsnummer", "pk")
+    filters = ApartmentManagementFilterForm(
+        request.GET,
+        floors=Wohnung.objects.order_by("etage").values_list("etage", flat=True).distinct(),
+    )
+    filters.is_valid()
+    if filters.cleaned_data.get("status"):
+        wohnungen = wohnungen.filter(status=filters.cleaned_data["status"])
+    if filters.cleaned_data.get("floor"):
+        wohnungen = wohnungen.filter(etage__in=filters.cleaned_data["floor"])
+    context = _table_filter_context(
+        filters,
+        (
+            ("floor", "Etage", ("floor",)),
+            ("status", "Status", ("status",)),
+        ),
+    )
+    context.update(wohnungen=wohnungen, filters=filters, inventory_exists=Wohnung.objects.exists())
+    return render(request, "wohnungsverwaltung/wohnung_list.html", context)
 
 
 @employee_required
@@ -2878,7 +3087,33 @@ def raum_delete(request: HttpRequest, wohnung_id, raum_id) -> HttpResponse:
 @employee_required
 def merkmal_list(request: HttpRequest) -> HttpResponse:
     merkmale = Merkmal.objects.order_by("bereich", "bezeichnung")
-    return render(request, "wohnungsverwaltung/merkmal_list.html", {"merkmale": merkmale})
+    filters = MerkmalManagementFilterForm(
+        request.GET,
+        bereiche=Merkmal.objects.order_by("bereich").values_list("bereich", flat=True).distinct(),
+        bezeichnungen=Merkmal.objects.order_by("bezeichnung")
+        .values_list("bezeichnung", flat=True)
+        .distinct(),
+        datentypen=Merkmal.objects.order_by("datentyp")
+        .values_list("datentyp", flat=True)
+        .distinct(),
+    )
+    filters.is_valid()
+    if filters.cleaned_data.get("bereich"):
+        merkmale = merkmale.filter(bereich__in=filters.cleaned_data["bereich"])
+    if filters.cleaned_data.get("bezeichnung"):
+        merkmale = merkmale.filter(bezeichnung__in=filters.cleaned_data["bezeichnung"])
+    if filters.cleaned_data.get("datentyp"):
+        merkmale = merkmale.filter(datentyp__in=filters.cleaned_data["datentyp"])
+    context = _table_filter_context(
+        filters,
+        (
+            ("area", "Wo wird geprüft?", ("bereich",)),
+            ("feature", "Was wird geprüft?", ("bezeichnung",)),
+            ("rating", "Vorgegebene Bewertung", ("datentyp",)),
+        ),
+    )
+    context.update(merkmale=merkmale, filters=filters, inventory_exists=Merkmal.objects.exists())
+    return render(request, "wohnungsverwaltung/merkmal_list.html", context)
 
 
 @employee_required
@@ -2924,12 +3159,28 @@ def _merkmal_form(request: HttpRequest, merkmal: Merkmal, title: str) -> HttpRes
 
 @employee_required
 def stellplatz_list(request: HttpRequest) -> HttpResponse:
-    stellplaetze = Stellplatz.objects.order_by("name").prefetch_related("zuordnungen__wohnung")
-    return render(
-        request,
-        "wohnungsverwaltung/stellplatz_list.html",
-        {"stellplaetze": stellplaetze},
+    stellplaetze = Stellplatz.objects.order_by("name", "pk").prefetch_related(
+        "zuordnungen__wohnung"
     )
+    filters = ParkingManagementFilterForm(request.GET)
+    filters.is_valid()
+    if filters.cleaned_data.get("type"):
+        stellplaetze = stellplaetze.filter(stellplatz_typ=filters.cleaned_data["type"])
+    if filters.cleaned_data.get("assignment"):
+        stellplaetze = stellplaetze.filter(
+            zuordnungen__isnull=filters.cleaned_data["assignment"] == "unassigned"
+        )
+    context = _table_filter_context(
+        filters,
+        (
+            ("type", "Typ", ("type",)),
+            ("assignment", "Zuordnung", ("assignment",)),
+        ),
+    )
+    context.update(
+        stellplaetze=stellplaetze, filters=filters, inventory_exists=Stellplatz.objects.exists()
+    )
+    return render(request, "wohnungsverwaltung/stellplatz_list.html", context)
 
 
 @employee_required
