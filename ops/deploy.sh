@@ -18,6 +18,9 @@ for tool in docker curl flock realpath; do command -v "$tool" >/dev/null || fail
 env_file="$root/shared/.env"
 [[ -f $env_file && ! -L $env_file ]] || fail 'Produktive shared/.env fehlt.'
 [[ $(stat -c %a "$env_file") == 600 ]] || fail 'shared/.env benötigt Modus 0600.'
+public="$root/public"
+[[ -d $public/releases ]] || fail 'public/releases fehlt; Bootstrap erneut ausführen.'
+[[ ! -e $public/current || -L $public/current ]] || fail 'public/current muss ein Symlink sein.'
 exec 9>"$root/deploy.lock"
 flock -n 9 || fail 'Ein Deployment läuft bereits.'
 [[ $(df -Pk "$root" | awk 'NR == 2 { print $4 }') -gt 1048576 ]] || fail 'Weniger als 1 GiB frei.'
@@ -31,6 +34,7 @@ if [[ -e $root/current || -L $root/current ]]; then
     [[ -L $root/current ]] || fail 'current muss ein symbolischer Link sein.'
     previous=$(realpath -e -- "$root/current")
     [[ $previous == "$root/releases/"* && -f $previous/success ]] || fail 'Ungültiger Vorgänger.'
+    [[ -d $public/releases/${previous##*/} ]] || fail 'Öffentliche Assets des Vorgängers fehlen; Bootstrap erneut ausführen.'
 fi
 mkdir -p "$root/releases" "$root/backups"
 chmod 755 "$root" "$root/releases"
@@ -58,6 +62,8 @@ success=0
 switch_current() {
     ln -s -- "$1" "$root/.current-$release_id"
     mv -Tf -- "$root/.current-$release_id" "$root/current"
+    ln -s -- "releases/${1##*/}" "$public/.current-$release_id"
+    mv -Tf -- "$public/.current-$release_id" "$public/current"
 }
 
 on_exit() {
@@ -71,6 +77,9 @@ on_exit() {
                 switch_current "$previous"
             elif [[ -L $root/current && $(readlink "$root/current") == "$release" ]]; then
                 unlink "$root/current"
+            fi
+            if [[ -z $previous && -L $public/current && $(readlink "$public/current") == "releases/$release_id" ]]; then
+                unlink "$public/current"
             fi
         fi
         if (( stopped == 1 )); then
@@ -129,18 +138,19 @@ migration_started=1
 compose run --rm --no-deps -T web python manage.py migrate --noinput
 
 phase=static
-mkdir -- "$release/static"
-chmod 755 "$release/static"
+static="$public/releases/$release_id"
+mkdir -- "$static"
+chmod 755 "$static"
 docker run --rm --user 0:0 --entrypoint sh \
-    --mount "type=bind,src=$release/static,dst=/out" "$image" \
+    --mount "type=bind,src=$static,dst=/out" "$image" \
     -ec 'chown 10001:10001 /out; chmod 755 /out'
-compose run --rm --no-deps -T --volume "$release/static:/app/staticfiles" \
+compose run --rm --no-deps -T --volume "$static:/app/staticfiles" \
     web python manage.py collectstatic --noinput
 
 phase=start
 compose up --detach --no-build --no-deps --wait --wait-timeout 120 web
-switch_current "$release"
 switched=1
+switch_current "$release"
 
 phase=https
 public_url=https://steimmo-projekt-page.justus.software

@@ -21,7 +21,7 @@ services:
     volumes:
       - media_data:/app/media
     ports:
-      - "127.0.0.1:8010:8000"
+      - "${STEIMMO_BIND_IP:-127.0.0.1}:8010:8000"
     depends_on:
       postgres:
         condition: service_healthy

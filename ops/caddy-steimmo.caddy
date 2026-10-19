@@ -2,7 +2,7 @@ steimmo-projekt-page.justus.software {
 	encode zstd gzip
 
 	handle_path /static/* {
-		root * /srv/steimmo/current/static
+		root * /srv/steimmo/public/current
 		file_server
 	}
 
@@ -11,6 +11,6 @@ steimmo-projekt-page.justus.software {
 	}
 
 	handle {
-		reverse_proxy 127.0.0.1:8010
+		reverse_proxy 172.17.0.1:8010
 	}
 }
