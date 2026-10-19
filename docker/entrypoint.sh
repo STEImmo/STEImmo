@@ -1,8 +1,10 @@
 #!/bin/sh
 set -eu
 
-python manage.py migrate --noinput
-python manage.py collectstatic --noinput
+if [ "${DJANGO_BOOTSTRAP_ON_START:-0}" = "1" ]; then
+    python manage.py migrate --noinput
+    python manage.py collectstatic --noinput
+fi
 
 if [ "${DJANGO_CREATE_DEVELOPMENT_EMPLOYEE:-0}" = "1" ]; then
     : "${DJANGO_DEVELOPMENT_EMPLOYEE_EMAIL:?DJANGO_DEVELOPMENT_EMPLOYEE_EMAIL fehlt}"
