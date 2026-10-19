@@ -6,7 +6,7 @@ import os
 from django.core.exceptions import ImproperlyConfigured
 
 from .settings import *  # noqa: F403
-from .settings import DATABASES, env_bool, env_list
+from .settings import DATABASES, env_bool, env_list, validate_secret_key
 
 
 def required(name: str) -> str:
@@ -22,9 +22,7 @@ if env_bool("DJANGO_BOOTSTRAP_ON_START"):
     raise ImproperlyConfigured("Produktionsmigrationen müssen als Release-Schritt laufen.")
 
 DEBUG = False
-SECRET_KEY = required("DJANGO_SECRET_KEY")
-if len(SECRET_KEY) < 50 or len(set(SECRET_KEY)) < 5 or SECRET_KEY.startswith("django-insecure-"):
-    raise ImproperlyConfigured("DJANGO_SECRET_KEY muss ein unabhängiges starkes Geheimnis sein.")
+SECRET_KEY = validate_secret_key(required("DJANGO_SECRET_KEY"))
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
 if not ALLOWED_HOSTS or any("*" in host for host in ALLOWED_HOSTS):
