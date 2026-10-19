@@ -425,7 +425,7 @@ docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.d
 
 Die persistenten Docker-Volumes für PostgreSQL und hochgeladene Dateien bleiben dabei erhalten.
 
-`compose.dev.yaml` aktiviert den Django-Entwicklungsserver und bindet den lokalen Quellcode in den Container ein. Änderungen am Python-, Template- oder Static-Code sind dadurch direkt aus IntelliJ/PyCharm möglich. Ohne den Development-Override startet `compose.yaml` die Anwendung mit Gunicorn und ist für den späteren Serverbetrieb vorgesehen.
+`compose.dev.yaml` aktiviert den Django-Entwicklungsserver und bindet den lokalen Quellcode in den Container ein. Änderungen am Python-, Template- oder Static-Code sind dadurch direkt aus IntelliJ/PyCharm möglich. Ohne den Development-Override startet `compose.yaml` Gunicorn für lokale Prüfungen. Beide lokalen Varianten verwenden das Development-Image. Der Serverbetrieb verwendet ausschließlich `compose.prod.yaml` mit dem geprüften GHCR-Image; siehe [ADR-0018](docs/decisions/0018-ghcr-server-deployment.md).
 
 ## Foundation-Struktur
 
@@ -449,6 +449,11 @@ docker/                 Compose, Umgebungsvariablen und EntryPoint
 - Einzelne Issue-Inhalte werden nicht vollständig in der README dupliziert.
 
 ## Portierbarkeit
+
+Die GitHub-Actions-Pipeline veröffentlicht ARM64-Images in GHCR und deployt
+sie auf den Ubuntu-Server hinter Caddy. Voraussetzungen, Servereinrichtung,
+GitHub-Secrets und der Releaseablauf stehen in
+[ADR-0018](docs/decisions/0018-ghcr-server-deployment.md).
 
 Die Anwendung bleibt durch Docker Compose, PostgreSQL, Umgebungsvariablen und persistente Volumes auf andere Server portierbar. 
 

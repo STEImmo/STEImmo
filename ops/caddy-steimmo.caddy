@@ -1,0 +1,16 @@
+steimmo-projekt-page.justus.software {
+	encode zstd gzip
+
+	handle_path /static/* {
+		root * /srv/steimmo/current/static
+		file_server
+	}
+
+	handle /media/* {
+		respond 404
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:8010
+	}
+}
