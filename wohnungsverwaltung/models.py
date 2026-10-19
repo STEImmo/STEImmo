@@ -224,8 +224,12 @@ class RegistrationVerification(models.Model):
         db_table = "registration_verification"
 
     def issue_code(self) -> str:
-        code = f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
-        while self.code_hash and check_password(code, self.code_hash):
+        code = (
+            "000000"
+            if settings.DEMO_MODE
+            else f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
+        )
+        while not settings.DEMO_MODE and self.code_hash and check_password(code, self.code_hash):
             code = f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
         now = timezone.now()
         self.code_hash = make_password(code)
@@ -263,8 +267,12 @@ class EmployeeLoginVerification(models.Model):
         db_table = "employee_login_verification"
 
     def issue_code(self) -> str:
-        code = f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
-        while self.code_hash and check_password(code, self.code_hash):
+        code = (
+            "000000"
+            if settings.DEMO_MODE
+            else f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
+        )
+        while not settings.DEMO_MODE and self.code_hash and check_password(code, self.code_hash):
             code = f"{secrets.randbelow(10**self.CODE_LENGTH):0{self.CODE_LENGTH}d}"
         self.code_hash = make_password(code)
         self.expires_at = timezone.now() + self.CODE_VALIDITY

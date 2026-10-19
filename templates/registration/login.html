@@ -3,6 +3,12 @@
 {% block auth_heading %}Willkommen zurück.{% endblock %}
 {% block auth_intro %}Melden Sie sich an, um Ihre Bewerbungen und freigeschalteten Unterlagen aufzurufen.{% endblock %}
 {% block auth_content %}
+{% if demo_mode %}
+<div class="uk-alert-primary">
+    <p>Bewerber: <code>user</code> / <code>user</code><br>
+    Verwaltung: <code>verwaltung</code> / <code>verwaltung</code></p>
+</div>
+{% endif %}
 <form method="post" class="uk-form-stacked">
     {% csrf_token %}
     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}

@@ -72,6 +72,9 @@ jobs:
       - name: Produktionscontainer und Persistenz prüfen
         run: bash ops/smoke.sh steimmo-ci
 
+      - name: Demo ohne SMTP und beide Testkonten prüfen
+        run: bash ops/smoke.sh steimmo-ci demo
+
       - name: Migrationen prüfen
         run: python manage.py makemigrations --check --dry-run
 

@@ -3,11 +3,13 @@ set -Eeuo pipefail
 umask 077
 
 fail() { printf '%s\n' "$*" >&2; exit 1; }
-[[ $# == 4 ]] || fail 'Aufruf: deploy.sh PROJEKTPFAD RELEASE IMAGE_DIGEST COMMIT'
+[[ $# == 4 || $# == 5 ]] || fail 'Aufruf: deploy.sh PROJEKTPFAD RELEASE IMAGE_DIGEST COMMIT [production|demo]'
 root=$(realpath -e -- "$1")
 release_id=$2
 image=$3
 commit=$4
+mode=${5:-production}
+[[ $mode == production || $mode == demo ]] || fail 'Unbekannter Deployment-Modus.'
 [[ $root =~ ^/[a-zA-Z0-9/_-]+$ && $root != / ]] || fail 'Ungültiger Projektpfad.'
 [[ $commit =~ ^[a-f0-9]{40}$ ]] || fail 'Ungültiger Commit.'
 [[ $release_id =~ ^${commit}-[0-9]+-[0-9]+$ ]] || fail 'Ungültige Release-ID.'
@@ -16,7 +18,7 @@ commit=$4
 for tool in docker curl flock realpath; do command -v "$tool" >/dev/null || fail "$tool fehlt."; done
 
 env_file="$root/shared/.env"
-[[ -f $env_file && ! -L $env_file ]] || fail 'Produktive shared/.env fehlt.'
+[[ -f $env_file && ! -L $env_file ]] || fail 'Private shared/.env für das Deployment fehlt.'
 [[ $(stat -c %a "$env_file") == 600 ]] || fail 'shared/.env benötigt Modus 0600.'
 public="$root/public"
 [[ -d $public/releases ]] || fail 'public/releases fehlt; Bootstrap erneut ausführen.'
@@ -35,6 +37,9 @@ if [[ -e $root/current || -L $root/current ]]; then
     previous=$(realpath -e -- "$root/current")
     [[ $previous == "$root/releases/"* && -f $previous/success ]] || fail 'Ungültiger Vorgänger.'
     [[ -d $public/releases/${previous##*/} ]] || fail 'Öffentliche Assets des Vorgängers fehlen; Bootstrap erneut ausführen.'
+    previous_mode=production
+    if [[ -f $previous/mode.txt ]]; then read -r previous_mode < "$previous/mode.txt"; fi
+    [[ $previous_mode == "$mode" ]] || fail 'Demo und Produktion dürfen nicht im selben Release-Pfad gewechselt werden.'
 fi
 mkdir -p "$root/releases" "$root/backups"
 chmod 755 "$root" "$root/releases"
@@ -42,11 +47,20 @@ chmod 700 "$root/backups"
 mv -- "$incoming" "$release"
 chmod 755 "$release"
 printf '%s\n' "$image" > "$release/image.txt"
+printf '%s\n' "$mode" > "$release/mode.txt"
 
 compose_at() {
     local directory=$1
     shift
+    local release_mode=production
+    if [[ -f $directory/mode.txt ]]; then read -r release_mode < "$directory/mode.txt"; fi
+    [[ $release_mode == production || $release_mode == demo ]] || fail 'Ungültiger Release-Modus.'
+    local -a profile_environment=("STEIMMO_SETTINGS_MODULE=config.settings_$release_mode")
+    if [[ $release_mode == demo ]]; then
+        profile_environment+=("POSTGRES_VOLUME_NAME=steimmo-demo-postgres-data" "MEDIA_VOLUME_NAME=steimmo-demo-media-data")
+    fi
     env -u POSTGRES_DB -u POSTGRES_USER -u POSTGRES_PASSWORD \
+        "${profile_environment[@]}" \
         STEIMMO_IMAGE="$(cat "$directory/image.txt")" STEIMMO_ENV_FILE="$env_file" \
         docker compose --project-name steimmo --env-file "$env_file" \
         --file "$directory/compose.prod.yaml" "$@"
@@ -104,6 +118,16 @@ compose pull web
 [[ $(docker image inspect "$image" --format '{{.Architecture}}') == arm64 ]] || fail 'Falsche Image-Architektur.'
 [[ $(docker image inspect "$image" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}') == "$commit" ]] || fail 'Image und Commit stimmen nicht überein.'
 
+if [[ $mode == demo ]]; then
+    existing_db=$(compose ps --all --quiet postgres)
+    if [[ -n $existing_db ]]; then
+        database_volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql"}}{{.Name}}{{end}}{{end}}' "$existing_db")
+        [[ $database_volume == steimmo-demo-postgres-data ]] || fail 'Vorhandener PostgreSQL-Container verwendet kein Demo-Volume; keine automatische Umstellung.'
+    fi
+    docker volume create steimmo-demo-postgres-data > /dev/null
+    docker volume create steimmo-demo-media-data > /dev/null
+fi
+
 # Reject placeholder settings before the first database is initialized.
 compose run --rm --no-deps -T web python manage.py check --deploy --fail-level WARNING
 
@@ -136,6 +160,10 @@ printf 'Backup vollständig.\n' > "$backup/complete"
 phase=migration
 migration_started=1
 compose run --rm --no-deps -T web python manage.py migrate --noinput
+if [[ $mode == demo ]]; then
+    phase=demo
+    compose run --rm --no-deps -T web python manage.py setup_demo
+fi
 
 phase=static
 static="$public/releases/$release_id"
@@ -165,8 +193,8 @@ for path in / /static/css/app.css; do
     [[ $status == 200 ]] || fail "HTTPS-Prüfung für $path liefert HTTP $status."
 done
 
-printf '{"commit":"%s","image":"%s","previous":"%s","backup":"%s","schema_changes":%s}\n' \
-    "$commit" "$image" "$previous" "$backup" "$schema_changes" > "$release/release.json"
+printf '{"commit":"%s","image":"%s","mode":"%s","previous":"%s","backup":"%s","schema_changes":%s}\n' \
+    "$commit" "$image" "$mode" "$previous" "$backup" "$schema_changes" > "$release/release.json"
 date -u +%FT%TZ > "$release/success"
 success=1
 printf 'Release %s erfolgreich.\n' "$release_id"

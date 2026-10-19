@@ -2,6 +2,9 @@
 # Exercise production settings and persistence with disposable local resources.
 set -Eeuo pipefail
 image=${1:?Aufruf: smoke.sh LOKALES_IMAGE}
+mode=${2:-production}
+[[ $mode == production || $mode == demo ]]
+export STEIMMO_SETTINGS_MODULE="config.settings_$mode"
 project="steimmo-smoke-$$"
 directory=$(mktemp -d /tmp/steimmo-smoke.XXXXXXXX)
 repository=$(cd -- "$(dirname -- "$0")/.." && pwd)
@@ -57,6 +60,9 @@ POSTGRES_USER=steimmo
 POSTGRES_PASSWORD=ci-only-example-database-password
 ENV
 chmod 600 "$STEIMMO_ENV_FILE"
+if [[ $mode == demo ]]; then
+    sed -i 's/^DJANGO_EMAIL_HOST=.*/DJANGO_EMAIL_HOST=CHANGE_ME/; s/^DJANGO_DEFAULT_FROM_EMAIL=.*/DJANGO_DEFAULT_FROM_EMAIL=CHANGE_ME/' "$STEIMMO_ENV_FILE"
+fi
 docker volume create "$POSTGRES_VOLUME_NAME" > /dev/null
 docker volume create "$MEDIA_VOLUME_NAME" > /dev/null
 docker volume create "$public_volume" > /dev/null
@@ -88,9 +94,13 @@ else
     [[ $? == 3 ]]
 fi
 compose run --rm --no-deps -T web python manage.py migrate --noinput
+if [[ $mode == demo ]]; then
+    compose run --rm --no-deps -T web python manage.py setup_demo
+    compose run --rm --no-deps -T web python manage.py setup_demo
+fi
 compose run --rm --no-deps -T web python manage.py deployment_preflight
 docker run --rm --network "$STEIMMO_NETWORK_NAME" --env-file "$STEIMMO_ENV_FILE" \
-    --env DJANGO_SETTINGS_MODULE=config.settings_production --env POSTGRES_HOST=postgres \
+    --env "DJANGO_SETTINGS_MODULE=$STEIMMO_SETTINGS_MODULE" --env POSTGRES_HOST=postgres \
     --env DJANGO_BOOTSTRAP_ON_START=0 \
     --mount "type=volume,src=$public_volume,dst=/app/staticfiles,volume-subpath=releases/one" "$image" sh -ec \
     'python manage.py collectstatic --noinput; test -s /app/staticfiles/css/app.css; test -s /app/staticfiles/admin/css/base.css'
@@ -148,6 +158,10 @@ for path in ("/media/smoke.txt", "/static/../shared/.env"):
 ' "$1"
 }
 https_check original
+if [[ $mode == demo ]]; then
+    printf '%s\n' "$caddy_ca" | docker run --rm --interactive --network "container:$caddy" \
+        --entrypoint python "$image" /app/ops/demo-smoke.py https://localhost
+fi
 docker exec "$caddy" sh -ec \
     'test ! -e /srv/steimmo/shared; test ! -e /srv/steimmo/backups; if touch /srv/steimmo/public/write-check 2>/dev/null; then exit 1; fi'
 # The same read-only mount must see an atomic asset switch and its rollback.
@@ -160,4 +174,4 @@ https_check original
 compose up --detach --no-build --force-recreate --wait --wait-timeout 120 web
 compose exec -T web python -c \
     'from pathlib import Path; assert Path("/app/media/smoke.txt").read_text() == "persistent"'
-printf 'Produktions-Smoke-Test mit Docker-Caddy, TLS, Static-Wechsel und Restore erfolgreich.\n'
+printf 'Container-Smoke-Test (%s) mit Docker-Caddy, TLS, Static-Wechsel und Restore erfolgreich.\n' "$mode"
