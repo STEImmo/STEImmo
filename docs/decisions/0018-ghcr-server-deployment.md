@@ -1,8 +1,13 @@
 # ADR-0018: GHCR und Deployment auf einem Ubuntu-ARM-Server
 
-- Status: Angenommen; im Repository implementiert, Servereinrichtung ausstehend
+- Status: Angenommen; technische Basis implementiert, Zielumgebung durch ADR-0019 als Demo präzisiert
 - Datum: 2026-10-19
-- Geltungsbereich: STEImmo-Produktion auf einem einzelnen Server
+- Geltungsbereich: Deployment-Basis auf einem einzelnen Server; aktueller Demo-Betrieb siehe ADR-0019
+
+Die Betreiberkorrektur in [ADR-0019](0019-demo-server-deployment.md) ersetzt
+für den aktuellen Server die Annahme eines produktiven Einsatzes. Die unten
+beschriebenen SMTP-Anforderungen gelten für das Produktionsprofil; die Demo
+benötigt keinen echten Mailzugang und verwendet eigene Datenvolumes.
 
 ## Kontext und Ziel
 

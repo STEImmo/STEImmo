@@ -14,7 +14,7 @@ services:
     env_file:
       - ${STEIMMO_ENV_FILE:?STEIMMO_ENV_FILE fehlt}
     environment:
-      DJANGO_SETTINGS_MODULE: config.settings_production
+      DJANGO_SETTINGS_MODULE: ${STEIMMO_SETTINGS_MODULE:-config.settings_production}
       DJANGO_BOOTSTRAP_ON_START: "0"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
