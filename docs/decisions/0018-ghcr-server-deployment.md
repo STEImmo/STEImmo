@@ -1,15 +1,20 @@
 # ADR-0018: GHCR und Deployment auf einem Ubuntu-ARM-Server
 
-- Status: Angenommen; im Repository implementiert, Servereinrichtung ausstehend
+- Status: Angenommen; technische Basis implementiert, Zielumgebung durch ADR-0019 als Demo präzisiert
 - Datum: 2026-10-19
-- Geltungsbereich: STEImmo-Produktion auf einem einzelnen Server
+- Geltungsbereich: Deployment-Basis auf einem einzelnen Server; aktueller Demo-Betrieb siehe ADR-0019
+
+Die Betreiberkorrektur in [ADR-0019](0019-demo-server-deployment.md) ersetzt
+für den aktuellen Server die Annahme eines produktiven Einsatzes. Die unten
+beschriebenen SMTP-Anforderungen gelten für das Produktionsprofil; die Demo
+benötigt keinen echten Mailzugang und verwendet eigene Datenvolumes.
 
 ## Kontext und Ziel
 
 Der Django-Monolith soll durch GitHub Actions geprüft, als Docker-Image in
 GitHub Container Registry (GHCR) veröffentlicht und über einen eigenen
 Deploy-Benutzer auf dem Server aktualisiert werden. Docker Compose betreibt
-Gunicorn und PostgreSQL; der vorhandene Caddy-Dienst übernimmt HTTPS,
+Gunicorn und PostgreSQL; der vorhandene Caddy-Container übernimmt HTTPS,
 statische Dateien und die Weiterleitung zur Anwendung.
 
 Vom Betreiber bestätigte Rahmenbedingungen:
@@ -19,17 +24,19 @@ Vom Betreiber bestätigte Rahmenbedingungen:
 | Domain | `steimmo-projekt-page.justus.software` |
 | Betriebssystem | Ubuntu, genaue Version noch offen |
 | Prozessor | ARM; geplant ist `linux/arm64`, vor Einrichtung mit `uname -m` bestätigen |
-| Caddy | Dienst direkt auf dem Server |
+| Caddy | vorhandener Container `n8n-docker-caddy-1`, Netzwerk `n8n-docker_default` |
+| Caddy-Konfiguration | `/root/n8n-docker/Caddyfile` → `/etc/caddy/Caddyfile` |
+| Caddy-Compose | `/root/n8n-docker/docker-compose.yml` |
 | Repository | `STEImmo/STEImmo` gemäß lokalem Git-Remote |
 | Release-Branch | `main` gemäß bestehender CI |
 | SSH-Server | `178.104.51.71`, Port 22 |
 | Deploy-Benutzer | vorhandener Benutzer `deploy` |
 | SSH-Anmeldung | Passwort über GitHub-Secret `DEPLOY_SSH_PASSWORD`, auf Betreiberwunsch |
 | Projektverzeichnis | Standard: `/srv/steimmo` |
-| App-Port | `127.0.0.1:8010`, vor Einrichtung auf Belegung prüfen |
+| App-Port | `172.17.0.1:8010`, über `STEIMMO_BIND_IP` konfiguriert |
 
-Passwortwert, Ubuntu-Version, DNS-Zugriff und SMTP-Konfiguration
-sind vor der Einrichtung zu klären. Der SSH-Hostname kann von der Domain
+Ubuntu-Version und SMTP-Konfiguration sind vor der Einrichtung zu klären.
+DNS-A und GitHub-Secret wurden vom Betreiber eingerichtet. Der SSH-Hostname kann von der Domain
 abweichen. Bei einem weiteren Uni-Proxy oder CDN vor Caddy müssen TLS- und
 Proxy-Vertrauen entsprechend angepasst werden.
 
@@ -53,7 +60,11 @@ Das Ablaufmuster wird übernommen. STEImmo erhält genau ein eigenes
 Anwendungsimage. PostgreSQL bleibt beim festgelegten `postgres:18.6`.
 Directus, Bootstrap-Images, VORNIS-Konfiguration und SEO-Dienste werden für
 diesen Monolithen nicht benötigt. Die dort verwendete Adresse `172.17.0.1`
-wird durch Loopback ersetzt, weil Caddy hier auf dem Host läuft.
+wird auch hier verwendet: Der Betreiber hat inzwischen bestätigt, dass
+Caddy im Container läuft; die frühere Annahme eines Host-Dienstes war falsch.
+Die vorhandenen Serverprojekte veröffentlichen ebenfalls an `172.17.0.1`.
+Dadurch müssen weder Caddys Netzwerk noch die Netzwerke anderer Projekte
+geändert werden. PostgreSQL bleibt ausschließlich im STEImmo-Netzwerk.
 
 ### Ausgangslage vor der Umsetzung
 
@@ -154,9 +165,12 @@ Ablauf im Deploy-Skript, Abbruch bei jedem Fehler:
    Release-Staticverzeichnis ausführen. Besitzrechte für den nicht
    privilegierten Containerbenutzer vorbereiten.
 7. Gunicorn mit dem Digest starten, mit begrenztem Timeout auf den gesunden
-   Container warten. Host-Port ist ausschließlich `127.0.0.1:8010`.
-8. Nach erfolgreichem internem Check den Static-Verweis auf das neue Release
-   umschalten. Öffentliche Domain über HTTPS auf `/health/`, Startseite und
+   Container warten. Host-Port ist an `STEIMMO_BIND_IP` gebunden; auf diesem
+   Server an die Docker-Host-Adresse `172.17.0.1`, nicht an alle Interfaces.
+8. Nach erfolgreichem internem Check die Verweise `current` und
+   `public/current` auf das neue Release bzw. dessen öffentliche Assets
+   umschalten. Bei einem Fehler werden beide Verweise zurückgestellt.
+   Öffentliche Domain über HTTPS auf `/health/`, Startseite und
    eine tatsächliche CSS-Datei prüfen; HTTP-Status und Health-Inhalt auswerten.
 9. Erst danach Release als erfolgreich markieren. Commit, Digest,
    Compose-Konfiguration, vorherigen Release und Backup-Zuordnung festhalten.
@@ -177,7 +191,8 @@ gesonderter Freigabe; ein Image-Rollback setzt Daten nicht zurück.
 
 Auch `config.settings` verweigert bei `DEBUG=False` bereits beim Import einen
 fehlenden oder unsicheren `DJANGO_SECRET_KEY`; ohne `DJANGO_DEBUG` gilt dieser
-Modus ebenfalls. `config.settings_production` verwendet dieselbe Validierung.
+Modus ebenfalls. `config.settings_deployment` verwendet dieselbe Validierung
+für das Produktions- und das Demo-Profil.
 Erforderlich sind mindestens 50 Zeichen und 5 unterschiedliche Zeichen ohne
 äußere Leerzeichen mitzuzählen. `django-insecure-` als Präfix sowie die
 Platzhalterbestandteile `change_me` und `change-this` werden unabhängig von
@@ -219,18 +234,24 @@ muss stattdessen ein eigener Rootless-Docker-Betrieb geplant werden.
   releases/<commit>-<run>/
     compose.prod.yaml
     deploy.sh
-    static/                  # nur öffentliche Assets
     image.txt                # gepinnter Digest, wird für Compose verwendet
     release.json             # Commit, Digest, Vorgänger, Backup, keine Secrets
     success                  # erst nach erfolgreichen öffentlichen Prüfungen
   current -> releases/<erfolgreiches-release>
+  public/                    # einziger Mount im vorhandenen Caddy-Container
+    releases/<commit>-<run>/  # nur collectstatic-Ergebnisse
+    current -> releases/<erfolgreiches-release>
   backups/                   # DB und Media, zugriffsbeschränkt
 ~~~
 
 Ein Releaseverzeichnis wird nach Erfolg nicht überschrieben. Persistente
 PostgreSQL- und Media-Volumes liegen außerhalb der Releaseverzeichnisse.
-Caddy erhält Leserechte nur auf öffentliche Static-Dateien samt notwendigen
-Verzeichnisrechten, nicht auf `.env`, Backups oder Media. Mindestens der
+Caddy erhält `/srv/steimmo/public:/srv/steimmo/public:ro`. Der gesamte
+Projektpfad wird nicht eingebunden: `.env`, Backups, Media und interne
+Release-Dateien bleiben außerhalb dieses Mounts. Der Symlink `public/current`
+liegt innerhalb des gemounteten Verzeichnisses und wird bei jedem Release
+neu aufgelöst. Ein Mount direkt auf den Symlink würde beim Release-Wechsel
+am alten Ziel hängenbleiben. Mindestens der
 aktuelle und vorherige erfolgreiche Release bleiben samt Images erhalten.
 Keine hostweiten Prune-Befehle im Deployment.
 
@@ -260,7 +281,8 @@ Eine eigenständig lesbare `docker/compose.prod.yaml` verwendet ausschließlich
 Images und feste, projektspezifische Volumes. Das vermeidet geerbte
 Development-Einstellungen aus mehreren Overrides. PostgreSQL 18.6 behält
 seinen Datenpfad `/var/lib/postgresql` und bekommt keinen Host-Port.
-Es laufen genau der Django-Webdienst und PostgreSQL; Caddy bleibt Host-Dienst.
+Der STEImmo-Stack enthält genau den Django-Webdienst und PostgreSQL;
+der vorhandene Caddy-Container bleibt außerhalb dieses Stacks.
 Media ist persistent, Quellcode wird nicht vom Host eingebunden. Docker-Logs
 erhalten eine Größen- und Rotationsgrenze.
 
@@ -280,8 +302,12 @@ Für Produktion erforderlich:
   scheitert. Extern wird regulär HTTPS geprüft.
 - `DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS` enthält nur die tatsächlich bei
   Gunicorn ankommende, geprüfte Caddy-Quelladresse. Durch Docker-NAT kann
-  dies eine Bridge-Adresse sein, obwohl Caddy `127.0.0.1` anspricht.
-  Keine geratenen Adressen oder pauschalen privaten Netze zulassen.
+  dies die Adresse einer anderen Bridge sein. `ops/proxy-source.sh` misst
+  den Peer mit einem kurzlebigen HTTP-Empfänger im STEImmo-Netzwerk hinter
+  einem dynamischen Host-Port. Der Client teilt Caddys Netzwerk-Namespace.
+  Die Messung verwendet das vorhandene Runtime-Image und entfernt ihre
+  eigenen Testcontainer. Weder Caddys `172.18.0.3` noch ein Gateway werden
+  ungeprüft übernommen. Keine pauschalen privaten Netze zulassen.
 - Produktiven SMTP-Versand einschließlich Registrierung und Mitarbeiter-MFA
   prüfen. Kein Mailpit und kein lokales Entwicklungskonto in Produktion.
 - `check --deploy` ausführen und Meldungen gezielt beheben bzw. eine bewusste
@@ -293,7 +319,7 @@ für die vorhandenen Settings. Neue Sicherheitsoptionen müssen bei der
 Implementierung tatsächlich in den Settings ausgewertet werden; bloße
 Einträge in der `.env` bewirken bisher keine Änderung.
 
-## Caddyfile für den Host-Dienst
+## Caddyfile für den vorhandenen Container
 
 Geplanter projektbezogener Block im administrativ verwalteten Caddyfile:
 
@@ -302,7 +328,7 @@ steimmo-projekt-page.justus.software {
     encode zstd gzip
 
     handle_path /static/* {
-        root * /srv/steimmo/current/static
+        root * /srv/steimmo/public/current
         file_server
     }
 
@@ -311,7 +337,7 @@ steimmo-projekt-page.justus.software {
     }
 
     handle {
-        reverse_proxy 127.0.0.1:8010
+        reverse_proxy 172.17.0.1:8010
     }
 }
 ~~~
@@ -331,9 +357,16 @@ HTTP-zu-HTTPS-Weiterleitung. Dafür müssen DNS-A/AAAA zum Server passen sowie
 und [automatisches HTTPS](https://caddyserver.com/docs/automatic-https)
 sind in der Caddy-Dokumentation beschrieben.
 
-Ein Administrator integriert und validiert den Block einmalig und lädt
-Caddy neu. Normale App-Releases benötigen keinen Caddy-Neustart und keine
-Schreibrechte auf andere Sites.
+Ein Administrator ergänzt im bestehenden Compose-Dienst `caddy` genau
+den Read-only-Mount `/srv/steimmo/public:/srv/steimmo/public:ro` und erstellt
+ausschließlich diesen Dienst mit `docker compose up -d --no-deps caddy`
+neu. Alle vorhandenen Volumes, Netzwerke, Ports und anderen Sites bleiben
+erhalten. Danach wird der Site-Block im vorhandenen Caddyfile ergänzt,
+innerhalb des Containers validiert und mit `caddy reload` geladen.
+Normale App-Releases benötigen keinen Caddy-Neustart und keine
+Schreibrechte auf andere Sites. Ports 80 und 443 werden weiterhin nur
+vom vorhandenen Caddy veröffentlicht. Die Erreichbarkeit von Port 8010
+über die öffentliche Server-IP muss bei der Abnahme ausgeschlossen werden.
 
 ## Umsetzungspakete und Abnahme
 
@@ -357,19 +390,24 @@ erfolgreich geprüften Push auf `main` automatisch.
 
 Die folgenden Schritte erfordern Administratorzugriff auf den Zielserver:
 
-1. Docker Engine mit Compose-Plugin und Caddy müssen bereits installiert
-   sein. ARM64 mit `uname -m` und den freien Port 8010 prüfen. Danach
-   `sudo bash ops/bootstrap-server.sh deploy` ausführen. Das Skript richtet
+1. Docker Engine mit Compose-Plugin müssen installiert sein; Caddy läuft
+   bereits im vorhandenen Container. ARM64 mit `uname -m` und den freien
+   Port 8010 prüfen. Als root `bash ops/bootstrap-server.sh deploy` ausführen.
+   Eine Caddy-Binary auf dem Host ist nicht erforderlich. Das Skript richtet
    ausschließlich Projektverzeichnisse, Docker-Zugriff, zwei benannte Volumes
    und das externe Netzwerk `steimmo-prod` ein. Es ändert kein Caddyfile.
+   Bei einem vorhandenen erfolgreichen Release im früheren Layout werden
+   ausschließlich dessen Static-Dateien ins öffentliche Verzeichnis kopiert.
 2. `docker/.env.prod.example` nach `/srv/steimmo/shared/.env` kopieren,
    Eigentümer `deploy` und Modus `0600` setzen. Alle Platzhalter ersetzen.
    Für Django und PostgreSQL getrennte, zufällige Geheimnisse verwenden,
    etwa jeweils die Ausgabe von `openssl rand -hex 32`. SMTP-Host,
    Absender und gegebenenfalls SMTP-Zugangsdaten ergänzen.
-3. Die von Bootstrap ausgegebene Gateway-IP des Netzwerks als Ausgangspunkt
-   für `DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS` verwenden. Beim Testrequest
-   die bei Gunicorn ankommende Quelladresse verifizieren; insbesondere
+3. `STEIMMO_BIND_IP=172.17.0.1` setzen. Das bereits veröffentlichte
+   Runtime-Image laden. Erst nach der Caddy-Neuerstellung aus Schritt 5 als root
+   `bash ops/proxy-source.sh n8n-docker-caddy-1 172.17.0.1 IMAGE_DIGEST`
+   ausführen. Ausschließlich die ausgegebene IP als
+   `DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS` eintragen. Insbesondere
    prüfen, dass getrennte Clients nicht denselben Throttle-Fingerprint
    erhalten und manipulierte `X-Forwarded-For`-Header nicht durchgereicht werden.
 4. Neu als `deploy` anmelden, damit die Docker-Gruppe wirksam wird. Bei
@@ -378,10 +416,16 @@ Die folgenden Schritte erfordern Administratorzugriff auf den Zielserver:
    mit `read:packages` ausführen. Der Token benötigt Package-Leserechte und
    gegebenenfalls eine SSO-Freigabe. Er verbleibt ausschließlich auf dem Server.
 5. DNS-A-Eintrag der Domain auf `178.104.51.71` setzen bzw. prüfen. Das
-   vorhandene Caddyfile um `ops/caddy-steimmo.caddy` ergänzen, bestehende
-   Sites erhalten. Mit `sudo caddy validate --config /etc/caddy/Caddyfile`
-   prüfen und danach `sudo systemctl reload caddy` ausführen. Erst ein
+   vorhandene `/root/n8n-docker/Caddyfile` um den Inhalt von
+   `ops/caddy-steimmo.caddy` ergänzen, bestehende Sites erhalten. Vorher
+   den oben beschriebenen Public-Mount im Caddy-Compose ergänzen.
+   Mit `docker exec n8n-docker-caddy-1 caddy validate --config /etc/caddy/Caddyfile`
+   prüfen und danach `docker exec n8n-docker-caddy-1 caddy reload --config /etc/caddy/Caddyfile`
+   ausführen. Erst ein
    erfolgreicher Release erzeugt das Ziel für den Static-Verweis `current`.
+   Danach die Proxy-Quelladresse aus Schritt 3 messen. Nach jeder späteren
+   Neuerstellung Caddys erneut messen und bei geänderter IP die Env sowie
+   die Webcontainer aktualisieren.
 6. Im GitHub-Repository das Environment `deploy` auf Branch `main`
    beschränken. Secret `DEPLOY_SSH_PASSWORD` mit dem tatsächlichen
    Serverpasswort anlegen. Variable `DEPLOY_KNOWN_HOSTS` mit dem unabhängig
@@ -396,15 +440,120 @@ Die folgenden Schritte erfordern Administratorzugriff auf den Zielserver:
    Client-IP-Erkennung auf der Zielumgebung prüfen. HSTS kann anschließend
    über `DJANGO_SECURE_HSTS_SECONDS` aktiviert werden.
 
+#### Root-Befehle für den bestätigten Server
+
+Erst nach Übernahme dieser Anpassung nach `main` ausführen. Docker und
+Compose sind bereits vorhanden. Die Befehle verändern keine bestehenden
+Geheimnisse. SMTP muss vom Betreiber konfiguriert werden.
+
+~~~bash
+setup_dir=$(mktemp -d)
+source_base=https://raw.githubusercontent.com/STEImmo/STEImmo/main
+curl -fL "$source_base/ops/bootstrap-server.sh" -o "$setup_dir/bootstrap-server.sh"
+curl -fL "$source_base/ops/proxy-source.sh" -o "$setup_dir/proxy-source.sh"
+curl -fL "$source_base/ops/caddy-steimmo.caddy" -o "$setup_dir/caddy-steimmo.caddy"
+curl -fL "$source_base/docker/.env.prod.example" -o "$setup_dir/.env.prod.example"
+bash "$setup_dir/bootstrap-server.sh" deploy
+
+if [ ! -e /srv/steimmo/shared/.env ]; then
+    (
+        umask 077
+        set -o noclobber
+        {
+            printf 'DJANGO_SECRET_KEY='
+            openssl rand -hex 32
+            printf 'POSTGRES_PASSWORD='
+            openssl rand -hex 32
+            sed '/^DJANGO_SECRET_KEY=/d; /^POSTGRES_PASSWORD=/d' "$setup_dir/.env.prod.example"
+        } > /srv/steimmo/shared/.env
+    )
+fi
+chown deploy:"$(id -gn deploy)" /srv/steimmo/shared/.env
+chmod 600 /srv/steimmo/shared/.env
+nano /srv/steimmo/shared/.env
+~~~
+
+SMTP-Werte ausfüllen. Bei einer vorhandenen Env `STEIMMO_BIND_IP=172.17.0.1`
+ergänzen. Den Proxy-Platzhalter erst nach der Messung unten ersetzen.
+Bei einer bestehenden Datenbank deren bisheriges Passwort beibehalten.
+
+~~~bash
+steimmo_image=ghcr.io/steimmo/steimmo@sha256:c810727a7d5c270eac38065f8f15c63f094ca655e0cf9c8f789715ab394cd45f
+runuser -u deploy -- docker pull "$steimmo_image"
+~~~
+
+Falls das Package privat ist, davor als `deploy` mit einem PAT classic
+mit `read:packages` anmelden; Token nur am Passwortprompt eingeben:
+
+~~~bash
+runuser -u deploy -- docker login ghcr.io --username DEIN_GITHUB_BENUTZER
+runuser -u deploy -- docker pull "$steimmo_image"
+~~~
+
+Nun die bestehende Proxy-Konfiguration sichern und bearbeiten:
+
+~~~bash
+cd /root/n8n-docker
+cp -a docker-compose.yml "docker-compose.yml.backup-$(date +%Y%m%d-%H%M%S)"
+cp -a Caddyfile "Caddyfile.backup-$(date +%Y%m%d-%H%M%S)"
+nano docker-compose.yml
+~~~
+
+Unter den vorhandenen `volumes` des Dienstes `caddy` genau diese Zeile
+ergänzen; alle übrigen Einträge beibehalten:
+
+~~~yaml
+- /srv/steimmo/public:/srv/steimmo/public:ro
+~~~
+
+Den Site-Block aus `ops/caddy-steimmo.caddy` direkt in die vorhandene
+Datei kopieren. Eine bereits vorhandene Definition derselben Domain
+ersetzen. Keine zusätzliche Importdatei anlegen: Im Container wird derzeit
+ausschließlich das einzelne Caddyfile vom Host eingebunden.
+
+~~~bash
+cat "$setup_dir/caddy-steimmo.caddy"
+nano /root/n8n-docker/Caddyfile
+docker compose config --quiet
+docker exec -i n8n-docker-caddy-1 caddy validate --config - --adapter caddyfile < Caddyfile
+~~~
+
+Nur nach erfolgreicher Validierung den Caddy-Dienst für den neuen Mount
+einmalig neu erstellen. Dabei gibt es eine kurze Unterbrechung am gemeinsamen
+Proxy. Daten-, Zertifikatsvolumes und andere Dienste bleiben bestehen.
+
+~~~bash
+docker compose up -d --no-deps --pull never --force-recreate caddy
+docker exec n8n-docker-caddy-1 caddy validate --config /etc/caddy/Caddyfile
+docker exec n8n-docker-caddy-1 caddy reload --config /etc/caddy/Caddyfile
+proxy_ip=$(bash "$setup_dir/proxy-source.sh" n8n-docker-caddy-1 172.17.0.1 "$steimmo_image")
+printf 'Gemessene Proxy-IP: %s\n' "$proxy_ip"
+nano /srv/steimmo/shared/.env
+chown deploy:"$(id -gn deploy)" /srv/steimmo/shared/.env
+chmod 600 /srv/steimmo/shared/.env
+~~~
+
+Die gemessene IP in `DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS` eintragen.
+Alle Platzhalter ersetzen. Anschließend ausschließlich den Workflow vom
+neuen `main` ausführen; ein erneuter Versuch des früheren Runs verwendet
+weiterhin dessen alte Compose- und Deploy-Dateien.
+
 `bash ops/smoke.sh <lokales-runtime-image>` prüft eine frische
 Produktionsdatenbank, Produktionssettings, den nicht privilegierten Benutzer,
 Static-Sammlung, Datenbank- und Media-Restore, HTTPS-Weiterleitung, Healthcheck
-und die Persistenz nach Neuerstellung des Webcontainers. Alle dafür erzeugten
+und die Persistenz nach Neuerstellung des Webcontainers. Ein echter
+Caddy-Container läuft dazu in einem getrennten Docker-Netzwerk, verwendet
+die Site-Konfiguration mit einer lokalen Test-CA und prüft HTTPS mit voller
+Zertifikatsvalidierung. Zusätzlich werden Proxy-Quelladresse, Static-Wechsel
+und Rollback bei unverändertem Read-only-Mount sowie private Dateipfade geprüft.
+Auf Docker Desktop verwendet allein der lokale Test dessen Host-Verbindung
+über `host.docker.internal` und Loopback; native Ubuntu-CI prüft die echte
+Bridge-IP-Bindung. Alle dafür erzeugten
 Ressourcen besitzen eigene Namen und werden nach dem Test entfernt. Dieser Test ist Teil der wiederverwendbaren
 CI. `python -m unittest discover -s ops/tests -v` prüft zusätzlich Fehlerfälle
 des echten Deploy-Skripts mit simulierten Docker- und HTTPS-Antworten.
 
-### Validierung am 2026-10-19
+### Vorausgehende Validierung am 2026-10-19
 
 - 144 Django-Tests sowie 14 Deploy-, SSH- und EntryPoint-Tests erfolgreich.
 - Django-Systemcheck und Migrationsprüfung erfolgreich; keine neuen
@@ -422,6 +571,22 @@ des echten Deploy-Skripts mit simulierten Docker- und HTTPS-Antworten.
   vor, und die Domain hatte bei der DNS-Prüfung noch keinen A-Eintrag.
   Server- und GitHub-Secrets wurden nicht verändert.
 
+### Validierung der Docker-Caddy-Anpassung am 2026-10-19
+
+- 726 Django-Tests sowie 15 Deploy-, SSH- und EntryPoint-Tests erfolgreich.
+- Django-Systemcheck, Migrationsprüfung, Ruff und Formatprüfung erfolgreich.
+- Echter Docker-Caddy in einem getrennten Bridge-Netzwerk: TLS mit geprüfter
+  lokaler CA, Healthcheck, Startseite, App-/Admin-CSS, private Pfade,
+  Read-only-Mount und Static-Wechsel samt Rollback ohne Caddy-Neustart erfolgreich.
+- Datenbank-/Media-Restore und Persistenz nach Web-Neuerstellung erfolgreich.
+- Die Betreiberangaben bestätigen Containername, Bridge-Netzwerk, IP und
+  Konfigurationsmount. Das Netzwerk bzw. dessen aktuelle Container-IP wird
+  nicht als Abhängigkeit in die STEImmo-Compose übernommen.
+- Der vorausgehende Live-Workflow `39248132843`, Versuch 3, erreichte die
+  SSH-Verbindung, endete aber ohne Release-Bestätigung mit Exit 1. Der neue
+  SSH-Vorabcheck benennt ein fehlendes oder unzugängliches `shared` jetzt
+  ausdrücklich. Die einmalige Servereinrichtung übernimmt der Betreiber.
+
 Für den Betrieb gehören eine regelmäßige Sicherung von PostgreSQL und Media,
 eine geschützte Kopie außerhalb dieses Servers sowie ein geprüfter Restore
 zur Abnahme. Aufbewahrung und Zeitplan werden vor dem ersten produktiven
@@ -434,7 +599,7 @@ Releases sind über Commit und Digest nachvollziehbar; der Server benötigt
 keine Build-Werkzeuge. Das MVP akzeptiert ein kurzes Wartungsfenster bei
 Releases; Blue/Green oder Kubernetes hätten dafür keinen belegten Nutzen.
 
-Ein eigener Caddy-Container würde die bestehende Host-Infrastruktur
+Ein zweiter Caddy-Container würde die vorhandene Proxy-Infrastruktur
 duplizieren. Eine zusätzliche Python-Static-Bibliothek entfällt, weil Caddy
 die öffentlichen Assets bereits bedienen kann. Ein vollständiger
 VORNIS-Compose-Stack würde unnötige Anwendungen und Abhängigkeiten einführen.

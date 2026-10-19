@@ -261,7 +261,9 @@ def _clear_account_login_throttle(user) -> None:
 class ThrottledAuthenticationForm(AuthenticationForm):
     def __init__(self, request=None, *args, **kwargs) -> None:
         super().__init__(request, *args, **kwargs)
-        self.fields["username"].label = "E-Mail-Adresse"
+        self.fields["username"].label = (
+            "Benutzername oder E-Mail-Adresse" if settings.DEMO_MODE else "E-Mail-Adresse"
+        )
         self.fields["username"].widget.attrs.pop("autofocus", None)
         for field in self.fields.values():
             field.widget.attrs["class"] = "uk-input"

@@ -456,7 +456,11 @@ docker/                 Compose, Umgebungsvariablen und EntryPoint
 ## Portierbarkeit
 
 Die GitHub-Actions-Pipeline veröffentlicht ARM64-Images in GHCR und deployt
-sie auf den Ubuntu-Server hinter Caddy. Voraussetzungen, Servereinrichtung,
+sie auf den Ubuntu-Server hinter Caddy. Der Server ist als reine
+Demo mit Beispieldaten und ohne echten Mailversand vorgesehen; die Zugänge stehen auf
+der Anmeldeseite. Die Entscheidung und Abgrenzung zum Produktionsprofil
+stehen in [ADR-0019](docs/decisions/0019-demo-server-deployment.md).
+Voraussetzungen, Servereinrichtung,
 GitHub-Secrets und der Releaseablauf stehen in
 [ADR-0018](docs/decisions/0018-ghcr-server-deployment.md).
 

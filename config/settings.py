@@ -40,6 +40,7 @@ if DEBUG:
     SECRET_KEY = SECRET_KEY or "dev-only-insecure-key-change-me"
 else:
     SECRET_KEY = validate_secret_key(SECRET_KEY)
+DEMO_MODE = False
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 
@@ -78,6 +79,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "core.context_processors.demo_mode",
             ],
         },
     },

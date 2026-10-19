@@ -14,14 +14,14 @@ services:
     env_file:
       - ${STEIMMO_ENV_FILE:?STEIMMO_ENV_FILE fehlt}
     environment:
-      DJANGO_SETTINGS_MODULE: config.settings_production
+      DJANGO_SETTINGS_MODULE: ${STEIMMO_SETTINGS_MODULE:-config.settings_production}
       DJANGO_BOOTSTRAP_ON_START: "0"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
     volumes:
       - media_data:/app/media
     ports:
-      - "127.0.0.1:8010:8000"
+      - "${STEIMMO_BIND_IP:-127.0.0.1}:8010:8000"
     depends_on:
       postgres:
         condition: service_healthy

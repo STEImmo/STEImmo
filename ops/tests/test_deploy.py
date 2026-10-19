@@ -21,6 +21,8 @@ with open(os.environ["CALL_LOG"], "a") as log:
     log.write(json.dumps(a) + "\n")
 if a[:2] == ["image", "inspect"]:
     print("arm64" if "Architecture" in a[-1] else os.environ["TEST_COMMIT"])
+elif a[:1] == ["inspect"]:
+    print("production-data" if scenario == "demo-volume-mismatch" else "steimmo-demo-postgres-data")
 elif "pull" in a and scenario == "pull-failure":
     sys.exit(1)
 elif "check" in a and scenario == "settings-failure":
@@ -74,6 +76,9 @@ class DeploymentTests(unittest.TestCase):
         (self.old / "image.txt").write_text(IMAGE)
         (self.old / "compose.prod.yaml").write_text("test")
         (self.root / "current").symlink_to(self.old)
+        self.public = self.root / "public"
+        (self.public / "releases/old").mkdir(parents=True)
+        (self.public / "current").symlink_to("releases/old")
         incoming = self.root / "incoming" / RELEASE
         incoming.mkdir()
         (incoming / "compose.prod.yaml").write_text("test")
@@ -91,9 +96,12 @@ class DeploymentTests(unittest.TestCase):
             "TEST_COMMIT": COMMIT,
         }
 
-    def deploy(self, scenario="success", image=IMAGE):
+    def deploy(self, scenario="success", image=IMAGE, mode=None):
+        arguments = ["bash", str(PROJECT / "ops/deploy.sh"), str(self.root), RELEASE, image, COMMIT]
+        if mode is not None:
+            arguments.append(mode)
         result = subprocess.run(
-            ["bash", str(PROJECT / "ops/deploy.sh"), str(self.root), RELEASE, image, COMMIT],
+            arguments,
             env=self.environment | {"SCENARIO": scenario},
             capture_output=True,
             text=True,
@@ -114,10 +122,36 @@ class DeploymentTests(unittest.TestCase):
         result = self.deploy()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.root / "current").resolve().name, RELEASE)
+        self.assertEqual((self.public / "current").resolve(), self.public / "releases" / RELEASE)
         metadata = json.loads((self.root / "current/release.json").read_text())
         self.assertEqual(metadata["image"], IMAGE)
         self.assertTrue((self.root / "backups" / RELEASE / "complete").exists())
         self.assertFalse(self.old_was_restarted())
+
+    def test_demo_deploy_records_mode_and_seeds_after_migration(self):
+        (self.old / "mode.txt").write_text("demo\n")
+        result = self.deploy(mode="demo")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        metadata = json.loads((self.root / "current/release.json").read_text())
+        self.assertEqual(metadata["mode"], "demo")
+        commands = [call for call in self.calls if "migrate" in call or "setup_demo" in call]
+        self.assertEqual(len(commands), 2)
+        self.assertIn("migrate", commands[0])
+        self.assertIn("setup_demo", commands[1])
+        self.assertIn(["volume", "create", "steimmo-demo-postgres-data"], self.calls)
+        self.assertIn(["volume", "create", "steimmo-demo-media-data"], self.calls)
+
+    def test_demo_cannot_replace_a_production_release(self):
+        result = self.deploy(mode="demo")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.calls)
+        self.assertEqual((self.root / "current").resolve(), self.old)
+
+    def test_demo_cannot_reuse_a_production_database_container(self):
+        (self.old / "mode.txt").write_text("demo\n")
+        result = self.deploy("demo-volume-mismatch", mode="demo")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any("migrate" in call or "stop" in call for call in self.calls))
 
     def test_pull_or_preflight_failure_keeps_running_release(self):
         for scenario in ("pull-failure", "preflight-failure"):
@@ -164,7 +198,17 @@ class DeploymentTests(unittest.TestCase):
         result = self.deploy("https-failure")
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual((self.root / "current").resolve(), self.old)
+        self.assertEqual((self.public / "current").resolve(), self.public / "releases/old")
         self.assertTrue(self.old_was_restarted())
+
+    def test_first_release_public_failure_removes_current_links(self):
+        (self.root / "current").unlink()
+        (self.public / "current").unlink()
+        result = self.deploy("https-failure")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.root / "current").is_symlink())
+        self.assertFalse((self.public / "current").is_symlink())
+        self.assertFalse(self.old_was_restarted())
 
     def test_redirect_is_not_a_successful_smoke_check(self):
         result = self.deploy("https-redirect")

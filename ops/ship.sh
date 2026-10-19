@@ -12,6 +12,8 @@ umask 077
 DEPLOY_USER=${DEPLOY_USER:-deploy}
 DEPLOY_PORT=${DEPLOY_PORT:-22}
 DEPLOY_PATH=${DEPLOY_PATH:-/srv/steimmo}
+DEPLOY_MODE=${DEPLOY_MODE:-production}
+[[ $DEPLOY_MODE == production || $DEPLOY_MODE == demo ]]
 [[ $DEPLOY_HOST =~ ^[a-zA-Z0-9.-]+$ && $DEPLOY_HOST != -* ]]
 [[ $DEPLOY_USER =~ ^[a-z_][a-z0-9_-]*$ ]]
 [[ $DEPLOY_PORT =~ ^[0-9]+$ && $DEPLOY_PORT -gt 0 && $DEPLOY_PORT -le 65535 ]]
@@ -36,8 +38,8 @@ target="$DEPLOY_USER@$DEPLOY_HOST"
 release_id="$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
 incoming="$DEPLOY_PATH/incoming/$release_id"
 setsid --wait ssh -p "$DEPLOY_PORT" "${ssh_options[@]}" "$target" \
-    "test -d '$DEPLOY_PATH/shared' && mkdir -m 700 -- '$incoming'" < /dev/null
+    "test -d '$DEPLOY_PATH/shared' || { printf '%s\\n' 'shared fehlt oder ist nicht zugänglich; zuerst Bootstrap als root ausführen.' >&2; exit 1; }; mkdir -m 700 -- '$incoming'" < /dev/null
 setsid --wait scp -P "$DEPLOY_PORT" "${ssh_options[@]}" \
     docker/compose.prod.yaml ops/deploy.sh "$target:$incoming/" < /dev/null
 setsid --wait ssh -p "$DEPLOY_PORT" "${ssh_options[@]}" "$target" \
-    "bash '$incoming/deploy.sh' '$DEPLOY_PATH' '$release_id' '$STEIMMO_IMAGE' '$GITHUB_SHA'" < /dev/null
+    "bash '$incoming/deploy.sh' '$DEPLOY_PATH' '$release_id' '$STEIMMO_IMAGE' '$GITHUB_SHA' '$DEPLOY_MODE'" < /dev/null

@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: steimmo-production
+  group: steimmo-server
   cancel-in-progress: false
 
 jobs:
@@ -57,7 +57,7 @@ jobs:
           STEIMMO_IMAGE: ghcr.io/steimmo/steimmo@${{ steps.build.outputs.digest }}
         run: |
           docker pull --platform linux/arm64 "$STEIMMO_IMAGE"
-          bash ops/smoke.sh "$STEIMMO_IMAGE"
+          bash ops/smoke.sh "$STEIMMO_IMAGE" demo
 
   deploy:
     needs: images
@@ -75,6 +75,7 @@ jobs:
           DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
           DEPLOY_USER: ${{ vars.DEPLOY_USER || 'deploy' }}
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/srv/steimmo' }}
+          DEPLOY_MODE: demo
           DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
           DEPLOY_SSH_PASSWORD: ${{ secrets.DEPLOY_SSH_PASSWORD }}
           STEIMMO_IMAGE: ${{ needs.images.outputs.image }}
