@@ -74,6 +74,9 @@ class DeploymentTests(unittest.TestCase):
         (self.old / "image.txt").write_text(IMAGE)
         (self.old / "compose.prod.yaml").write_text("test")
         (self.root / "current").symlink_to(self.old)
+        self.public = self.root / "public"
+        (self.public / "releases/old").mkdir(parents=True)
+        (self.public / "current").symlink_to("releases/old")
         incoming = self.root / "incoming" / RELEASE
         incoming.mkdir()
         (incoming / "compose.prod.yaml").write_text("test")
@@ -114,6 +117,7 @@ class DeploymentTests(unittest.TestCase):
         result = self.deploy()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.root / "current").resolve().name, RELEASE)
+        self.assertEqual((self.public / "current").resolve(), self.public / "releases" / RELEASE)
         metadata = json.loads((self.root / "current/release.json").read_text())
         self.assertEqual(metadata["image"], IMAGE)
         self.assertTrue((self.root / "backups" / RELEASE / "complete").exists())
@@ -164,7 +168,17 @@ class DeploymentTests(unittest.TestCase):
         result = self.deploy("https-failure")
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual((self.root / "current").resolve(), self.old)
+        self.assertEqual((self.public / "current").resolve(), self.public / "releases/old")
         self.assertTrue(self.old_was_restarted())
+
+    def test_first_release_public_failure_removes_current_links(self):
+        (self.root / "current").unlink()
+        (self.public / "current").unlink()
+        result = self.deploy("https-failure")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.root / "current").is_symlink())
+        self.assertFalse((self.public / "current").is_symlink())
+        self.assertFalse(self.old_was_restarted())
 
     def test_redirect_is_not_a_successful_smoke_check(self):
         result = self.deploy("https-redirect")

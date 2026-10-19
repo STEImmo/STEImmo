@@ -86,5 +86,5 @@ jobs:
 
       - name: Deploy-Skripte prüfen
         run: |
-          bash -n ops/deploy.sh ops/ship.sh ops/bootstrap-server.sh ops/smoke.sh
+          bash -n ops/deploy.sh ops/ship.sh ops/bootstrap-server.sh ops/proxy-source.sh ops/smoke.sh
           python -m unittest discover -s ops/tests -v

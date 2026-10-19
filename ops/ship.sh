@@ -36,7 +36,7 @@ target="$DEPLOY_USER@$DEPLOY_HOST"
 release_id="$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
 incoming="$DEPLOY_PATH/incoming/$release_id"
 setsid --wait ssh -p "$DEPLOY_PORT" "${ssh_options[@]}" "$target" \
-    "test -d '$DEPLOY_PATH/shared' && mkdir -m 700 -- '$incoming'" < /dev/null
+    "test -d '$DEPLOY_PATH/shared' || { printf '%s\\n' 'shared fehlt oder ist nicht zugänglich; zuerst Bootstrap als root ausführen.' >&2; exit 1; }; mkdir -m 700 -- '$incoming'" < /dev/null
 setsid --wait scp -P "$DEPLOY_PORT" "${ssh_options[@]}" \
     docker/compose.prod.yaml ops/deploy.sh "$target:$incoming/" < /dev/null
 setsid --wait ssh -p "$DEPLOY_PORT" "${ssh_options[@]}" "$target" \
