@@ -279,7 +279,9 @@
                     {% endfor %}
                 </div>
                 <div hidden>{{ inline_form.DELETE }}</div>
-                <button class="uk-button uk-button-danger uk-button-small uk-margin-small-top" type="button" data-remove-key>Schlüsselposition entfernen</button>
+                <div class="uk-margin-top">
+                    <button class="uk-button uk-button-danger uk-button-small" type="button" data-remove-key>Schlüsselposition entfernen</button>
+                </div>
             </article>
         {% endfor %}
     </div>
@@ -297,7 +299,9 @@
                 {% endfor %}
             </div>
             <div hidden>{{ key_formset.empty_form.DELETE }}</div>
-            <button class="uk-button uk-button-danger uk-button-small uk-margin-small-top" type="button" data-remove-key>Schlüsselposition entfernen</button>
+            <div class="uk-margin-top">
+                <button class="uk-button uk-button-danger uk-button-small" type="button" data-remove-key>Schlüsselposition entfernen</button>
+            </div>
         </article>
     </template>
 </section>
