@@ -1,4 +1,5 @@
 {% if perms.immobilien.access_employee_area %}
+    <li><a href="{% url 'verwaltung:dashboard' %}"{% if namespace == 'verwaltung' and route == 'dashboard' %} aria-current="page"{% endif %}>Übersicht</a></li>
     <li><a href="{% url 'wohnungsverwaltung:employee_application_list' %}"{% if 'employee_application' in route %} aria-current="{% if route == 'employee_application_list' %}page{% else %}true{% endif %}"{% endif %}>Bewerbungen</a></li>
     <li><a href="{% url 'wohnungsverwaltung:handover_protocol_list' %}"{% if 'handover_protocol' in route and route != 'handover_protocol_mine' %} aria-current="{% if route == 'handover_protocol_list' %}page{% else %}true{% endif %}"{% endif %}>Übergaben</a></li>
     <li><a href="{% url 'verwaltung:wohnung_list' %}"{% if namespace == 'verwaltung' and 'wohnung' in route or namespace == 'verwaltung' and 'raum' in route or route == 'apartment_photos' %} aria-current="{% if route == 'wohnung_list' %}page{% else %}true{% endif %}"{% endif %}>Wohnungen</a></li>

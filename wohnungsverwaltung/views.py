@@ -57,6 +57,7 @@ from .building_plans import (
     building_overview,
     floor_label,
 )
+from .dashboard import dashboard_context
 from .forms import (
     ACCEPTANCE_STATUS_LABELS,
     HANDOVER_STATUS_LABELS,
@@ -156,6 +157,16 @@ APPLICATION_PROOF_GROUPS = (
     (ApplicationProofCategory.IDENTITY, "identity_proof", "Identitätsnachweis"),
     (ApplicationProofCategory.CREDIT_REPORT, "credit_report_proof", "SCHUFA-Unterlage"),
 )
+
+
+@never_cache
+@employee_required
+def employee_dashboard(request: HttpRequest) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    return render(
+        request, "wohnungsverwaltung/employee_dashboard.html", dashboard_context(request.GET)
+    )
 
 
 def _can_manage_handover_photos(request: HttpRequest) -> bool:

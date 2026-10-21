@@ -249,6 +249,49 @@ absichtlich öffentlichen Beispielzugangsdaten sind ausschließlich für die lok
 
 Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD`, `DJANGO_EMAIL_USE_TLS` und `DJANGO_EMAIL_TIMEOUT`. Der SMTP-Timeout beträgt standardmäßig zehn Sekunden und kann über `DJANGO_EMAIL_TIMEOUT` in Sekunden angepasst werden. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
 
+## Verwaltungsübersicht
+
+Nach erfolgreicher Mitarbeiteranmeldung einschließlich Einmalcode öffnet sich
+unter `/verwaltung/` die **Übersicht**. Ein ausdrücklich gewähltes Anmeldeziel
+bleibt erhalten. Die Seite zeigt den gemeinsamen Arbeitsbestand aller Mitarbeiter;
+es gibt keine persönliche Aufgabenzuordnung.
+
+Vier verlinkte Kennzahlen führen zu vollständigen Listen mit 20 Einträgen je Seite:
+
+- **Offene Bewerbungen:** Status offen und nicht zurückgezogen, ohne Altersbegrenzung.
+- **Anstehende Besichtigungen:** geplante und bestätigte Termine aktiver Bewerbungen,
+  deren Ende noch nicht erreicht ist; heute bis einschließlich des siebten Folgetags.
+  Gezählt wird je Bewerbungstermin, auch bei gemeinsamen Besichtigungszeiten.
+- **Ausstehende Rückmeldungen:** Bewerbungen mit zukünftiger, noch unbestätigter
+  Besichtigung oder freigeschalteter, noch nicht eingereichter Hauptbewerbung.
+  Jede Bewerbung zählt einmal; der Zeitraum ist unbegrenzt.
+- **Offene Übergabeprotokolle:** gespeicherte Protokolle in Bearbeitung, ohne
+  browsergebundene Formularentwürfe und ohne Altersbegrenzung.
+
+**Jetzt bearbeiten** leitet je aktiver Bewerbung einen nächsten Schritt ab:
+Hauptbewerbung prüfen und final entscheiden, auf Hauptbewerbung warten,
+Besichtigungsergebnis nachtragen, offenen Termin abwarten, Auswahlvoraussetzungen
+prüfen, Main-Freischaltung prüfen, Bewerbung bewerten oder Besichtigung planen.
+Wartezustände erscheinen außerhalb der Mitarbeiteraufgaben. Offene Übergabeprotokolle
+ergänzen die Aufgaben. Abgelaufene Besichtigungen stehen zuerst, danach eingereichte
+Hauptbewerbungen, anschließend die übrigen Aufgaben; innerhalb jeder Gruppe steht
+der älteste Vorgang zuerst. Die Vorschau zeigt höchstens fünf Aufgaben und fünf
+ausstehende Rückmeldungen. Direktlinks öffnen die vorhandenen Detailansichten;
+ein Dashboardaufruf verändert keine fachlichen Daten.
+
+Der **Besichtigungskalender** zeigt Montag bis Sonntag der aktuellen Woche und
+erlaubt das Blättern in zukünftige Wochen. Pro Tag erscheinen höchstens drei noch
+nicht beendete Termine; bei weiteren Terminen führt ein Link zur vollständigen
+Tagesliste. Auf schmalen Bildschirmen stehen die Tage untereinander. Alle Zeiten
+und Tagesgrenzen gelten in `Europe/Berlin`. Das Blättern verändert die feste
+Kennzahl für heute und die nächsten sieben Tage nicht.
+
+Eingereichte Hauptbewerbungen bleiben bis zu ihrem fachlichen Abschluss als
+Mitarbeiteraufgabe sichtbar. Die Erfassung einer finalen Zu- oder Absage ist noch
+nicht Bestandteil der Anwendung und bleibt eine gesonderte Folgeaufgabe. Ebenso
+bleiben das Einblenden anderer Kalender, Kalenderabonnements und Synchronisation
+einem separaten Folgeissue nach Fertigstellung des Dashboards vorbehalten.
+
 ## Bewerbungen im Betreiberbereich
 
 Die Mitarbeiternavigation zeigt **Wohnungen finden** und **Gebäudeansicht**

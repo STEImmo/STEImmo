@@ -5,6 +5,7 @@ from . import views
 app_name = "verwaltung"
 
 urlpatterns = [
+    path("", views.employee_dashboard, name="dashboard"),
     path("wohnungen/<uuid:wohnung_id>/fotos/", views.apartment_photos, name="apartment_photos"),
     path(
         "wohnungen/<uuid:wohnung_id>/fotos/<uuid:photo_id>/loeschen/",

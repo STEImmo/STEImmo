@@ -194,6 +194,19 @@ Ablehnung sagt offene Termine in derselben Transaktion ab und benachrichtigt den
 Bewerber. Ein Rückzug sagt ebenfalls offene Termine ab, versendet aber keine
 zusätzliche Nachricht. Historische abgeschlossene Termine bleiben erhalten.
 
+## Verwaltungsübersicht
+
+Die Verwaltungsstartseite unter `/verwaltung/` und sämtliche über `bereich`
+ausgewählten Dashboardlisten erfordern ebenfalls `access_employee_area`.
+Kennzahlen, Aufgaben und Besichtigungswochen verwenden denselben gemeinsamen
+Mitarbeiterbestand wie die vorhandenen Fachansichten. Es gibt keine zusätzliche
+Zuordnung zu einzelnen Mitarbeitern oder neue Objektfreigaben. Browsergebundene
+Protokollentwürfe werden nicht in die gemeinsamen Kennzahlen aufgenommen.
+Dashboardantworten verwenden private `no-store`-Header und akzeptieren nur GET.
+Nach erfolgreicher MFA ist die Übersicht das Standardziel; ein geprüftes explizites
+Anmeldeziel hat weiterhin Vorrang. Ein direktes Einzelrecht zur Benutzerverwaltung
+allein gewährt weiterhin keinen Zugriff auf Mitarbeiterkennzahlen.
+
 ## Erweiterungsroutine
 
 Für eine neue geschützte Seite wird in dieser Reihenfolge vorgegangen:

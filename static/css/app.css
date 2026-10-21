@@ -1926,3 +1926,80 @@ a:active,
 .application-empty-state {
     grid-column: 1 / -1;
 }
+
+.dashboard-metric {
+    display: block;
+    height: 100%;
+    box-sizing: border-box;
+    color: var(--steimmo-color-text);
+}
+
+.dashboard-metric:hover {
+    color: var(--steimmo-color-text);
+    text-decoration: none;
+    outline: 1px solid var(--steimmo-color-primary);
+}
+
+.dashboard-metric__count {
+    display: block;
+    margin-block: var(--steimmo-space-sm);
+    font-size: var(--steimmo-font-size-3xl);
+    font-weight: 600;
+    color: var(--steimmo-color-primary);
+}
+
+.dashboard-section-heading,
+.dashboard-calendar-navigation,
+.dashboard-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--steimmo-space-sm);
+}
+
+.dashboard-entry > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.dashboard-calendar {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--steimmo-space-xs);
+}
+
+.dashboard-calendar__day {
+    min-width: 0;
+    padding: var(--steimmo-space-sm);
+    border: 1px solid var(--steimmo-color-border);
+    border-radius: var(--steimmo-radius-sm);
+    overflow-wrap: anywhere;
+}
+
+.dashboard-calendar__day--today {
+    border-color: var(--steimmo-color-primary);
+    background: var(--steimmo-color-success-surface);
+}
+
+.dashboard-calendar__today,
+.dashboard-calendar__entry span {
+    display: block;
+}
+
+.dashboard-calendar__today {
+    margin-top: var(--steimmo-space-2xs);
+    font-size: var(--steimmo-font-size-xs);
+    color: var(--steimmo-color-primary);
+}
+
+.dashboard-calendar__entry {
+    display: block;
+    font-size: var(--steimmo-font-size-sm);
+}
+
+@media (max-width: 1199px) {
+    .dashboard-calendar {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

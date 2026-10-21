@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% load tz %}
+
+{% block title %}Verwaltungsübersicht – STE Immobilien eGbR{% endblock %}
+
+{% block content %}
+{% timezone "Europe/Berlin" %}
+<section class="uk-section management-page">
+    <div class="uk-container">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
+        <div class="management-page__heading uk-margin-bottom">
+            <h1 class="uk-heading-small uk-margin-remove-bottom">Verwaltungsübersicht</h1>
+            <p class="uk-text-muted uk-margin-small-top">{{ today|date:"l, d. F Y" }} · Gemeinsamer Arbeitsbestand aller Mitarbeiter</p>
+        </div>
+
+        <div class="uk-grid-small uk-child-width-1-2@s uk-child-width-1-4@l uk-margin-medium-bottom" uk-grid>
+            {% for metric in metrics %}
+            <div>
+                <a class="dashboard-metric management-panel uk-card uk-card-default uk-card-body" href="{% url 'verwaltung:dashboard' %}?bereich={{ metric.section }}">
+                    <h2 class="uk-h5 uk-margin-remove">{{ metric.label }}</h2>
+                    <span class="dashboard-metric__count">{{ metric.count }}</span>
+                    <p class="uk-text-small uk-text-muted uk-margin-remove">{{ metric.description }}</p>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if list_title %}
+            <section class="management-panel uk-card uk-card-default uk-card-body" aria-labelledby="dashboard-list-title">
+                <a href="{% url 'verwaltung:dashboard' %}">Zur Übersicht</a>
+                <h2 id="dashboard-list-title" class="uk-card-title">{{ list_title }}{% if selected_day %} · {{ selected_day|date:"d.m.Y" }}{% endif %}</h2>
+                {% if section == 'termine' %}
+                    <p class="uk-text-meta">{% if selected_day %}Noch nicht beendete Besichtigungen dieses Tages{% else %}Heute und nächste sieben Tage{% endif %} · Europe/Berlin</p>
+                {% endif %}
+                <p class="uk-text-meta">{{ page_obj.paginator.count }} Einträge</p>
+                {% include "wohnungsverwaltung/_dashboard_entries.html" with empty_message="Keine Vorgänge für diese Ansicht vorhanden." %}
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="Seiten der Dashboardliste">
+                    <ul class="uk-pagination uk-flex-center uk-flex-wrap">
+                        {% if page_obj.has_previous %}<li><a href="{% querystring page=page_obj.previous_page_number %}">Zurück</a></li>{% endif %}
+                        <li class="uk-active"><span aria-current="page">Seite {{ page_obj.number }} von {{ page_obj.paginator.num_pages }}</span></li>
+                        {% if page_obj.has_next %}<li><a href="{% querystring page=page_obj.next_page_number %}">Weiter</a></li>{% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </section>
+        {% else %}
+            <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-medium-bottom" aria-labelledby="dashboard-tasks-title">
+                <div class="dashboard-section-heading">
+                    <h2 id="dashboard-tasks-title" class="uk-card-title uk-margin-remove">Jetzt bearbeiten <span class="uk-badge">{{ task_count }}</span></h2>
+                    <a href="?bereich=aufgaben">Alle ansehen</a>
+                </div>
+                <p class="uk-text-meta">Offene Aufgaben ohne Altersbegrenzung. Besichtigungsergebnisse und finale Entscheidungen stehen zuerst.</p>
+                {% include "wohnungsverwaltung/_dashboard_entries.html" with entries=task_entries empty_message="Aktuell keine Aufgaben. Alle vorhandenen Vorgänge sind bearbeitet oder warten auf den nächsten Schritt." %}
+            </section>
+
+            <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-medium-bottom" aria-labelledby="dashboard-calendar-title">
+                <div class="dashboard-section-heading">
+                    <div>
+                        <h2 id="dashboard-calendar-title" class="uk-card-title uk-margin-remove">Besichtigungskalender</h2>
+                        <p class="uk-text-meta uk-margin-small-top">{{ week_start|date:"d.m.Y" }}–{{ week_last|date:"d.m.Y" }} · Europe/Berlin</p>
+                    </div>
+                    <nav class="dashboard-calendar-navigation" aria-label="Kalenderwochen">
+                        {% if previous_week %}<a class="uk-button uk-button-default uk-button-small" href="?woche={{ previous_week|date:'Y-m-d' }}">Vorige Woche</a>{% endif %}
+                        <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:dashboard' %}">Diese Woche</a>
+                        {% if next_week %}<a class="uk-button uk-button-default uk-button-small" href="?woche={{ next_week|date:'Y-m-d' }}">Nächste Woche</a>{% endif %}
+                    </nav>
+                </div>
+                <p class="uk-text-meta">Geplante und bestätigte Besichtigungen, die noch nicht beendet sind. Ein Eintrag öffnet die zugehörige Bewerbung.</p>
+                <div class="dashboard-calendar">
+                    {% for day in calendar_days %}
+                    <section class="dashboard-calendar__day{% if day.is_today %} dashboard-calendar__day--today{% endif %}" aria-label="{{ day.date|date:'l, d.m.Y' }}{% if day.is_today %}, heute{% endif %}">
+                        <h3 class="uk-h5">{{ day.date|date:"D" }} <time datetime="{{ day.date|date:'Y-m-d' }}"{% if day.is_today %} aria-current="date"{% endif %}>{{ day.date|date:"d.m." }}</time>{% if day.is_today %}<span class="dashboard-calendar__today">Heute</span>{% endif %}</h3>
+                        <ul class="uk-list uk-list-divider">
+                            {% for entry in day.entries %}
+                            <li>
+                                <a class="dashboard-calendar__entry" href="{{ entry.url }}">
+                                    <strong>{{ entry.starts_at|date:"H:i" }}–{{ entry.ends_at|date:"H:i" }}</strong>
+                                    <span>{{ entry.apartment }}</span>
+                                    <span>{{ entry.person }}</span>
+                                    <span class="uk-text-small">{{ entry.label }}</span>
+                                </a>
+                            </li>
+                            {% empty %}<li class="uk-text-small uk-text-muted">Keine Besichtigungen</li>{% endfor %}
+                        </ul>
+                        {% if day.count > 3 %}<a class="uk-text-small" href="?bereich=termine&amp;datum={{ day.date|date:'Y-m-d' }}">Alle {{ day.count }} Termine</a>{% endif %}
+                    </section>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="management-panel uk-card uk-card-default uk-card-body" aria-labelledby="dashboard-waiting-title">
+                <div class="dashboard-section-heading">
+                    <h2 id="dashboard-waiting-title" class="uk-card-title uk-margin-remove">Wir warten auf Bewerber <span class="uk-badge">{{ counts.waiting }}</span></h2>
+                    <a href="?bereich=rueckmeldungen">Alle ansehen</a>
+                </div>
+                <p class="uk-text-meta">Ausstehende Terminbestätigungen und Hauptbewerbungen · ohne zeitliche Begrenzung</p>
+                {% include "wohnungsverwaltung/_dashboard_entries.html" with entries=waiting_entries empty_message="Keine ausstehenden Rückmeldungen." %}
+            </section>
+        {% endif %}
+    </div>
+</section>
+{% endtimezone %}
+{% endblock %}

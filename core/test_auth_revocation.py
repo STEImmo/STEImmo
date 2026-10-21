@@ -202,7 +202,7 @@ class AccountAuthenticationRegressionTests(AccountChangesMixin, TestCase):
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertTrue(EmployeeLoginVerification.objects.filter(user=account).exists())
         response = new_client.post(reverse("employee_mfa_verify"), {"code": code})
-        self.assertRedirects(response, reverse("verwaltung:wohnung_list"))
+        self.assertRedirects(response, reverse("verwaltung:dashboard"))
 
     def test_a_stale_account_form_does_not_restore_the_previous_password(self):
         account = self.create_account()

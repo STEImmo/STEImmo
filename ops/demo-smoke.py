@@ -44,7 +44,7 @@ assert (
     submit(manager, "/accounts/login/", {"username": "verwaltung", "password": "verwaltung"})
     == "/accounts/mitarbeiter-mfa/"
 )
-assert submit(manager, "/accounts/mitarbeiter-mfa/", {"code": "000000"}) == "/verwaltung/wohnungen/"
+assert submit(manager, "/accounts/mitarbeiter-mfa/", {"code": "000000"}) == "/verwaltung/"
 with manager.open(base + "/verwaltung/benutzer/", timeout=20) as response:
     assert response.status == 200
     assert urllib.parse.urlparse(response.url).path == "/verwaltung/benutzer/"
