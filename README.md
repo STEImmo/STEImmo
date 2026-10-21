@@ -304,7 +304,11 @@ Direktlinks öffnen die vorhandenen Detailansichten;
 ein Dashboardaufruf verändert keine fachlichen Daten.
 
 Der **Besichtigungskalender** zeigt Montag bis Sonntag der aktuellen Woche und
-erlaubt das Blättern in zukünftige Wochen. Pro Tag erscheinen höchstens drei noch
+erlaubt das Blättern in zukünftige Wochen. Beim Wochenwechsel wird nur der Kalender
+aktualisiert; die Seite und ihre Scrollposition bleiben erhalten. Browser-Zurück
+und -Vorwärts stellen die gewählte Woche wieder her. Ohne JavaScript funktionieren
+die Links weiterhin über normale Seitenaufrufe. Eine Animation ist noch nicht enthalten.
+Pro Tag erscheinen höchstens drei noch
 nicht beendete Termine; bei weiteren Terminen führt ein Link zur vollständigen
 Tagesliste. Auf schmalen Bildschirmen stehen die Tage untereinander. Alle Zeiten
 und Tagesgrenzen gelten in `Europe/Berlin`. Das Blättern verändert die feste

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load tz %}
+{% load static tz %}
 
 {% block title %}Verwaltungsübersicht – STE Immobilien eGbR{% endblock %}
 
@@ -61,11 +61,11 @@
                 {% endif %}
             </section>
         {% else %}
-            <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-medium-bottom" aria-labelledby="dashboard-calendar-title">
+            <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-medium-bottom" aria-labelledby="dashboard-calendar-title" data-dashboard-calendar>
                 <div class="dashboard-section-heading">
                     <div>
                         <h2 id="dashboard-calendar-title" class="uk-card-title uk-margin-remove">Besichtigungskalender</h2>
-                        <p class="uk-text-meta uk-margin-small-top">{{ week_start|date:"d.m.Y" }}–{{ week_last|date:"d.m.Y" }} · Europe/Berlin</p>
+                        <p class="uk-text-meta uk-margin-small-top" role="status">{{ week_start|date:"d.m.Y" }}–{{ week_last|date:"d.m.Y" }} · Europe/Berlin</p>
                     </div>
                     <nav class="dashboard-calendar-navigation" aria-label="Kalenderwochen">
                         {% if previous_week %}<a class="uk-button uk-button-default uk-button-small" href="?woche={{ previous_week|date:'Y-m-d' }}">Vorige Woche</a>{% endif %}
@@ -108,4 +108,8 @@
     </div>
 </section>
 {% endtimezone %}
+{% endblock %}
+
+{% block extra_js %}
+{% if not list_title %}<script src="{% static 'js/dashboard-calendar.js' %}?v=1" defer></script>{% endif %}
 {% endblock %}
