@@ -316,6 +316,8 @@ nicht beendete Termine; bei weiteren Terminen führt ein Link zur vollständigen
 Tagesliste. Auf schmalen Bildschirmen stehen die Tage untereinander. Alle Zeiten
 und Tagesgrenzen gelten in `Europe/Berlin`. Das Blättern verändert die feste
 Kennzahl für heute und die nächsten sieben Tage nicht.
+Die Parameter `woche` und `datum` erwarten `YYYY-MM-DD`; andere Formate fallen auf
+die aktuelle Woche beziehungsweise die Standardterminliste zurück.
 
 Eingereichte Hauptbewerbungen bleiben bis zu ihrem fachlichen Abschluss als
 Mitarbeiteraufgabe sichtbar. Die Erfassung einer finalen Zu- oder Absage ist noch

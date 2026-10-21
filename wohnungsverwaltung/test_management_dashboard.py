@@ -241,6 +241,21 @@ class ManagementDashboardTests(TestCase):
                 self.assertEqual(response.context["page_obj"].paginator.count, 1)
             ViewingAppointment.objects.all().delete()
 
+    def test_calendar_rejects_compact_and_iso_week_date_parameters(self):
+        for value in ("20261111", "2026-W46-3"):
+            with self.subTest(value=value):
+                response = self.get(woche=value)
+                self.assertEqual(response.context["week_start"].isoformat(), "2026-10-19")
+
+    def test_invalid_day_format_keeps_the_default_appointment_list(self):
+        for day in (1, 2):
+            self.viewing(self.application(), start=self.now + timedelta(days=day))
+        for value in ("20261022", "2026-W43-4"):
+            with self.subTest(value=value):
+                response = self.get(bereich="termine", datum=value)
+                self.assertIsNone(response.context["selected_day"])
+                self.assertEqual(response.context["page_obj"].paginator.count, 2)
+
     def test_lists_paginate_and_preview_is_bounded(self):
         for _ in range(21):
             self.application()

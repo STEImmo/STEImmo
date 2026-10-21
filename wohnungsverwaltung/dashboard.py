@@ -193,6 +193,8 @@ def midnight(day):
 def selected_date(value):
     try:
         day = date.fromisoformat(value)
+        if day.isoformat() != value:
+            return None
         # Leave room for normalising and advancing a full calendar week.
         return day if date.min + timedelta(days=7) <= day <= date.max - timedelta(days=14) else None
     except (ValueError, TypeError):
