@@ -39,6 +39,16 @@ class DemoSettingsTests(SimpleTestCase):
                 )
                 self.assertNotEqual(result.returncode, 0)
 
+    def test_demo_rejects_missing_or_unsafe_secret_keys(self):
+        for secret_key in ("", "change-this-for-local-development", "abcd" * 20):
+            with self.subTest(secret_key=secret_key):
+                result = self.load_settings(
+                    DJANGO_SETTINGS_MODULE="config.settings_demo", DJANGO_SECRET_KEY=secret_key
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("ImproperlyConfigured", result.stderr)
+                self.assertIn("DJANGO_SECRET_KEY", result.stderr)
+
 
 @override_settings(DEMO_MODE=True, EMAIL_BACKEND="django.core.mail.backends.dummy.EmailBackend")
 class DemoSetupTests(TestCase):

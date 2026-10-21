@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -15,8 +17,29 @@ def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
 
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-insecure-key-change-me")
+def validate_secret_key(value: str) -> str:
+    key = value.strip()
+    if (
+        len(key) < 50
+        or len(set(key)) < 5
+        or key.lower().startswith("django-insecure-")
+        or "change_me" in key.lower()
+        or "change-this" in key.lower()
+    ):
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY fehlt oder ist unsicher. Einen unabhängigen, zufällig erzeugten "
+            "Schlüssel mit mindestens 50 Zeichen und mindestens 5 verschiedenen Zeichen setzen; "
+            "keine Platzhalter verwenden. Lokale Entwicklung benötigt ausdrücklich DJANGO_DEBUG=1."
+        )
+    return value
+
+
 DEBUG = env_bool("DJANGO_DEBUG", default=False)
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
+if DEBUG:
+    SECRET_KEY = SECRET_KEY or "dev-only-insecure-key-change-me"
+else:
+    SECRET_KEY = validate_secret_key(SECRET_KEY)
 DEMO_MODE = False
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")

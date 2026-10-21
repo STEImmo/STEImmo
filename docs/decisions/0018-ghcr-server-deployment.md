@@ -187,6 +187,27 @@ oder inkompatiblen Migrationen bleibt die Anwendung zur Prüfung angehalten.
 Datenbank-Restore und rückwärts gerichtete Migrationen erfolgen nach
 gesonderter Freigabe; ein Image-Rollback setzt Daten nicht zurück.
 
+## Gemeinsame Prüfung des Django-Schlüssels (Issue #133)
+
+Auch `config.settings` verweigert bei `DEBUG=False` bereits beim Import einen
+fehlenden oder unsicheren `DJANGO_SECRET_KEY`; ohne `DJANGO_DEBUG` gilt dieser
+Modus ebenfalls. `config.settings_deployment` verwendet dieselbe Validierung
+für das Produktions- und das Demo-Profil.
+Erforderlich sind mindestens 50 Zeichen und 5 unterschiedliche Zeichen ohne
+äußere Leerzeichen mitzuzählen. `django-insecure-` als Präfix sowie die
+Platzhalterbestandteile `change_me` und `change-this` werden unabhängig von
+Groß-/Kleinschreibung abgelehnt. Fehlermeldungen geben den Schlüssel nicht aus.
+Diese Mindestprüfung kann Zufälligkeit und Geheimhaltung nicht beweisen:
+Für Produktion stets ein eigenes Zufallsgeheimnis erzeugen, beispielsweise mit
+`openssl rand -hex 32`, und ausschließlich in der Serverkonfiguration speichern.
+
+Nur ausdrücklich aktiviertes `DJANGO_DEBUG=1` erlaubt den öffentlichen lokalen
+Beispielschlüssel und bei fehlendem oder leerem Wert den Entwicklungsfallback.
+Die Produktionssettings verbieten diesen Entwicklungsmodus weiterhin.
+CI erzeugt je Prüflauf einen flüchtigen Zufallsschlüssel ohne Produktionszugriff.
+`core/test_secret_key_settings.py` prüft die Basiskonfiguration in isolierten
+Prozessen; `core/test_production_settings.py` sichert die Produktionssettings ab.
+
 ## Deploy-Benutzer, Serverdateien und Secrets
 
 Der vorhandene Benutzer `deploy` erhält Zugriff auf das Projektverzeichnis
