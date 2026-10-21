@@ -5,12 +5,13 @@
 
 {% block content %}
 {% timezone "Europe/Berlin" %}
-<section class="uk-section management-page">
+<section class="uk-section management-page dashboard-page">
     <div class="uk-container">
         {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
-        <div class="management-page__heading uk-margin-bottom">
-            <h1 class="uk-heading-small uk-margin-remove-bottom">Verwaltungsübersicht</h1>
-            <p class="uk-text-muted uk-margin-small-top">{{ today|date:"l, d. F Y" }} · Gemeinsamer Arbeitsbestand aller Mitarbeiter</p>
+        <div class="dashboard-heading uk-margin-medium-bottom">
+            <p class="home-eyebrow">STE Immobilien · Ihr Verwaltungsbereich</p>
+            <h1 class="home-title">Verwaltungsübersicht</h1>
+            <p class="dashboard-heading__date">{{ today|date:"l, d. F Y" }} · Gemeinsamer Arbeitsbestand aller Mitarbeiter</p>
         </div>
 
         <div class="{% if not list_title %}dashboard-summary {% endif %}uk-grid-medium uk-flex-top uk-margin-medium-bottom" uk-grid>
@@ -31,7 +32,7 @@
             <div class="uk-width-3-5@l">
                 <section class="dashboard-tasks management-panel uk-card uk-card-default uk-card-body" aria-labelledby="dashboard-tasks-title">
                     <div class="dashboard-section-heading">
-                        <h2 id="dashboard-tasks-title" class="uk-card-title uk-margin-remove">Jetzt bearbeiten <span class="uk-badge">{{ task_count }}</span></h2>
+                        <h2 id="dashboard-tasks-title" class="uk-card-title uk-margin-remove"><span class="dashboard-section-icon" uk-icon="list" aria-hidden="true"></span> Jetzt bearbeiten <span class="uk-badge">{{ task_count }}</span></h2>
                         {% if task_count %}<a href="?bereich=aufgaben">{% if task_count == 1 %}Aufgabe ansehen{% else %}Alle {{ task_count }} Aufgaben ansehen{% endif %}</a>{% endif %}
                     </div>
                     <p class="uk-text-meta">Besichtigungsergebnisse und finale Entscheidungen zuerst.</p>
@@ -64,7 +65,7 @@
             <section class="management-panel uk-card uk-card-default uk-card-body uk-margin-medium-bottom" aria-labelledby="dashboard-calendar-title" data-dashboard-calendar>
                 <div class="dashboard-section-heading">
                     <div>
-                        <h2 id="dashboard-calendar-title" class="uk-card-title uk-margin-remove">Besichtigungskalender</h2>
+                        <h2 id="dashboard-calendar-title" class="uk-card-title uk-margin-remove"><span class="dashboard-section-icon" uk-icon="calendar" aria-hidden="true"></span> Besichtigungskalender</h2>
                         <p class="uk-text-meta uk-margin-small-top" role="status">{{ week_start|date:"d.m.Y" }}–{{ week_last|date:"d.m.Y" }} · Europe/Berlin</p>
                     </div>
                     <nav class="dashboard-calendar-navigation" aria-label="Kalenderwochen">
@@ -98,7 +99,7 @@
 
             <section class="management-panel uk-card uk-card-default uk-card-body" aria-labelledby="dashboard-waiting-title">
                 <div class="dashboard-section-heading">
-                    <h2 id="dashboard-waiting-title" class="uk-card-title uk-margin-remove">Wir warten auf Bewerber <span class="uk-badge">{{ counts.waiting }}</span></h2>
+                    <h2 id="dashboard-waiting-title" class="uk-card-title uk-margin-remove"><span class="dashboard-section-icon" uk-icon="mail" aria-hidden="true"></span> Wir warten auf Bewerber <span class="uk-badge">{{ counts.waiting }}</span></h2>
                     <a href="{{ waiting_list_url }}">Alle ansehen</a>
                 </div>
                 <p class="uk-text-meta">Ausstehende Terminbestätigungen und Hauptbewerbungen · ohne zeitliche Begrenzung</p>

@@ -302,6 +302,8 @@ Zeitangaben sichtbar. Unterhalb folgt der Wochenkalender über die gesamte Breit
 Auf dem Desktop haben die beiden KPI-Reihen zusammen und das Aufgabenfeld dieselbe
 feste Höhe, unabhängig von der Aufgabenanzahl. Bei längeren Aufgabeninhalten scrollt
 die Liste innerhalb des Felds. Auf schmalen Bildschirmen bleibt die Höhe flexibel.
+Warme Flächen, Typografie und Symbole greifen die Gestaltung der öffentlichen
+Startseite auf. Alle KPI-Kacheln sind einheitlich gestaltet; der Kopfbereich bleibt ohne Foto.
 Die Rückmeldungsvorschau zeigt höchstens fünf Einträge.
 Direktlinks öffnen die vorhandenen Detailansichten;
 ein Dashboardaufruf verändert keine fachlichen Daten.
