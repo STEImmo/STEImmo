@@ -1,16 +1,15 @@
 <ul class="uk-list uk-list-divider dashboard-entries">
     {% for entry in entries %}
     <li class="dashboard-entry">
-        <div>
-            <strong>{{ entry.label }}</strong>
-            <div>{{ entry.apartment }} · {{ entry.person }}</div>
-            {% if entry.starts_at %}<div class="uk-text-small">{{ entry.starts_at|date:"d.m.Y, H:i" }}–{{ entry.ends_at|date:"H:i" }} Uhr</div>{% endif %}
+        <a class="dashboard-entry__link" href="{{ entry.url }}">
+            <strong class="dashboard-entry__label">{{ entry.label }}</strong>
+            <span class="dashboard-entry__subject">{{ entry.apartment }} · {{ entry.person }}</span>
+            {% if entry.starts_at %}<span class="dashboard-entry__meta uk-text-small">{{ entry.starts_at|date:"d.m.Y, H:i" }}–{{ entry.ends_at|date:"H:i" }} Uhr</span>{% endif %}
             {% if not compact %}
-                {% if entry.reason %}<div class="uk-text-small">{{ entry.reason }}</div>{% endif %}
-                {% if entry.since %}<div class="uk-text-meta">{{ entry.since_label }} {{ entry.since|date:"d.m.Y, H:i" }} Uhr</div>{% endif %}
+                {% if entry.reason %}<span class="dashboard-entry__meta uk-text-small">{{ entry.reason }}</span>{% endif %}
+                {% if entry.since %}<span class="dashboard-entry__meta uk-text-meta">{{ entry.since_label }} {{ entry.since|date:"d.m.Y, H:i" }} Uhr</span>{% endif %}
             {% endif %}
-        </div>
-        <a class="uk-button uk-button-default uk-button-small" href="{{ entry.url }}" aria-label="{{ entry.label }}: {{ entry.person }}, {{ entry.apartment }}">Ansehen</a>
+        </a>
     </li>
     {% empty %}<li class="uk-text-muted">{{ empty_message }}</li>{% endfor %}
 </ul>

@@ -305,8 +305,9 @@ die Liste innerhalb des Felds. Auf schmalen Bildschirmen bleibt die Höhe flexib
 Warme Flächen, Typografie und Symbole greifen die Gestaltung der öffentlichen
 Startseite auf. Alle KPI-Kacheln sind einheitlich gestaltet; der Kopfbereich bleibt ohne Foto.
 Die Rückmeldungsvorschau zeigt höchstens fünf Einträge.
-Direktlinks öffnen die vorhandenen Detailansichten;
-ein Dashboardaufruf verändert keine fachlichen Daten.
+Aufgaben und Rückmeldungen sind über den gesamten Eintrag anklickbar und öffnen
+die vorhandenen Detailansichten; separate Ansehen-Buttons entfallen.
+Ein Dashboardaufruf verändert keine fachlichen Daten.
 
 Der **Besichtigungskalender** zeigt Montag bis Sonntag der aktuellen Woche und
 erlaubt das Blättern in zukünftige Wochen. Beim Wochenwechsel wird nur der Kalender
