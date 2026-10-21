@@ -23,11 +23,8 @@ STEP_LABELS = {
     "handover": "Übergabeprotokoll fortsetzen",
 }
 LIST_TITLES = {
-    "bewerbungen": "Offene Bewerbungen",
     "aufgaben": "Jetzt bearbeiten",
     "termine": "Anstehende Besichtigungen",
-    "rueckmeldungen": "Wir warten auf Bewerber",
-    "uebergaben": "Offene Übergabeprotokolle",
 }
 ENTRY_FIELDS = (
     "pk",
@@ -44,11 +41,43 @@ ENTRY_FIELDS = (
 )
 
 
+def dashboard_links():
+    applications = reverse("wohnungsverwaltung:employee_application_list")
+    return {
+        "bewerbungen": applications + "?workflow=open&segment=all",
+        "rueckmeldungen": applications + "?workflow=waiting&segment=all",
+        "uebergaben": reverse("wohnungsverwaltung:handover_protocol_list") + "?status=open",
+        "termine": reverse("verwaltung:dashboard") + "#dashboard-calendar-title",
+    }
+
+
+def filter_application_workflow(applications, workflow, now):
+    """Keep dashboard counts and both levels of the application workspace consistent."""
+    if workflow not in ("open", "waiting"):
+        return applications
+    applications = applications.filter(status="open", interest_withdrawn_at__isnull=True)
+    if workflow == "waiting":
+        applications = applications.annotate(
+            waiting_for_main=Case(
+                When(main_application_unlocked=True, submitted_at__isnull=True, then=Value(True)),
+                default=Value(False),
+            ),
+            waiting_for_confirmation=Exists(
+                ViewingAppointment.objects.filter(
+                    application_id=OuterRef("pk"),
+                    status="planned",
+                    starts_at__gt=now,
+                )
+            ),
+        ).filter(Q(waiting_for_main=True) | Q(waiting_for_confirmation=True))
+    return applications
+
+
 def application_rows(now):
     open_viewings = ViewingAppointment.objects.filter(
         application_id=OuterRef("pk"), status__in=("planned", "confirmed")
     )
-    applications = Bewerbung.objects.filter(status="open", interest_withdrawn_at__isnull=True)
+    applications = filter_application_workflow(Bewerbung.objects.all(), "open", now)
     applications = (
         applications.annotate(
             open_viewing_start=Subquery(open_viewings.values("starts_at")[:1]),
@@ -180,10 +209,7 @@ def dashboard_context(query):
 
     applications = application_rows(now)
     application_tasks = applications.exclude(dashboard_step__in=("waiting_main", "viewing"))
-    waiting = applications.filter(
-        Q(main_application_unlocked=True, submitted_at__isnull=True)
-        | Q(open_viewing_status="planned", open_viewing_start__gt=now)
-    )
+    waiting = filter_application_workflow(applications, "waiting", now)
     protocols = Protokoll.objects.filter(status="open").annotate(
         dashboard_step=Value("handover"),
         dashboard_reason=Value(""),
@@ -242,6 +268,9 @@ def dashboard_context(query):
             "description": "In Bearbeitung · ohne Formularentwürfe · gesamter Bestand",
         },
     ]
+    links = dashboard_links()
+    for metric in metrics:
+        metric["href"] = links[metric["section"]]
     section = query.get("bereich", "")
     context = {
         "counts": counts,
@@ -250,14 +279,12 @@ def dashboard_context(query):
         "today": today,
         "week_start": week_start,
         "week_last": week_end - timedelta(days=1),
+        "waiting_list_url": links["rueckmeldungen"],
     }
     if section in LIST_TITLES:
         day = selected_date(query.get("datum")) if section == "termine" else None
         listing = {
-            "bewerbungen": applications.order_by("created_at", "pk").values(*ENTRY_FIELDS),
             "aufgaben": tasks,
-            "rueckmeldungen": waiting.order_by("created_at", "pk").values(*ENTRY_FIELDS),
-            "uebergaben": protocols.order_by("created_at", "pk").values(*ENTRY_FIELDS),
             "termine": appointments.filter(
                 starts_at__gte=midnight(day), starts_at__lt=midnight(day + timedelta(days=1))
             )
@@ -269,9 +296,7 @@ def dashboard_context(query):
             list_title=LIST_TITLES[section],
             page_obj=page,
             selected_day=day,
-            entries=format_appointments(page)
-            if section == "termine"
-            else format_rows(page, waiting=section == "rueckmeldungen"),
+            entries=format_appointments(page) if section == "termine" else format_rows(page),
         )
         return context
 

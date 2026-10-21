@@ -16,6 +16,12 @@
             <div>{{ application.get_applicant_status_display }}</div>
         </div>
         <div class="uk-text-small uk-margin-small-top">Priorität: {{ application.get_review_priority_display }}</div>
+        {% if application.waiting_for_main or application.waiting_for_confirmation %}
+            <div class="uk-text-small uk-margin-small-top">
+                {% if application.waiting_for_main %}<div>Warten auf Hauptbewerbung</div>{% endif %}
+                {% if application.waiting_for_confirmation %}<div>Warten auf Terminbestätigung</div>{% endif %}
+            </div>
+        {% endif %}
         {% if segment == 'review' %}
             <div class="uk-text-small uk-margin-small-top">
                 <strong>Prüfgrund:</strong>

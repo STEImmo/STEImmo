@@ -2000,7 +2000,19 @@ class ApartmentManagementFilterForm(UIkitFormMixin, forms.Form):
         ]
 
 
+APPLICATION_WORKFLOW_CHOICES = (
+    ("", "Alle Bewerbungen"),
+    ("open", "Offene Bewerbungen"),
+    ("waiting", "Rückmeldung ausstehend"),
+)
+
+
 class EmployeeApplicationUnitFilterForm(UIkitFormMixin, forms.Form):
+    workflow = forms.ChoiceField(
+        required=False,
+        label="Bewerbungsauswahl",
+        choices=APPLICATION_WORKFLOW_CHOICES,
+    )
     floor = forms.MultipleChoiceField(
         required=False,
         label="Etage",
@@ -2107,6 +2119,11 @@ class HandoverProtocolFilterForm(UIkitFormMixin, forms.Form):
 
 
 class EmployeeApplicationFilterForm(UIkitFormMixin, forms.Form):
+    workflow = forms.ChoiceField(
+        required=False,
+        label="Bewerbungsauswahl",
+        choices=APPLICATION_WORKFLOW_CHOICES,
+    )
     viewing_status = forms.ChoiceField(
         required=False,
         choices=(

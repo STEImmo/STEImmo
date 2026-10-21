@@ -12,10 +12,12 @@
     <div class="uk-container">
         {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
         {% if unit %}
-            <ul class="uk-breadcrumb">
-                <li><a href="{% url 'wohnungsverwaltung:employee_application_list' %}">Bewerbungen je Wohnung</a></li>
-                <li><span>{{ unit }}</span></li>
-            </ul>
+            <div data-table-filter-fragment="application-breadcrumb">
+                <ul class="uk-breadcrumb">
+                    <li><a href="{{ application_index_url }}">Bewerbungen je Wohnung</a></li>
+                    <li><span>{{ unit }}</span></li>
+                </ul>
+            </div>
             <h1 class="uk-heading-small">Bewerbungen</h1>
             <h2 class="uk-h3">{{ unit }}</h2>
 
@@ -116,7 +118,7 @@
                         </th>
                         <td data-label="Bewerbungen">{{ unit.application_count }} Bewerbung{{ unit.application_count|pluralize:"en" }}</td>
                         <td data-label="Aktion">
-                            <a class="uk-button uk-button-default uk-button-small" href="?wohnung={{ unit.pk }}"
+                            <a class="uk-button uk-button-default uk-button-small" href="{% if workflow %}{% querystring filter_query wohnung=unit.pk segment='all' page=None %}{% else %}?wohnung={{ unit.pk }}{% endif %}"
                                aria-label="Bewerbungen für {{ unit }} ansehen">Bewerbungen ansehen</a>
                         </td>
                     </tr>

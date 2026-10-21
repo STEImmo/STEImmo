@@ -18,7 +18,7 @@
                 <div class="uk-grid-small uk-child-width-1-2@s {% if list_title %}uk-child-width-1-4@l{% endif %}" uk-grid>
                     {% for metric in metrics %}
                     <div>
-                        <a class="dashboard-metric management-panel uk-card uk-card-default uk-card-body" href="{% url 'verwaltung:dashboard' %}?bereich={{ metric.section }}">
+                        <a class="dashboard-metric management-panel uk-card uk-card-default uk-card-body" href="{{ metric.href }}">
                             <h2 class="dashboard-metric__title uk-margin-remove">{{ metric.label }}</h2>
                             <span class="dashboard-metric__count">{{ metric.count }}</span>
                             <p class="dashboard-metric__description uk-text-muted uk-margin-remove">{{ metric.description }}</p>
@@ -99,7 +99,7 @@
             <section class="management-panel uk-card uk-card-default uk-card-body" aria-labelledby="dashboard-waiting-title">
                 <div class="dashboard-section-heading">
                     <h2 id="dashboard-waiting-title" class="uk-card-title uk-margin-remove">Wir warten auf Bewerber <span class="uk-badge">{{ counts.waiting }}</span></h2>
-                    <a href="?bereich=rueckmeldungen">Alle ansehen</a>
+                    <a href="{{ waiting_list_url }}">Alle ansehen</a>
                 </div>
                 <p class="uk-text-meta">Ausstehende Terminbestätigungen und Hauptbewerbungen · ohne zeitliche Begrenzung</p>
                 {% include "wohnungsverwaltung/_dashboard_entries.html" with entries=waiting_entries empty_message="Keine ausstehenden Rückmeldungen." %}

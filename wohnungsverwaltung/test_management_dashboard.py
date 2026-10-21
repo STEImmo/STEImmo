@@ -167,9 +167,9 @@ class ManagementDashboardTests(TestCase):
         self.viewing(self.application(), status="confirmed")
         self.viewing(self.application(), start=self.now - timedelta(minutes=10))
         self.viewing(self.application(main_application_unlocked=True, submitted_at=self.now))
-        response = self.get(bereich="rueckmeldungen")
+        response = self.get()
         self.assertEqual(response.context["counts"]["waiting"], 3)
-        self.assertEqual(response.context["page_obj"].paginator.count, 3)
+        self.assertEqual(len(response.context["waiting_entries"]), 3)
 
     def test_open_protocols_are_tasks_but_signed_and_blocked_protocols_are_not(self):
         application = self.application(main_application_unlocked=True)
@@ -248,7 +248,7 @@ class ManagementDashboardTests(TestCase):
         self.assertEqual(len(response.context["task_entries"]), 3)
         self.assertEqual(response.context["task_count"], 21)
         self.assertContains(response, "Alle 21 Aufgaben ansehen")
-        response = self.get(bereich="bewerbungen", page=2)
+        response = self.get(bereich="aufgaben", page=2)
         self.assertEqual(len(response.context["entries"]), 1)
         self.assertEqual(response.context["page_obj"].paginator.count, 21)
 

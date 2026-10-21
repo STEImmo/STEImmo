@@ -69,7 +69,10 @@
 
     function updateFragments(parsedDocument) {
         let foundFragment = false;
-        for (const name of ["filter-summary", "table-body", "application-count", "pagination"]) {
+        for (const name of [
+            "filter-summary", "table-body", "application-count", "pagination",
+            "application-breadcrumb",
+        ]) {
             const selector = `[data-table-filter-fragment="${name}"]`;
             const currentFragments = document.querySelectorAll(selector);
             const newFragment = parsedDocument.querySelector(selector);
