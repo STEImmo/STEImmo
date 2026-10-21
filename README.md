@@ -275,8 +275,12 @@ prüfen, Main-Freischaltung prüfen, Bewerbung bewerten oder Besichtigung planen
 Wartezustände erscheinen außerhalb der Mitarbeiteraufgaben. Offene Übergabeprotokolle
 ergänzen die Aufgaben. Abgelaufene Besichtigungen stehen zuerst, danach eingereichte
 Hauptbewerbungen, anschließend die übrigen Aufgaben; innerhalb jeder Gruppe steht
-der älteste Vorgang zuerst. Die Vorschau zeigt höchstens fünf Aufgaben und fünf
-ausstehende Rückmeldungen. Direktlinks öffnen die vorhandenen Detailansichten;
+der älteste Vorgang zuerst. Neben den vier kompakten Kennzahlen zeigt die Vorschau
+höchstens drei Aufgaben mit Arbeitsschritt, Wohnung und Bewerber. Der Link zur
+vollständigen Aufgabenliste nennt die Gesamtzahl; dort bleiben Prüfgründe und
+Zeitangaben sichtbar. Unterhalb folgt der Wochenkalender über die gesamte Breite.
+Die Rückmeldungsvorschau zeigt höchstens fünf Einträge.
+Direktlinks öffnen die vorhandenen Detailansichten;
 ein Dashboardaufruf verändert keine fachlichen Daten.
 
 Der **Besichtigungskalender** zeigt Montag bis Sonntag der aktuellen Woche und

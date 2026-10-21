@@ -295,7 +295,7 @@ def dashboard_context(query):
     for appointment in previews:
         by_day.setdefault(appointment.calendar_day, []).append(appointment)
     context.update(
-        task_entries=format_rows(tasks[:5]),
+        task_entries=format_rows(tasks[:3]),
         task_count=tasks.count(),
         waiting_entries=format_rows(
             waiting.order_by("created_at", "pk").values(*ENTRY_FIELDS)[:5], waiting=True

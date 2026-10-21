@@ -245,10 +245,22 @@ class ManagementDashboardTests(TestCase):
         for _ in range(21):
             self.application()
         response = self.get()
-        self.assertEqual(len(response.context["task_entries"]), 5)
+        self.assertEqual(len(response.context["task_entries"]), 3)
+        self.assertEqual(response.context["task_count"], 21)
+        self.assertContains(response, "Alle 21 Aufgaben ansehen")
         response = self.get(bereich="bewerbungen", page=2)
         self.assertEqual(len(response.context["entries"]), 1)
         self.assertEqual(response.context["page_obj"].paginator.count, 21)
+
+    def test_task_preview_is_compact_and_full_list_keeps_reasons_and_dates(self):
+        Wohnung.objects.filter(pk=self.unit.pk).update(pet_review_required=True)
+        self.application(haustiere=True)
+        overview = self.get()
+        self.assertNotContains(overview, "Tierhaltung muss geprüft werden")
+        self.assertNotContains(overview, "Bewerbung eingegangen am")
+        listing = self.get(bereich="aufgaben")
+        self.assertContains(listing, "Tierhaltung muss geprüft werden")
+        self.assertContains(listing, "Bewerbung eingegangen am")
 
     def test_query_count_does_not_grow_with_calendar_or_task_rows(self):
         self.viewing(self.application())
