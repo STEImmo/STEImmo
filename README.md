@@ -299,6 +299,9 @@ der älteste Vorgang zuerst. Neben den vier kompakten Kennzahlen zeigt die Vorsc
 höchstens drei Aufgaben mit Arbeitsschritt, Wohnung und Bewerber. Der Link zur
 vollständigen Aufgabenliste nennt die Gesamtzahl; dort bleiben Prüfgründe und
 Zeitangaben sichtbar. Unterhalb folgt der Wochenkalender über die gesamte Breite.
+Auf dem Desktop haben die beiden KPI-Reihen zusammen und das Aufgabenfeld dieselbe
+feste Höhe, unabhängig von der Aufgabenanzahl. Bei längeren Aufgabeninhalten scrollt
+die Liste innerhalb des Felds. Auf schmalen Bildschirmen bleibt die Höhe flexibel.
 Die Rückmeldungsvorschau zeigt höchstens fünf Einträge.
 Direktlinks öffnen die vorhandenen Detailansichten;
 ein Dashboardaufruf verändert keine fachlichen Daten.

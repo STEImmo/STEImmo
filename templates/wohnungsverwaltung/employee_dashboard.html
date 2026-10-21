@@ -13,9 +13,9 @@
             <p class="uk-text-muted uk-margin-small-top">{{ today|date:"l, d. F Y" }} · Gemeinsamer Arbeitsbestand aller Mitarbeiter</p>
         </div>
 
-        <div class="uk-grid-medium uk-flex-top uk-margin-medium-bottom" uk-grid>
+        <div class="{% if not list_title %}dashboard-summary {% endif %}uk-grid-medium uk-flex-top uk-margin-medium-bottom" uk-grid>
             <div class="{% if list_title %}uk-width-1-1{% else %}uk-width-2-5@l{% endif %}">
-                <div class="uk-grid-small uk-child-width-1-2@s {% if list_title %}uk-child-width-1-4@l{% endif %}" uk-grid>
+                <div class="{% if list_title %}uk-grid-small uk-child-width-1-2@s uk-child-width-1-4@l{% else %}dashboard-metrics{% endif %}"{% if list_title %} uk-grid{% endif %}>
                     {% for metric in metrics %}
                     <div>
                         <a class="dashboard-metric management-panel uk-card uk-card-default uk-card-body" href="{{ metric.href }}">
