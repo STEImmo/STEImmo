@@ -2006,6 +2006,11 @@ a:active,
     background: var(--steimmo-color-success-surface);
 }
 
+.dashboard-calendar__day > h3 {
+    /* Reserve the extra line for today's label in every day column. */
+    min-block-size: 3rem;
+}
+
 .dashboard-calendar__today,
 .dashboard-calendar__entry span {
     display: block;
