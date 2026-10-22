@@ -102,7 +102,7 @@ class DemoSetupTests(TestCase):
         self.assertRedirects(response, reverse("employee_mfa_verify"))
         self.assertNotIn("_auth_user_id", self.client.session)
         response = self.client.post(reverse("employee_mfa_verify"), {"code": "000000"})
-        self.assertRedirects(response, reverse("verwaltung:wohnung_list"))
+        self.assertRedirects(response, reverse("verwaltung:dashboard"))
         self.assertEqual(self.client.get(reverse("verwaltung:user_account_list")).status_code, 200)
 
     def test_reissued_demo_code_finishes_and_gets_new_challenge(self):

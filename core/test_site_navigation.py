@@ -64,6 +64,7 @@ class SiteNavigationTests(TestCase):
                     "immobilien.access_employee_area"
                 ):
                     destinations[2:] = [
+                        reverse("verwaltung:dashboard"),
                         reverse("wohnungsverwaltung:employee_application_list"),
                         reverse("wohnungsverwaltung:handover_protocol_list"),
                         reverse("verwaltung:wohnung_list"),
@@ -104,6 +105,7 @@ class SiteNavigationTests(TestCase):
                     [
                         reverse(name)
                         for name in (
+                            "verwaltung:dashboard",
                             "wohnungsverwaltung:employee_application_list",
                             "wohnungsverwaltung:handover_protocol_list",
                             "verwaltung:wohnung_list",
@@ -150,7 +152,7 @@ class SiteNavigationTests(TestCase):
             (
                 "wohnungsverwaltung_public:apartment_search",
                 "wohnungsverwaltung_public:building_view",
-                "verwaltung:wohnung_list",
+                "verwaltung:dashboard",
                 "wohnungsverwaltung:handover_protocol_list",
                 "wohnungsverwaltung:employee_application_list",
                 "verwaltung:user_account_list",
@@ -212,7 +214,7 @@ class SiteNavigationTests(TestCase):
                 self.assertEqual(
                     [(href, current) for href, current in links if current],
                     [
-                        (reverse("verwaltung:wohnung_list"), "true")
+                        (reverse("verwaltung:dashboard"), "true")
                         if label == "Footernavigation"
                         else (reverse("verwaltung:stellplatz_list"), "page")
                     ],

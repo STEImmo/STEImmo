@@ -57,6 +57,7 @@ from .building_plans import (
     building_overview,
     floor_label,
 )
+from .dashboard import dashboard_context, dashboard_links, filter_application_workflow
 from .forms import (
     ACCEPTANCE_STATUS_LABELS,
     HANDOVER_STATUS_LABELS,
@@ -156,6 +157,19 @@ APPLICATION_PROOF_GROUPS = (
     (ApplicationProofCategory.IDENTITY, "identity_proof", "Identitätsnachweis"),
     (ApplicationProofCategory.CREDIT_REPORT, "credit_report_proof", "SCHUFA-Unterlage"),
 )
+
+
+@never_cache
+@employee_required
+def employee_dashboard(request: HttpRequest) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    section = request.GET.get("bereich")
+    if section in ("bewerbungen", "rueckmeldungen", "uebergaben"):
+        return redirect(dashboard_links()[section])
+    return render(
+        request, "wohnungsverwaltung/employee_dashboard.html", dashboard_context(request.GET)
+    )
 
 
 def _can_manage_handover_photos(request: HttpRequest) -> bool:
@@ -943,6 +957,7 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(["GET"])
 
     context = {}
+    now = timezone.now()
     if "wohnung" in request.GET:
         unit_id = _valid_wohnung_id(request.GET.get("wohnung"))
         if unit_id is None:
@@ -951,6 +966,7 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
         filters = EmployeeApplicationFilterForm(request.GET)
         filters.is_valid()
         cleaned_filters = filters.cleaned_data
+        workflow = cleaned_filters.get("workflow", "")
         pet_review_mismatch = Q(haustiere=True) if unit.pet_review_required is True else Q()
         pet_review_expression = (
             Case(
@@ -1012,6 +1028,7 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
                 ),
             )
         )
+        applications = filter_application_workflow(applications, workflow, now)
         if cleaned_filters.get("q"):
             query = cleaned_filters["q"]
             applications = applications.alias(
@@ -1050,7 +1067,7 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
         if cleaned_filters.get("created_to"):
             applications = applications.filter(created_at__date__lte=cleaned_filters["created_to"])
 
-        segment = request.GET.get("segment", "matching")
+        segment = request.GET.get("segment", "all" if workflow else "matching")
         if segment not in {"matching", "review", "all"}:
             segment = "matching"
         if segment == "matching":
@@ -1078,7 +1095,7 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
                 filters,
                 (
                     ("applicant", "Bewerber", ("people", "priority")),
-                    ("status", "Bearbeitung", ("status",)),
+                    ("status", "Bearbeitung", ("status", "workflow")),
                     ("main", "Hauptbewerbungsstatus", ("main_status",)),
                     ("viewing", "Besichtigung", ("viewing_status",)),
                     ("created", "Anfrage eingegangen", ("created_from", "created_to")),
@@ -1099,6 +1116,8 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
             segment=segment,
             requirements_open=(unit.max_occupants is None or unit.pet_review_required is None),
             unit_application_count=Bewerbung.objects.filter(wohnung=unit).count(),
+            application_index_url=reverse("wohnungsverwaltung:employee_application_list")
+            + ("?" + urlencode({"workflow": workflow}) if workflow else ""),
         )
     else:
         filters = EmployeeApplicationUnitFilterForm(
@@ -1110,7 +1129,17 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
         )
         filters.is_valid()
         cleaned_filters = filters.cleaned_data
-        units = Wohnung.objects.annotate(application_count=Count("bewerbungen"))
+        workflow = cleaned_filters.get("workflow", "")
+        if workflow:
+            matching = filter_application_workflow(Bewerbung.objects.all(), workflow, now)
+            units = Wohnung.objects.annotate(
+                application_count=Count(
+                    "bewerbungen",
+                    filter=Q(bewerbungen__pk__in=matching.values("pk")),
+                )
+            ).filter(application_count__gt=0)
+        else:
+            units = Wohnung.objects.annotate(application_count=Count("bewerbungen"))
         if cleaned_filters.get("floor"):
             units = units.filter(etage__in=cleaned_filters["floor"])
         if cleaned_filters.get("rooms"):
@@ -1129,7 +1158,7 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
                 filters,
                 (
                     ("apartment", "Wohnung", ("floor", "rooms")),
-                    ("application_count", "Bewerbungen", ("application_sort",)),
+                    ("application_count", "Bewerbungen", ("application_sort", "workflow")),
                 ),
             )
         )
@@ -1139,6 +1168,7 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
             inventory_exists=Wohnung.objects.exists(),
         )
 
+    context["workflow"] = workflow
     return render(
         request,
         "wohnungsverwaltung/employee_application_list.html",
@@ -2063,11 +2093,10 @@ def handover_protocol_list(request: HttpRequest) -> HttpResponse:
         .values_list("protokoll_typ", flat=True)
         .distinct()
     ]
+    status_values = set(Protokoll.objects.values_list("status", flat=True).distinct())
+    status_values.add(ProtokollStatus.OPEN)
     status_choices = [
-        (value, PROTOCOL_STATUS_LABELS.get(value, str(value)))
-        for value in Protokoll.objects.order_by("status")
-        .values_list("status", flat=True)
-        .distinct()
+        (value, PROTOCOL_STATUS_LABELS.get(value, str(value))) for value in sorted(status_values)
     ]
     filters = HandoverProtocolFilterForm(
         request.GET,

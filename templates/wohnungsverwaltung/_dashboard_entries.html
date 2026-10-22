@@ -1,0 +1,15 @@
+<ul class="uk-list uk-list-divider dashboard-entries">
+    {% for entry in entries %}
+    <li class="dashboard-entry">
+        <a class="dashboard-entry__link" href="{{ entry.url }}">
+            <strong class="dashboard-entry__label">{{ entry.label }}</strong>
+            <span class="dashboard-entry__subject">{{ entry.apartment }} · {{ entry.person }}</span>
+            {% if entry.starts_at %}<span class="dashboard-entry__meta uk-text-small">{{ entry.starts_at|date:"d.m.Y, H:i" }}–{{ entry.ends_at|date:"H:i" }} Uhr</span>{% endif %}
+            {% if not compact %}
+                {% if entry.reason %}<span class="dashboard-entry__meta uk-text-small">{{ entry.reason }}</span>{% endif %}
+                {% if entry.since %}<span class="dashboard-entry__meta uk-text-meta">{{ entry.since_label }} {{ entry.since|date:"d.m.Y, H:i" }} Uhr</span>{% endif %}
+            {% endif %}
+        </a>
+    </li>
+    {% empty %}<li class="uk-text-muted">{{ empty_message }}</li>{% endfor %}
+</ul>

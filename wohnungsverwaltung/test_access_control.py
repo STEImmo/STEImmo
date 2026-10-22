@@ -366,7 +366,7 @@ class EmployeeMfaLoginTests(TestCase):
 
         response = self.client.post(reverse("employee_mfa_verify"), {"code": code})
 
-        self.assertRedirects(response, reverse("verwaltung:wohnung_list"))
+        self.assertRedirects(response, reverse("verwaltung:dashboard"))
 
     def test_employee_login_after_logout_issues_a_new_code(self) -> None:
         self.login_employee()

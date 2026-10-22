@@ -384,7 +384,7 @@ class RoleAwareLoginView(LoginView):
 
     def get_default_redirect_url_for_user(self, user) -> str:
         if user.has_perm(EMPLOYEE_ACCESS_PERMISSION):
-            return reverse("verwaltung:wohnung_list")
+            return reverse("verwaltung:dashboard")
         if user.has_perm(USER_MANAGEMENT_PERMISSION):
             return reverse("verwaltung:user_account_list")
         if user.has_perm(APPLICANT_ACCESS_PERMISSION):

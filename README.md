@@ -249,6 +249,88 @@ absichtlich öffentlichen Beispielzugangsdaten sind ausschließlich für die lok
 
 Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD`, `DJANGO_EMAIL_USE_TLS` und `DJANGO_EMAIL_TIMEOUT`. Der SMTP-Timeout beträgt standardmäßig zehn Sekunden und kann über `DJANGO_EMAIL_TIMEOUT` in Sekunden angepasst werden. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
 
+## Verwaltungsübersicht
+
+Nach erfolgreicher Mitarbeiteranmeldung einschließlich Einmalcode öffnet sich
+unter `/verwaltung/` die **Übersicht**. Ein ausdrücklich gewähltes Anmeldeziel
+bleibt erhalten. Die Seite zeigt den gemeinsamen Arbeitsbestand aller Mitarbeiter;
+es gibt keine persönliche Aufgabenzuordnung.
+
+Die vier Kennzahlen führen in die bestehenden Fachbereiche:
+
+- **Offene Bewerbungen:** Status offen und nicht zurückgezogen, ohne Altersbegrenzung.
+  Der Link öffnet den Bewerbungsbereich mit der Auswahl **Offene Bewerbungen**.
+- **Anstehende Besichtigungen:** geplante und bestätigte Termine aktiver Bewerbungen,
+  deren Ende noch nicht erreicht ist; heute bis einschließlich des siebten Folgetags.
+  Gezählt wird je Bewerbungstermin, auch bei gemeinsamen Besichtigungszeiten.
+  Der Link springt zum Wochenkalender auf derselben Dashboardseite und setzt ihn
+  auf die aktuelle Woche zurück; weitere Wochen sind über die Kalendernavigation erreichbar.
+- **Ausstehende Rückmeldungen:** Bewerbungen mit zukünftiger, noch unbestätigter
+  Besichtigung oder freigeschalteter, noch nicht eingereichter Hauptbewerbung.
+  Jede Bewerbung zählt einmal; der Zeitraum ist unbegrenzt. Der Link öffnet den
+  Bewerbungsbereich mit der Auswahl **Rückmeldung ausstehend**.
+- **Offene Übergabeprotokolle:** gespeicherte Protokolle in Bearbeitung, ohne
+  browsergebundene Formularentwürfe und ohne Altersbegrenzung. Der Link öffnet die
+  bestehende Übergabeliste mit dem Filter **In Bearbeitung**, auch bei null Treffern.
+
+Die Bewerbungsauswahl schränkt bereits die Anzahl je Wohnung ein und zeigt nur
+Wohnungen mit Treffern. Sie bleibt beim Öffnen einer Wohnung, beim Zurückwechseln
+zur Wohnungsübersicht und beim Blättern erhalten. Der KPI-Einstieg verwendet den
+Bereich **Alle Bewerbungen**, damit offene Einzelfallprüfungen ebenfalls sichtbar
+bleiben. Bei **Rückmeldung ausstehend** wird je Bewerbung angezeigt, ob die
+Terminbestätigung, die Hauptbewerbung oder beides fehlt. Beide Ebenen nutzen dieselbe
+Rückmeldungsregel wie die Dashboardkennzahl; weitere Filter lassen sich kombinieren
+und wieder entfernen. Der normale Bewerbungsbereich behält ohne diese Auswahl sein
+bisheriges Verhalten.
+
+Die gemeinsame Aufgabenliste und die Besichtigungstageslisten bleiben im Dashboard
+mit 20 Einträgen je Seite verfügbar. Alte Dashboardlinks für Bewerbungen,
+Rückmeldungen und Übergaben leiten in die jeweiligen Fachbereiche weiter. Eine
+zusätzliche eigenständige Kalenderansicht ist nicht Bestandteil dieser Umsetzung.
+
+**Jetzt bearbeiten** leitet je aktiver Bewerbung einen nächsten Schritt ab:
+Hauptbewerbung prüfen und final entscheiden, Besichtigungsergebnis nachtragen,
+auf Hauptbewerbung warten, offenen Termin abwarten, Auswahlvoraussetzungen
+prüfen, Main-Freischaltung prüfen, Bewerbung bewerten oder Besichtigung planen.
+Ein abgelaufener offener Folgetermin bleibt auch bei bereits freigeschalteter,
+noch nicht eingereichter Hauptbewerbung als Ergebnisaufgabe sichtbar. Nach dem
+Erfassen des Ergebnisses gilt wieder der Wartezustand. Eingereichte Hauptbewerbungen
+behalten Vorrang. Wartezustände erscheinen außerhalb der Mitarbeiteraufgaben.
+Offene Übergabeprotokolle ergänzen die Aufgaben. Abgelaufene Besichtigungen stehen
+zuerst, danach eingereichte Hauptbewerbungen, anschließend die übrigen Aufgaben; innerhalb jeder Gruppe steht
+der älteste Vorgang zuerst. Neben den vier kompakten Kennzahlen zeigt die Vorschau
+höchstens drei Aufgaben mit Arbeitsschritt, Wohnung und Bewerber. Der Link zur
+vollständigen Aufgabenliste nennt die Gesamtzahl; dort bleiben Prüfgründe und
+Zeitangaben sichtbar. Unterhalb folgt der Wochenkalender über die gesamte Breite.
+Auf dem Desktop haben die beiden KPI-Reihen zusammen und das Aufgabenfeld dieselbe
+feste Höhe, unabhängig von der Aufgabenanzahl. Bei längeren Aufgabeninhalten scrollt
+die Liste innerhalb des Felds. Auf schmalen Bildschirmen bleibt die Höhe flexibel.
+Warme Flächen, Typografie und Symbole greifen die Gestaltung der öffentlichen
+Startseite auf. Alle KPI-Kacheln sind einheitlich gestaltet; der Kopfbereich bleibt ohne Foto.
+Die Rückmeldungsvorschau zeigt höchstens fünf Einträge.
+Aufgaben und Rückmeldungen sind über den gesamten Eintrag anklickbar und öffnen
+die vorhandenen Detailansichten; separate Ansehen-Buttons entfallen.
+Ein Dashboardaufruf verändert keine fachlichen Daten.
+
+Der **Besichtigungskalender** zeigt Montag bis Sonntag der aktuellen Woche und
+erlaubt das Blättern in zukünftige Wochen. Beim Wochenwechsel wird nur der Kalender
+aktualisiert; die Seite und ihre Scrollposition bleiben erhalten. Browser-Zurück
+und -Vorwärts stellen die gewählte Woche wieder her. Ohne JavaScript funktionieren
+die Links weiterhin über normale Seitenaufrufe. Eine Animation ist noch nicht enthalten.
+Pro Tag erscheinen höchstens drei noch
+nicht beendete Termine; bei weiteren Terminen führt ein Link zur vollständigen
+Tagesliste. Auf schmalen Bildschirmen stehen die Tage untereinander. Alle Zeiten
+und Tagesgrenzen gelten in `Europe/Berlin`. Das Blättern verändert die feste
+Kennzahl für heute und die nächsten sieben Tage nicht.
+Die Parameter `woche` und `datum` erwarten `YYYY-MM-DD`; andere Formate fallen auf
+die aktuelle Woche beziehungsweise die Standardterminliste zurück.
+
+Eingereichte Hauptbewerbungen bleiben bis zu ihrem fachlichen Abschluss als
+Mitarbeiteraufgabe sichtbar. Die Erfassung einer finalen Zu- oder Absage ist noch
+nicht Bestandteil der Anwendung und bleibt eine gesonderte Folgeaufgabe. Ebenso
+bleiben das Einblenden anderer Kalender, Kalenderabonnements und Synchronisation
+einem separaten Folgeissue nach Fertigstellung des Dashboards vorbehalten.
+
 ## Bewerbungen im Betreiberbereich
 
 Die Mitarbeiternavigation zeigt **Wohnungen finden** und **Gebäudeansicht**
