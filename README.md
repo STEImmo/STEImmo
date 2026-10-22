@@ -61,6 +61,10 @@ ansehen und bearbeiten; die Anmelde-E-Mail wird nur angezeigt. **Abbrechen** ver
 ungespeicherte Eingaben. Konten ohne Personenverknüpfung erhalten einen Hinweis auf
 die Benutzerverwaltung. Eingereichte Bewerbungsunterlagen und abgeschlossene
 Übergabearchive werden durch Profiländerungen nicht überschrieben.
+Der Profilbereich bündelt persönliche Daten und Anmeldeinformationen in getrennten
+Karten. Eine Kontonavigation führt abhängig von den bestehenden Rechten zu eigenen
+Bewerbungen und Übergabeprotokollen. Hinweise erläutern die freiwillige Telefonnummer
+und den Erhalt bereits eingereichter Unterlagen.
 
 Die Gebäudeansicht ist lokal unter [Gebäude erkunden](http://localhost:8000/wohnungen/gebaeude/)
 erreichbar: Gebäude → Etagenplan → Wohnungsdetails. Öffentliche Wohnungsfotos können im

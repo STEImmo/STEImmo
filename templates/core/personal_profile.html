@@ -1,55 +1,42 @@
 {% extends "base.html" %}
-
 {% block title %}{% if form %}Profil bearbeiten{% else %}Mein Profil{% endif %} – STE Immobilien eGbR{% endblock %}
-
 {% block content %}
-<section class="uk-section uk-section-default">
-    <div class="uk-container uk-container-small">
-        <nav aria-label="Brotkrumennavigation">
-            <ul class="uk-breadcrumb">
-                <li><a href="{% url 'home' %}">Startseite</a></li>
-                {% if form %}<li><a href="{% url 'profile:detail' %}">Mein Profil</a></li><li><span aria-current="page">Bearbeiten</span></li>
-                {% else %}<li><span aria-current="page">Mein Profil</span></li>{% endif %}
-            </ul>
-        </nav>
-        <h1 class="uk-heading-small">{% if form %}Profil bearbeiten{% else %}Mein Profil{% endif %}</h1>
-        <p class="uk-text-lead">Ihre persönlichen Angaben und Kontaktdaten.</p>
-        <div class="uk-card uk-card-default uk-card-body">
-            <h2 class="uk-h3">Anmeldung</h2>
-            <dl class="uk-description-list">
-                <dt>E-Mail-Adresse für die Anmeldung</dt>
-                <dd class="uk-text-break">{{ user.email|default:"Nicht angegeben" }}</dd>
-            </dl>
-            <p class="uk-text-meta">Die Anmelde-E-Mail-Adresse kann hier nicht geändert werden.</p>
-            <hr>
-            {% if not person %}
-                <div class="uk-alert-primary" role="status">
-                    <p>Ihrem Konto ist noch kein Personendatensatz zugeordnet.</p>
-                    <p>Bitte wenden Sie sich an die Benutzerverwaltung, um Ihre persönlichen Daten zuzuordnen.</p>
-                </div>
-                <a class="uk-button uk-button-default" href="{% url 'home' %}">Zur Startseite</a>
-            {% elif form %}
-                <h2 class="uk-h3">Persönliche Daten</h2>
-                <p class="uk-text-meta">Mit * gekennzeichnete Felder sind Pflichtfelder.</p>
-                <form method="post" class="uk-form-stacked" autocomplete="on">
-                    {% csrf_token %}
-                    {% if form.errors %}<div class="uk-alert-danger" role="alert"><p>Bitte prüfen Sie die markierten Felder. Ihre Änderungen wurden noch nicht gespeichert.</p>{{ form.non_field_errors }}</div>{% endif %}
-                    {% for field in form %}{% include "wohnungsverwaltung/_form_field.html" with field=field only %}{% endfor %}
-                    <div class="uk-flex uk-flex-wrap uk-flex-middle uk-grid-small uk-margin-top" uk-grid>
-                        <div><button class="uk-button uk-button-primary" type="submit">Änderungen speichern</button></div>
-                        <div><a class="uk-button uk-button-default" href="{% url 'profile:detail' %}">Abbrechen</a></div>
-                    </div>
-                </form>
-            {% else %}
-                <h2 class="uk-h3">Persönliche Daten</h2>
-                <dl class="uk-description-list">
-                    <dt>Vorname</dt><dd class="uk-text-break">{{ person.vorname|default:"Nicht angegeben" }}</dd>
-                    <dt>Nachname</dt><dd class="uk-text-break">{{ person.nachname|default:"Nicht angegeben" }}</dd>
-                    <dt>Telefonnummer</dt><dd class="uk-text-break">{{ person.telefonnummer|default:"Nicht angegeben" }}</dd>
-                </dl>
-                <a class="uk-button uk-button-primary" href="{% url 'profile:edit' %}">Profil bearbeiten</a>
-            {% endif %}
+<section class="uk-section profile-page"><div class="uk-container">
+    <nav aria-label="Brotkrumennavigation"><ul class="uk-breadcrumb"><li><a href="{% url 'home' %}">Startseite</a></li>{% if form %}<li><a href="{% url 'profile:detail' %}">Mein Profil</a></li><li><span aria-current="page">Bearbeiten</span></li>{% else %}<li><span aria-current="page">Mein Profil</span></li>{% endif %}</ul></nav>
+    <header class="profile-heading"><div><p class="profile-eyebrow">Ihr persönlicher Bereich</p><h1>{% if form %}Profil bearbeiten{% else %}Mein Profil{% endif %}</h1><p>Alles Wichtige zu Ihren persönlichen Angaben. Übersichtlich an einem Ort.</p></div>{% if person and not form %}<a class="uk-button uk-button-primary" href="{% url 'profile:edit' %}"><span uk-icon="icon: pencil; ratio: .8" aria-hidden="true"></span> Profil bearbeiten</a>{% endif %}</header>
+    <div class="profile-layout">
+        <aside class="profile-sidebar">
+            <div class="profile-identity"><span class="profile-monogram" aria-hidden="true">{% if person.vorname and person.nachname %}{{ person.vorname|first }}{{ person.nachname|first }}{% else %}<span uk-icon="user"></span>{% endif %}</span><div><p class="profile-identity-name">{% if person.vorname %}{{ person.vorname }} {{ person.nachname }}{% else %}Ihr Konto{% endif %}</p><p class="profile-identity-caption">Bei STE Immobilien</p></div></div>
+            <nav aria-label="Persönlicher Bereich" class="profile-navigation">
+                <a href="{% url 'profile:detail' %}" aria-current="{% if form %}true{% else %}page{% endif %}"><span uk-icon="user" aria-hidden="true"></span> Mein Profil <span uk-icon="chevron-right" aria-hidden="true"></span></a>
+                {% if perms.immobilien.access_applicant_area %}<a href="{% url 'wohnungsverwaltung:pre_application_list' %}"><span uk-icon="file-text" aria-hidden="true"></span> Meine Bewerbungen <span uk-icon="chevron-right" aria-hidden="true"></span></a>{% endif %}
+                {% if perms.immobilien.access_tenant_area %}<a href="{% url 'wohnungsverwaltung:handover_protocol_mine' %}"><span uk-icon="file-text" aria-hidden="true"></span> Meine Übergabeprotokolle <span uk-icon="chevron-right" aria-hidden="true"></span></a>{% endif %}
+                <a href="{% url 'wohnungsverwaltung_public:apartment_search' %}"><span uk-icon="home" aria-hidden="true"></span> Wohnungen entdecken <span uk-icon="chevron-right" aria-hidden="true"></span></a>
+            </nav><p class="profile-sidebar-note"><span uk-icon="icon: lock; ratio: .8" aria-hidden="true"></span> Nur für Sie zugänglich</p>
+        </aside>
+        <div class="profile-main">
+            <section class="uk-card uk-card-default profile-panel" aria-labelledby="profile-contact-title">
+                <div class="profile-panel-heading"><span class="profile-section-icon" uk-icon="user" aria-hidden="true"></span><div><h2 id="profile-contact-title">Persönliche Daten</h2><p>So sind Ihre Kontaktdaten bei uns hinterlegt.</p></div></div>
+                {% if not person %}<div class="uk-alert-primary" role="status"><p>Ihrem Konto ist noch kein Personendatensatz zugeordnet.</p><p>Bitte wenden Sie sich an die Benutzerverwaltung, um Ihre persönlichen Daten zuzuordnen.</p></div>
+                {% elif form %}
+                    <p class="uk-text-meta">Mit * gekennzeichnete Felder sind Pflichtfelder.</p>
+                    <form method="post" class="uk-form-stacked" autocomplete="on">{% csrf_token %}
+                        {% if form.errors %}<div class="uk-alert-danger" role="alert"><p>Bitte prüfen Sie die markierten Felder. Ihre Änderungen wurden noch nicht gespeichert.</p>{{ form.non_field_errors }}</div>{% endif %}
+                        <div class="profile-fields">{% for field in form %}<div{% if field.name == 'telefonnummer' %} class="profile-field-wide"{% endif %}>{% include "wohnungsverwaltung/_form_field.html" with field=field only %}</div>{% endfor %}</div>
+                        <div class="profile-form-actions"><button class="uk-button uk-button-primary" type="submit">Änderungen speichern</button><a class="uk-button uk-button-default" href="{% url 'profile:detail' %}">Abbrechen</a></div>
+                    </form>
+                {% else %}
+                    <dl class="profile-data"><div><dt>Vorname</dt><dd>{{ person.vorname|default:"Nicht angegeben" }}</dd></div><div><dt>Nachname</dt><dd>{{ person.nachname|default:"Nicht angegeben" }}</dd></div><div class="profile-data-phone"><dt>Telefonnummer <span class="profile-optional">Optional</span></dt><dd>{% if person.telefonnummer %}{{ person.telefonnummer }}{% else %}<span class="profile-missing">Nicht angegeben</span>{% endif %}</dd><dd class="profile-data-help">Für eine telefonische Rückfrage zu Ihrem Anliegen.</dd></div></dl>
+                    {% if not person.telefonnummer %}<div class="profile-gentle-note"><span uk-icon="icon: receiver; ratio: .9" aria-hidden="true"></span><p>Auch telefonisch erreichbar sein?<br><a href="{% url 'profile:edit' %}">Telefonnummer ergänzen</a> – ganz freiwillig.</p></div>{% endif %}
+                {% endif %}
+            </section>
+            <section class="uk-card uk-card-default profile-panel" aria-labelledby="profile-login-title">
+                <div class="profile-panel-heading"><span class="profile-section-icon" uk-icon="lock" aria-hidden="true"></span><div><h2 id="profile-login-title">Anmeldung &amp; Konto</h2><p>Ihr Zugang zum persönlichen Bereich.</p></div></div>
+                <dl class="profile-data profile-login-data"><div><dt>E-Mail-Adresse für die Anmeldung</dt><dd>{{ user.email|default:"Nicht angegeben" }}</dd></div></dl>
+                <p class="profile-card-footnote"><span uk-icon="icon: info; ratio: .8" aria-hidden="true"></span> Die Anmelde-E-Mail-Adresse kann hier nicht geändert werden.</p>
+            </section>
+            <div class="profile-information"><span uk-icon="icon: info; ratio: 1.1" aria-hidden="true"></span><div><h2>Was passiert mit Ihren Änderungen?</h2><p>Ihre Änderungen aktualisieren die Angaben in Ihrem Profil. Bereits eingereichte Bewerbungsunterlagen und abgeschlossene Übergabeprotokolle bleiben erhalten.</p><a href="{% url 'privacy' %}">Mehr zum Umgang mit Ihren Daten <span uk-icon="icon: arrow-right; ratio: .8" aria-hidden="true"></span></a></div></div>
         </div>
     </div>
-</section>
+</div></section>
 {% endblock %}
