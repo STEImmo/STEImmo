@@ -12,7 +12,7 @@
                 {% if perms.immobilien.access_applicant_area %}<a href="{% url 'wohnungsverwaltung:pre_application_list' %}"><span uk-icon="file-text" aria-hidden="true"></span> Meine Bewerbungen <span uk-icon="chevron-right" aria-hidden="true"></span></a>{% endif %}
                 {% if perms.immobilien.access_tenant_area %}<a href="{% url 'wohnungsverwaltung:handover_protocol_mine' %}"><span uk-icon="file-text" aria-hidden="true"></span> Meine Übergabeprotokolle <span uk-icon="chevron-right" aria-hidden="true"></span></a>{% endif %}
                 <a href="{% url 'wohnungsverwaltung_public:apartment_search' %}"><span uk-icon="home" aria-hidden="true"></span> Wohnungen entdecken <span uk-icon="chevron-right" aria-hidden="true"></span></a>
-            </nav><p class="profile-sidebar-note"><span uk-icon="icon: lock; ratio: .8" aria-hidden="true"></span> Nur für Sie zugänglich</p>
+            </nav>
         </aside>
         <div class="profile-main">
             <section class="uk-card uk-card-default profile-panel" aria-labelledby="profile-contact-title">
