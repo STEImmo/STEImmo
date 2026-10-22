@@ -458,6 +458,11 @@ Copy-Item docker/.env.example docker/.env
 
 Die Datei `docker/.env` ist nur für die lokale Entwicklung vorgesehen und wird nicht versioniert.
 
+Der öffentliche Beispielschlüssel ist ausschließlich mit `DJANGO_DEBUG=1` nutzbar.
+Bei `DJANGO_DEBUG=0` oder fehlender Debug-Einstellung verweigert bereits das Laden
+der Settings einen fehlenden oder unsicheren `DJANGO_SECRET_KEY`. Anforderungen
+und sichere Erzeugung stehen in [ADR-0018](docs/decisions/0018-ghcr-server-deployment.md).
+
 ### 2. Entwicklungsumgebung starten
 
 Der folgende Befehl ist unter macOS, Linux und Windows PowerShell identisch:

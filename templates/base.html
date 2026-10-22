@@ -19,7 +19,7 @@
                 {% for message in messages %}
                     <div class="uk-alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% elif message.tags == 'info' %}primary{% else %}success{% endif %}" uk-alert>
                         <a class="uk-alert-close" uk-close></a>
-                        <p>{{ message }}</p>
+                        <p class="uk-margin-right">{{ message }}</p>
                     </div>
                 {% endfor %}
             </div>
