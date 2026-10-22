@@ -55,6 +55,13 @@ helles Einzugsmotiv neben den echten Formularen, Passwortanzeige/-hilfen und
 verständliche Feldfehler. Das gemeinsame Template liegt in
 `templates/registration/auth_base.html`.
 
+Angemeldete Nutzer erreichen **Mein Profil** über das Kontomenü auf Desktop und
+Mobilgeräten. Dort können sie Vor- und Nachnamen sowie ihre optionale Telefonnummer
+ansehen und bearbeiten; die Anmelde-E-Mail wird nur angezeigt. **Abbrechen** verwirft
+ungespeicherte Eingaben. Konten ohne Personenverknüpfung erhalten einen Hinweis auf
+die Benutzerverwaltung. Eingereichte Bewerbungsunterlagen und abgeschlossene
+Übergabearchive werden durch Profiländerungen nicht überschrieben.
+
 Die Gebäudeansicht ist lokal unter [Gebäude erkunden](http://localhost:8000/wohnungen/gebaeude/)
 erreichbar: Gebäude → Etagenplan → Wohnungsdetails. Öffentliche Wohnungsfotos können im
 Mitarbeiterbereich unter **Wohnung bearbeiten → Wohnungsfotos verwalten** gepflegt werden.

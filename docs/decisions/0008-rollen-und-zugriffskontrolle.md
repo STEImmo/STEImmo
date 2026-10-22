@@ -194,6 +194,32 @@ Ablehnung sagt offene Termine in derselben Transaktion ab und benachrichtigt den
 Bewerber. Ein Rückzug sagt ebenfalls offene Termine ab, versendet aber keine
 zusätzliche Nachricht. Historische abgeschlossene Termine bleiben erhalten.
 
+### Eigenes Profil (US-21 / Issue #129)
+
+Alle angemeldeten Konten erreichen ihr eigenes Profil unter `/accounts/profil/`
+(URL-Namespace `profile`), unabhängig von ihrer fachlichen Rolle. Die Auswahl
+erfolgt ausschließlich über `Person.user` und den angemeldeten Nutzer; es gibt keine
+Profil-URL mit fremder Personenkennung. Konten ohne Zuordnung können keine Person
+anlegen oder auswählen und erhalten einen verständlichen Hinweis.
+
+Das Django-ModelForm gibt nur Vorname, Nachname und die optionale Telefonnummer
+frei. Die Namen werden atomar mit `User.first_name` und `User.last_name`
+synchronisiert und auf deren bestehende Feldlängen begrenzt (je 150 Zeichen).
+Die Telefonnummer behält die bestehende flexible Schreibweise und Feldlänge.
+Anmelde-E-Mail, Personen-E-Mail, Passwort, Rollen, Wohnung und weitere fachliche
+Daten werden nicht geändert. Schreibzugriffe benötigen POST und CSRF. Konto und
+Person werden in derselben Reihenfolge wie in der Benutzerverwaltung gesperrt;
+zwischenzeitlich geänderte Zugangsdaten oder eine Deaktivierung weisen eine
+laufende Schreibanfrage ab. Die Profilseiten erhalten private `no-store`-Header.
+
+Die Profilbearbeitung schreibt weder Bewerbungen noch Nachweise oder Protokolle.
+Bewerbungsansichten dürfen weiterhin aktuelle Stammdaten über die bestehende
+Personenverknüpfung anzeigen; eingereichte Inhalte und Dateien bleiben erhalten.
+Abgeschlossene Protokolle verwenden weiterhin ihren Export-Snapshot und ihre
+gespeicherte PDF-Fassung; Altprotokolle ohne gesicherten Namen bleiben gemäß
+bestehendem Verhalten ausdrücklich gekennzeichnet. Eine Datenmigration ist nicht
+erforderlich.
+
 ## Erweiterungsroutine
 
 Für eine neue geschützte Seite wird in dieser Reihenfolge vorgegangen:

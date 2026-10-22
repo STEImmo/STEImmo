@@ -6,9 +6,10 @@ from smtplib import SMTPException
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.views import LoginView
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
 from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
@@ -20,6 +21,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare, salted_hmac
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_http_methods, require_safe
 
 from wohnungsverwaltung.access import (
     APPLICANT_ACCESS_PERMISSION,
@@ -30,6 +33,7 @@ from wohnungsverwaltung.building_plans import building_overview
 from wohnungsverwaltung.forms import (
     ACCOUNT_CREATION_ERROR,
     EmployeeMfaCodeForm,
+    PersonalProfileForm,
     RegistrationForm,
     RegistrationVerificationForm,
     ResendRegistrationCodeForm,
@@ -38,6 +42,7 @@ from wohnungsverwaltung.models import (
     AccountLoginThrottle,
     EmployeeLoginVerification,
     LoginIpThrottle,
+    Person,
     RegistrationVerification,
     Wohnung,
 )
@@ -47,6 +52,44 @@ EMPLOYEE_MFA_REDIRECT_SESSION_KEY = "employee_mfa_redirect_url"
 EMPLOYEE_MFA_CHALLENGE_SESSION_KEY = "employee_mfa_challenge"
 LOGIN_FAILURE_MESSAGE = "Bitte überprüfen Sie Ihre Zugangsdaten und versuchen Sie es später erneut."
 logger = logging.getLogger(__name__)
+
+
+@never_cache
+@login_required
+@require_safe
+def personal_profile(request):
+    person = Person.objects.filter(user=request.user).first()
+    return render(request, "core/personal_profile.html", {"person": person})
+
+
+@never_cache
+@login_required
+@require_http_methods(["GET", "POST"])
+def personal_profile_edit(request):
+    if request.method == "POST":
+        with transaction.atomic():
+            # Match the account administration's lock order and reload the
+            # current person link; submitted identifiers never select a person.
+            account = get_user_model().objects.select_for_update().get(pk=request.user.pk)
+            if not account.is_active or any(
+                getattr(account, field) != getattr(request.user, field)
+                for field in ("password", "username", "email")
+            ):
+                raise PermissionDenied("Ihr Konto wurde geändert. Bitte melden Sie sich erneut an.")
+            person = Person.objects.select_for_update().filter(user=account).first()
+            form = PersonalProfileForm(request.POST, instance=person) if person else None
+            if form is not None and form.is_valid():
+                person = form.save(commit=False)
+                person.save(update_fields=["vorname", "nachname", "telefonnummer", "updated_at"])
+                account.first_name = person.vorname
+                account.last_name = person.nachname
+                account.save(update_fields=["first_name", "last_name"])
+                messages.success(request, "Ihre Profildaten wurden gespeichert.")
+                return redirect("profile:detail")
+    else:
+        person = Person.objects.filter(user=request.user).first()
+        form = PersonalProfileForm(instance=person) if person else None
+    return render(request, "core/personal_profile.html", {"person": person, "form": form})
 
 
 def _error_response(status, title, message):

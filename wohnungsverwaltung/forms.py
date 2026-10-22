@@ -158,6 +158,32 @@ def _has_other_active_account_manager(account) -> bool:
     )
 
 
+class PersonalProfileForm(forms.ModelForm):
+    vorname = forms.CharField(
+        label="Vorname",
+        max_length=ACCOUNT_FIRST_NAME_MAX_LENGTH,
+        widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "given-name"}),
+    )
+    nachname = forms.CharField(
+        label="Nachname",
+        max_length=ACCOUNT_LAST_NAME_MAX_LENGTH,
+        widget=forms.TextInput(attrs={"class": "uk-input", "autocomplete": "family-name"}),
+    )
+
+    class Meta:
+        model = Person
+        fields = ("vorname", "nachname", "telefonnummer")
+        labels = {"telefonnummer": "Telefonnummer (optional)"}
+        help_texts = {
+            "telefonnummer": "Zum Beispiel +49 931 123456. Sie können das Feld leer lassen."
+        }
+        widgets = {
+            "telefonnummer": forms.TextInput(
+                attrs={"class": "uk-input", "type": "tel", "autocomplete": "tel"}
+            ),
+        }
+
+
 class RegistrationForm(forms.Form):
     vorname = forms.CharField(
         label="Vorname",
