@@ -32,6 +32,9 @@ class FilterMarkupParser(HTMLParser):
         self.ids = []
         self.links = {}
         self.segment_links = {}
+        self.segment_ids = {}
+        self.segment_fragment = None
+        self.active_segments = []
         self.form_depth = 0
         self.nested_form = False
         self.forms = []
@@ -44,6 +47,11 @@ class FilterMarkupParser(HTMLParser):
             self.links[attrs["data-remove-filter"]] = attrs["href"]
         if tag == "a" and "data-application-segment" in attrs:
             self.segment_links[attrs["data-application-segment"]] = attrs["href"]
+            self.segment_ids[attrs["data-application-segment"]] = attrs.get("id")
+            if attrs.get("aria-current") == "page":
+                self.active_segments.append(attrs["data-application-segment"])
+        if tag == "nav" and attrs.get("aria-label") == "Bewerbungsansichten":
+            self.segment_fragment = attrs.get("data-table-filter-fragment")
         if tag == "form":
             self.forms.append({})
             self.nested_form |= self.form_depth > 0
@@ -476,6 +484,46 @@ class TableFilterTests(TestCase):
                 self.assertEqual(params["segment"], [segment])
                 self.assertEqual(params["q"], ["Berta"])
                 self.assertNotIn("page", params)
+
+    def test_ajax_workflow_responses_keep_replaceable_navigation_consistent_with_results(self):
+        Wohnung.objects.filter(pk=self.free.pk).update(max_occupants=2)
+        self.application.main_application_unlocked = True
+        self.application.save(update_fields=("main_application_unlocked",))
+        mismatch = test_employee_dashboard.EmployeeDashboardTests.create_application(
+            self.free, personenanzahl=3, main_application_unlocked=True
+        )
+        matching = {self.application.pk}
+        all_open = {self.application.pk, mismatch.pk}
+        navigation_ids = None
+        for query, segment, expected in (
+            ({}, "matching", matching),
+            ({"workflow": "open"}, "all", all_open),
+            ({"workflow": "waiting"}, "all", all_open),
+            ({"workflow": ""}, "matching", matching),
+            ({"workflow": "open", "segment": "matching"}, "matching", matching),
+            ({"workflow": "waiting", "segment": "review"}, "review", set()),
+            ({"workflow": "waiting", "segment": "all"}, "all", all_open),
+        ):
+            with self.subTest(query=query):
+                response = self.client.get(
+                    self.application_url,
+                    {"wohnung": self.free.pk, **query},
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                )
+                parser = FilterMarkupParser()
+                parser.feed(response.content.decode())
+                self.assertEqual(response.context["segment"], segment)
+                self.assertEqual(
+                    {application.pk for application in response.context["applications"]}, expected
+                )
+                self.assertEqual(parser.active_segments, [segment])
+                self.assertEqual(parser.segment_fragment, "application-segments")
+                self.assertTrue(all(parser.segment_ids.values()))
+                self.assertEqual(len(set(parser.segment_ids.values())), 3)
+                if navigation_ids is None:
+                    navigation_ids = parser.segment_ids
+                else:
+                    self.assertEqual(parser.segment_ids, navigation_ids)
 
     def test_contradictory_application_filters_explain_empty_result_without_mutation(self):
         response = self.client.get(

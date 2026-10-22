@@ -282,6 +282,10 @@ Terminbestätigung, die Hauptbewerbung oder beides fehlt. Beide Ebenen nutzen di
 Rückmeldungsregel wie die Dashboardkennzahl; weitere Filter lassen sich kombinieren
 und wieder entfernen. Der normale Bewerbungsbereich behält ohne diese Auswahl sein
 bisheriges Verhalten.
+Bei dynamischen Filteränderungen werden auch die aktiven Bewerbungsansichten
+einschließlich ihrer Kennzeichnung für assistive Technik aktualisiert. Das gilt
+ebenso beim Entfernen oder Zurücksetzen von Filtern und bei Browser-Zurück/-Vorwärts.
+Ein bereits fokussierter Ansichtsreiter behält seinen Tastaturfokus nach der Aktualisierung.
 
 Die gemeinsame Aufgabenliste und die Besichtigungstageslisten bleiben im Dashboard
 mit 20 Einträgen je Seite verfügbar. Alte Dashboardlinks für Bewerbungen,
