@@ -289,12 +289,15 @@ Rückmeldungen und Übergaben leiten in die jeweiligen Fachbereiche weiter. Eine
 zusätzliche eigenständige Kalenderansicht ist nicht Bestandteil dieser Umsetzung.
 
 **Jetzt bearbeiten** leitet je aktiver Bewerbung einen nächsten Schritt ab:
-Hauptbewerbung prüfen und final entscheiden, auf Hauptbewerbung warten,
-Besichtigungsergebnis nachtragen, offenen Termin abwarten, Auswahlvoraussetzungen
+Hauptbewerbung prüfen und final entscheiden, Besichtigungsergebnis nachtragen,
+auf Hauptbewerbung warten, offenen Termin abwarten, Auswahlvoraussetzungen
 prüfen, Main-Freischaltung prüfen, Bewerbung bewerten oder Besichtigung planen.
-Wartezustände erscheinen außerhalb der Mitarbeiteraufgaben. Offene Übergabeprotokolle
-ergänzen die Aufgaben. Abgelaufene Besichtigungen stehen zuerst, danach eingereichte
-Hauptbewerbungen, anschließend die übrigen Aufgaben; innerhalb jeder Gruppe steht
+Ein abgelaufener offener Folgetermin bleibt auch bei bereits freigeschalteter,
+noch nicht eingereichter Hauptbewerbung als Ergebnisaufgabe sichtbar. Nach dem
+Erfassen des Ergebnisses gilt wieder der Wartezustand. Eingereichte Hauptbewerbungen
+behalten Vorrang. Wartezustände erscheinen außerhalb der Mitarbeiteraufgaben.
+Offene Übergabeprotokolle ergänzen die Aufgaben. Abgelaufene Besichtigungen stehen
+zuerst, danach eingereichte Hauptbewerbungen, anschließend die übrigen Aufgaben; innerhalb jeder Gruppe steht
 der älteste Vorgang zuerst. Neben den vier kompakten Kennzahlen zeigt die Vorschau
 höchstens drei Aufgaben mit Arbeitsschritt, Wohnung und Bewerber. Der Link zur
 vollständigen Aufgabenliste nennt die Gesamtzahl; dort bleiben Prüfgründe und

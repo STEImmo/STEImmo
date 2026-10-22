@@ -112,8 +112,8 @@ def application_rows(now):
         .annotate(
             dashboard_step=Case(
                 When(submitted_at__isnull=False, then=Value("decision")),
-                When(main_application_unlocked=True, then=Value("waiting_main")),
                 When(open_viewing_end__lte=now, then=Value("result")),
+                When(main_application_unlocked=True, then=Value("waiting_main")),
                 When(open_viewing_end__gt=now, then=Value("viewing")),
                 When(~Q(dashboard_reason=""), then=Value("eligibility")),
                 When(has_completed_viewing=True, then=Value("unlock")),
@@ -154,14 +154,18 @@ def format_rows(rows, *, waiting=False):
                 "person": f"{row['person__vorname']} {row['person__nachname']}",
                 "apartment": str(apartment),
                 "label": (
-                    "Warten auf Terminbestätigung"
-                    if waiting and row["dashboard_step"] != "waiting_main"
+                    (
+                        "Warten auf Hauptbewerbung"
+                        if row["waiting_for_main"]
+                        else "Warten auf Terminbestätigung"
+                    )
+                    if waiting
                     else STEP_LABELS[row["dashboard_step"]]
                 ),
                 "reason": row["dashboard_reason"] if row["dashboard_step"] == "eligibility" else "",
-                "since": row["task_since"],
+                "since": row["created_at"] if waiting else row["task_since"],
                 "since_label": "Offen seit"
-                if row["dashboard_step"] in ("result", "decision", "handover")
+                if not waiting and row["dashboard_step"] in ("result", "decision", "handover")
                 else "Bewerbung eingegangen am",
                 "url": reverse(f"wohnungsverwaltung:{route}", args=[row["pk"]]),
             }
@@ -325,7 +329,10 @@ def dashboard_context(query):
         task_entries=format_rows(tasks[:3]),
         task_count=tasks.count(),
         waiting_entries=format_rows(
-            waiting.order_by("created_at", "pk").values(*ENTRY_FIELDS)[:5], waiting=True
+            waiting.order_by("created_at", "pk").values(
+                *ENTRY_FIELDS, "waiting_for_main", "created_at"
+            )[:5],
+            waiting=True,
         ),
         calendar_days=[
             {

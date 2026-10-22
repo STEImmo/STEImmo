@@ -143,6 +143,61 @@ class ManagementDashboardTests(TestCase):
             [entry["id"] for entry in response.context["entries"]][:2], [result.pk, decision.pk]
         )
 
+    def test_expired_follow_up_viewing_remains_a_task_while_waiting_for_main_application(self):
+        application = self.application(main_application_unlocked=True, review_priority=2)
+        self.viewing(application, start=self.now - timedelta(days=1), status="completed")
+        with self.clock:
+            response = self.client.post(
+                reverse("wohnungsverwaltung:employee_viewing_create", args=[application.pk]),
+                {
+                    "date": (self.now + timedelta(days=1)).date().isoformat(),
+                    "start_time": "10:00",
+                    "end_time": "10:30",
+                    "action": "schedule",
+                },
+            )
+        self.assertEqual(response.status_code, 302)
+        appointment = application.viewings.get(status="planned")
+        self.assertEqual(self.get().context["task_count"], 0)
+
+        self.now = appointment.ends_at + timedelta(minutes=1)
+        self.clock = patch("wohnungsverwaltung.dashboard.timezone.now", return_value=self.now)
+        for query, key in (({}, "task_entries"), ({"bereich": "aufgaben"}, "entries")):
+            with self.subTest(query=query):
+                response = self.get(**query)
+                self.assertEqual(
+                    [(entry["id"], entry["label"]) for entry in response.context[key]],
+                    [(application.pk, "Besichtigungsergebnis nachtragen")],
+                )
+                self.assertEqual(response.context[key][0]["since"], appointment.ends_at)
+                self.assertEqual(response.context["counts"]["waiting"], 1)
+                if key == "task_entries":
+                    self.assertEqual(
+                        response.context["waiting_entries"][0]["label"],
+                        "Warten auf Hauptbewerbung",
+                    )
+                    self.assertEqual(
+                        response.context["waiting_entries"][0]["since"], application.created_at
+                    )
+                    self.assertEqual(
+                        response.context["waiting_entries"][0]["since_label"],
+                        "Bewerbung eingegangen am",
+                    )
+
+        ViewingAppointment.objects.filter(pk=appointment.pk).update(status="completed")
+        response = self.get()
+        self.assertEqual(response.context["task_count"], 0)
+        self.assertEqual(response.context["counts"]["waiting"], 1)
+
+    def test_submitted_main_application_still_takes_precedence_over_expired_viewing(self):
+        application = self.application(main_application_unlocked=True, submitted_at=self.now)
+        self.viewing(application, start=self.now - timedelta(hours=1))
+        response = self.get(bereich="aufgaben")
+        self.assertEqual(
+            [entry["label"] for entry in response.context["entries"]],
+            ["Hauptbewerbung prüfen und final entscheiden"],
+        )
+
     def test_current_pet_approval_and_occupancy_are_respected(self):
         Wohnung.objects.filter(pk=self.unit.pk).update(pet_review_required=True, max_occupants=2)
         pet = self.application(haustiere=True, review_priority=2)
