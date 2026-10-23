@@ -215,12 +215,15 @@ erfolgt ausschließlich über `Person.user` und den angemeldeten Nutzer; es gibt
 Profil-URL mit fremder Personenkennung. Konten ohne Zuordnung können keine Person
 anlegen oder auswählen und erhalten einen verständlichen Hinweis.
 
-Das Django-ModelForm gibt nur Vorname, Nachname und die optionale Telefonnummer
-frei. Die Namen werden atomar mit `User.first_name` und `User.last_name`
+Das Django-ModelForm gibt Vorname, Nachname, optionale Telefonnummer und seit #153
+Anrede, Geburtsdatum und Anschrift frei. Die Namen werden atomar mit
+`User.first_name` und `User.last_name`
 synchronisiert und auf deren bestehende Feldlängen begrenzt (je 150 Zeichen).
 Die Telefonnummer behält die bestehende flexible Schreibweise und Feldlänge.
-Anmelde-E-Mail, Personen-E-Mail, Passwort, Rollen, Wohnung und weitere fachliche
-Daten werden nicht geändert. Schreibzugriffe benötigen POST und CSRF. Konto und
+Rollen, Wohnung und weitere fachliche Daten werden nicht geändert. Passwort und
+Anmelde-/Personen-E-Mail werden ausschließlich über die getrennten, erneut
+authentifizierten Abläufe aus [ADR-0020](0020-persoenliche-kontoeinstellungen.md)
+geändert. Schreibzugriffe benötigen POST und CSRF. Konto und
 Person werden in derselben Reihenfolge wie in der Benutzerverwaltung gesperrt;
 zwischenzeitlich geänderte Zugangsdaten oder eine Deaktivierung weisen eine
 laufende Schreibanfrage ab. Die Profilseiten erhalten private `no-store`-Header.
@@ -230,8 +233,10 @@ Bewerbungsansichten dürfen weiterhin aktuelle Stammdaten über die bestehende
 Personenverknüpfung anzeigen; eingereichte Inhalte und Dateien bleiben erhalten.
 Abgeschlossene Protokolle verwenden weiterhin ihren Export-Snapshot und ihre
 gespeicherte PDF-Fassung; Altprotokolle ohne gesicherten Namen bleiben gemäß
-bestehendem Verhalten ausdrücklich gekennzeichnet. Eine Datenmigration ist nicht
-erforderlich.
+bestehendem Verhalten ausdrücklich gekennzeichnet. Die ursprüngliche Profilbasis
+#129 benötigt keine Modellmigration. Die additive Erweiterung aus #153 erhält
+Migration 0029; sie erweitert
+den ursprünglichen US-21-Umfang ausdrücklich auf Nutzerauftrag.
 
 ## Erweiterungsroutine
 

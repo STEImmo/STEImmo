@@ -188,6 +188,16 @@ class Person(models.Model):
     email = models.EmailField(max_length=255, unique=True)
     telefonnummer = models.CharField(max_length=255, blank=True, default="")
     geburtsdatum = models.DateField(blank=True, null=True)
+    salutation = models.CharField(
+        max_length=10,
+        blank=True,
+        default="",
+        choices=[("mr", "Herr"), ("ms", "Frau"), ("neutral", "Keine Anrede")],
+    )
+    street_address = models.CharField(max_length=255, blank=True, default="")
+    postal_code = models.CharField(max_length=20, blank=True, default="")
+    city = models.CharField(max_length=255, blank=True, default="")
+    country = models.CharField(max_length=100, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -202,6 +212,28 @@ class Person(models.Model):
 
     def __str__(self) -> str:
         return f"{self.vorname} {self.nachname}"
+
+
+class PendingEmailChange(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    new_email = models.EmailField(max_length=150)
+    credentials_hash = models.CharField(max_length=64)
+    challenge = models.UUIDField(default=uuid.uuid4)
+    code_hash = models.CharField(max_length=128)
+    expires_at = models.DateTimeField()
+    last_sent_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+
+    def issue_code(self):
+        code = "000000" if settings.DEMO_MODE else f"{secrets.randbelow(10**6):06d}"
+        while not settings.DEMO_MODE and self.code_hash and check_password(code, self.code_hash):
+            code = f"{secrets.randbelow(10**6):06d}"
+        self.code_hash = make_password(code)
+        self.challenge = uuid.uuid4()
+        self.last_sent_at = timezone.now()
+        self.expires_at = self.last_sent_at + timedelta(minutes=15)
+        self.attempts = 0
+        return code
 
 
 class RegistrationVerification(models.Model):

@@ -9,6 +9,7 @@ from uuid import UUID
 from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.password_validation import (
@@ -50,6 +51,7 @@ from .models import (
     BewerbungStatus,
     EmployeeLoginVerification,
     Merkmal,
+    PendingEmailChange,
     Person,
     Protokoll,
     ProtokollSchluessel,
@@ -172,16 +174,138 @@ class PersonalProfileForm(forms.ModelForm):
 
     class Meta:
         model = Person
-        fields = ("vorname", "nachname", "telefonnummer")
-        labels = {"telefonnummer": "Telefonnummer (optional)"}
+        fields = (
+            "salutation",
+            "vorname",
+            "nachname",
+            "telefonnummer",
+            "geburtsdatum",
+            "street_address",
+            "postal_code",
+            "city",
+            "country",
+        )
+        labels = {
+            "salutation": "Anrede (optional)",
+            "telefonnummer": "Telefonnummer (optional)",
+            "geburtsdatum": "Geburtsdatum (optional)",
+            "street_address": "Straße und Hausnummer",
+            "postal_code": "Postleitzahl",
+            "city": "Ort",
+            "country": "Land",
+        }
         help_texts = {
             "telefonnummer": "Zum Beispiel +49 931 123456. Sie können das Feld leer lassen."
         }
         widgets = {
+            "salutation": forms.Select(attrs={"class": "uk-select"}),
+            "geburtsdatum": forms.DateInput(
+                format="%Y-%m-%d",
+                attrs={"class": "uk-input", "type": "date", "autocomplete": "bday"},
+            ),
+            "street_address": forms.TextInput(
+                attrs={"class": "uk-input", "autocomplete": "address-line1"}
+            ),
+            "postal_code": forms.TextInput(
+                attrs={"class": "uk-input", "autocomplete": "postal-code"}
+            ),
+            "city": forms.TextInput(attrs={"class": "uk-input", "autocomplete": "address-level2"}),
+            "country": forms.TextInput(attrs={"class": "uk-input", "autocomplete": "country-name"}),
             "telefonnummer": forms.TextInput(
                 attrs={"class": "uk-input", "type": "tel", "autocomplete": "tel"}
             ),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["geburtsdatum"].widget.attrs["max"] = timezone.localdate().isoformat()
+        self.fields["salutation"].choices = [
+            ("", "Keine Angabe"),
+            *Person._meta.get_field("salutation").choices,
+        ]
+
+    def clean_geburtsdatum(self):
+        value = self.cleaned_data["geburtsdatum"]
+        if value and value > timezone.localdate():
+            raise ValidationError("Das Geburtsdatum darf nicht in der Zukunft liegen.")
+        return value
+
+    def clean(self):
+        data = super().clean()
+        address_fields = ("street_address", "postal_code", "city", "country")
+        if any(data.get(name) for name in address_fields):
+            for name in address_fields:
+                if not data.get(name):
+                    self.add_error(
+                        name,
+                        (
+                            "Bitte vervollständigen Sie die Anschrift oder leeren Sie alle "
+                            "Adressfelder."
+                        ),
+                    )
+        return data
+
+
+class AccountPasswordChangeForm(PasswordChangeForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["old_password"].label = "Aktuelles Passwort"
+        self.fields["new_password2"].label = "Neues Passwort wiederholen"
+        for field in self.fields.values():
+            field.widget.attrs["class"] = "uk-input"
+
+    def clean_old_password(self):
+        value = self.cleaned_data["old_password"]
+        # No password-hash upgrade while validating an old request object.
+        if not check_password(value, self.user.password):
+            raise ValidationError(
+                "Das aktuelle Passwort ist nicht korrekt.", code="password_incorrect"
+            )
+        return value
+
+
+class AccountEmailChangeForm(forms.Form):
+    new_email = forms.EmailField(
+        label="Neue E-Mail-Adresse",
+        max_length=ACCOUNT_EMAIL_MAX_LENGTH,
+        widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "email"}),
+    )
+    current_password = forms.CharField(
+        label="Aktuelles Passwort",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"class": "uk-input", "autocomplete": "current-password"}),
+    )
+
+    def __init__(self, *args, user, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_current_password(self):
+        value = self.cleaned_data["current_password"]
+        if not check_password(value, self.user.password):
+            raise ValidationError(
+                "Das aktuelle Passwort ist nicht korrekt.", code="password_incorrect"
+            )
+        return value
+
+    def clean_new_email(self):
+        value = self.cleaned_data["new_email"].strip().lower()
+        _validate_account_email_length(value)
+        if value == self.user.email.lower():
+            raise ValidationError("Bitte geben Sie eine neue E-Mail-Adresse ein.")
+        if account_email_in_use(value, self.user):
+            raise ValidationError("Diese E-Mail-Adresse wird bereits verwendet.")
+        return value
+
+
+def account_email_in_use(email, user):
+    return (
+        get_user_model()
+        .objects.exclude(pk=user.pk)
+        .filter(Q(username__iexact=email) | Q(email__iexact=email))
+        .exists()
+        or Person.objects.exclude(user=user).filter(email__iexact=email).exists()
+    )
 
 
 class RegistrationForm(forms.Form):
@@ -301,6 +425,11 @@ class ResendRegistrationCodeForm(forms.Form):
         max_length=255,
         widget=forms.EmailInput(attrs={"class": "uk-input", "autocomplete": "username"}),
     )
+
+
+class AccountEmailConfirmationForm(RegistrationVerificationForm):
+    email = None
+    challenge = forms.UUIDField(widget=forms.HiddenInput)
 
 
 class EmployeeMfaCodeForm(forms.Form):
@@ -652,6 +781,7 @@ class UserAccountForm(forms.Form):
                 # A pending code was issued for the previous credentials or access state.
                 EmployeeLoginVerification.objects.filter(user=account).delete()
                 RegistrationVerification.objects.filter(user=account).delete()
+                PendingEmailChange.objects.filter(user=account).delete()
                 # Login completion persists its session under the same user-row
                 # lock, so this also catches sessions from concurrent requests.
                 for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator():

@@ -137,7 +137,7 @@ class PersonalProfileTests(TestCase):
         self.assertContains(response, "Nicht angegeben")
         Person.objects.filter(pk=self.person.pk).update(vorname="", nachname="")
         response = self.client.get(reverse("profile:detail"))
-        self.assertContains(response, "Nicht angegeben", count=3)
+        self.assertContains(response, "Nicht angegeben", count=6)
 
     def test_cancel_returns_to_saved_data_and_get_does_not_write(self):
         response = self.client.get(reverse("profile:edit"), self.data())
