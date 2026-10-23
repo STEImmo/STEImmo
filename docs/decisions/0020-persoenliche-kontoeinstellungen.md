@@ -6,16 +6,18 @@
 
 ## Entscheidung
 
-Der bestehende Profilbereich erhält die optionalen Angaben Anrede, Geburtsdatum
-und Anschrift sowie getrennte Formulare für Passwort und Anmelde-E-Mail.
+Der bestehende Profilbereich erhält die optionalen Angaben Anrede und Geburtsdatum
+sowie getrennte Formulare für Passwort und Anmelde-E-Mail.
 Anrede wird separat vom vorhandenen Geschlechtsfeld gespeichert; Geschlecht,
 Titel, Rollen und Wohnungszuordnung bleiben unverändert. Das vorhandene
-Geburtsdatum wird wiederverwendet. Die Anschrift liegt als Straße/Hausnummer,
-Postleitzahl, Ort und Land direkt an Person, ohne zusätzliche Adressverwaltung.
-Alle vier Adressfelder müssen gemeinsam gefüllt oder leer sein. Internationale
-Postleitzahlen sind erlaubt. Ein natives Datumsfeld und serverseitige Prüfung
+Geburtsdatum wird wiederverwendet. Eine Anschrift wird auf Nutzerauftrag im
+allgemeinen Profil weder angezeigt noch abgefragt. Bereits vorhandene Adressdaten
+bleiben erhalten; auch mitgesendete Adressfelder werden ignoriert.
+Ein natives Datumsfeld und serverseitige Prüfung
 verhindern ein zukünftiges Geburtsdatum. Migration 0029 ergänzt ausschließlich
-optionale Felder und eine Tabelle für ausstehende E-Mail-Änderungen.
+optionale Felder und eine Tabelle für ausstehende E-Mail-Änderungen. Die bereits
+angewendete Migration bleibt unverändert; ihre Adressfelder werden im Profil
+nicht verwendet.
 
 ### Zugriff und Passwortwechsel
 

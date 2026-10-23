@@ -180,19 +180,11 @@ class PersonalProfileForm(forms.ModelForm):
             "nachname",
             "telefonnummer",
             "geburtsdatum",
-            "street_address",
-            "postal_code",
-            "city",
-            "country",
         )
         labels = {
             "salutation": "Anrede (optional)",
             "telefonnummer": "Telefonnummer (optional)",
             "geburtsdatum": "Geburtsdatum (optional)",
-            "street_address": "Straße und Hausnummer",
-            "postal_code": "Postleitzahl",
-            "city": "Ort",
-            "country": "Land",
         }
         help_texts = {
             "telefonnummer": "Zum Beispiel +49 931 123456. Sie können das Feld leer lassen."
@@ -203,14 +195,6 @@ class PersonalProfileForm(forms.ModelForm):
                 format="%Y-%m-%d",
                 attrs={"class": "uk-input", "type": "date", "autocomplete": "bday"},
             ),
-            "street_address": forms.TextInput(
-                attrs={"class": "uk-input", "autocomplete": "address-line1"}
-            ),
-            "postal_code": forms.TextInput(
-                attrs={"class": "uk-input", "autocomplete": "postal-code"}
-            ),
-            "city": forms.TextInput(attrs={"class": "uk-input", "autocomplete": "address-level2"}),
-            "country": forms.TextInput(attrs={"class": "uk-input", "autocomplete": "country-name"}),
             "telefonnummer": forms.TextInput(
                 attrs={"class": "uk-input", "type": "tel", "autocomplete": "tel"}
             ),
@@ -229,21 +213,6 @@ class PersonalProfileForm(forms.ModelForm):
         if value and value > timezone.localdate():
             raise ValidationError("Das Geburtsdatum darf nicht in der Zukunft liegen.")
         return value
-
-    def clean(self):
-        data = super().clean()
-        address_fields = ("street_address", "postal_code", "city", "country")
-        if any(data.get(name) for name in address_fields):
-            for name in address_fields:
-                if not data.get(name):
-                    self.add_error(
-                        name,
-                        (
-                            "Bitte vervollständigen Sie die Anschrift oder leeren Sie alle "
-                            "Adressfelder."
-                        ),
-                    )
-        return data
 
 
 class AccountPasswordChangeForm(PasswordChangeForm):

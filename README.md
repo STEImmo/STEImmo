@@ -56,8 +56,8 @@ verständliche Feldfehler. Das gemeinsame Template liegt in
 `templates/registration/auth_base.html`.
 
 Angemeldete Nutzer erreichen **Mein Profil** über das Kontomenü auf Desktop und
-Mobilgeräten. Dort können sie Vor- und Nachnamen, optionale Telefonnummer, Anrede,
-Geburtsdatum und Anschrift ansehen und bearbeiten. **Abbrechen** verwirft
+Mobilgeräten. Dort können sie Vor- und Nachnamen, optionale Telefonnummer, Anrede
+und Geburtsdatum ansehen und bearbeiten. **Abbrechen** verwirft
 ungespeicherte Eingaben. Konten ohne Personenverknüpfung erhalten einen Hinweis auf
 die Benutzerverwaltung. Eingereichte Bewerbungsunterlagen und abgeschlossene
 Übergabearchive werden durch Profiländerungen nicht überschrieben.
@@ -73,8 +73,8 @@ Der Code gilt 15 Minuten und erlaubt fünf Versuche. Ein neuer Code kann nach ei
 Minute angefordert werden. Passwortwechsel und bestätigter E-Mail-Wechsel melden
 das Konto auf allen Geräten ab; die nächste Anmeldung verwendet weiterhin die
 bestehende Mitarbeiter-MFA, sofern diese für das Konto erforderlich ist.
-Die Anschrift kann vollständig ausgefüllt oder vollständig leer gelassen werden;
-internationale Postleitzahlen sind möglich. Neue Profilangaben verändern keine
+Eine Anschrift wird im allgemeinen Profil nicht abgefragt oder angezeigt.
+Neue Profilangaben verändern keine
 eingereichten Unterlagen oder archivierten Protokolle. Details stehen in
 [ADR-0020](docs/decisions/0020-persoenliche-kontoeinstellungen.md).
 

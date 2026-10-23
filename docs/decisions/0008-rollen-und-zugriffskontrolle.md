@@ -216,7 +216,8 @@ Profil-URL mit fremder Personenkennung. Konten ohne Zuordnung können keine Pers
 anlegen oder auswählen und erhalten einen verständlichen Hinweis.
 
 Das Django-ModelForm gibt Vorname, Nachname, optionale Telefonnummer,
-Anrede, Geburtsdatum und Anschrift frei. Die Namen werden atomar mit
+Anrede und Geburtsdatum frei. Die Anschrift wird im Profil weder angezeigt
+noch bearbeitet; vorhandene Adressdaten bleiben erhalten. Die Namen werden atomar mit
 `User.first_name` und `User.last_name`
 synchronisiert und auf deren bestehende Feldlängen begrenzt (je 150 Zeichen).
 Die Telefonnummer behält die bestehende flexible Schreibweise und Feldlänge.

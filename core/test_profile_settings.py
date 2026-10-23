@@ -52,10 +52,6 @@ class ProfileSettingsTests(TestCase):
             "telefonnummer": "",
             "salutation": "ms",
             "geburtsdatum": "1995-04-12",
-            "street_address": "Beispielweg 12",
-            "postal_code": "SW1A 1AA",
-            "city": "London",
-            "country": "Vereinigtes Königreich",
             **changes,
         }
 
@@ -82,29 +78,54 @@ class ProfileSettingsTests(TestCase):
             "challenge": str(pending.challenge),
         }
 
-    def test_extended_profile_round_trips_optional_personal_data_and_international_address(self):
+    def test_extended_profile_round_trips_optional_personal_data(self):
         response = self.client.post(reverse("profile:edit"), self.profile_data())
         self.assertRedirects(response, reverse("profile:detail"))
         self.person.refresh_from_db()
         self.assertEqual(self.person.salutation, "ms")
         self.assertEqual(self.person.geburtsdatum, date(1995, 4, 12))
-        self.assertEqual(self.person.postal_code, "SW1A 1AA")
         response = self.client.get(reverse("profile:detail"))
         for value in (
             "Frau",
             "12. April 1995",
-            "Beispielweg 12",
-            "London",
-            "Vereinigtes Königreich",
         ):
             self.assertContains(response, value)
         self.assertContains(self.client.get(reverse("profile:edit")), 'type="date"')
 
-    def test_profile_rejects_future_birthdate_unknown_salutation_and_partial_address(self):
+    def test_profile_does_not_display_or_collect_address(self):
+        self.person.street_address = "Beispielweg 12"
+        self.person.save(update_fields=["street_address"])
+        for url in ("profile:detail", "profile:edit"):
+            with self.subTest(url=url):
+                response = self.client.get(reverse(url))
+                self.assertNotContains(response, "Anschrift")
+                self.assertNotContains(response, "Beispielweg 12")
+                for field in ("street_address", "postal_code", "city", "country"):
+                    self.assertNotContains(response, f'name="{field}"')
+
+    def test_profile_ignores_posted_address_and_preserves_existing_data(self):
+        address = {
+            "street_address": "Beispielweg 12",
+            "postal_code": "SW1A 1AA",
+            "city": "London",
+            "country": "Vereinigtes Königreich",
+        }
+        Person.objects.filter(pk=self.person.pk).update(**address)
+        for changes in ({}, {"street_address": "Andere Straße 3", "city": ""}):
+            with self.subTest(changes=changes):
+                response = self.client.post(
+                    reverse("profile:edit"), self.profile_data(vorname="Maja", **changes)
+                )
+                self.assertRedirects(response, reverse("profile:detail"))
+                self.person.refresh_from_db()
+                self.assertEqual(self.person.vorname, "Maja")
+                for field, value in address.items():
+                    self.assertEqual(getattr(self.person, field), value)
+
+    def test_profile_rejects_future_birthdate_and_unknown_salutation(self):
         for changes, field in (
             ({"geburtsdatum": str(timezone.localdate() + timedelta(days=1))}, "geburtsdatum"),
             ({"salutation": "admin"}, "salutation"),
-            ({"city": ""}, "city"),
         ):
             with self.subTest(field=field):
                 response = self.client.post(reverse("profile:edit"), self.profile_data(**changes))
@@ -120,15 +141,10 @@ class ProfileSettingsTests(TestCase):
             self.profile_data(
                 salutation="",
                 geburtsdatum="",
-                street_address="",
-                postal_code="",
-                city="",
-                country="",
             ),
         )
         self.assertRedirects(response, reverse("profile:detail"))
         self.person.refresh_from_db()
-        self.assertEqual(self.person.street_address, "")
         self.assertIsNone(self.person.geburtsdatum)
 
     def test_password_change_rejects_wrong_current_weak_and_mismatched_passwords(self):
