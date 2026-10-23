@@ -27,13 +27,13 @@
                     </form>
                 {% else %}
                     <dl class="profile-data"><div><dt>Vorname</dt><dd>{{ person.vorname|default:"Nicht angegeben" }}</dd></div><div><dt>Nachname</dt><dd>{{ person.nachname|default:"Nicht angegeben" }}</dd></div><div class="profile-data-phone"><dt>Telefonnummer <span class="profile-optional">Optional</span></dt><dd>{% if person.telefonnummer %}{{ person.telefonnummer }}{% else %}<span class="profile-missing">Nicht angegeben</span>{% endif %}</dd><dd class="profile-data-help">Für eine telefonische Rückfrage zu Ihrem Anliegen.</dd></div></dl>
-                    {% if not person.telefonnummer %}<div class="profile-gentle-note"><span uk-icon="icon: receiver; ratio: .9" aria-hidden="true"></span><p>Auch telefonisch erreichbar sein?<br><a href="{% url 'profile:edit' %}">Telefonnummer ergänzen</a> – ganz freiwillig.</p></div>{% endif %}
+                    {% if not person.telefonnummer %}<div class="profile-gentle-note"><span uk-icon="icon: receiver; ratio: .9" aria-hidden="true"></span><p>Auch telefonisch erreichbar sein?<br><a href="{% url 'profile:edit' %}">Telefonnummer ergänzen</a></p></div>{% endif %}
                 {% endif %}
             </section>
             <section class="uk-card uk-card-default profile-panel" aria-labelledby="profile-login-title">
                 <div class="profile-panel-heading"><span class="profile-section-icon" uk-icon="lock" aria-hidden="true"></span><div><h2 id="profile-login-title">Anmeldung &amp; Konto</h2><p>Ihr Zugang zum persönlichen Bereich.</p></div></div>
                 <dl class="profile-data profile-login-data"><div><dt>E-Mail-Adresse für die Anmeldung</dt><dd>{{ user.email|default:"Nicht angegeben" }}</dd></div></dl>
-                <p class="profile-card-footnote"><span uk-icon="icon: info; ratio: .8" aria-hidden="true"></span> Die Anmelde-E-Mail-Adresse kann hier nicht geändert werden.</p>
+                <p class="profile-card-footnote"><span uk-icon="icon: info; ratio: .8" aria-hidden="true"></span> Mit dieser E-Mail-Adresse melden Sie sich bei uns an.</p>
             </section>
             <div class="profile-information"><span uk-icon="icon: info; ratio: 1.1" aria-hidden="true"></span><div><h2>Was passiert mit Ihren Änderungen?</h2><p>Ihre Änderungen aktualisieren die Angaben in Ihrem Profil. Bereits eingereichte Bewerbungsunterlagen und abgeschlossene Übergabeprotokolle bleiben erhalten.</p><a href="{% url 'privacy' %}">Mehr zum Umgang mit Ihren Daten <span uk-icon="icon: arrow-right; ratio: .8" aria-hidden="true"></span></a></div></div>
         </div>
