@@ -55,6 +55,29 @@ helles Einzugsmotiv neben den echten Formularen, Passwortanzeige/-hilfen und
 verständliche Feldfehler. Das gemeinsame Template liegt in
 `templates/registration/auth_base.html`.
 
+Angemeldete Nutzer erreichen **Mein Profil** über das Kontomenü auf Desktop und
+Mobilgeräten. Dort können sie Vor- und Nachnamen, optionale Telefonnummer, Anrede
+und Geburtsdatum ansehen und bearbeiten. **Abbrechen** verwirft
+ungespeicherte Eingaben. Konten ohne Personenverknüpfung erhalten einen Hinweis auf
+die Benutzerverwaltung. Eingereichte Bewerbungsunterlagen und abgeschlossene
+Übergabearchive werden durch Profiländerungen nicht überschrieben.
+Der Profilbereich bündelt persönliche Daten und Anmeldeinformationen in getrennten
+Karten. Eine Kontonavigation führt abhängig von den bestehenden Rechten zu eigenen
+Bewerbungen und Übergabeprotokollen. Hinweise erläutern die freiwillige Telefonnummer
+und den Erhalt bereits eingereichter Unterlagen.
+
+Unter **Anmeldung & Konto** lassen sich Passwort und E-Mail-Adresse ändern.
+Beide Änderungen verlangen das aktuelle Passwort. Eine neue E-Mail-Adresse wird
+erst nach einem Bestätigungscode übernommen; bis dahin gilt die bisherige Adresse.
+Der Code gilt 15 Minuten und erlaubt fünf Versuche. Ein neuer Code kann nach einer
+Minute angefordert werden. Passwortwechsel und bestätigter E-Mail-Wechsel melden
+das Konto auf allen Geräten ab; die nächste Anmeldung verwendet weiterhin die
+bestehende Mitarbeiter-MFA, sofern diese für das Konto erforderlich ist.
+Eine Anschrift wird im allgemeinen Profil nicht abgefragt oder angezeigt.
+Neue Profilangaben verändern keine
+eingereichten Unterlagen oder archivierten Protokolle. Details stehen in
+[ADR-0020](docs/decisions/0020-persoenliche-kontoeinstellungen.md).
+
 Die Gebäudeansicht ist lokal unter [Gebäude erkunden](http://localhost:8000/wohnungen/gebaeude/)
 erreichbar: Gebäude → Etagenplan → Wohnungsdetails. Öffentliche Wohnungsfotos können im
 Mitarbeiterbereich unter **Wohnung bearbeiten → Wohnungsfotos verwalten** gepflegt werden.

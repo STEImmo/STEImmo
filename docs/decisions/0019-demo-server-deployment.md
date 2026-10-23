@@ -26,8 +26,8 @@ keine Demo. Nur `config.settings_demo` setzt `DEMO_MODE=True` und verwendet
 Djangos vorhandenes Dummy-Mailbackend: Nachrichten werden nicht versendet.
 `DEBUG` bleibt ausgeschaltet; Gunicorn bleibt der Webserver.
 
-Im Demo-Modus ist der Bestätigungscode für Registrierung und Verwaltungslogin
-`000000`. Die normalen Formulare, Sitzungen, CSRF-Prüfungen, Rollen,
+Im Demo-Modus ist der Bestätigungscode für Registrierung, Verwaltungslogin und
+E-Mail-Wechsel `000000`. Die normalen Formulare, Sitzungen, CSRF-Prüfungen, Rollen,
 Codeablaufzeiten und Fehlversuchsgrenzen bleiben aktiv. Außerhalb des
 Demo-Profils werden weiterhin zufällige Codes erzeugt. Ein zusätzlicher
 Mailpit-Service oder Zugriff auf Serverlogs ist für die Anmeldung nicht nötig.
