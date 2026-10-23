@@ -2,7 +2,7 @@
 
 - Status: Angenommen auf ausdrücklichen Nutzerauftrag
 - Datum: 2026-10-23
-- Issue: #153; erweitert die bewusst begrenzte Profilseite aus #129
+- Issue: #129 (US-21), auf Nutzerauftrag um Kontoeinstellungen erweitert
 
 ## Entscheidung
 
@@ -85,8 +85,6 @@ Bewerbungsdaten. Eingereichte Dateien und Texte sowie archivierte Protokolle,
 Unterschriften und PDFs bleiben unverändert. Bestehende fachliche Ansichten dürfen
 weiterhin aktuelle Stammdaten über Person darstellen.
 
-Die Profilbasis #129 ist derzeit eine lokale Abhängigkeit. Der Folgebranch
-feat/153-account-settings beginnt auf aktuellem origin/main und übernimmt die
-Profilbasis durch einen expliziten lokalen Merge. Vor einer unabhängigen
-Integration von #153 muss #129 integriert werden; beide Issues bleiben bis Review
-und freigegebenem Merge offen.
+Profilbearbeitung und Kontoeinstellungen gehören gemeinsam zu US-21 (#129)
+und werden im Branch `feat/129-personal-profile` umgesetzt. Die Integration
+erfolgt nach erfolgreicher CI, Review und freigegebenem Merge.

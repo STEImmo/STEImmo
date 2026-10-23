@@ -215,7 +215,7 @@ erfolgt ausschließlich über `Person.user` und den angemeldeten Nutzer; es gibt
 Profil-URL mit fremder Personenkennung. Konten ohne Zuordnung können keine Person
 anlegen oder auswählen und erhalten einen verständlichen Hinweis.
 
-Das Django-ModelForm gibt Vorname, Nachname, optionale Telefonnummer und seit #153
+Das Django-ModelForm gibt Vorname, Nachname, optionale Telefonnummer,
 Anrede, Geburtsdatum und Anschrift frei. Die Namen werden atomar mit
 `User.first_name` und `User.last_name`
 synchronisiert und auf deren bestehende Feldlängen begrenzt (je 150 Zeichen).
@@ -233,10 +233,9 @@ Bewerbungsansichten dürfen weiterhin aktuelle Stammdaten über die bestehende
 Personenverknüpfung anzeigen; eingereichte Inhalte und Dateien bleiben erhalten.
 Abgeschlossene Protokolle verwenden weiterhin ihren Export-Snapshot und ihre
 gespeicherte PDF-Fassung; Altprotokolle ohne gesicherten Namen bleiben gemäß
-bestehendem Verhalten ausdrücklich gekennzeichnet. Die ursprüngliche Profilbasis
-#129 benötigt keine Modellmigration. Die additive Erweiterung aus #153 erhält
-Migration 0029; sie erweitert
-den ursprünglichen US-21-Umfang ausdrücklich auf Nutzerauftrag.
+bestehendem Verhalten ausdrücklich gekennzeichnet. Migration 0029 ergänzt
+die optionalen Stammdaten und ausstehenden E-Mail-Änderungen innerhalb von
+US-21 (#129). Diese Erweiterung erfolgt ausdrücklich auf Nutzerauftrag.
 
 ## Erweiterungsroutine
 
