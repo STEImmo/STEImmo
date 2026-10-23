@@ -1,5 +1,6 @@
 {% if user.is_authenticated %}
     <p class="site-account-name uk-text-small">{{ user.get_username }}</p>
+    <a class="uk-button uk-button-text" href="{% url 'profile:detail' %}"{% if request.resolver_match.namespace == 'profile' %} aria-current="{% if request.resolver_match.url_name == 'detail' %}page{% else %}true{% endif %}"{% endif %}>Mein Profil</a>
     <form method="post" action="{% url 'logout' %}">
         {% csrf_token %}
         <button class="uk-button uk-button-default" type="submit">Abmelden</button>

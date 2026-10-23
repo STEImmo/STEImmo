@@ -1,5 +1,5 @@
 from django.contrib.auth.views import LogoutView
-from django.urls import path
+from django.urls import include, path
 from django.views.generic import TemplateView
 
 from . import views
@@ -14,6 +14,19 @@ urlpatterns = [
         name="image_credits",
     ),
     path("health/", views.health, name="health"),
+    path(
+        "accounts/profil/",
+        include(
+            (
+                [
+                    path("", views.personal_profile, name="detail"),
+                    path("bearbeiten/", views.personal_profile_edit, name="edit"),
+                ],
+                "profile",
+            ),
+            namespace="profile",
+        ),
+    ),
     path(
         "accounts/login/",
         views.RoleAwareLoginView.as_view(),
