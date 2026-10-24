@@ -422,6 +422,11 @@ werden kann. Nach einer Zusage heißt die Absageaktion **Terminzusage zurückzie
 ein Bestätigungsdialog und die Rückmeldung erklären, dass die Bewerbung aktiv bleibt.
 Vorschläge sind unverbindlich. Die Verwaltung sieht sie bei der Bewerbung und plant
 über das bestehende Terminformular einen neuen Termin, den der Bewerber zusagen kann.
+**Vorschlag übernehmen** füllt dieses Formular mit dem gewünschten Datum und Beginn
+sowie einer Standarddauer von 30 Minuten vor. Erst **Besichtigung speichern** legt
+den Termin an und versendet die Einladung. Würde die Endzeit auf den Folgetag fallen,
+muss die Verwaltung eine Endzeit am selben Tag wählen. Veraltete oder inzwischen
+nicht mehr zulässige Vorschläge können nicht übernommen werden.
 Nach einer Neuplanung bleibt der frühere Vorschlag zur Nachvollziehbarkeit sichtbar.
 Aktive Konten mit Mitarbeiterzugriff und hinterlegter E-Mail-Adresse werden nach dem
 Speichern über neue oder geänderte Vorschläge benachrichtigt. Fehlt ein Empfänger oder

@@ -1012,6 +1012,93 @@ class ViewingProposalTests(TestCase):
         appointment.refresh_from_db()
         self.assertEqual(appointment.status, "applicant_declined")
 
+    def test_staff_can_prefill_planning_form_from_current_proposal_without_booking(self):
+        appointment = self.decline()
+        self.post(self.proposal_url(appointment), self.proposal_data(appointment))
+        appointment.refresh_from_db()
+        self.client.force_login(self.employee)
+        page = self.client.get(self.detail_url)
+        self.assertContains(page, "Vorschlag übernehmen")
+        self.assertContains(page, f"?proposal={appointment.pk}#viewing-create")
+        mail.outbox.clear()
+        page = self.client.get(self.detail_url, {"proposal": appointment.pk})
+        form = page.context["viewing_form"]
+        start = timezone.localtime(appointment.proposed_start)
+        self.assertEqual(form.initial["date"], start.date())
+        self.assertEqual(form.initial["start_time"], start.time())
+        self.assertEqual(form.initial["end_time"], (start + timedelta(minutes=30)).time())
+        self.assertEqual(form.initial["action"], "schedule")
+        self.assertEqual(self.application.viewings.count(), 3)
+        self.assertEqual(mail.outbox, [])
+        self.post(
+            self.create_url,
+            {
+                "date": form.initial["date"].isoformat(),
+                "start_time": form.initial["start_time"].isoformat(),
+                "end_time": form.initial["end_time"].isoformat(),
+                "action": "schedule",
+            },
+        )
+        replacement = self.application.viewings.first()
+        self.assertEqual(replacement.starts_at, appointment.proposed_start)
+        self.assertEqual(replacement.status, "planned")
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_prefill_rejects_foreign_ids_and_requires_employee_access(self):
+        appointment = self.decline()
+        self.post(self.proposal_url(appointment), self.proposal_data(appointment))
+        self.assertEqual(
+            self.client.get(self.detail_url, {"proposal": appointment.pk}).status_code, 403
+        )
+        self.client.force_login(self.employee)
+        other = Bewerbung.objects.create(
+            person=self.person, wohnung=self.unit, status=BewerbungStatus.DECLINED
+        )
+        foreign = ViewingAppointment.objects.create(
+            application=other,
+            starts_at=appointment.starts_at,
+            ends_at=appointment.ends_at,
+            status="applicant_declined",
+        )
+        for value in ("invalid", str(uuid4()), str(foreign.pk)):
+            self.assertEqual(self.client.get(self.detail_url, {"proposal": value}).status_code, 404)
+
+    def test_prefill_does_not_offer_expired_ineligible_or_superseded_proposals(self):
+        appointment = self.decline()
+        self.post(self.proposal_url(appointment), self.proposal_data(appointment))
+        appointment.refresh_from_db()
+        self.client.force_login(self.employee)
+        future = appointment.proposed_start
+        for overrides in (
+            {"proposed_start": timezone.now() - timedelta(minutes=1)},
+            {"proposed_start": None},
+        ):
+            ViewingAppointment.objects.filter(pk=appointment.pk).update(**overrides)
+            page = self.client.get(self.detail_url, {"proposal": appointment.pk})
+            self.assertNotContains(page, "Vorschlag übernehmen")
+            self.assertNotIn("date", page.context["viewing_form"].initial)
+        ViewingAppointment.objects.filter(pk=appointment.pk).update(proposed_start=future)
+        Bewerbung.objects.filter(pk=self.application.pk).update(review_priority=0)
+        page = self.client.get(self.detail_url, {"proposal": appointment.pk})
+        self.assertNotContains(page, "Vorschlag übernehmen")
+        self.assertNotIn("date", page.context["viewing_form"].initial)
+        Bewerbung.objects.filter(pk=self.application.pk).update(review_priority=2)
+        self.post(self.create_url, self.payload(days=4))
+        page = self.client.get(self.detail_url, {"proposal": appointment.pk})
+        self.assertNotContains(page, "Vorschlag übernehmen")
+        self.assertNotIn("date", page.context["viewing_form"].initial)
+
+    def test_prefill_near_midnight_requires_manual_end_on_same_day(self):
+        appointment = self.decline()
+        self.post(
+            self.proposal_url(appointment), self.proposal_data(appointment, start_time="23:45")
+        )
+        self.client.force_login(self.employee)
+        page = self.client.get(self.detail_url, {"proposal": appointment.pk})
+        form = page.context["viewing_form"]
+        self.assertEqual(form.initial["start_time"].hour, 23)
+        self.assertIsNone(form.initial["end_time"])
+
     def test_superseded_proposal_callback_and_retry_do_not_send_stale_mail(self):
         from .viewings import send_viewing_notification
 

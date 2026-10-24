@@ -7,6 +7,9 @@
         <section class="uk-margin-medium-bottom">
             {% include "wohnungsverwaltung/_viewing_summary.html" with appointment=appointment only %}
             {% include "wohnungsverwaltung/_viewing_proposal_summary.html" with appointment=appointment only %}
+            {% if appointment.can_use_proposal %}
+                <p><a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:employee_application_detail' application.pk %}?proposal={{ appointment.pk }}#viewing-create">Vorschlag übernehmen</a></p>
+            {% endif %}
             {% if appointment.current_notice %}
                 <p>Benachrichtigung: <strong>{{ appointment.current_notice.get_notification_status_display }}</strong></p>
                 <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_resend' application.pk appointment.pk %}">
@@ -62,7 +65,10 @@
         </section>
     {% empty %}<p>Noch keine Besichtigung dokumentiert.</p>{% endfor %}
     {% if not has_open_viewing and not viewing_eligibility_error %}
-        <h3 class="uk-h4">Termin planen oder Besichtigung nachtragen</h3>
+        <h3 class="uk-h4" id="viewing-create">Termin planen oder Besichtigung nachtragen</h3>
+        {% if selected_proposal %}
+            <div class="uk-alert-primary" uk-alert><p>Datum und Beginn wurden aus dem Alternativvorschlag übernommen. Bitte prüfen Sie die Angaben und speichern Sie den Termin. Die Standarddauer beträgt 30 Minuten; falls sie über Mitternacht hinausgeht, wählen Sie eine Endzeit am selben Tag.</p></div>
+        {% endif %}
         <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_create' application.pk %}" class="uk-form-stacked" data-viewing-time-form data-current-time="{{ viewing_now|date:'c' }}">
             {% csrf_token %}
             {% if viewing_form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ viewing_form.non_field_errors }}</div>{% endif %}
