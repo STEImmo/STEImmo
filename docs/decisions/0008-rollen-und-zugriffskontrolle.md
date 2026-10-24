@@ -237,6 +237,11 @@ gespeicherte PDF-Fassung; Altprotokolle ohne gesicherten Namen bleiben gemäß
 bestehendem Verhalten ausdrücklich gekennzeichnet. Migration 0029 ergänzt
 die optionalen Stammdaten und ausstehenden E-Mail-Änderungen innerhalb von
 US-21 (#129). Diese Erweiterung erfolgt ausdrücklich auf Nutzerauftrag.
+Migration 0030 übernimmt bestehende Versandzeitpunkte in eine eigene kontobezogene
+Versandsperre. Abbrechen und das Löschen ausstehender Codes heben die einminütige
+Wartezeit nicht auf. Neue E-Mail-Adressen werden vor Verfügbarkeitsprüfung, Versand
+und Speicherung wie beim Anmeldeformular per Unicode-NFKC normalisiert und erneut
+validiert, damit die anschließende Anmeldung dieselbe Adresse verwendet.
 
 ## Erweiterungsroutine
 

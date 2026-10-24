@@ -70,7 +70,9 @@ Unter **Anmeldung & Konto** lassen sich Passwort und E-Mail-Adresse ändern.
 Beide Änderungen verlangen das aktuelle Passwort. Eine neue E-Mail-Adresse wird
 erst nach einem Bestätigungscode übernommen; bis dahin gilt die bisherige Adresse.
 Der Code gilt 15 Minuten und erlaubt fünf Versuche. Ein neuer Code kann nach einer
-Minute angefordert werden. Passwortwechsel und bestätigter E-Mail-Wechsel melden
+Minute angefordert werden. Diese Wartezeit bleibt auch beim Abbrechen erhalten.
+Neue Adressen werden wie bei der Anmeldung per Unicode-NFKC normalisiert.
+Passwortwechsel und bestätigter E-Mail-Wechsel melden
 das Konto auf allen Geräten ab; die nächste Anmeldung verwendet weiterhin die
 bestehende Mitarbeiter-MFA, sofern diese für das Konto erforderlich ist.
 Eine Anschrift wird im allgemeinen Profil nicht abgefragt oder angezeigt.

@@ -15,6 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from wohnungsverwaltung.models import (
+    AccountEmailChangeThrottle,
     AccountLoginThrottle,
     EmployeeLoginVerification,
     Person,
@@ -263,12 +264,57 @@ class ProfileSettingsTests(TestCase):
             .exists()
         )
 
+    def test_cancelling_email_change_keeps_send_limit_and_invalidates_old_code(self):
+        now = timezone.now()
+        with patch("core.account_views.timezone.now", return_value=now):
+            self.start_email_change()
+            old = self.confirmation_data()
+            self.client.post(reverse("profile:email_cancel"))
+            response = self.start_email_change("replacement@example.test")
+        self.assertContains(response, "Bitte warten Sie")
+        self.assertEqual(len(mail.outbox), 1)
+        response = self.client.post(reverse("profile:email_confirm"), old)
+        self.assertContains(response, "Es ist keine E-Mail-Änderung offen.")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "settings@example.test")
+        with patch("core.account_views.timezone.now", return_value=now + timedelta(minutes=1)):
+            self.assertRedirects(
+                self.start_email_change("replacement@example.test"),
+                reverse("profile:email_confirm"),
+            )
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_unicode_email_change_allows_actual_login_after_confirmation(self):
+        self.assertRedirects(
+            self.start_email_change("new@ｅxample.test"), reverse("profile:email_confirm")
+        )
+        self.assertEqual(mail.outbox[-1].to, ["new@example.test"])
+        self.client.post(reverse("profile:email_confirm"), self.confirmation_data())
+        self.user.refresh_from_db()
+        self.person.refresh_from_db()
+        self.assertEqual(
+            (self.user.username, self.user.email, self.person.email), ("new@example.test",) * 3
+        )
+        response = self.client.post(
+            reverse("login"), {"username": "new@ｅxample.test", "password": PASSWORD}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.client.session["_auth_user_id"], str(self.user.pk))
+
+    def test_unicode_email_change_checks_normalized_address_for_duplicates(self):
+        response = self.start_email_change("other@ｅxample.test")
+        self.assertIn("new_email", response.context["form"].errors)
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_mail_failure_preserves_login_and_explains_retry(self):
         with patch("core.views.send_mail", side_effect=OSError):
             response = self.start_email_change()
         self.assertContains(response, "konnte nicht gesendet")
         self.user.refresh_from_db()
         self.assertEqual(self.user.email, "settings@example.test")
+        self.client.post(reverse("profile:email_cancel"))
+        self.assertContains(self.start_email_change(), "Bitte warten Sie")
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_email_collision_after_code_issue_is_a_form_error(self):
         self.start_email_change()
@@ -336,6 +382,9 @@ class ProfileSettingsTests(TestCase):
         pending = self.pending()
         pending.last_sent_at = timezone.now() - timedelta(minutes=2)
         pending.save(update_fields=["last_sent_at"])
+        AccountEmailChangeThrottle.objects.filter(user=self.user).update(
+            last_sent_at=pending.last_sent_at
+        )
         self.assertRedirects(
             self.start_email_change("replacement@example.test"), reverse("profile:email_confirm")
         )

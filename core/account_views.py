@@ -22,6 +22,7 @@ from wohnungsverwaltung.forms import (
     account_email_in_use,
 )
 from wohnungsverwaltung.models import (
+    AccountEmailChangeThrottle,
     EmployeeLoginVerification,
     PendingEmailChange,
     Person,
@@ -137,7 +138,8 @@ def email_change(request):
             and credential_form_valid(form, account, request, "current_password")
         ):
             pending = PendingEmailChange.objects.select_for_update().filter(user=account).first()
-            if pending and pending.last_sent_at + timedelta(minutes=1) > timezone.now():
+            throttle = AccountEmailChangeThrottle.objects.filter(user=account).first()
+            if throttle and throttle.last_sent_at + timedelta(minutes=1) > timezone.now():
                 form.add_error(
                     None, "Bitte warten Sie eine Minute, bevor Sie einen neuen Code anfordern."
                 )
@@ -147,6 +149,9 @@ def email_change(request):
                 pending.credentials_hash = credentials_hash(account)
                 code = pending.issue_code()
                 pending.save()
+                AccountEmailChangeThrottle.objects.update_or_create(
+                    user=account, defaults={"last_sent_at": pending.last_sent_at}
+                )
     # Deliver after releasing the account/person row locks.
     if code is not None:
         if views._deliver_verification_code(send_email_code, pending.new_email, code):

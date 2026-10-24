@@ -214,6 +214,11 @@ class Person(models.Model):
         return f"{self.vorname} {self.nachname}"
 
 
+class AccountEmailChangeThrottle(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    last_sent_at = models.DateTimeField()
+
+
 class PendingEmailChange(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     new_email = models.EmailField(max_length=150)

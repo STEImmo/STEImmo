@@ -258,7 +258,9 @@ class AccountEmailChangeForm(forms.Form):
         return value
 
     def clean_new_email(self):
-        value = self.cleaned_data["new_email"].strip().lower()
+        value = get_user_model().normalize_username(self.cleaned_data["new_email"]).strip().lower()
+        # Normalization can change syntax as well as length; validate the stored value.
+        value = self.fields["new_email"].clean(value)
         _validate_account_email_length(value)
         if value == self.user.email.lower():
             raise ValidationError("Bitte geben Sie eine neue E-Mail-Adresse ein.")
