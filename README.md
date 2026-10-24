@@ -414,6 +414,23 @@ verlangen aber eine erneute Prüfung vor weiteren Zuweisungen oder Verschiebunge
 Der interne Verlauf dokumentiert Termin- und Statusänderungen sowie Versandversuche.
 Es gibt keine Selbstbuchung, Kalenderintegration, Kapazitätsprüfung oder Erinnerungen.
 
+Nach der Absage eines eigenen Termins können Bewerber bei aktiver Bewerbung einen
+zukünftigen **Alternativtermin** mit Datum und Beginn vorschlagen. Pro abgesagtem
+Termin gibt es einen aktuellen Vorschlag, der bis zur nächsten Terminplanung geändert
+werden kann. Nach einer Zusage heißt die Absageaktion **Terminzusage zurückziehen**;
+ein Bestätigungsdialog und die Rückmeldung erklären, dass die Bewerbung aktiv bleibt.
+Vorschläge sind unverbindlich. Die Verwaltung sieht sie bei der Bewerbung und plant
+über das bestehende Terminformular einen neuen Termin, den der Bewerber zusagen kann.
+Nach einer Neuplanung bleibt der frühere Vorschlag zur Nachvollziehbarkeit sichtbar.
+Aktive Konten mit Mitarbeiterzugriff und hinterlegter E-Mail-Adresse werden nach dem
+Speichern über neue oder geänderte Vorschläge benachrichtigt. Fehlt ein Empfänger oder
+scheitert der Versand, bleibt der Vorschlag erhalten; der Versandstatus und die
+Wiederholungsaktion stehen im internen Terminbereich. Überholte oder vergangene
+Vorschläge werden nicht erneut versendet. Zeitangaben gelten in `Europe/Berlin`;
+nicht eindeutige oder nicht existierende Uhrzeiten bei der Zeitumstellung werden
+abgelehnt. Details zu Zugriff und Verlauf stehen in
+[ADR-0008](docs/decisions/0008-rollen-und-zugriffskontrolle.md).
+
 ## Lokale Entwicklung
 
 Übergabeprotokolle werden über **Protokoll prüfen und unterschreiben** abgeschlossen.

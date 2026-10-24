@@ -12,6 +12,7 @@ from django.test import Client, TestCase, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from .access import ROLE_APPLICANT, ROLE_EMPLOYEE
 from .forms import ViewingAppointmentForm
@@ -675,9 +676,362 @@ class ViewingTests(TestCase):
         )
 
 
+class ViewingProposalTests(TestCase):
+    setUp = ViewingTests.setUp
+    payload = ViewingTests.payload
+    post = ViewingTests.post
+    schedule = ViewingTests.schedule
+    response_url = ViewingTests.response_url
+
+    def decline(self):
+        appointment = self.schedule()
+        self.client.force_login(self.user)
+        self.post(self.response_url(appointment), {"action": "decline", "version": 1})
+        appointment.refresh_from_db()
+        return appointment
+
+    def proposal_url(self, appointment):
+        return reverse(
+            "wohnungsverwaltung:applicant_viewing_proposal",
+            args=[self.application.pk, appointment.pk],
+        )
+
+    def proposal_data(self, appointment, **overrides):
+        return {
+            "date": self.payload(days=3)["date"],
+            "start_time": "14:00",
+            "version": appointment.version,
+        } | overrides
+
+    def test_proposal_preserves_declined_appointment_and_notifies_staff_after_commit(self):
+        self.employee.email = "employee@example.test"
+        self.employee.save(update_fields=["email"])
+        appointment = self.decline()
+        original_start = appointment.starts_at
+        mail.outbox.clear()
+        with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            response = self.client.post(
+                self.proposal_url(appointment), self.proposal_data(appointment)
+            )
+        self.assertRedirects(response, reverse("wohnungsverwaltung:pre_application_list"))
+        self.assertEqual(mail.outbox, [])
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, "applicant_declined")
+        self.assertEqual(appointment.starts_at, original_start)
+        self.assertEqual(timezone.localtime(appointment.proposed_start).hour, 14)
+        self.assertEqual(self.application.viewings.count(), 1)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status, BewerbungStatus.OPEN)
+        event = appointment.events.get(kind="proposal_changed")
+        self.assertEqual(event.actor, self.user)
+        self.assertEqual(parse_datetime(event.after["proposed_start"]), appointment.proposed_start)
+        for callback in callbacks:
+            callback()
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.employee.email])
+        self.assertIn(self.detail_url, mail.outbox[0].body)
+        self.assertIn("14:00", mail.outbox[0].body)
+        self.client.force_login(self.employee)
+        self.assertContains(self.client.get(self.detail_url), "Alternativtermin")
+        self.assertContains(self.client.get(self.detail_url), "14:00")
+
+    def test_proposal_rejects_invalid_past_and_ambiguous_dates(self):
+        appointment = self.decline()
+        cases = [
+            {"date": self.payload(days=-1)["date"]},
+            {"date": "invalid"},
+            {"start_time": "25:00"},
+            {"start_time": ""},
+            {"date": "2027-03-28", "start_time": "02:30"},
+            {"date": "2027-10-31", "start_time": "02:30"},
+        ]
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                response = self.post(
+                    self.proposal_url(appointment), self.proposal_data(appointment, **overrides)
+                )
+                self.assertEqual(response.status_code, 400)
+                appointment.refresh_from_db()
+                self.assertIsNone(appointment.proposed_start)
+        self.assertFalse(appointment.events.filter(kind="proposal_changed").exists())
+
+    def test_proposal_changes_reject_stale_versions_and_skip_unchanged_values(self):
+        appointment = self.decline()
+        original_data = self.proposal_data(appointment)
+        self.post(self.proposal_url(appointment), original_data)
+        self.post(self.proposal_url(appointment), original_data | {"start_time": "15:00"})
+        appointment.refresh_from_db()
+        self.assertEqual(timezone.localtime(appointment.proposed_start).hour, 14)
+        self.post(self.proposal_url(appointment), self.proposal_data(appointment))
+        self.assertEqual(appointment.events.filter(kind="proposal_changed").count(), 1)
+        self.post(
+            self.proposal_url(appointment), self.proposal_data(appointment, start_time="16:00")
+        )
+        appointment.refresh_from_db()
+        self.assertEqual(timezone.localtime(appointment.proposed_start).hour, 16)
+        self.assertEqual(appointment.events.filter(kind="proposal_changed").count(), 2)
+
+    def test_only_latest_declined_appointment_of_active_own_application_accepts_proposal(self):
+        appointment = self.decline()
+        url = self.proposal_url(appointment)
+        other_user = get_user_model().objects.create_user(username="other-proposer")
+        other_user.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+        Person.objects.create(
+            user=other_user, vorname="Test", nachname="Andere", email="other@example.test"
+        )
+        self.client.force_login(other_user)
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(self.post(url, self.proposal_data(appointment)).status_code, 404)
+        self.client.force_login(self.employee)
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.client.force_login(self.user)
+        for overrides in (
+            {"status": BewerbungStatus.BLOCKED},
+            {"interest_withdrawn_at": timezone.now()},
+        ):
+            Bewerbung.objects.filter(pk=self.application.pk).update(**overrides)
+            self.post(url, self.proposal_data(appointment))
+            appointment.refresh_from_db()
+            self.assertIsNone(appointment.proposed_start)
+            Bewerbung.objects.filter(pk=self.application.pk).update(
+                status=BewerbungStatus.OPEN, interest_withdrawn_at=None
+            )
+        for status in ("planned", "confirmed", "completed", "cancelled", "no_show"):
+            ViewingAppointment.objects.filter(pk=appointment.pk).update(status=status)
+            self.post(url, self.proposal_data(appointment))
+            appointment.refresh_from_db()
+            self.assertIsNone(appointment.proposed_start)
+        ViewingAppointment.objects.filter(pk=appointment.pk).update(status="applicant_declined")
+        self.client.force_login(self.employee)
+        self.post(self.create_url, self.payload(days=4))
+        self.client.force_login(self.user)
+        self.post(url, self.proposal_data(appointment))
+        appointment.refresh_from_db()
+        self.assertIsNone(appointment.proposed_start)
+
+    def test_withdrawing_confirmation_has_clear_label_confirmation_and_message(self):
+        appointment = self.schedule()
+        self.client.force_login(self.user)
+        self.post(self.response_url(appointment), {"action": "confirm", "version": 1})
+        page = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+        self.assertContains(page, "Terminzusage zurückziehen")
+        self.assertContains(page, "Möchten Sie Ihre Terminzusage wirklich zurückziehen?")
+        response = self.client.post(
+            self.response_url(appointment), {"action": "decline", "version": 2}, follow=True
+        )
+        self.assertContains(
+            response, "Ihre Terminzusage wurde zurückgezogen. Ihre Bewerbung bleibt aktiv."
+        )
+        self.assertContains(response, "Alternativtermin vorschlagen")
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status, BewerbungStatus.OPEN)
+
+    def test_proposal_requires_csrf_and_get_does_not_mutate(self):
+        appointment = self.decline()
+        self.assertEqual(self.client.get(self.proposal_url(appointment)).status_code, 200)
+        self.assertFalse(appointment.events.filter(kind="proposal_changed").exists())
+        secure = Client(enforce_csrf_checks=True)
+        secure.force_login(self.user)
+        self.assertEqual(
+            secure.post(
+                self.proposal_url(appointment), self.proposal_data(appointment)
+            ).status_code,
+            403,
+        )
+
+    def test_anonymous_and_mixed_ids_cannot_access_proposal(self):
+        appointment = self.decline()
+        anonymous = Client()
+        self.assertEqual(anonymous.get(self.proposal_url(appointment)).status_code, 302)
+        self.assertEqual(
+            anonymous.post(
+                self.proposal_url(appointment), self.proposal_data(appointment)
+            ).status_code,
+            302,
+        )
+        other = Bewerbung.objects.create(
+            person=self.person,
+            wohnung=self.unit,
+            ueber_mich="Andere Bewerbung",
+            status=BewerbungStatus.DECLINED,
+        )
+        mixed = reverse(
+            "wohnungsverwaltung:applicant_viewing_proposal", args=[other.pk, appointment.pk]
+        )
+        self.assertEqual(self.client.get(mixed).status_code, 404)
+        self.assertEqual(self.client.post(mixed, self.proposal_data(appointment)).status_code, 404)
+
+    def test_past_proposal_notification_is_not_sent(self):
+        from .viewings import send_viewing_notification
+
+        appointment = self.decline()
+        with self.captureOnCommitCallbacks(execute=False):
+            self.client.post(self.proposal_url(appointment), self.proposal_data(appointment))
+        event = appointment.events.get(kind="proposal_changed")
+        ViewingAppointment.objects.filter(pk=appointment.pk).update(
+            proposed_start=timezone.now() - timedelta(minutes=1)
+        )
+        count = len(mail.outbox)
+        self.assertFalse(send_viewing_notification(event.pk))
+        self.assertEqual(len(mail.outbox), count)
+
+    def test_failed_staff_notification_keeps_proposal_and_can_be_retried(self):
+        self.employee.email = "employee@example.test"
+        self.employee.save(update_fields=["email"])
+        appointment = self.decline()
+        with patch("wohnungsverwaltung.viewings.send_mail", side_effect=TimeoutError):
+            self.post(self.proposal_url(appointment), self.proposal_data(appointment))
+        appointment.refresh_from_db()
+        self.assertIsNotNone(appointment.proposed_start)
+        event = appointment.events.get(kind="proposal_changed")
+        self.assertEqual(event.notification_status, "failed")
+        self.assertTrue(appointment.events.filter(kind="mail_failed").exists())
+        self.client.force_login(self.employee)
+        mail.outbox.clear()
+        self.post(
+            reverse(
+                "wohnungsverwaltung:employee_viewing_resend",
+                args=[self.application.pk, appointment.pk],
+            ),
+            {"event": event.pk},
+        )
+        event.refresh_from_db()
+        self.assertEqual(event.notification_status, "sent")
+        self.assertEqual(mail.outbox[0].to, [self.employee.email])
+
+    def test_proposal_notifications_only_target_active_staff_with_email(self):
+        from django.contrib.auth.models import Permission
+
+        from .access import EMPLOYEE_ACCESS_PERMISSION
+
+        self.employee.email = "staff@example.test"
+        self.employee.save(update_fields=["email"])
+        inactive = get_user_model().objects.create_user(
+            username="inactive-staff", email="inactive@example.test", is_active=False
+        )
+        inactive.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
+        direct = get_user_model().objects.create_user(
+            username="direct-staff", email="direct@example.test"
+        )
+        direct.user_permissions.add(
+            Permission.objects.get(codename=EMPLOYEE_ACCESS_PERMISSION.split(".")[1])
+        )
+        appointment = self.decline()
+        mail.outbox.clear()
+        self.post(self.proposal_url(appointment), self.proposal_data(appointment))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertCountEqual(mail.outbox[0].to, [self.employee.email, direct.email])
+
+    def test_no_recipient_records_failed_notification_instead_of_losing_proposal(self):
+        appointment = self.decline()
+        self.post(self.proposal_url(appointment), self.proposal_data(appointment))
+        appointment.refresh_from_db()
+        self.assertIsNotNone(appointment.proposed_start)
+        self.assertEqual(
+            appointment.events.get(kind="proposal_changed").notification_status, "failed"
+        )
+
+    def test_rollback_discards_proposal_history_and_notification(self):
+        appointment = self.decline()
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            with transaction.atomic():
+                self.client.post(self.proposal_url(appointment), self.proposal_data(appointment))
+                transaction.set_rollback(True)
+        appointment.refresh_from_db()
+        self.assertIsNone(appointment.proposed_start)
+        self.assertFalse(appointment.events.filter(kind="proposal_changed").exists())
+        self.assertEqual(callbacks, [])
+
+    def test_staff_plans_replacement_without_reopening_declined_appointment(self):
+        appointment = self.decline()
+        self.post(self.proposal_url(appointment), self.proposal_data(appointment))
+        appointment.refresh_from_db()
+        self.client.force_login(self.employee)
+        self.post(self.create_url, self.payload(days=3, start_time="14:00", end_time="14:30"))
+        replacement = self.application.viewings.first()
+        self.assertNotEqual(replacement.pk, appointment.pk)
+        self.assertEqual(replacement.status, "planned")
+        self.assertEqual(replacement.starts_at, appointment.proposed_start)
+        self.assertEqual(
+            self.application.viewings.filter(status__in=("planned", "confirmed")).count(), 1
+        )
+        self.client.force_login(self.user)
+        page = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+        self.assertNotContains(page, "Alternativtermin ändern")
+        self.post(
+            self.response_url(replacement), {"action": "confirm", "version": replacement.version}
+        )
+        replacement.refresh_from_db()
+        self.assertEqual(replacement.status, "confirmed")
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, "applicant_declined")
+
+    def test_superseded_proposal_callback_and_retry_do_not_send_stale_mail(self):
+        from .viewings import send_viewing_notification
+
+        self.employee.email = "employee@example.test"
+        self.employee.save(update_fields=["email"])
+        appointment = self.decline()
+        with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            self.client.post(self.proposal_url(appointment), self.proposal_data(appointment))
+        appointment.refresh_from_db()
+        first_event = appointment.events.get(kind="proposal_changed")
+        self.post(
+            self.proposal_url(appointment), self.proposal_data(appointment, start_time="15:00")
+        )
+        count = len(mail.outbox)
+        for callback in callbacks:
+            callback()
+        self.assertEqual(len(mail.outbox), count)
+        first_event.refresh_from_db()
+        self.assertEqual(first_event.notification_status, "obsolete")
+        current_event = appointment.events.filter(kind="proposal_changed").first()
+        self.client.force_login(self.employee)
+        self.post(self.create_url, self.payload(days=4))
+        count = len(mail.outbox)
+        self.assertFalse(send_viewing_notification(current_event.pk))
+        self.assertEqual(len(mail.outbox), count)
+
+
 class ConcurrentViewingTests(TransactionTestCase):
     setUp = ViewingTests.setUp
     payload = ViewingTests.payload
+
+    def test_concurrent_proposals_preserve_first_accepted_version(self):
+        appointment = ViewingAppointment.objects.create(
+            application=self.application,
+            starts_at=timezone.now() + timedelta(days=1),
+            ends_at=timezone.now() + timedelta(days=1, minutes=30),
+            status="applicant_declined",
+        )
+        url = reverse(
+            "wohnungsverwaltung:applicant_viewing_proposal",
+            args=[self.application.pk, appointment.pk],
+        )
+        barrier = Barrier(2)
+
+        def propose(hour):
+            try:
+                client = Client()
+                client.force_login(get_user_model().objects.get(pk=self.user.pk))
+                barrier.wait(timeout=10)
+                return client.post(
+                    url,
+                    {
+                        "version": appointment.version,
+                        "date": self.payload(days=3)["date"],
+                        "start_time": hour,
+                    },
+                ).status_code
+            finally:
+                connections.close_all()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = list(executor.map(propose, ("14:00", "15:00")))
+        self.assertCountEqual(responses, [302, 400])
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.version, 2)
+        self.assertEqual(appointment.events.filter(kind="proposal_changed").count(), 1)
 
     def test_concurrent_scheduling_creates_only_one_open_appointment(self):
         barrier = Barrier(2)

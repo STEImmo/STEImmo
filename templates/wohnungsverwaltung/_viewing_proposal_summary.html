@@ -1,0 +1,10 @@
+{% load tz %}
+{% if appointment.proposed_start %}
+    {% timezone "Europe/Berlin" %}
+        <div class="uk-alert-primary" uk-alert>
+            <p><strong>Alternativtermin{% if not appointment.can_propose %} (früherer Vorschlag){% endif %}:</strong>
+                {{ appointment.proposed_start|date:"d.m.Y, H:i" }} Uhr (Europe/Berlin)<br>
+                Unverbindlicher Vorschlag; die Verwaltung plant den verbindlichen Termin separat.</p>
+        </div>
+    {% endtimezone %}
+{% endif %}

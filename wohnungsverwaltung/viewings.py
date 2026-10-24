@@ -3,10 +3,12 @@
 import logging
 from zoneinfo import ZoneInfo
 
+from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 
+from .access import EMPLOYEE_ACCESS_PERMISSION
 from .models import (
     ApplicationReviewEvent,
     Bewerbung,
@@ -66,6 +68,12 @@ def notification_is_current(event, appointment, *, latest_appointment_id=None):
         return False
     if event.appointment_version != appointment.version or not event.notification_url:
         return False
+    if event.kind == "proposal_changed":
+        return (
+            appointment.can_propose
+            and appointment.proposed_start is not None
+            and appointment.proposed_start > timezone.now()
+        )
     if appointment.status == ViewingAppointment.Status.CANCELLED:
         return True
     return (
@@ -110,13 +118,33 @@ def send_viewing_notification(event_id, actor=None):
             f"Status: {appointment.get_status_display()}\n\n"
             f"Ihre Termine und Rückmeldung: {event.notification_url}\n"
         )
+        recipients = [application.person.email]
+        subject = "Ihr Besichtigungstermin bei STEImmo"
+        if event.kind == "proposal_changed":
+            proposed = timezone.localtime(appointment.proposed_start, BERLIN)
+            subject = "Neuer Alternativtermin für eine Besichtigung"
+            body = (
+                f"Für die Besichtigung zu {application.wohnung} "
+                "wurde ein Alternativtermin vorgeschlagen.\n"
+                f"Wunschdatum: {proposed:%d.%m.%Y}\n"
+                f"Beginn: {proposed:%H:%M} Uhr (Europe/Berlin)\n\n"
+                f"Bewerbung prüfen und verbindlichen Termin planen: {event.notification_url}\n"
+                "Der Vorschlag ist keine verbindliche Buchung.\n"
+            )
+            recipients = list(
+                get_user_model()
+                .objects.with_perm(EMPLOYEE_ACCESS_PERMISSION)
+                .exclude(email="")
+                .values_list("email", flat=True)
+                .distinct()
+            )
         try:
             sent = bool(
                 send_mail(
-                    "Ihr Besichtigungstermin bei STEImmo",
+                    subject,
                     body,
                     None,
-                    [application.person.email],
+                    recipients,
                     fail_silently=False,
                 )
             )

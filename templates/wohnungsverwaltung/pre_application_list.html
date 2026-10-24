@@ -25,10 +25,30 @@
                     <input type="hidden" name="version" value="{{ appointment.version }}">
                     <div class="uk-flex uk-flex-wrap uk-grid-small" uk-grid>
                         {% if appointment.status == "planned" %}<div><button type="submit" class="uk-button uk-button-primary" name="action" value="confirm">Termin zusagen</button></div>{% endif %}
-                        <div><button type="submit" class="uk-button uk-button-default" name="action" value="decline">Termin absagen</button></div>
+                        <div><a class="uk-button uk-button-default" href="#viewing-decline-{{ appointment.pk }}" uk-toggle>{% if appointment.status == "confirmed" %}Terminzusage zurückziehen{% else %}Termin absagen{% endif %}</a></div>
                     </div>
                 </form>
+                <div id="viewing-decline-{{ appointment.pk }}" uk-modal aria-labelledby="viewing-decline-title-{{ appointment.pk }}">
+                    <div class="uk-modal-dialog uk-modal-body">
+                        <h2 class="uk-modal-title" id="viewing-decline-title-{{ appointment.pk }}">{% if appointment.status == "confirmed" %}Terminzusage zurückziehen{% else %}Termin absagen{% endif %}</h2>
+                        <p>{% if appointment.status == "confirmed" %}Möchten Sie Ihre Terminzusage wirklich zurückziehen?{% else %}Möchten Sie diesen Termin wirklich absagen?{% endif %}</p>
+                        <p>Ihre Bewerbung bleibt aktiv. Anschließend können Sie einen Alternativtermin vorschlagen.</p>
+                        <form method="post" action="{% url 'wohnungsverwaltung:applicant_viewing_response' application.pk appointment.pk %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="version" value="{{ appointment.version }}">
+                            <input type="hidden" name="action" value="decline">
+                            <div class="uk-flex uk-flex-wrap uk-grid-small" uk-grid>
+                                <div><button type="button" class="uk-button uk-button-default uk-modal-close">Abbrechen</button></div>
+                                <div><button type="submit" class="uk-button uk-button-primary">{% if appointment.status == "confirmed" %}Terminzusage zurückziehen{% else %}Termin absagen{% endif %}</button></div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
                 <p class="uk-text-meta">Eine Terminabsage beendet Ihre Bewerbung nicht. Ein neuer Termin wird durch die Verwaltung vergeben.</p>
+            {% endif %}
+            {% include "wohnungsverwaltung/_viewing_proposal_summary.html" with appointment=appointment only %}
+            {% if appointment.can_propose %}
+                <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:applicant_viewing_proposal' application.pk appointment.pk %}">{% if appointment.proposed_start %}Alternativtermin ändern{% else %}Alternativtermin vorschlagen{% endif %}</a>
             {% endif %}
         </section>
     {% endfor %}

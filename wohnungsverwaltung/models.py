@@ -654,6 +654,7 @@ class ViewingAppointment(models.Model):
     application = models.ForeignKey(Bewerbung, on_delete=models.CASCADE, related_name="viewings")
     starts_at = models.DateTimeField()
     ends_at = models.DateTimeField()
+    proposed_start = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=24, choices=Status.choices, default=Status.PLANNED)
     version = models.PositiveIntegerField(default=1, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -671,11 +672,22 @@ class ViewingAppointment(models.Model):
     def can_record_result(self):
         return self.is_open and self.ends_at <= timezone.now()
 
+    @property
+    def can_propose(self):
+        return (
+            self.status == self.Status.APPLICANT_DECLINED
+            and self.application.status == BewerbungStatus.OPEN
+            and self.application.interest_withdrawn_at is None
+            and self.application.viewings.first().pk == self.pk
+            and not self.application.viewings.filter(status__in=("planned", "confirmed")).exists()
+        )
+
     def snapshot(self):
         return {
             "starts_at": self.starts_at.isoformat(),
             "ends_at": self.ends_at.isoformat(),
             "status": self.status,
+            "proposed_start": self.proposed_start.isoformat() if self.proposed_start else None,
         }
 
     class Meta:
@@ -715,6 +727,7 @@ class ViewingAppointmentEvent(models.Model):
         RECORDED = "recorded", "Besichtigung nachgetragen"
         MAIL_SENT = "mail_sent", "Terminbenachrichtigung versendet"
         MAIL_FAILED = "mail_failed", "Terminversand fehlgeschlagen"
+        PROPOSAL_CHANGED = "proposal_changed", "Alternativtermin vorgeschlagen / geändert"
 
     class NotificationStatus(models.TextChoices):
         NONE = "none", "Keine Benachrichtigung erforderlich"
@@ -779,6 +792,20 @@ class ViewingAppointmentEvent(models.Model):
         from django.utils.dateparse import parse_datetime
 
         value = self.after.get("ends_at")
+        return parse_datetime(value) if value else None
+
+    @property
+    def before_proposed_start(self):
+        from django.utils.dateparse import parse_datetime
+
+        value = self.before.get("proposed_start")
+        return parse_datetime(value) if value else None
+
+    @property
+    def after_proposed_start(self):
+        from django.utils.dateparse import parse_datetime
+
+        value = self.after.get("proposed_start")
         return parse_datetime(value) if value else None
 
     class Meta:

@@ -6,12 +6,13 @@
     {% for appointment in viewings %}
         <section class="uk-margin-medium-bottom">
             {% include "wohnungsverwaltung/_viewing_summary.html" with appointment=appointment only %}
+            {% include "wohnungsverwaltung/_viewing_proposal_summary.html" with appointment=appointment only %}
             {% if appointment.current_notice %}
                 <p>Benachrichtigung: <strong>{{ appointment.current_notice.get_notification_status_display }}</strong></p>
                 <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_resend' application.pk appointment.pk %}">
                     {% csrf_token %}
                     <input type="hidden" name="event" value="{{ appointment.current_notice.pk }}">
-                    <button type="submit" class="uk-button uk-button-default">Aktuelle Terminbenachrichtigung erneut versenden</button>
+                    <button type="submit" class="uk-button uk-button-default">{% if appointment.current_notice.kind == "proposal_changed" %}Verwaltung erneut über Vorschlag benachrichtigen{% else %}Aktuelle Terminbenachrichtigung erneut versenden{% endif %}</button>
                 </form>
             {% endif %}
             {% if appointment.is_open %}
@@ -51,6 +52,7 @@
                             · {{ event.created_at|date:"d.m.Y, H:i" }} Uhr · {{ event.actor|default:"System" }}
                             {% if event.before %}<br>{{ event.before_status_display }} → {{ event.after_status_display }}{% endif %}
                             {% if event.kind == "rescheduled" %}<br>{{ event.before_start|date:"d.m.Y, H:i" }}–{{ event.before_end|date:"H:i" }} Uhr → {{ event.after_start|date:"d.m.Y, H:i" }}–{{ event.after_end|date:"H:i" }} Uhr{% endif %}
+                            {% if event.kind == "proposal_changed" %}<br>Alternativtermin: {{ event.before_proposed_start|date:"d.m.Y, H:i"|default:"Noch kein Vorschlag" }} → {{ event.after_proposed_start|date:"d.m.Y, H:i" }} Uhr{% endif %}
                             {% if event.reason %}<br>{{ event.reason|linebreaksbr }}{% endif %}
                             {% if event.notification_status != "none" %}<br>{{ event.get_notification_status_display }}{% endif %}
                         </li>

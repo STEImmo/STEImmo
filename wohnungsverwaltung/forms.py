@@ -2300,6 +2300,54 @@ class ViewingAppointmentForm(UIkitFormMixin, forms.Form):
         return cleaned
 
 
+class ViewingProposalForm(UIkitFormMixin, forms.Form):
+    date = forms.DateField(
+        label="Wunschdatum", widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"})
+    )
+    start_time = forms.TimeField(
+        label="Gewünschter Beginn",
+        widget=forms.TimeInput(format="%H:%M", attrs={"type": "time", "step": "60"}),
+    )
+    version = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
+
+    def __init__(self, *args, appointment, **kwargs):
+        from .viewings import BERLIN
+
+        initial = {"version": appointment.version}
+        if appointment.proposed_start:
+            start = timezone.localtime(appointment.proposed_start, BERLIN)
+            initial.update(date=start.date(), start_time=start.time())
+        kwargs.setdefault("initial", {}).update(initial)
+        super().__init__(*args, **kwargs)
+        self.fields["date"].widget.attrs["min"] = (
+            timezone.localtime(timezone.now(), BERLIN).date().isoformat()
+        )
+
+    def clean(self):
+        from .viewings import BERLIN
+
+        cleaned = super().clean()
+        date, time = cleaned.get("date"), cleaned.get("start_time")
+        if date is not None and time is not None:
+            naive = datetime.combine(date, time)
+            if (
+                naive.replace(tzinfo=BERLIN, fold=0).utcoffset()
+                != naive.replace(tzinfo=BERLIN, fold=1).utcoffset()
+            ):
+                self.add_error(
+                    "start_time",
+                    "Diese Uhrzeit ist wegen der Zeitumstellung nicht eindeutig "
+                    "oder existiert nicht.",
+                )
+            else:
+                start = timezone.make_aware(naive, BERLIN)
+                if start <= timezone.now():
+                    self.add_error("start_time", "Der Alternativtermin muss in der Zukunft liegen.")
+                else:
+                    cleaned["proposed_start"] = start
+        return cleaned
+
+
 class ViewingActionForm(UIkitFormMixin, forms.Form):
     version = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
     action = forms.ChoiceField(
