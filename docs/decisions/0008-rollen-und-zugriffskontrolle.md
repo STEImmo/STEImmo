@@ -196,9 +196,12 @@ zusätzliche Nachricht. Historische abgeschlossene Termine bleiben erhalten.
 
 ### Alternativtermine (US-24 / Issue #148)
 
-Nach einer eigenen Terminabsage oder zurückgezogenen Zusage darf der Bewerber für
-den neuesten Termin einer weiterhin aktiven Bewerbung einen zukünftigen Beginn
-vorschlagen. Das ist nur möglich, solange kein offener oder neuerer Termin besteht.
+Nach drei eigenen Terminabsagen innerhalb derselben weiterhin aktiven Bewerbung darf
+der Bewerber für den neuesten abgesagten Termin einen zukünftigen Beginn vorschlagen.
+Zurückgezogene Zusagen zählen ebenfalls; Mitarbeiterabsagen und Absagen aus anderen
+Bewerbungen zählen nicht. Gezählt werden die Termine mit Status „Vom Bewerber abgesagt“;
+erneute Anfragen mit einer alten Formularversion erhöhen die Anzahl nicht.
+Das ist nur möglich, solange kein offener oder neuerer Termin besteht.
 Pro abgesagtem Termin bleibt ein änderbarer Vorschlag erhalten. Eine neue Planung
 durch Mitarbeiter verwendet den bestehenden Ablauf einschließlich Eignungsprüfung,
 Benachrichtigung und Bewerberzusage; der Vorschlag allein bucht keinen Termin.

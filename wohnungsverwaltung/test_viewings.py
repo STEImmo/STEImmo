@@ -680,14 +680,19 @@ class ViewingProposalTests(TestCase):
     setUp = ViewingTests.setUp
     payload = ViewingTests.payload
     post = ViewingTests.post
-    schedule = ViewingTests.schedule
     response_url = ViewingTests.response_url
 
-    def decline(self):
-        appointment = self.schedule()
-        self.client.force_login(self.user)
-        self.post(self.response_url(appointment), {"action": "decline", "version": 1})
-        appointment.refresh_from_db()
+    def schedule(self):
+        self.post(self.create_url, self.payload())
+        return self.application.viewings.first()
+
+    def decline(self, count=3):
+        for _ in range(count):
+            self.client.force_login(self.employee)
+            appointment = self.schedule()
+            self.client.force_login(self.user)
+            self.post(self.response_url(appointment), {"action": "decline", "version": 1})
+            appointment.refresh_from_db()
         return appointment
 
     def proposal_url(self, appointment):
@@ -702,6 +707,45 @@ class ViewingProposalTests(TestCase):
             "start_time": "14:00",
             "version": appointment.version,
         } | overrides
+
+    def test_proposal_unlocks_only_after_three_applicant_declines(self):
+        for count in range(1, 4):
+            with self.subTest(declines=count):
+                appointment = self.decline(count=1)
+                page = self.client.get(reverse("wohnungsverwaltung:pre_application_list"))
+                proposal = self.client.get(self.proposal_url(appointment))
+                if count < 3:
+                    self.assertNotContains(page, 'href="' + self.proposal_url(appointment) + '"')
+                    self.assertEqual(proposal.status_code, 302)
+                    self.post(self.proposal_url(appointment), self.proposal_data(appointment))
+                    appointment.refresh_from_db()
+                    self.assertIsNone(appointment.proposed_start)
+                else:
+                    self.assertContains(page, 'href="' + self.proposal_url(appointment) + '"')
+                    self.assertEqual(proposal.status_code, 200)
+                    self.post(self.proposal_url(appointment), self.proposal_data(appointment))
+                    appointment.refresh_from_db()
+                    self.assertIsNotNone(appointment.proposed_start)
+
+    def test_staff_cancellations_do_not_count_toward_proposal_unlock(self):
+        for _ in range(3):
+            appointment = self.schedule()
+            self.post(
+                reverse(
+                    "wohnungsverwaltung:employee_viewing_update",
+                    args=[self.application.pk, appointment.pk],
+                ),
+                {
+                    "action": "cancel",
+                    "version": appointment.version,
+                    "reason": "Verwaltung sagt ab",
+                },
+            )
+        appointment = self.decline(count=2)
+        self.assertEqual(self.client.get(self.proposal_url(appointment)).status_code, 302)
+        self.post(self.proposal_url(appointment), self.proposal_data(appointment))
+        appointment.refresh_from_db()
+        self.assertIsNone(appointment.proposed_start)
 
     def test_proposal_preserves_declined_appointment_and_notifies_staff_after_commit(self):
         self.employee.email = "employee@example.test"
@@ -719,7 +763,7 @@ class ViewingProposalTests(TestCase):
         self.assertEqual(appointment.status, "applicant_declined")
         self.assertEqual(appointment.starts_at, original_start)
         self.assertEqual(timezone.localtime(appointment.proposed_start).hour, 14)
-        self.assertEqual(self.application.viewings.count(), 1)
+        self.assertEqual(self.application.viewings.count(), 3)
         self.application.refresh_from_db()
         self.assertEqual(self.application.status, BewerbungStatus.OPEN)
         event = appointment.events.get(kind="proposal_changed")
@@ -810,6 +854,8 @@ class ViewingProposalTests(TestCase):
         self.assertIsNone(appointment.proposed_start)
 
     def test_withdrawing_confirmation_has_clear_label_confirmation_and_message(self):
+        self.decline(count=2)
+        self.client.force_login(self.employee)
         appointment = self.schedule()
         self.client.force_login(self.user)
         self.post(self.response_url(appointment), {"action": "confirm", "version": 1})
@@ -998,6 +1044,13 @@ class ConcurrentViewingTests(TransactionTestCase):
     payload = ViewingTests.payload
 
     def test_concurrent_proposals_preserve_first_accepted_version(self):
+        for _ in range(2):
+            ViewingAppointment.objects.create(
+                application=self.application,
+                starts_at=timezone.now() + timedelta(days=1),
+                ends_at=timezone.now() + timedelta(days=1, minutes=30),
+                status="applicant_declined",
+            )
         appointment = ViewingAppointment.objects.create(
             application=self.application,
             starts_at=timezone.now() + timedelta(days=1),

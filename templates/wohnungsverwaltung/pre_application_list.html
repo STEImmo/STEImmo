@@ -32,7 +32,7 @@
                     <div class="uk-modal-dialog uk-modal-body">
                         <h2 class="uk-modal-title" id="viewing-decline-title-{{ appointment.pk }}">{% if appointment.status == "confirmed" %}Terminzusage zurückziehen{% else %}Termin absagen{% endif %}</h2>
                         <p>{% if appointment.status == "confirmed" %}Möchten Sie Ihre Terminzusage wirklich zurückziehen?{% else %}Möchten Sie diesen Termin wirklich absagen?{% endif %}</p>
-                        <p>Ihre Bewerbung bleibt aktiv. Anschließend können Sie einen Alternativtermin vorschlagen.</p>
+                        <p>Ihre Bewerbung bleibt aktiv. Nach drei eigenen Terminabsagen können Sie einen Alternativtermin vorschlagen. Zurückgezogene Zusagen zählen ebenfalls.</p>
                         <form method="post" action="{% url 'wohnungsverwaltung:applicant_viewing_response' application.pk appointment.pk %}">
                             {% csrf_token %}
                             <input type="hidden" name="version" value="{{ appointment.version }}">
@@ -52,6 +52,9 @@
             {% endif %}
         </section>
     {% endfor %}
+    {% if application.status == "open" and not application.interest_withdrawn_at and application.viewings.all %}
+        <p class="uk-text-meta">Einen Alternativtermin können Sie nach drei eigenen Terminabsagen vorschlagen. Zurückgezogene Zusagen zählen ebenfalls; Absagen durch die Verwaltung zählen nicht.</p>
+    {% endif %}
     {% if application.main_application_accessible %}<a class="uk-button {% if application.submitted_at %}uk-button-default{% else %}uk-button-primary{% endif %}" href="{% url 'wohnungsverwaltung:main_application_status' application.pk %}">{% if application.submitted_at %}Eingereichte Unterlagen ansehen{% else %}Bewerbung vervollständigen{% endif %}</a>
     {% elif application.status == 'open' and not application.interest_withdrawn_at %}<p class="uk-text-meta uk-margin-remove-bottom">Die Hauptbewerbung folgt nach Besichtigung und Freigabe.</p>{% endif %}
 </article>

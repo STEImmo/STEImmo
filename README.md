@@ -414,8 +414,9 @@ verlangen aber eine erneute Prüfung vor weiteren Zuweisungen oder Verschiebunge
 Der interne Verlauf dokumentiert Termin- und Statusänderungen sowie Versandversuche.
 Es gibt keine Selbstbuchung, Kalenderintegration, Kapazitätsprüfung oder Erinnerungen.
 
-Nach der Absage eines eigenen Termins können Bewerber bei aktiver Bewerbung einen
-zukünftigen **Alternativtermin** mit Datum und Beginn vorschlagen. Pro abgesagtem
+Nach drei eigenen Terminabsagen innerhalb derselben aktiven Bewerbung können Bewerber
+einen zukünftigen **Alternativtermin** mit Datum und Beginn vorschlagen. Zurückgezogene
+Zusagen zählen mit; Absagen durch Mitarbeiter oder aus anderen Bewerbungen nicht. Pro abgesagtem
 Termin gibt es einen aktuellen Vorschlag, der bis zur nächsten Terminplanung geändert
 werden kann. Nach einer Zusage heißt die Absageaktion **Terminzusage zurückziehen**;
 ein Bestätigungsdialog und die Rückmeldung erklären, dass die Bewerbung aktiv bleibt.

@@ -679,6 +679,7 @@ class ViewingAppointment(models.Model):
             and self.application.status == BewerbungStatus.OPEN
             and self.application.interest_withdrawn_at is None
             and self.application.viewings.first().pk == self.pk
+            and self.application.viewings.filter(status=self.Status.APPLICANT_DECLINED).count() >= 3
             and not self.application.viewings.filter(status__in=("planned", "confirmed")).exists()
         )
 
