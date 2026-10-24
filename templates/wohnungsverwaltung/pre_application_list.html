@@ -18,7 +18,7 @@
     <div class="application-next-step"><span uk-icon="arrow-right" aria-hidden="true"></span><div><strong>Ihr nächster Schritt</strong><p>{{ application.get_applicant_next_step }}</p></div></div>
     {% for appointment in application.viewings.all %}
         <section class="uk-margin">
-            {% include "wohnungsverwaltung/_viewing_summary.html" with appointment=appointment only %}
+            {% include "wohnungsverwaltung/_viewing_summary.html" with appointment=appointment applicant_view=True only %}
             {% if appointment.can_respond and application.status == "open" and not application.interest_withdrawn_at %}
                 <form method="post" action="{% url 'wohnungsverwaltung:applicant_viewing_response' application.pk appointment.pk %}">
                     {% csrf_token %}

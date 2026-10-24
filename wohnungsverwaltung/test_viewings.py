@@ -727,6 +727,18 @@ class ViewingProposalTests(TestCase):
                     appointment.refresh_from_db()
                     self.assertIsNotNone(appointment.proposed_start)
 
+    def test_applicant_sees_simple_cancelled_label(self):
+        appointment = self.decline()
+        for url in (
+            reverse("wohnungsverwaltung:pre_application_list"),
+            self.proposal_url(appointment),
+        ):
+            page = self.client.get(url)
+            self.assertContains(page, "Abgesagt")
+            self.assertNotContains(page, "Vom Bewerber abgesagt")
+        self.client.force_login(self.employee)
+        self.assertContains(self.client.get(self.detail_url), "Vom Bewerber abgesagt")
+
     def test_staff_cancellations_do_not_count_toward_proposal_unlock(self):
         for _ in range(3):
             appointment = self.schedule()

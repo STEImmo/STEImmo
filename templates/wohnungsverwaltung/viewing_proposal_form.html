@@ -5,7 +5,7 @@
 {% block application_content %}
 <article class="uk-card uk-card-default uk-card-body application-form-card">
     <h2>{{ application.wohnung }}</h2>
-    {% include "wohnungsverwaltung/_viewing_summary.html" with appointment=appointment only %}
+    {% include "wohnungsverwaltung/_viewing_summary.html" with appointment=appointment applicant_view=True only %}
     <p>Ihr Vorschlag ist unverbindlich. Die Verwaltung prüft ihn und plant einen neuen Termin, den Sie anschließend zusagen können. Ihre Bewerbung bleibt aktiv.</p>
     <p class="uk-text-meta">Es gilt Europe/Berlin. Sie können Ihren Vorschlag bis zur neuen Terminplanung ändern.</p>
     <form method="post" class="uk-form-stacked" novalidate>
