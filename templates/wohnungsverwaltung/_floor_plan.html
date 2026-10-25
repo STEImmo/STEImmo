@@ -26,18 +26,15 @@
         <g class="plan-linework" fill="none" pointer-events="none" aria-hidden="true">{% include "wohnungsverwaltung/_floor_plan_architecture.html" with layer="details" %}</g>
         <g class="plan-annotations" pointer-events="none" aria-hidden="true">
             {% for item in plan_units %}
-            {% if item.unit.status == 'free' %}
-            <g class="plan-caption" transform="translate({{ item.x }} {{ item.y }}) rotate({{ plan_reference.label_rotation }})">
-                {% if floor_number == 0 or floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %}<rect x="-45" y="-18" width="90" height="38" rx="2"/>{% else %}<rect x="-27" y="-12" width="54" height="27" rx="2"/>{% endif %}
-                <text text-anchor="middle" y="{% if floor_number == 0 or floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %}-3{% else %}-1{% endif %}" class="plan-number">Whg. {{ item.unit.display_number }}</text>
-                <text text-anchor="middle" y="{% if floor_number == 0 or floor_number == 1 or floor_number == 2 or floor_number == 3 or floor_number == 4 %}14{% else %}10{% endif %}" class="plan-area">{% if item.unit.groesse_qm > 0 %}{{ item.unit.groesse_qm }} m²{% else %}Fläche offen{% endif %}</text>
+            <g class="plan-caption{% if item.unit.status != 'free' %} plan-unavailable-caption{% endif %}" transform="translate({{ item.x }} {{ item.y }}) rotate({{ plan_reference.label_rotation }})">
+                <rect x="-60" y="-20" width="120" height="44" rx="2"/>
+                <text text-anchor="middle" y="-3" class="plan-number">Wohnung {{ item.unit.display_number }}</text>
+                {% if item.unit.status == 'free' %}
+                <text text-anchor="middle" y="14" class="plan-area">{% if item.unit.groesse_qm > 0 %}{{ item.unit.groesse_qm }} m²{% else %}Fläche offen{% endif %}</text>
+                {% else %}
+                <text text-anchor="middle" y="14" class="plan-status">Nicht verfügbar</text>
+                {% endif %}
             </g>
-            {% else %}
-            <g class="plan-unavailable-caption" transform="translate({{ item.x }} {{ item.y }}) rotate({{ plan_reference.label_rotation }})">
-                <rect x="-49" y="-12" width="98" height="24" rx="3"/>
-                <text text-anchor="middle" y="4">Nicht verfügbar</text>
-            </g>
-            {% endif %}
             {% endfor %}
         </g>
     </g>

@@ -127,8 +127,8 @@ a.plan-apartment { cursor: pointer; }
 a.plan-apartment:hover .plan-apartment-shape,
 a.plan-apartment:focus-visible .plan-apartment-shape { fill: color-mix(in srgb, var(--steimmo-color-primary) 15%, var(--steimmo-color-surface)); stroke: var(--steimmo-color-focus-ring); }
 .is-unavailable .plan-apartment-shape { fill: url(#plan-unavailable-hatch); stroke: #999e96; }
-.plan-unavailable-caption rect { fill: #f2f2ef; stroke: #b4b8b0; stroke-width: 1; }
-.plan-unavailable-caption text { fill: #5e645a; font: 12px Arial, sans-serif; }
+.plan-caption.plan-unavailable-caption rect { fill: #f2f2ef; stroke: #b4b8b0; stroke-width: 1; }
+.plan-caption.plan-unavailable-caption text { fill: #5e645a; }
 .plan-linework { pointer-events: none; }
 .plan-walls { stroke: #8a9285; stroke-width: 1.5; }
 .plan-door-gap { stroke: #f6f6f2; stroke-width: 3; }
@@ -145,6 +145,7 @@ a.plan-apartment:focus-visible .plan-apartment-shape { fill: color-mix(in srgb, 
 .plan-caption rect { fill: #fff; fill-opacity: .96; stroke: #bac5b5; stroke-width: .6; }
 .plan-caption .plan-number { font-weight: 700; }
 .plan-caption .plan-area { font-size: 8px; }
+.plan-caption .plan-status { font-size: 12px; }
 :is(.is-ground, .is-regular) .plan-caption { font-size: 14px; }
 :is(.is-ground, .is-regular) .plan-caption .plan-area { font-size: 12px; }
 :is(.is-ground, .is-regular) .plan-room-label { font-size: 14px; }

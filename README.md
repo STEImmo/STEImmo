@@ -58,7 +58,10 @@ verständliche Feldfehler. Das gemeinsame Template liegt in
 Die Gebäudeansicht ist lokal unter [Gebäude erkunden](http://localhost:8000/wohnungen/gebaeude/)
 erreichbar: Gebäude → Etagenplan → Wohnungsdetails. Öffentliche Wohnungsfotos können im
 Mitarbeiterbereich unter **Wohnung bearbeiten → Wohnungsfotos verwalten** gepflegt werden.
-Die Etagenpläne sind vereinfachte Vektorgrafiken nach den Vorlagen. Von den Wohnungsdetails
+Die Etagenpläne sind vereinfachte Vektorgrafiken nach den Vorlagen. Alle Wohnungen
+tragen eine ausgeschriebene Beschriftung wie „Wohnung 101“. Belegte und gesperrte
+Wohnungen zeigen zusätzlich „Nicht verfügbar“, bleiben schraffiert und sind nicht
+auswählbar. Von den Wohnungsdetails
 führt **Zur Besichtigung anmelden** zur wohnungsbezogenen Voranfrage; die Hauptbewerbung
 wird später freigeschaltet.
 Die Einrichtung, der Abgleich älterer Beispielwohnungen und die noch vorläufige räumliche
