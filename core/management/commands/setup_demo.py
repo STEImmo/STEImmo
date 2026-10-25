@@ -26,7 +26,6 @@ class Command(BaseCommand):
             call_command("seed_standard_data", stdout=self.stdout)
             Wohnung.objects.filter(wohnungsnummer__in=("301", "302", "303", "401", "402")).update(
                 status=WohnungStatus.FREE,
-                zimmeranzahl=2,
                 kaltmiete="450.00",
                 warmmiete="550.00",
                 kaution="1350.00",

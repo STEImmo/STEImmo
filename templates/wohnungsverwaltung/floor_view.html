@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load room_counts %}
 {% block title %}{{ floor_label }} – STE Immobilien eGbR{% endblock %}
 {% block content %}
 <section class="uk-section architecture-view architecture-view--floor">
@@ -28,7 +29,7 @@
                         <div class="architecture-apartment-title"><h3>Wohnung {{ wohnung.display_number }}</h3><span class="uk-label {% if wohnung.status == 'free' %}uk-label-success{% endif %}">{% if wohnung.status == 'free' %}Verfügbar{% else %}Nicht verfügbar{% endif %}</span></div>
                         <dl class="architecture-apartment-facts">
                             <div><dt>Wohnfläche</dt><dd>{% if wohnung.groesse_qm > 0 %}{{ wohnung.groesse_qm }} m²{% else %}Wohnfläche noch nicht angegeben{% endif %}</dd></div>
-                            <div><dt>Zimmer</dt><dd>{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl }}{% else %}Zimmerzahl noch nicht angegeben{% endif %}</dd></div>
+                            <div><dt>Zimmer</dt><dd>{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl|room_count }}{% else %}Zimmerzahl noch nicht angegeben{% endif %}</dd></div>
                             <div><dt>Kaltmiete / Monat</dt><dd>{% if wohnung.kaltmiete > 0 %}{{ wohnung.kaltmiete }} €{% else %}Kaltmiete noch nicht angegeben{% endif %}</dd></div>
                         </dl>
                         {% if wohnung.status == 'free' %}<a class="uk-button uk-button-default architecture-apartment-link" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' wohnung.pk %}">Wohnung ansehen <span uk-icon="arrow-right" aria-hidden="true"></span></a>{% endif %}

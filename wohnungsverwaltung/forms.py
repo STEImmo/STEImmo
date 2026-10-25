@@ -35,6 +35,7 @@ from .access import (
     ROLE_USER_MANAGEMENT,
     USER_MANAGEMENT_PERMISSION,
 )
+from .formatting import format_room_count
 from .handover_photos import (
     PHOTO_READ_ERROR,
     HandoverPhotoReadError,
@@ -2041,7 +2042,7 @@ class EmployeeApplicationUnitFilterForm(UIkitFormMixin, forms.Form):
         self.fields["rooms"].choices = [
             (
                 str(room_count),
-                f"{str(room_count).rstrip('0').rstrip('.').replace('.', ',')} Zimmer",
+                f"{format_room_count(room_count)} Zimmer",
             )
             for room_count in room_counts
         ]

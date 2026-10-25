@@ -145,7 +145,8 @@ class BuildingViewTests(TestCase):
             with self.subTest(url=url):
                 response = self.client.get(url)
                 self.assertContains(response, "53,21")
-                self.assertContains(response, "3,50")
+                self.assertContains(response, "3,5</dd>")
+                self.assertNotContains(response, "3,50")
                 self.assertContains(response, "654,32")
         self.assertContains(self.client.get(detail_url), "Beschreibung aus der Datenbank")
         filtered = self.client.get(search_url, {"zimmer_min": "3", "groesse_min": "50"})
@@ -790,10 +791,10 @@ class ApartmentPhotoTests(TestCase):
 
 
 class BuildingInventoryTests(TestCase):
-    def test_setup_keeps_unconfirmed_numbers_at_default_and_preserves_saved_facts(self):
+    def test_setup_keeps_unconfirmed_costs_at_default_and_preserves_saved_facts(self):
         call_command("seed_standard_data", verbosity=0)
         for unit in Wohnung.objects.all():
-            for field in ("zimmeranzahl", "kaltmiete", "warmmiete", "kaution"):
+            for field in ("kaltmiete", "warmmiete", "kaution"):
                 self.assertEqual(getattr(unit, field), Decimal("0"))
             self.assertEqual(unit.status, WohnungStatus.BLOCKED)
         unit = Wohnung.objects.get(wohnungsnummer="401")

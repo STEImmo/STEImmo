@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load room_counts %}
 
 {% block title %}Wohnungen verwalten – STE Immobilien eGbR{% endblock %}
 
@@ -37,7 +38,7 @@
                             <td data-label="Wohnung"><strong>{{ wohnung.display_number }}</strong></td>
                             <td data-label="Etage">{{ wohnung.etage }}</td>
                             <td data-label="Größe">{{ wohnung.groesse_qm }} m²</td>
-                            <td data-label="Zimmer">{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl }}{% else %}Noch nicht angegeben{% endif %}</td>
+                            <td data-label="Zimmer">{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl|room_count }}{% else %}Noch nicht angegeben{% endif %}</td>
                             <td data-label="Status">
                                 <span class="uk-label">
                                     {% if wohnung.status == "free" %}Verfügbar{% elif wohnung.status == "taken" %}Vermietet{% else %}Gesperrt{% endif %}

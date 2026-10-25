@@ -65,6 +65,16 @@ Die Einrichtung, der Abgleich älterer Beispielwohnungen und die noch vorläufig
 Zuordnung sind in der [Dokumentation zu US-02](docs/prototypes/16-building-apartment-view.md)
 beschrieben.
 
+Die Zimmerzahlen aller 25 Wohnungen sind gemäß der bestätigten Vorlage aus
+[Issue #158](https://github.com/STEImmo/STEImmo/issues/158) hinterlegt. Neue
+Beispiel- und Demo-Einrichtungen verwenden diese Werte. Bestehende Datenbanken
+übernehmen sie einmalig mit `python manage.py migrate` über Migration
+`0029_confirmed_room_counts`; dabei werden ausschließlich die Zimmerzahlen der
+zugeordneten Wohnungen in Gebäude 1 ersetzt. Spätere manuelle Änderungen bleiben
+bei weiteren Starts und Migrationen erhalten. Zimmerzahlen erscheinen einheitlich
+als ganze Zahl oder mit Dezimalkomma, etwa `2` und `3,5`. Zuordnung, Fehlerfälle
+und Rückmigration sind in der verlinkten Gebäudedokumentation beschrieben.
+
 Der Stack ist festgelegt. Die Foundation ist umgesetzt; die fachlichen MVP-Vertical-Slices folgen.
 
 Statussymbole:
