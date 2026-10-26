@@ -21,6 +21,12 @@ erhalten. Historische Nummern wie `1.01` werden nicht zugeordnet; solche alten
 Entwicklungsbestände sind vor dieser Migration mit dem unten beschriebenen
 Inventarabgleich umzustellen.
 
+Die zusätzliche Merge-Migration `0031_merge_room_counts_and_account_settings`
+verbindet den Zimmerzahlzweig mit `0030_account_email_change_throttle` aus den
+persönlichen Kontoeinstellungen. Sie enthält keine eigenen Daten- oder
+Schemaoperationen. Beide bereits geteilten Migrationszweige bleiben unverändert;
+der reguläre `migrate`-Aufruf führt jeweils nur die noch fehlenden Schritte aus.
+
 Spätere manuelle Änderungen werden bei weiteren Starts oder `migrate`-Aufrufen
 nicht erneut überschrieben. Eine Rückmigration lässt die korrigierten Werte
 bestehen, da sich unbekannte Altwerte nicht rekonstruieren lassen. Wird die

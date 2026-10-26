@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} – STE Immobilien eGbR{% endblock %}
+{% block content %}
+<section class="uk-section profile-page"><div class="uk-container uk-container-small">
+    <nav aria-label="Brotkrumennavigation"><ul class="uk-breadcrumb"><li><a href="{% url 'profile:detail' %}">Mein Profil</a></li><li><span aria-current="page">{{ title }}</span></li></ul></nav>
+    <header class="profile-heading"><div><p class="profile-eyebrow">Ihr persönlicher Bereich</p><h1>{{ title }}</h1><p>{{ intro }}</p></div></header>
+    <div class="uk-card uk-card-default profile-panel">
+        {% if not person %}<div class="uk-alert-primary" role="status"><p>Ihrem Konto ist noch kein Personendatensatz zugeordnet.</p><p>Bitte wenden Sie sich an die Benutzerverwaltung.</p></div><a href="{% url 'profile:detail' %}">Zurück zum Profil</a>
+        {% elif email_confirmation and not pending_email %}
+            <div class="uk-alert-primary" role="status"><p>Es ist keine E-Mail-Änderung offen. Ihre bisherige Adresse bleibt gültig.</p></div><a href="{% url 'profile:email' %}">E-Mail-Adresse ändern</a>
+        {% else %}
+            {% if email_change %}<p>Aktuelle E-Mail-Adresse: <strong class="uk-text-break">{{ user.email }}</strong></p>{% endif %}
+            {% if pending_email %}<p>Code gesendet an: <strong class="uk-text-break">{{ pending_email }}</strong></p>{% endif %}
+            <form method="post" class="uk-form-stacked">{% csrf_token %}
+                {% if form.errors %}<div class="uk-alert-danger" role="alert"><p>Bitte prüfen Sie Ihre Angaben.</p>{{ form.non_field_errors }}</div>{% endif %}
+                {% for field in form %}{% if field.is_hidden %}{{ field }}{{ field.errors }}{% else %}{% include "wohnungsverwaltung/_form_field.html" with field=field only %}{% endif %}{% endfor %}
+                <div class="profile-form-actions"><button class="uk-button uk-button-primary" type="submit">{{ action_label }}</button>{% if not email_confirmation %}<a class="uk-button uk-button-default" href="{% url 'profile:detail' %}">Abbrechen</a>{% endif %}</div>
+            </form>
+            {% if email_confirmation %}<div class="uk-margin-top"><a href="{% url 'profile:email' %}">Neuen Code anfordern oder Adresse korrigieren</a></div><form method="post" action="{% url 'profile:email_cancel' %}" class="profile-form-actions">{% csrf_token %}<button class="uk-button uk-button-default" type="submit">E-Mail-Änderung abbrechen</button></form>{% endif %}
+        {% endif %}
+    </div>
+</div></section>
+{% endblock %}

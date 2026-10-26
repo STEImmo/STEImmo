@@ -8,6 +8,7 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from .access import ROLE_EMPLOYEE
 from .forms import EmployeeApplicationUnitFilterForm
@@ -185,6 +186,56 @@ class RoomCountMigrationTests(TransactionTestCase):
         MigrationExecutor(connection).migrate([self.migrate_from])
         unit.refresh_from_db()
         self.assertEqual(unit.zimmeranzahl, Decimal("4.25"))
+
+    def test_merging_from_room_count_branch_preserves_later_manual_room_edits(self):
+        unit = self.Unit.objects.create(gebaeudenummer="1", etage=4, wohnungsnummer="401")
+        self.migrate()
+        self.Unit.objects.filter(pk=unit.pk).update(zimmeranzahl="4.25")
+
+        executor = MigrationExecutor(connection)
+        targets = executor.loader.graph.leaf_nodes()
+        executor.migrate(targets)
+        unit.refresh_from_db()
+        self.assertEqual(unit.zimmeranzahl, Decimal("4.25"))
+        final_apps = executor.loader.project_state(targets).apps
+        Person = final_apps.get_model("immobilien", "Person")
+        person = Person.objects.create(
+            vorname="Test", nachname="Profil", email="profile-merge@example.test", city="Würzburg"
+        )
+        self.assertEqual(Person.objects.get(pk=person.pk).city, "Würzburg")
+
+    def test_merging_from_profile_branch_preserves_profile_and_email_throttle(self):
+        profile_target = ("immobilien", "0030_account_email_change_throttle")
+        executor = MigrationExecutor(connection)
+        executor.migrate([profile_target])
+        profile_apps = executor.loader.project_state([profile_target]).apps
+        User = profile_apps.get_model("auth", "User")
+        Person = profile_apps.get_model("immobilien", "Person")
+        Throttle = profile_apps.get_model("immobilien", "AccountEmailChangeThrottle")
+        user = User.objects.create(username="migration-profile")
+        person = Person.objects.create(
+            user=user,
+            vorname="Test",
+            nachname="Profil",
+            email="migration-profile@example.test",
+            city="Würzburg",
+            postal_code="97070",
+            country="Deutschland",
+            salutation="neutral",
+        )
+        before = Person.objects.values().get(pk=person.pk)
+        sent_at = timezone.now()
+        Throttle.objects.create(user=user, last_sent_at=sent_at)
+        unit = self.Unit.objects.create(
+            gebaeudenummer="1", etage=4, wohnungsnummer="401", zimmeranzahl="9"
+        )
+
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        unit.refresh_from_db()
+        self.assertEqual(unit.zimmeranzahl, Decimal("3.5"))
+        self.assertEqual(Person.objects.values().get(pk=person.pk), before)
+        self.assertEqual(Throttle.objects.get(user_id=user.pk).last_sent_at, sent_at)
 
 
 class RoomCountFormattingTests(SimpleTestCase):

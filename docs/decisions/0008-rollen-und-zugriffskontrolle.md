@@ -207,6 +207,42 @@ Nach erfolgreicher MFA ist die Übersicht das Standardziel; ein geprüftes expli
 Anmeldeziel hat weiterhin Vorrang. Ein direktes Einzelrecht zur Benutzerverwaltung
 allein gewährt weiterhin keinen Zugriff auf Mitarbeiterkennzahlen.
 
+### Eigenes Profil (US-21 / Issue #129)
+
+Alle angemeldeten Konten erreichen ihr eigenes Profil unter `/accounts/profil/`
+(URL-Namespace `profile`), unabhängig von ihrer fachlichen Rolle. Die Auswahl
+erfolgt ausschließlich über `Person.user` und den angemeldeten Nutzer; es gibt keine
+Profil-URL mit fremder Personenkennung. Konten ohne Zuordnung können keine Person
+anlegen oder auswählen und erhalten einen verständlichen Hinweis.
+
+Das Django-ModelForm gibt Vorname, Nachname, optionale Telefonnummer,
+Anrede und Geburtsdatum frei. Die Anschrift wird im Profil weder angezeigt
+noch bearbeitet; vorhandene Adressdaten bleiben erhalten. Die Namen werden atomar mit
+`User.first_name` und `User.last_name`
+synchronisiert und auf deren bestehende Feldlängen begrenzt (je 150 Zeichen).
+Die Telefonnummer behält die bestehende flexible Schreibweise und Feldlänge.
+Rollen, Wohnung und weitere fachliche Daten werden nicht geändert. Passwort und
+Anmelde-/Personen-E-Mail werden ausschließlich über die getrennten, erneut
+authentifizierten Abläufe aus [ADR-0020](0020-persoenliche-kontoeinstellungen.md)
+geändert. Schreibzugriffe benötigen POST und CSRF. Konto und
+Person werden in derselben Reihenfolge wie in der Benutzerverwaltung gesperrt;
+zwischenzeitlich geänderte Zugangsdaten oder eine Deaktivierung weisen eine
+laufende Schreibanfrage ab. Die Profilseiten erhalten private `no-store`-Header.
+
+Die Profilbearbeitung schreibt weder Bewerbungen noch Nachweise oder Protokolle.
+Bewerbungsansichten dürfen weiterhin aktuelle Stammdaten über die bestehende
+Personenverknüpfung anzeigen; eingereichte Inhalte und Dateien bleiben erhalten.
+Abgeschlossene Protokolle verwenden weiterhin ihren Export-Snapshot und ihre
+gespeicherte PDF-Fassung; Altprotokolle ohne gesicherten Namen bleiben gemäß
+bestehendem Verhalten ausdrücklich gekennzeichnet. Migration 0029 ergänzt
+die optionalen Stammdaten und ausstehenden E-Mail-Änderungen innerhalb von
+US-21 (#129). Diese Erweiterung erfolgt ausdrücklich auf Nutzerauftrag.
+Migration 0030 übernimmt bestehende Versandzeitpunkte in eine eigene kontobezogene
+Versandsperre. Abbrechen und das Löschen ausstehender Codes heben die einminütige
+Wartezeit nicht auf. Neue E-Mail-Adressen werden vor Verfügbarkeitsprüfung, Versand
+und Speicherung wie beim Anmeldeformular per Unicode-NFKC normalisiert und erneut
+validiert, damit die anschließende Anmeldung dieselbe Adresse verwendet.
+
 ## Erweiterungsroutine
 
 Für eine neue geschützte Seite wird in dieser Reihenfolge vorgegangen:
