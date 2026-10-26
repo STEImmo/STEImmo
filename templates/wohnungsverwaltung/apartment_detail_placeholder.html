@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load room_counts %}
 {% load static %}
 {% block title %}Wohnung {{ wohnung.display_number }} – STE Immobilien eGbR{% endblock %}
 {% block content %}
@@ -19,7 +20,7 @@
                 <p class="uk-text-meta">Für die Vorauswahl senden Sie eine Voranfrage über Ihr Bewerberkonto. Ein Besichtigungstermin wird nach Prüfung separat bestätigt.</p>
             </aside>
             <div class="apartment-detail-content">
-                <dl class="apartment-detail-metrics"><div><dt>Wohnfläche</dt><dd>{% if wohnung.groesse_qm > 0 %}{{ wohnung.groesse_qm }} m²{% else %}Noch offen{% endif %}</dd></div><div><dt>Zimmer</dt><dd>{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl }}{% else %}Noch offen{% endif %}</dd></div><div><dt>Etage</dt><dd>{{ floor_label }}</dd></div></dl>
+                <dl class="apartment-detail-metrics"><div><dt>Wohnfläche</dt><dd>{% if wohnung.groesse_qm > 0 %}{{ wohnung.groesse_qm }} m²{% else %}Noch offen{% endif %}</dd></div><div><dt>Zimmer</dt><dd>{% if wohnung.zimmeranzahl > 0 %}{{ wohnung.zimmeranzahl|room_count }}{% else %}Noch offen{% endif %}</dd></div><div><dt>Etage</dt><dd>{{ floor_label }}</dd></div></dl>
                 <section><h2>Ihre Wohnung im Überblick</h2><p>{% if wohnung.description %}{{ wohnung.description|linebreaksbr }}{% else %}Noch nicht angegeben{% endif %}</p></section>
                 <section><h2>Ausstattung &amp; weitere Angaben</h2><dl class="apartment-detail-facts">
                     <div><dt>Ausstattung</dt><dd>{{ wohnung.equipment|default:"Noch nicht angegeben"|linebreaksbr }}</dd></div>

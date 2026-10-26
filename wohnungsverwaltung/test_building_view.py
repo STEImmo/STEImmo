@@ -145,7 +145,8 @@ class BuildingViewTests(TestCase):
             with self.subTest(url=url):
                 response = self.client.get(url)
                 self.assertContains(response, "53,21")
-                self.assertContains(response, "3,50")
+                self.assertContains(response, "3,5</dd>")
+                self.assertNotContains(response, "3,50")
                 self.assertContains(response, "654,32")
         self.assertContains(self.client.get(detail_url), "Beschreibung aus der Datenbank")
         filtered = self.client.get(search_url, {"zimmer_min": "3", "groesse_min": "50"})
@@ -235,10 +236,10 @@ class BuildingViewTests(TestCase):
             )
         self.assertContains(response, free.wohnungsnummer)
         self.assertContains(response, taken.wohnungsnummer)
-        self.assertContains(response, f"Whg. {free.wohnungsnummer}")
-        self.assertNotContains(response, f"Whg. {taken.wohnungsnummer}")
+        self.assertContains(response, f'class="plan-number">Wohnung {free.wohnungsnummer}</text>')
+        self.assertContains(response, f'class="plan-number">Wohnung {taken.wohnungsnummer}</text>')
         self.assertContains(response, 'class="plan-apartment is-unavailable"')
-        self.assertContains(response, 'class="plan-unavailable-caption"', count=1)
+        self.assertContains(response, 'class="plan-caption plan-unavailable-caption"', count=1)
         self.assertContains(response, '<ul id="etagenplan"')
         self.assertNotContains(response, "uk-sticky")
         self.assertNotContains(response, "Auswählbar")
@@ -310,7 +311,7 @@ class BuildingViewTests(TestCase):
             [(item["unit"].pk, item["points"]) for item in after.context["plan_units"]], positions
         )
         self.assertContains(after, "Wohnung 100")
-        self.assertNotContains(after, "Whg. 100")
+        self.assertNotContains(after, 'class="plan-number">Wohnung 100</text>')
         self.assertContains(after, "Bitte nutzen Sie die Wohnungsliste.")
         self.assertContains(
             after,
@@ -330,7 +331,7 @@ class BuildingViewTests(TestCase):
         floor = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[0]))
         search = self.client.get(reverse("wohnungsverwaltung_public:apartment_search"))
         for number, unit in enumerate(units, start=1):
-            self.assertContains(floor, f"Whg. {number:03d}")
+            self.assertContains(floor, f'class="plan-number">Wohnung {number:03d}</text>')
             self.assertContains(search, f"Wohnung {number:03d}")
             detail = self.client.get(
                 reverse("wohnungsverwaltung_public:apartment_detail_placeholder", args=[unit.pk])
@@ -790,10 +791,10 @@ class ApartmentPhotoTests(TestCase):
 
 
 class BuildingInventoryTests(TestCase):
-    def test_setup_keeps_unconfirmed_numbers_at_default_and_preserves_saved_facts(self):
+    def test_setup_keeps_unconfirmed_costs_at_default_and_preserves_saved_facts(self):
         call_command("seed_standard_data", verbosity=0)
         for unit in Wohnung.objects.all():
-            for field in ("zimmeranzahl", "kaltmiete", "warmmiete", "kaution"):
+            for field in ("kaltmiete", "warmmiete", "kaution"):
                 self.assertEqual(getattr(unit, field), Decimal("0"))
             self.assertEqual(unit.status, WohnungStatus.BLOCKED)
         unit = Wohnung.objects.get(wohnungsnummer="401")

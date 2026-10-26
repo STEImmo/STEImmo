@@ -1,5 +1,51 @@
 # Gebäude- und Wohnungsansicht (US-02, #16)
 
+## Bestätigte Zimmerzahlen vom 24. Oktober 2026 (#158)
+
+Die im Issue #158 vollständig übertragene Auftraggebervorlage bestätigt die
+Zimmerzahl jeder der 25 Wohnungen: zwölf Einzimmer-, elf Zweizimmer-, eine
+Dreizimmer- und eine Dreieinhalbzimmerwohnung. Die Einzelzuordnung steht im Issue
+und ist durch unabhängige Tests abgesichert. Die fachliche Zimmerzahl wird nicht
+aus den Raumstammdaten abgeleitet.
+
+`python manage.py migrate` führt die neue Datenmigration
+`0029_confirmed_room_counts` einmalig aus. Sie ersetzt auch abweichende vorhandene
+Zimmerzahlen, ausschließlich für Gebäude `1` und passende Kombinationen aus Etage
+und Wohnungsnummer. EG-Nummern `1`–`5` und `001`–`005` sind gleichwertige
+Zuordnungen; gespeicherte Nummern werden nicht geändert. Bei doppelten oder
+mehrdeutigen Zuordnungen bricht die Migration vor sämtlichen Änderungen ab.
+Die betreffenden Nummern müssen bereinigt und `migrate` erneut ausgeführt werden.
+Fehlende Wohnungen werden nicht angelegt; fremde Nummern und Etagen bleiben
+unberührt. IDs, Verknüpfungen, Flächen, Mieten, Status und Raumstammdaten bleiben
+erhalten. Historische Nummern wie `1.01` werden nicht zugeordnet; solche alten
+Entwicklungsbestände sind vor dieser Migration mit dem unten beschriebenen
+Inventarabgleich umzustellen.
+
+Die zusätzliche Merge-Migration `0031_merge_room_counts_and_account_settings`
+verbindet den Zimmerzahlzweig mit `0030_account_email_change_throttle` aus den
+persönlichen Kontoeinstellungen. Sie enthält keine eigenen Daten- oder
+Schemaoperationen. Beide bereits geteilten Migrationszweige bleiben unverändert;
+der reguläre `migrate`-Aufruf führt jeweils nur die noch fehlenden Schritte aus.
+
+Spätere manuelle Änderungen werden bei weiteren Starts oder `migrate`-Aufrufen
+nicht erneut überschrieben. Eine Rückmigration lässt die korrigierten Werte
+bestehen, da sich unbekannte Altwerte nicht rekonstruieren lassen. Wird die
+Migration nach einer Rückmigration erneut vorwärts angewendet, übernimmt sie die
+Vorlage erneut. Vor der Übernahme auf einer bestehenden Umgebung ist daher eine
+übliche Datenbanksicherung sinnvoll.
+
+`seed_standard_data` verwendet die bestätigten Zimmerzahlen nur für neu angelegte
+Wohnungen und erhält bereits gepflegte Werte. Auch `setup_demo` übernimmt diese
+Werte, ohne verfügbare Wohnungen pauschal auf zwei Zimmer zu setzen. Der vorhandene
+Inventarabgleich bleibt unverändert. Suche, Etagenansicht, Wohnungsdetails,
+Wohnungsliste und Zimmerfilterbeschriftungen verwenden denselben Formatter:
+`2.00` erscheint als `2`, `3.50` als `3,5`. Technische Filterwerte bleiben erhalten;
+der Standardwert `0` wird weiterhin als fehlende Zimmerangabe angezeigt.
+
+Die folgenden datierten Abschnitte dokumentieren frühere Arbeitsstände.
+Aussagen über damals unbekannte Zimmerzahlen sind durch diese bestätigte
+Zuordnung überholt; Mieten, Ausstattung und andere unbestätigte Angaben bleiben offen.
+
 ## Review-Nacharbeit vom 10. Oktober 2026
 
 Die ausgewählte Wohnungsroute bleibt beim Wechsel vom Login zur Registrierung und
@@ -44,7 +90,7 @@ EG-Türzeichnungen, 22 Türzeichnungen der gemeinsamen OG-Vorlage und 17
 DG-Türzeichnungen findet keine Wandkreuzungen in Türöffnungen oder Schwenkbereichen;
 die vorgesehenen Anschlüsse an den Türenden sind dabei ausgenommen.
 
-## Aktueller Datenstand und Vereinfachung vom 9. Oktober 2026
+## Historischer Datenstand und Vereinfachung vom 9. Oktober 2026
 
 Die aktuelle Excel-Wohnungsliste des Nutzers ist die maßgebliche Flächenquelle. Alle 25 gespeicherten Nummern, Etagen und Flächen stimmen damit überein, einschließlich DG 401 mit 92,94 m² und 402 mit 64,90 m². Wohnungsangaben, Fotos, Suchfilter und Verfügbarkeitszahlen kommen zur Laufzeit ausschließlich aus der Datenbank. Änderungen über die Mitarbeiterverwaltung erscheinen beim nächsten Seitenaufruf ohne Codeänderung.
 

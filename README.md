@@ -83,12 +83,25 @@ eingereichten Unterlagen oder archivierten Protokolle. Details stehen in
 Die Gebäudeansicht ist lokal unter [Gebäude erkunden](http://localhost:8000/wohnungen/gebaeude/)
 erreichbar: Gebäude → Etagenplan → Wohnungsdetails. Öffentliche Wohnungsfotos können im
 Mitarbeiterbereich unter **Wohnung bearbeiten → Wohnungsfotos verwalten** gepflegt werden.
-Die Etagenpläne sind vereinfachte Vektorgrafiken nach den Vorlagen. Von den Wohnungsdetails
+Die Etagenpläne sind vereinfachte Vektorgrafiken nach den Vorlagen. Alle Wohnungen
+tragen eine ausgeschriebene Beschriftung wie „Wohnung 101“. Belegte und gesperrte
+Wohnungen zeigen zusätzlich „Nicht verfügbar“, bleiben schraffiert und sind nicht
+auswählbar. Von den Wohnungsdetails
 führt **Zur Besichtigung anmelden** zur wohnungsbezogenen Voranfrage; die Hauptbewerbung
 wird später freigeschaltet.
 Die Einrichtung, der Abgleich älterer Beispielwohnungen und die noch vorläufige räumliche
 Zuordnung sind in der [Dokumentation zu US-02](docs/prototypes/16-building-apartment-view.md)
 beschrieben.
+
+Die Zimmerzahlen aller 25 Wohnungen sind gemäß der bestätigten Vorlage aus
+[Issue #158](https://github.com/STEImmo/STEImmo/issues/158) hinterlegt. Neue
+Beispiel- und Demo-Einrichtungen verwenden diese Werte. Bestehende Datenbanken
+übernehmen sie einmalig mit `python manage.py migrate` über Migration
+`0029_confirmed_room_counts`; dabei werden ausschließlich die Zimmerzahlen der
+zugeordneten Wohnungen in Gebäude 1 ersetzt. Spätere manuelle Änderungen bleiben
+bei weiteren Starts und Migrationen erhalten. Zimmerzahlen erscheinen einheitlich
+als ganze Zahl oder mit Dezimalkomma, etwa `2` und `3,5`. Zuordnung, Fehlerfälle
+und Rückmigration sind in der verlinkten Gebäudedokumentation beschrieben.
 
 Der Stack ist festgelegt. Die Foundation ist umgesetzt; die fachlichen MVP-Vertical-Slices folgen.
 
