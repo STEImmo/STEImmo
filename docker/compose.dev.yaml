@@ -2,6 +2,9 @@ services:
   web:
     build:
       target: development
+      args:
+        STEIMMO_DEV_UID: ${STEIMMO_DEV_UID:-10001}
+        STEIMMO_DEV_GID: ${STEIMMO_DEV_GID:-10001}
     environment:
       DJANGO_DEBUG: "1"
       DJANGO_EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend

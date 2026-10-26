@@ -89,6 +89,12 @@ jobs:
       - name: Docker-Image bauen
         run: docker build --tag steimmo-ci .
 
+      - name: Entwicklungsrechte für einen Linux-Checkout prüfen
+        run: |
+          docker build --target development --build-arg STEIMMO_DEV_UID=1000 \
+            --build-arg STEIMMO_DEV_GID=1000 --tag steimmo-dev-ci .
+          bash ops/smoke-development.sh steimmo-dev-ci 1000 1000
+
       - name: Produktionscontainer und Persistenz prüfen
         run: bash ops/smoke.sh steimmo-ci
 
@@ -109,7 +115,7 @@ jobs:
 
       - name: Deploy-Skripte prüfen
         run: |
-          bash -n ops/deploy.sh ops/ship.sh ops/bootstrap-server.sh ops/proxy-source.sh ops/smoke.sh
+          bash -n ops/deploy.sh ops/ship.sh ops/bootstrap-server.sh ops/proxy-source.sh ops/smoke.sh ops/smoke-development.sh
           python -m unittest discover -s ops/tests -v
 
   security:

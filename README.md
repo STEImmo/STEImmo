@@ -508,6 +508,21 @@ Bei `DJANGO_DEBUG=0` oder fehlender Debug-Einstellung verweigert bereits das Lad
 der Settings einen fehlenden oder unsicheren `DJANGO_SECRET_KEY`. Anforderungen
 und sichere Erzeugung stehen in [ADR-0018](docs/decisions/0018-ghcr-server-deployment.md).
 
+Unter Linux vor dem ersten Build `STEIMMO_DEV_UID` und `STEIMMO_DEV_GID` in
+`docker/.env` auf die Benutzer- und Gruppenkennung des lokalen Checkouts setzen
+(Ausgaben von `id -u` und `id -g`). So kann `makemigrations` neue Dateien im
+Checkout schreiben, ohne Root-Rechte zu benötigen. Docker Desktop unter Windows
+und macOS kann die Vorgaben `10001:10001` verwenden. Die Werte gelten ausschließlich
+für das Entwicklungsimage; nach einer Änderung muss es neu gebaut werden.
+
+Wenn lokale Media-/Static-Volumes noch einer früheren Containerkennung gehören,
+nach dem Neubauen einmalig ausschließlich deren Eigentümer anpassen:
+
+~~~bash
+docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.dev.yaml build web
+docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.dev.yaml run --rm --no-deps --user 0:0 --entrypoint sh web -ec 'chown -R steimmo:steimmo /app/media /app/staticfiles'
+~~~
+
 ### 2. Entwicklungsumgebung starten
 
 Der folgende Befehl ist unter macOS, Linux und Windows PowerShell identisch:

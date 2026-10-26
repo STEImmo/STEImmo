@@ -72,7 +72,19 @@ Das Standard-Buildziel `runtime` und die Basis-Compose-Konfiguration verwenden
 den festen Benutzer `steimmo` mit UID/GID `10001:10001`. Nur das
 Development-Override wählt das Ziel `development` mit `.[dev]`; auch dieses
 wechselt nach der Paketinstallation wieder zum unprivilegierten Benutzer.
-Das Runtime-Ziel erbt keine Entwicklungswerkzeuge aus diesem separaten Ziel.
+Dessen UID/GID sind ausschließlich im Development-Ziel über die Buildargumente
+`STEIMMO_DEV_UID` und `STEIMMO_DEV_GID` konfigurierbar (Vorgabe: 10001:10001,
+beide größer als null). Unter Linux entsprechen sie dem Eigentümer des
+Host-Checkouts, damit etwa `makemigrations` neue Quelldateien anlegen kann.
+Das Benutzerkonto und die Media-/Static-Verzeichnisse erhalten diese Kennungen
+beim Build. Die Startanleitung einschließlich Umstellung vorhandener lokaler
+Volumes steht in der README. Es gibt keinen privilegierten Entwicklungs-Webprozess
+und keine automatische Änderung der Host-Checkout-Rechte.
+Das Runtime-Ziel erbt weder diese Development-Argumente noch Entwicklungswerkzeuge.
+`ops/smoke-development.sh` reproduziert Linux-Checkout-Rechte in einem eigenen
+Testvolume und schreibt als UID/GID 1000:1000 eine echte Django-Migrationsdatei
+sowie Media-/Static-Testdateien. Dieser Test läuft in der CI zusätzlich zum
+Produktions-Smoke-Test; die feste Runtime-UID bleibt 10001.
 
 Quellcode und installierte Pakete bleiben im Eigentum von root. Beim Build
 werden Schreibrechte für Gruppe und andere am Quellcode entfernt, Leserechte
@@ -96,6 +108,10 @@ Runtime- und Development-Build, Compose-Buildziele, Produktions-Smoke-Test,
 840 Django-Tests, 18 Deployment-/EntryPoint-/Shipping-Tests, Systemcheck,
 Migrationsprüfung, Ruff-Lint und Formatprüfung sowie ShellCheck erfolgreich.
 Die Prüfung verwendet ausschließlich isolierte lokale Testdaten.
+Die Reviewkorrektur prüft zusätzlich das Schreiben von Migrationen und
+Laufzeitdateien mit 1000:1000 sowie der Vorgabe 10001:10001. Der neue
+Regressionstest scheitert am ursprünglichen Entwicklungsimage reproduzierbar
+mit einem PermissionError und besteht nach Anpassung der Build-Kennungen.
 
 ### Ausgangslage vor der Umsetzung
 
