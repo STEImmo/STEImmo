@@ -1,5 +1,7 @@
 services:
   web:
+    build:
+      target: development
     environment:
       DJANGO_DEBUG: "1"
       DJANGO_EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend

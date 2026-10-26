@@ -66,6 +66,37 @@ Die vorhandenen Serverprojekte veröffentlichen ebenfalls an `172.17.0.1`.
 Dadurch müssen weder Caddys Netzwerk noch die Netzwerke anderer Projekte
 geändert werden. PostgreSQL bleibt ausschließlich im STEImmo-Netzwerk.
 
+### Runtime-Benutzer und Dateirechte (Issue #136)
+
+Das Standard-Buildziel `runtime` und die Basis-Compose-Konfiguration verwenden
+den festen Benutzer `steimmo` mit UID/GID `10001:10001`. Nur das
+Development-Override wählt das Ziel `development` mit `.[dev]`; auch dieses
+wechselt nach der Paketinstallation wieder zum unprivilegierten Benutzer.
+Das Runtime-Ziel erbt keine Entwicklungswerkzeuge aus diesem separaten Ziel.
+
+Quellcode und installierte Pakete bleiben im Eigentum von root. Beim Build
+werden Schreibrechte für Gruppe und andere am Quellcode entfernt, Leserechte
+bleiben erhalten. Schreibbar sind Media, die Static-Ausgabe und temporäre
+Dateien unter `/tmp`. Frische benannte Docker-Volumes übernehmen beim ersten
+Mount die im Image vorbereiteten Verzeichnisrechte. Vorhandene Volumes mit
+abweichenden Eigentümern müssen vor einer Umstellung kontrolliert durch den
+Betreiber auf UID/GID 10001 vorbereitet werden; der Webprozess erhält dafür
+keine Root-Rechte und korrigiert keine Bestandsdateien automatisch.
+
+Migrationen und `collectstatic` laufen ebenfalls als UID 10001. Das
+Release-Skript bereitet ausschließlich das neue Static-Ausgabeverzeichnis
+mit einem gesonderten privilegierten Hilfscontainer vor. Der bestehende
+Produktions-Smoke-Test prüft Quellcode-Schreibschutz, fehlendes Ruff,
+Upload und Lesen über Django-Storage sowie die UID im gestarteten Webcontainer
+einschließlich PID 1. Er prüft außerdem Migrationen, Static-Sammlung und
+Media-Persistenz nach Neuerstellung in einer isolierten Compose-Umgebung.
+
+Am 2026-10-26 lokal mit Python 3.13 und PostgreSQL 18.6 geprüft:
+Runtime- und Development-Build, Compose-Buildziele, Produktions-Smoke-Test,
+840 Django-Tests, 18 Deployment-/EntryPoint-/Shipping-Tests, Systemcheck,
+Migrationsprüfung, Ruff-Lint und Formatprüfung sowie ShellCheck erfolgreich.
+Die Prüfung verwendet ausschließlich isolierte lokale Testdaten.
+
 ### Ausgangslage vor der Umsetzung
 
 - `.github/workflows/ci.yml` prüft bisher ausschließlich Pull Requests nach

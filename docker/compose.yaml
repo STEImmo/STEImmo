@@ -3,7 +3,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-      target: development
+      target: runtime
     restart: unless-stopped
     env_file:
       - .env

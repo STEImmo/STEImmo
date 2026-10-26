@@ -13,6 +13,7 @@ RUN python -m pip install --upgrade pip \
     && groupadd --gid 10001 steimmo \
     && useradd --uid 10001 --gid steimmo --no-create-home steimmo \
     && mkdir -p /app/media /app/staticfiles \
+    && chmod -R a+rX,go-w /app \
     && chown steimmo:steimmo /app/media /app/staticfiles
 
 USER 10001:10001
@@ -25,5 +26,6 @@ CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
 FROM app AS development
 USER root
 RUN python -m pip install ".[dev]"
+USER 10001:10001
 
 FROM app AS runtime
