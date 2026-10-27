@@ -1,6 +1,13 @@
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TransactionTestCase
+from django.db.migrations.loader import MigrationLoader
+from django.test import SimpleTestCase, TransactionTestCase
+
+
+class MigrationGraphTests(SimpleTestCase):
+    def test_apartment_migrations_have_one_unambiguous_endpoint(self):
+        loader = MigrationLoader(None)
+        self.assertNotIn("immobilien", loader.detect_conflicts())
 
 
 class RaumstammMigrationTests(TransactionTestCase):

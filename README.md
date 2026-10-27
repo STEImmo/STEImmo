@@ -55,15 +55,53 @@ helles Einzugsmotiv neben den echten Formularen, Passwortanzeige/-hilfen und
 verständliche Feldfehler. Das gemeinsame Template liegt in
 `templates/registration/auth_base.html`.
 
+Angemeldete Nutzer erreichen **Mein Profil** über das Kontomenü auf Desktop und
+Mobilgeräten. Dort können sie Vor- und Nachnamen, optionale Telefonnummer, Anrede
+und Geburtsdatum ansehen und bearbeiten. **Abbrechen** verwirft
+ungespeicherte Eingaben. Konten ohne Personenverknüpfung erhalten einen Hinweis auf
+die Benutzerverwaltung. Eingereichte Bewerbungsunterlagen und abgeschlossene
+Übergabearchive werden durch Profiländerungen nicht überschrieben.
+Der Profilbereich bündelt persönliche Daten und Anmeldeinformationen in getrennten
+Karten. Eine Kontonavigation führt abhängig von den bestehenden Rechten zu eigenen
+Bewerbungen und Übergabeprotokollen. Hinweise erläutern die freiwillige Telefonnummer
+und den Erhalt bereits eingereichter Unterlagen.
+
+Unter **Anmeldung & Konto** lassen sich Passwort und E-Mail-Adresse ändern.
+Beide Änderungen verlangen das aktuelle Passwort. Eine neue E-Mail-Adresse wird
+erst nach einem Bestätigungscode übernommen; bis dahin gilt die bisherige Adresse.
+Der Code gilt 15 Minuten und erlaubt fünf Versuche. Ein neuer Code kann nach einer
+Minute angefordert werden. Diese Wartezeit bleibt auch beim Abbrechen erhalten.
+Neue Adressen werden wie bei der Anmeldung per Unicode-NFKC normalisiert.
+Passwortwechsel und bestätigter E-Mail-Wechsel melden
+das Konto auf allen Geräten ab; die nächste Anmeldung verwendet weiterhin die
+bestehende Mitarbeiter-MFA, sofern diese für das Konto erforderlich ist.
+Eine Anschrift wird im allgemeinen Profil nicht abgefragt oder angezeigt.
+Neue Profilangaben verändern keine
+eingereichten Unterlagen oder archivierten Protokolle. Details stehen in
+[ADR-0020](docs/decisions/0020-persoenliche-kontoeinstellungen.md).
+
 Die Gebäudeansicht ist lokal unter [Gebäude erkunden](http://localhost:8000/wohnungen/gebaeude/)
 erreichbar: Gebäude → Etagenplan → Wohnungsdetails. Öffentliche Wohnungsfotos können im
 Mitarbeiterbereich unter **Wohnung bearbeiten → Wohnungsfotos verwalten** gepflegt werden.
-Die Etagenpläne sind vereinfachte Vektorgrafiken nach den Vorlagen. Von den Wohnungsdetails
+Die Etagenpläne sind vereinfachte Vektorgrafiken nach den Vorlagen. Alle Wohnungen
+tragen eine ausgeschriebene Beschriftung wie „Wohnung 101“. Belegte und gesperrte
+Wohnungen zeigen zusätzlich „Nicht verfügbar“, bleiben schraffiert und sind nicht
+auswählbar. Von den Wohnungsdetails
 führt **Zur Besichtigung anmelden** zur wohnungsbezogenen Voranfrage; die Hauptbewerbung
 wird später freigeschaltet.
 Die Einrichtung, der Abgleich älterer Beispielwohnungen und die noch vorläufige räumliche
 Zuordnung sind in der [Dokumentation zu US-02](docs/prototypes/16-building-apartment-view.md)
 beschrieben.
+
+Die Zimmerzahlen aller 25 Wohnungen sind gemäß der bestätigten Vorlage aus
+[Issue #158](https://github.com/STEImmo/STEImmo/issues/158) hinterlegt. Neue
+Beispiel- und Demo-Einrichtungen verwenden diese Werte. Bestehende Datenbanken
+übernehmen sie einmalig mit `python manage.py migrate` über Migration
+`0029_confirmed_room_counts`; dabei werden ausschließlich die Zimmerzahlen der
+zugeordneten Wohnungen in Gebäude 1 ersetzt. Spätere manuelle Änderungen bleiben
+bei weiteren Starts und Migrationen erhalten. Zimmerzahlen erscheinen einheitlich
+als ganze Zahl oder mit Dezimalkomma, etwa `2` und `3,5`. Zuordnung, Fehlerfälle
+und Rückmigration sind in der verlinkten Gebäudedokumentation beschrieben.
 
 Der Stack ist festgelegt. Die Foundation ist umgesetzt; die fachlichen MVP-Vertical-Slices folgen.
 
@@ -282,6 +320,10 @@ Terminbestätigung, die Hauptbewerbung oder beides fehlt. Beide Ebenen nutzen di
 Rückmeldungsregel wie die Dashboardkennzahl; weitere Filter lassen sich kombinieren
 und wieder entfernen. Der normale Bewerbungsbereich behält ohne diese Auswahl sein
 bisheriges Verhalten.
+Bei dynamischen Filteränderungen werden auch die aktiven Bewerbungsansichten
+einschließlich ihrer Kennzeichnung für assistive Technik aktualisiert. Das gilt
+ebenso beim Entfernen oder Zurücksetzen von Filtern und bei Browser-Zurück/-Vorwärts.
+Ein bereits fokussierter Ansichtsreiter behält seinen Tastaturfokus nach der Aktualisierung.
 
 Die gemeinsame Aufgabenliste und die Besichtigungstageslisten bleiben im Dashboard
 mit 20 Einträgen je Seite verfügbar. Alte Dashboardlinks für Bewerbungen,

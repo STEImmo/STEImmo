@@ -71,7 +71,7 @@
         let foundFragment = false;
         for (const name of [
             "filter-summary", "table-body", "application-count", "pagination",
-            "application-breadcrumb",
+            "application-breadcrumb", "application-segments",
         ]) {
             const selector = `[data-table-filter-fragment="${name}"]`;
             const currentFragments = document.querySelectorAll(selector);

@@ -14,6 +14,8 @@ Die fachliche Datenbankstruktur wird in Django-Modellen beschrieben und über ve
 
 Die Compose-Konfiguration stellt PostgreSQL bereit; sie enthält keine zweite, parallele SQL-Quelle für das fachliche Schema. Neue Änderungen werden mit `makemigrations` erzeugt und beim nächsten Containerstart angewendet.
 
+Entstehen durch parallele Branches mehrere Blattmigrationen, werden die unabhängigen Zweige mit einer zusätzlichen Merge-Migration verbunden. Bereits geteilte Migrationen bleiben unverändert. Vor der Integration werden der eindeutige Migrationsendpunkt, eine leere Datenbank und das Upgrade von den bisherigen Zweigständen geprüft.
+
 Migrationstests registrieren vor dem Wechsel auf ein historisches Schema ein Cleanup, das sämtliche aktuellen Blattmigrationen wiederherstellt. Damit läuft die Wiederherstellung auch nach einer fehlgeschlagenen Vorbereitung; nachfolgende Tests erhalten unabhängig von ihrer Reihenfolge das aktuelle Schema. Eine fest verdrahtete historische Zielmigration genügt dafür nicht. Die eigentliche Backfill-Prüfung verwendet weiterhin die vorgesehenen historischen Modelle.
 
 Die im ER-Modell festgelegten Status- und Merkmalswerte werden als echte PostgreSQL-Enum-Typen angelegt. Neue Enum-Werte benötigen deshalb zusätzlich eine explizite Migration mit `ALTER TYPE ... ADD VALUE`; reine Änderungen an `TextChoices` aktualisieren einen bestehenden PostgreSQL-Enum-Typ nicht automatisch.
