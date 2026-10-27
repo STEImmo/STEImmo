@@ -42,6 +42,11 @@ urlpatterns = [
     ),
     path("bewerbung/neu/", views.pre_application_create, name="pre_application_create"),
     path(
+        "bewerbung/<uuid:application_id>/besichtigungen/<uuid:appointment_id>/alternativtermin/",
+        views.applicant_viewing_proposal,
+        name="applicant_viewing_proposal",
+    ),
+    path(
         "bewerbung/neu/<uuid:unit_id>/",
         views.pre_application_create,
         name="pre_application_create_for_unit",

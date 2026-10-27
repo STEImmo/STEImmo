@@ -194,6 +194,34 @@ Ablehnung sagt offene Termine in derselben Transaktion ab und benachrichtigt den
 Bewerber. Ein Rückzug sagt ebenfalls offene Termine ab, versendet aber keine
 zusätzliche Nachricht. Historische abgeschlossene Termine bleiben erhalten.
 
+### Alternativtermine (US-24 / Issue #148)
+
+Nach drei eigenen Terminabsagen innerhalb derselben weiterhin aktiven Bewerbung darf
+der Bewerber für den neuesten abgesagten Termin einen zukünftigen Beginn vorschlagen.
+Zurückgezogene Zusagen zählen ebenfalls; Mitarbeiterabsagen und Absagen aus anderen
+Bewerbungen zählen nicht. Gezählt werden die Termine mit Status „Vom Bewerber abgesagt“;
+erneute Anfragen mit einer alten Formularversion erhöhen die Anzahl nicht.
+Das ist nur möglich, solange kein offener oder neuerer Termin besteht.
+Pro abgesagtem Termin bleibt ein änderbarer Vorschlag erhalten. Eine neue Planung
+durch Mitarbeiter verwendet den bestehenden Ablauf einschließlich Eignungsprüfung,
+Benachrichtigung und Bewerberzusage; der Vorschlag allein bucht keinen Termin.
+Die verbindlichen Zeiten des abgesagten Termins bleiben unverändert.
+
+Ein additives Datumsfeld am Termin enthält den aktuellen Vorschlag. Jede Änderung
+speichert vorherigen und neuen Wert sowie Akteur und Zeitpunkt im vorhandenen
+Terminverlauf. Versionsprüfung und Bewerbungssperre verhindern das Überschreiben
+paralleler Änderungen oder einer zwischenzeitlichen Neuplanung. Fremde sowie
+gemischte Bewerbungs-/Terminkennungen liefern 404; POST benötigt CSRF-Schutz.
+Vergangene, nicht existente und mehrdeutige Uhrzeiten in Europe/Berlin werden abgelehnt.
+
+Neue und geänderte Vorschläge benachrichtigen nach Commit aktive Konten mit dem
+vorhandenen Mitarbeiterzugriffsrecht und nicht leerer Konto-E-Mail-Adresse.
+Der bestehende Versandstatus und die interne Wiederholungsaktion werden verwendet.
+Versandfehler oder fehlende Empfänger verwerfen keinen Vorschlag. Nur aktuelle,
+zukünftige Vorschläge aktiver Bewerbungen dürfen versendet werden. Frühere Werte
+bleiben intern im Verlauf, der letzte Vorschlag am historischen Termin sichtbar.
+Es entstehen keine neuen Dienste oder JavaScript-Abhängigkeiten.
+
 ## Verwaltungsübersicht
 
 Die Verwaltungsstartseite unter `/verwaltung/` und sämtliche über `bereich`

@@ -456,6 +456,29 @@ verlangen aber eine erneute Prüfung vor weiteren Zuweisungen oder Verschiebunge
 Der interne Verlauf dokumentiert Termin- und Statusänderungen sowie Versandversuche.
 Es gibt keine Selbstbuchung, Kalenderintegration, Kapazitätsprüfung oder Erinnerungen.
 
+Nach drei eigenen Terminabsagen innerhalb derselben aktiven Bewerbung können Bewerber
+einen zukünftigen **Alternativtermin** mit Datum und Beginn vorschlagen. Zurückgezogene
+Zusagen zählen mit; Absagen durch Mitarbeiter oder aus anderen Bewerbungen nicht. Pro abgesagtem
+Termin gibt es einen aktuellen Vorschlag, der bis zur nächsten Terminplanung geändert
+werden kann. Nach einer Zusage heißt die Absageaktion **Terminzusage zurückziehen**;
+ein Bestätigungsdialog und die Rückmeldung erklären, dass die Bewerbung aktiv bleibt.
+Vorschläge sind unverbindlich. Die Verwaltung sieht sie bei der Bewerbung und plant
+über das bestehende Terminformular einen neuen Termin, den der Bewerber zusagen kann.
+**Vorschlag übernehmen** füllt dieses Formular mit dem gewünschten Datum und Beginn
+sowie einer Standarddauer von 30 Minuten vor. Erst **Besichtigung speichern** legt
+den Termin an und versendet die Einladung. Würde die Endzeit auf den Folgetag fallen,
+muss die Verwaltung eine Endzeit am selben Tag wählen. Veraltete oder inzwischen
+nicht mehr zulässige Vorschläge können nicht übernommen werden.
+Nach einer Neuplanung bleibt der frühere Vorschlag zur Nachvollziehbarkeit sichtbar.
+Aktive Konten mit Mitarbeiterzugriff und hinterlegter E-Mail-Adresse werden nach dem
+Speichern über neue oder geänderte Vorschläge benachrichtigt. Fehlt ein Empfänger oder
+scheitert der Versand, bleibt der Vorschlag erhalten; der Versandstatus und die
+Wiederholungsaktion stehen im internen Terminbereich. Überholte oder vergangene
+Vorschläge werden nicht erneut versendet. Zeitangaben gelten in `Europe/Berlin`;
+nicht eindeutige oder nicht existierende Uhrzeiten bei der Zeitumstellung werden
+abgelehnt. Details zu Zugriff und Verlauf stehen in
+[ADR-0008](docs/decisions/0008-rollen-und-zugriffskontrolle.md).
+
 ## Lokale Entwicklung
 
 Übergabeprotokolle werden über **Protokoll prüfen und unterschreiben** abgeschlossen.

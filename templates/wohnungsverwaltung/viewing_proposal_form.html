@@ -1,0 +1,23 @@
+{% extends "wohnungsverwaltung/application_base.html" %}
+{% block title %}Alternativtermin – STE Immobilien eGbR{% endblock %}
+{% block application_heading %}Alternativtermin vorschlagen{% endblock %}
+{% block application_intro %}Teilen Sie der Verwaltung mit, wann Sie die Wohnung besichtigen möchten.{% endblock %}
+{% block application_content %}
+<article class="uk-card uk-card-default uk-card-body application-form-card">
+    <h2>{{ application.wohnung }}</h2>
+    {% include "wohnungsverwaltung/_viewing_summary.html" with appointment=appointment applicant_view=True only %}
+    <p>Ihr Vorschlag ist unverbindlich. Die Verwaltung prüft ihn und plant einen neuen Termin, den Sie anschließend zusagen können. Ihre Bewerbung bleibt aktiv.</p>
+    <p class="uk-text-meta">Es gilt Europe/Berlin. Sie können Ihren Vorschlag bis zur neuen Terminplanung ändern.</p>
+    <form method="post" class="uk-form-stacked" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+        {% for field in form %}
+            {% if field.is_hidden %}{{ field }}{% else %}{% include "wohnungsverwaltung/_form_field.html" with field=field only %}{% endif %}
+        {% endfor %}
+        <div class="application-form-actions">
+            <a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung:pre_application_list' %}">Abbrechen</a>
+            <button class="uk-button uk-button-primary" type="submit">Vorschlag speichern</button>
+        </div>
+    </form>
+</article>
+{% endblock %}

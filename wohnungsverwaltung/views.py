@@ -2,6 +2,7 @@ import json
 import logging
 from collections import Counter
 from copy import copy
+from datetime import timedelta
 from urllib.parse import urlencode
 from uuid import UUID
 
@@ -93,6 +94,7 @@ from .forms import (
     UserAccountForm,
     ViewingActionForm,
     ViewingAppointmentForm,
+    ViewingProposalForm,
     WohnungForm,
     photo_content_type_from_format,
     verified_photo_content_type,
@@ -137,6 +139,7 @@ from .models import (
 )
 from .upload_limits import upload_too_large_response
 from .viewings import (
+    BERLIN,
     cancel_open_viewings,
     notification_is_current,
     record_viewing_event,
@@ -1198,8 +1201,15 @@ def _employee_application_detail_response(
             Prefetch("events", queryset=ViewingAppointmentEvent.objects.select_related("actor"))
         )
     )
+    eligibility_error = viewing_eligibility_error(application)
     for appointment in viewings:
         appointment.application = application
+        appointment.can_use_proposal = (
+            not eligibility_error
+            and appointment.proposed_start is not None
+            and appointment.proposed_start > timezone.now()
+            and appointment.can_propose
+        )
         events = list(appointment.events.all())
         appointment.current_notice = next(
             (
@@ -1217,6 +1227,29 @@ def _employee_application_detail_response(
         )
         if editing_form is not None and editing_form[0] == appointment.pk:
             appointment.edit_form = editing_form[1]
+    selected_proposal = None
+    if viewing_form is None:
+        initial = {"action": "schedule"}
+        if proposal_id := request.GET.get("proposal"):
+            proposal = next((item for item in viewings if str(item.pk) == proposal_id), None)
+            if proposal is None:
+                raise Http404
+            if proposal.can_use_proposal:
+                selected_proposal = proposal
+                start = timezone.localtime(proposal.proposed_start, BERLIN)
+                end = start + timedelta(minutes=30)
+                initial.update(
+                    date=start.date(),
+                    start_time=start.time(),
+                    end_time=end.time() if end.date() == start.date() else None,
+                )
+            else:
+                messages.warning(
+                    request,
+                    "Dieser Vorschlag kann nicht mehr übernommen werden. "
+                    "Bitte prüfen Sie den aktuellen Termin- und Bewerbungsstand.",
+                )
+        viewing_form = ViewingAppointmentForm(auto_id="id_viewing_create_%s", initial=initial)
     return render(
         request,
         "wohnungsverwaltung/employee_application_detail.html",
@@ -1224,12 +1257,9 @@ def _employee_application_detail_response(
             "application": application,
             "viewings": viewings,
             "viewing_now": timezone.now(),
-            "viewing_form": viewing_form
-            if viewing_form is not None
-            else ViewingAppointmentForm(
-                auto_id="id_viewing_create_%s", initial={"action": "schedule"}
-            ),
-            "viewing_eligibility_error": viewing_eligibility_error(application),
+            "viewing_form": viewing_form,
+            "selected_proposal": selected_proposal,
+            "viewing_eligibility_error": eligibility_error,
             "has_open_viewing": any(appointment.is_open for appointment in viewings),
             "has_completed_viewing": any(
                 appointment.status == "completed" for appointment in viewings
@@ -1444,8 +1474,83 @@ def applicant_viewing_response(request, application_id, appointment_id):
             record_viewing_event(
                 appointment, actor=request.user, kind="status_changed", before=before
             )
-            messages.success(request, "Ihre Rückmeldung wurde gespeichert.")
+            if form.cleaned_data["action"] == "decline":
+                message = (
+                    "Ihre Terminzusage wurde zurückgezogen. Ihre Bewerbung bleibt aktiv."
+                    if before["status"] == "confirmed"
+                    else "Der Termin wurde abgesagt. Ihre Bewerbung bleibt aktiv."
+                )
+            else:
+                message = "Ihre Terminzusage wurde gespeichert."
+            messages.success(request, message)
     return redirect("wohnungsverwaltung:pre_application_list")
+
+
+@never_cache
+@applicant_required
+def applicant_viewing_proposal(request, application_id, appointment_id):
+    if request.method not in ("GET", "POST"):
+        return HttpResponseNotAllowed(["GET", "POST"])
+    with transaction.atomic():
+        application = get_object_or_404(
+            Bewerbung.objects.select_for_update(),
+            pk=application_id,
+            person=_applicant_for_user(request),
+        )
+        appointment = get_object_or_404(
+            ViewingAppointment.objects.select_for_update(),
+            pk=appointment_id,
+            application=application,
+        )
+        if not appointment.can_propose:
+            messages.error(request, "Für diesen Termin ist kein Alternativvorschlag mehr möglich.")
+            return redirect("wohnungsverwaltung:pre_application_list")
+        form = ViewingProposalForm(
+            request.POST if request.method == "POST" else None, appointment=appointment
+        )
+        if request.method == "POST" and form.is_valid():
+            if form.cleaned_data["version"] != appointment.version:
+                form.add_error(
+                    None,
+                    "Der Termin wurde zwischenzeitlich geändert. "
+                    "Bitte laden Sie den aktuellen Stand erneut.",
+                )
+            elif form.cleaned_data["proposed_start"] == appointment.proposed_start:
+                messages.info(request, "Dieser Alternativtermin ist bereits gespeichert.")
+                return redirect("wohnungsverwaltung:pre_application_list")
+            else:
+                before = appointment.snapshot()
+                appointment.proposed_start = form.cleaned_data["proposed_start"]
+                appointment.version += 1
+                appointment.save(update_fields=("proposed_start", "version", "updated_at"))
+                record_viewing_event(
+                    appointment,
+                    actor=request.user,
+                    kind="proposal_changed",
+                    before=before,
+                    notify=True,
+                    notification_url=request.build_absolute_uri(
+                        reverse(
+                            "wohnungsverwaltung:employee_application_detail", args=[application.pk]
+                        )
+                    ),
+                )
+                messages.success(
+                    request,
+                    "Ihr Alternativtermin wurde gespeichert. Erst die Terminplanung "
+                    "durch die Verwaltung macht daraus einen verbindlichen Termin.",
+                )
+                return redirect("wohnungsverwaltung:pre_application_list")
+        return render(
+            request,
+            "wohnungsverwaltung/viewing_proposal_form.html",
+            {
+                "application": application,
+                "appointment": appointment,
+                "form": form,
+            },
+            status=400 if request.method == "POST" else 200,
+        )
 
 
 @never_cache
