@@ -107,13 +107,8 @@ body {
 
 .facade-floor {
     --facade-highlight-color: var(--steimmo-color-primary);
-    --facade-highlight-fill: color-mix(in srgb, var(--facade-highlight-color) 15%, transparent);
+    --facade-highlight-fill: color-mix(in srgb, var(--steimmo-color-success-surface-emphasis) 35%, transparent);
     cursor: pointer;
-}
-/* A light theme green stays visible against the dark roof. Keep labels dark on white. */
-.facade-floor[data-floor="4"] {
-    --facade-highlight-color: var(--steimmo-color-success-surface-emphasis);
-    --facade-highlight-fill: color-mix(in srgb, var(--facade-highlight-color) 35%, transparent);
 }
 .facade-hit { fill: transparent; stroke: transparent; stroke-width: 3; transition: fill .15s; }
 .facade-floor-label rect { fill: #fff; stroke: #ddd; }
@@ -1169,7 +1164,16 @@ a:active,
 .home-floor-links > li:nth-child(n + 2) { margin-top: var(--steimmo-space-xs); }
 .home-floor-links a { display: block; position: relative; min-height: 44px; padding: var(--steimmo-space-xs); border: 1px solid var(--steimmo-color-border); border-radius: var(--steimmo-radius-sm); background: var(--steimmo-color-surface-page); color: var(--steimmo-color-text); font-size: var(--steimmo-font-size-sm); }
 .home-floor-links a:hover,
-.home-floor-links a:focus-visible { border-color: var(--steimmo-color-primary); text-decoration: none; }
+.home-floor-links a:focus-visible,
+.home-facade-preview:has(.facade-floor[data-floor="0"]:is(:hover, :focus-visible)) .home-floor-links [data-floor="0"],
+.home-facade-preview:has(.facade-floor[data-floor="1"]:is(:hover, :focus-visible)) .home-floor-links [data-floor="1"],
+.home-facade-preview:has(.facade-floor[data-floor="2"]:is(:hover, :focus-visible)) .home-floor-links [data-floor="2"],
+.home-facade-preview:has(.facade-floor[data-floor="3"]:is(:hover, :focus-visible)) .home-floor-links [data-floor="3"],
+.home-facade-preview:has(.facade-floor[data-floor="4"]:is(:hover, :focus-visible)) .home-floor-links [data-floor="4"] {
+    border-color: var(--steimmo-color-primary);
+    box-shadow: inset 0 0 0 1px var(--steimmo-color-primary);
+    text-decoration: underline;
+}
 .home-floor-availability { display: block; padding-right: var(--steimmo-space-lg); color: var(--steimmo-color-text-muted); font-size: var(--steimmo-font-size-xs); }
 .home-floor-arrow { position: absolute; right: var(--steimmo-space-xs); bottom: var(--steimmo-space-xs); }
 .home-building-figure .facade-floor:hover .facade-hit,
