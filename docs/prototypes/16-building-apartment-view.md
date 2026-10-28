@@ -1,5 +1,25 @@
 # Gebäude- und Wohnungsansicht (US-02, #16)
 
+## Kontrast der Dachgeschoss-Hervorhebung (#170)
+
+Das dunkle Dach verwendet bei Hover und Tastaturfokus das vorhandene helle
+Theme-Grün `--steimmo-color-success-surface-emphasis` (`#C8E2D0`) als Kontur
+und mit 35 % Deckkraft als Flächentönung. Der Beschriftungsrahmen bleibt
+waldgrün, damit er auf Weiß erkennbar bleibt. Die übrigen Etagen behalten
+ihre waldgrüne Kontur und 15 % Flächentönung.
+
+Die lokalen CSS-Variablen `--facade-highlight-color` und
+`--facade-highlight-fill` an jeder `.facade-floor` versorgen sowohl die
+Gebäudeansicht als auch die Startseitenvorschau und deren Etagenlinks.
+Änderungen am Farbschema bleiben dadurch an die vorhandenen Theme-Werte gebunden.
+Es sind keine Template-, JavaScript- oder Datenbankänderungen erforderlich.
+
+Manuelle Browserprüfung: Hover und Tastaturfokus auf Dach und weiterer Etage,
+Startseiten-Dachlink per Hover/Fokus, Rücksetzen nach Verlassen/Fokuswechsel,
+Navigation zum Etagenplan sowie Gebäudeansicht bei 390 px Breite ohne
+horizontalen Seitenüberlauf. Automatisierte Response-Tests bleiben in
+`wohnungsverwaltung.test_building_view` und `core`.
+
 ## Bestätigte Zimmerzahlen vom 24. Oktober 2026 (#158)
 
 Die im Issue #158 vollständig übertragene Auftraggebervorlage bestätigt die
