@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Exercise production settings and persistence with disposable local resources.
+# Container shell programs must expand variables inside the container.
+# shellcheck disable=SC2016
 set -Eeuo pipefail
 image=${1:?Aufruf: smoke.sh LOKALES_IMAGE}
 mode=${2:-production}
@@ -85,7 +87,19 @@ docker run --rm --user 0:0 --entrypoint sh --volume "$public_volume:/out" "$imag
 compose config --quiet
 [[ $(docker run --rm --entrypoint id "$image" -u) == 10001 ]]
 docker run --rm --entrypoint python "$image" -c \
-    'import importlib.util; assert importlib.util.find_spec("ruff") is None'
+    '
+import importlib.util, os
+from pathlib import Path
+assert os.getuid() == os.getgid() == 10001
+assert importlib.util.find_spec("ruff") is None
+root = Path("/app")
+for path in (root, *root.rglob("*")):
+    if path.relative_to(root).parts[:1] in (("media",), ("staticfiles",)):
+        continue
+    assert not os.access(path, os.W_OK), f"Writable source: {path}"
+for directory in (root / "media", root / "staticfiles", Path("/tmp")):
+    assert os.access(directory, os.W_OK), f"Runtime directory not writable: {directory}"
+'
 compose up --detach --wait --wait-timeout 120 postgres
 if compose run --rm --no-deps -T web python manage.py deployment_preflight; then
     echo 'Auf einer frischen Datenbank wurden keine Migrationen erkannt.' >&2
@@ -104,8 +118,14 @@ docker run --rm --network "$STEIMMO_NETWORK_NAME" --env-file "$STEIMMO_ENV_FILE"
     --env DJANGO_BOOTSTRAP_ON_START=0 \
     --mount "type=volume,src=$public_volume,dst=/app/staticfiles,volume-subpath=releases/one" "$image" sh -ec \
     'python manage.py collectstatic --noinput; test -s /app/staticfiles/css/app.css; test -s /app/staticfiles/admin/css/base.css'
-compose run --rm --no-deps -T web python -c \
-    'from pathlib import Path; Path("/app/media/smoke.txt").write_text("persistent")'
+compose run --rm --no-deps -T web python manage.py shell -c '
+from django.core.files.storage import default_storage
+from django.core.files.uploadedfile import SimpleUploadedFile
+name = default_storage.save("smoke.txt", SimpleUploadedFile("smoke.txt", b"persistent"))
+assert name == "smoke.txt"
+with default_storage.open(name, "rb") as upload:
+    assert upload.read() == b"persistent"
+'
 compose exec -T postgres sh -ec \
     'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' > "$directory/database.dump"
 compose exec -T postgres sh -ec 'createdb -U "$POSTGRES_USER" steimmo_smoke_restore'
@@ -118,6 +138,8 @@ compose run --rm --no-deps -T web sh -ec \
     'mkdir /tmp/media-restore; tar -xzf - -C /tmp/media-restore; test "$(cat /tmp/media-restore/smoke.txt)" = persistent' \
     < "$directory/media.tar.gz"
 compose up --detach --no-build --wait --wait-timeout 120 web
+[[ $(compose exec -T web id -u) == 10001 ]]
+[[ $(compose exec -T web sh -ec "awk '/^Uid:/ {print \$2}' /proc/1/status") == 10001 ]]
 docker run --rm --network "container:$caddy" --entrypoint python "$image" -c '
 import json, sys, urllib.error, urllib.request
 class NoRedirect(urllib.request.HTTPRedirectHandler):
