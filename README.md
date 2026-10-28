@@ -44,7 +44,8 @@ Filteraufrufe verändern keine Bewerbungsstatus oder Wohnungsanforderungen.
 Die [Startseite](http://localhost:8000/) verwendet das gewählte Unternehmensdesign
 mit einer echten Würzburg-Luftaufnahme, Wohnungssuche, Gebäudevorschau, aktuellen
 Bestandszahlen, großen Etagenlinks und Zugang zu den persönlichen Bereichen.
-Unternehmen, Besichtigungsablauf und Kontakt sind als Abschnitte direkt erreichbar.
+Unternehmen und Besichtigungsablauf sind als Abschnitte direkt erreichbar.
+Der Navigationspunkt **Kontakt** führt zum öffentlichen Rückrufformular.
 Header und Footer ergänzen diese Einstiege sowie Bildnachweise. Quelle und Lizenz
 der lokal gespeicherten Aufnahme stehen in [Bildinformationen](static/images/README.md)
 und auf `/bildnachweise/`. Echte Hausfotos, Lage- und Kontaktdaten sowie freigegebene
@@ -286,6 +287,46 @@ Hauptbewerbung wird erst nach Freigabe im Mitarbeiterbereich zugänglich. Auch d
 absichtlich öffentlichen Beispielzugangsdaten sind ausschließlich für die lokale Entwicklung.
 
 Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD`, `DJANGO_EMAIL_USE_TLS` und `DJANGO_EMAIL_TIMEOUT`. Der SMTP-Timeout beträgt standardmäßig zehn Sekunden und kann über `DJANGO_EMAIL_TIMEOUT` in Sekunden angepasst werden. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
+
+## Kontakt und Rückrufwünsche
+
+Unter [Kontakt](http://localhost:8000/kontakt/) können Besucher ohne Konto ihre
+Telefonnummer und Erreichbarkeit angeben. Beide Angaben sind erforderlich; die
+Erreichbarkeit ist ein Freitext, beispielsweise „werktags ab 17 Uhr“. Es gibt keine
+öffentliche Telefonnummer oder Anruflinks zur direkten Erstkontaktaufnahme.
+Besichtigungsanfragen bleiben bei der jeweiligen Wohnung.
+
+Gültige Rückrufwünsche werden per E-Mail an die mit `DJANGO_CALLBACK_RECIPIENTS`
+konfigurierten Empfänger gesendet (mehrere Adressen kommagetrennt). Lokal ist bei
+`DEBUG=True` die fiktive Mitarbeiteradresse `mitarbeiter@example.test` vorbelegt;
+das Development-Profil fängt die E-Mail in [Mailpit](http://localhost:8025) ab.
+Testablauf: Kontaktseite öffnen, ausschließlich fiktive Telefonnummer und
+Erreichbarkeit eintragen, absenden und Nachricht im lokalen Postfach prüfen.
+Die Erfolgsmeldung erscheint erst nach Annahme durch das Mail-Backend. Bei einem
+Versandfehler bleiben die Eingaben erhalten und ein erneuter Versuch ist möglich.
+Ein Neuladen nach erfolgreichem Versand sendet nicht erneut.
+
+Der Demo-Modus simuliert den Vorgang ausdrücklich ohne E-Mail und ohne Rückruf.
+Außerhalb der lokalen Entwicklung gibt es keinen voreingestellten Empfänger.
+Fehlende oder ungültige Empfänger verhindern den Versand; das Formular meldet
+einen vorübergehenden Fehler. Vor Produktivbetrieb echte Empfänger und SMTP-Zugang
+konfigurieren und die weiterhin als Entwurf markierten Rechtstexte freigeben.
+Das Konsolen-Mail-Backend ist für Rückrufwünsche gesperrt, damit Telefonnummer und
+Erreichbarkeit nicht in Anwendungsprotokolle gelangen.
+
+CSRF, serverseitige Feldprüfung, ein unsichtbares Bot-Feld und eine gemeinsame
+Datenbankbegrenzung schützen das Formular. Pro Quell-IP sind höchstens fünf
+Formularversuche innerhalb von 15 Minuten zulässig, auch mit neuen Sitzungen und
+bei ungültigen Eingaben. Bei vertrauenswürdigen Proxys gilt dieselbe explizite
+IP-Liste wie beim Anmeldeschutz (`DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS`);
+Weiterleitungsheader anderer Quellen werden ignoriert. Die Begrenzung speichert
+nur einen geschützten IP-Prüfwert, Zähler und Ablaufzeit. Abgelaufene Einträge
+werden beim nächsten Formularversuch entfernt; ohne weitere Anfragen verbleiben
+sie bis dahin. Formularinhalte werden nicht zusätzlich als Anfrage gespeichert
+oder durch die Anwendung geloggt. Die Kontaktantworten untersagen Caching.
+
+Die neue Tabelle für diese kurzzeitigen Zähler wird durch die Migration
+`core/0001_initial` mit dem regulären `python manage.py migrate` angelegt.
 
 ## Verwaltungsübersicht
 

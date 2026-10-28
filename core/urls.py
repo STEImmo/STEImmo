@@ -2,10 +2,11 @@ from django.contrib.auth.views import LogoutView
 from django.urls import include, path
 from django.views.generic import TemplateView
 
-from . import account_views, views
+from . import account_views, contact, views
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("kontakt/", contact.contact, name="contact"),
     path("impressum/", TemplateView.as_view(template_name="core/imprint.html"), name="imprint"),
     path("datenschutz/", TemplateView.as_view(template_name="core/privacy.html"), name="privacy"),
     path(
