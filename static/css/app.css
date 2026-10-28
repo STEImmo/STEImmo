@@ -105,14 +105,23 @@ body {
     height: auto;
 }
 
-.facade-floor { cursor: pointer; }
+.facade-floor {
+    --facade-highlight-color: var(--steimmo-color-primary);
+    --facade-highlight-fill: color-mix(in srgb, var(--facade-highlight-color) 15%, transparent);
+    cursor: pointer;
+}
+/* A light theme green stays visible against the dark roof. Keep labels dark on white. */
+.facade-floor[data-floor="4"] {
+    --facade-highlight-color: var(--steimmo-color-success-surface-emphasis);
+    --facade-highlight-fill: color-mix(in srgb, var(--facade-highlight-color) 35%, transparent);
+}
 .facade-hit { fill: transparent; stroke: transparent; stroke-width: 3; transition: fill .15s; }
 .facade-floor-label rect { fill: #fff; stroke: #ddd; }
 .facade-floor-label text { fill: #555; font: 15px Arial, sans-serif; }
 .facade-floor-label .facade-floor-summary { font-size: 11px; fill: var(--steimmo-color-text-muted); }
 .facade-floor-label path { stroke: #aaa; }
 .facade-floor:hover .facade-hit,
-.facade-floor:focus-visible .facade-hit { fill: color-mix(in srgb, var(--steimmo-color-focus-ring) 15%, transparent); stroke: var(--steimmo-color-focus-ring); }
+.facade-floor:focus-visible .facade-hit { fill: var(--facade-highlight-fill); stroke: var(--facade-highlight-color); }
 .facade-floor:hover .facade-floor-label rect,
 .facade-floor:focus-visible .facade-floor-label rect { stroke: var(--steimmo-color-focus-ring); stroke-width: 2; }
 .floor-navigation { scroll-margin-top: 18px; }
@@ -1169,7 +1178,7 @@ a:active,
 .home-facade-preview:has(.home-floor-links [data-floor="1"]:is(:hover, :focus-visible)) .facade-floor[data-floor="1"] .facade-hit,
 .home-facade-preview:has(.home-floor-links [data-floor="2"]:is(:hover, :focus-visible)) .facade-floor[data-floor="2"] .facade-hit,
 .home-facade-preview:has(.home-floor-links [data-floor="3"]:is(:hover, :focus-visible)) .facade-floor[data-floor="3"] .facade-hit,
-.home-facade-preview:has(.home-floor-links [data-floor="4"]:is(:hover, :focus-visible)) .facade-floor[data-floor="4"] .facade-hit { fill: rgb(45 90 67 / 15%); stroke: var(--steimmo-color-primary); }
+.home-facade-preview:has(.home-floor-links [data-floor="4"]:is(:hover, :focus-visible)) .facade-floor[data-floor="4"] .facade-hit { fill: var(--facade-highlight-fill); stroke: var(--facade-highlight-color); }
 .home-building-empty { min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--steimmo-color-primary); text-align: center; }
 .home-company-band { background: var(--steimmo-color-surface-brand); padding-block: var(--steimmo-space-2xl); }
 .home-company-band h2 { margin-bottom: 0; font-size: var(--steimmo-font-size-2xl); }
