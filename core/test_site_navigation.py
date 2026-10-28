@@ -73,7 +73,8 @@ class SiteNavigationTests(TestCase):
                     ]
                     if response.context["user"].has_perm("immobilien.manage_user_accounts"):
                         destinations.append(reverse("verwaltung:user_account_list"))
-                destinations.append(reverse("contact"))
+                if label != "Footernavigation":
+                    destinations.append(reverse("contact"))
                 self.assertEqual([href for href, _ in navigation[label]], destinations)
 
     def test_public_pages_use_the_company_name_instead_of_the_project_nickname(self):

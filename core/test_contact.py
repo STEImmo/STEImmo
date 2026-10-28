@@ -114,6 +114,16 @@ class ContactTests(TestCase):
         self.assertContains(privacy, "Telefonnummer")
         self.assertContains(privacy, "Erreichbarkeit")
 
+    def test_footer_lists_contact_only_under_company_information(self):
+        from .test_site_navigation import NavigationParser
+
+        parser = NavigationParser()
+        parser.feed(self.client.get(self.url).content.decode())
+        self.assertNotIn(self.url, [href for href, _ in parser.navigation["Footernavigation"]])
+        self.assertEqual(
+            [href for href, _ in parser.navigation["Unternehmensinformationen"]].count(self.url), 1
+        )
+
     @override_settings(DEMO_MODE=True)
     def test_demo_simulates_request_without_sending_real_mail(self):
         with patch("core.contact.send_mail") as send:
