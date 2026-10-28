@@ -1,11 +1,75 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from smtplib import SMTPException
 from unittest.mock import patch
 
 from django.core import mail
-from django.test import Client, TestCase, override_settings
+from django.db import close_old_connections
+from django.test import (
+    Client,
+    SimpleTestCase,
+    TestCase,
+    TransactionTestCase,
+    override_settings,
+)
 from django.urls import reverse
 from django.utils import timezone
+
+from .forms import CallbackForm
+
+
+class CallbackPhoneTests(SimpleTestCase):
+    def test_rejects_text_injection_and_numbers_outside_length_limits(self):
+        for value in (
+            "Hallo",
+            "abc123456",
+            "123456@example.test",
+            "<script>alert(1)</script>",
+            "12345",
+            "1234567890123456",
+            "+49\nBcc: other@example.test",
+            "+49+1234567",
+            "１２３４５６７８９",
+            "---() /.",
+        ):
+            with self.subTest(value=value):
+                form = CallbackForm({"phone": value, "availability": "Abends"})
+                self.assertFalse(form.is_valid())
+                self.assertIn("phone", form.errors)
+
+    def test_accepts_usual_local_and_international_formats(self):
+        for value in ("0931 5550123", "+49 (931) 555-0123", "0049/931/5550123", "(0931) 5550123"):
+            with self.subTest(value=value):
+                form = CallbackForm({"phone": value, "availability": "Abends"})
+                self.assertTrue(form.is_valid(), form.errors)
+
+
+@override_settings(
+    CALLBACK_RECIPIENTS=["verwaltung@example.test"],
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
+class ConcurrentCallbackThrottleTests(TransactionTestCase):
+    def test_parallel_bot_requests_cannot_exceed_five_reserved_attempts(self):
+        def attempt(_):
+            close_old_connections()
+            try:
+                return (
+                    Client()
+                    .post(
+                        reverse("contact"),
+                        {"phone": "+49 931 5550123", "availability": "Abends"},
+                        REMOTE_ADDR="192.0.2.100",
+                    )
+                    .status_code
+                )
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=8) as workers:
+            results = list(workers.map(attempt, range(12)))
+        self.assertEqual(results.count(302), 5)
+        self.assertEqual(results.count(429), 7)
+        self.assertEqual(len(mail.outbox), 5)
 
 
 @override_settings(

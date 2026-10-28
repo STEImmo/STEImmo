@@ -296,6 +296,14 @@ Erreichbarkeit ist ein Freitext, beispielsweise „werktags ab 17 Uhr“. Es gib
 öffentliche Telefonnummer oder Anruflinks zur direkten Erstkontaktaufnahme.
 Besichtigungsanfragen bleiben bei der jeweiligen Wohnung.
 
+Telefonnummern müssen 6 bis 15 Ziffern enthalten. Ein führendes Plus sowie übliche
+Trennzeichen sind erlaubt, Buchstaben und andere Inhalte werden abgelehnt. Der
+Browser prüft dies vor dem Absenden; der Server prüft unabhängig davon erneut.
+Eine formal gültige Nummer kann trotzdem erfunden, nicht erreichbar oder einer
+anderen Person zugeordnet sein. Es gibt keine Bestätigung per SMS oder Anruf.
+Die IP-Begrenzung schützt auch bei parallelen Anfragen, kann aber verteilte Bots
+mit wechselnden IP-Adressen nicht vollständig verhindern.
+
 Gültige Rückrufwünsche werden per E-Mail an die mit `DJANGO_CALLBACK_RECIPIENTS`
 konfigurierten Empfänger gesendet (mehrere Adressen kommagetrennt). Lokal ist bei
 `DEBUG=True` die fiktive Mitarbeiteradresse `mitarbeiter@example.test` vorbelegt;

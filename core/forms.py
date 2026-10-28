@@ -2,13 +2,24 @@ import re
 
 from django import forms
 
+# Shared by server validation and the browser's native input validation.
+PHONE_PATTERN = r"(?=(?:[^0-9]*[0-9]){6,15}[^0-9]*$)\+?[0-9 \(\)\/\.\-]+"
+
 
 class CallbackForm(forms.Form):
     phone = forms.CharField(
         label="Telefonnummer",
         max_length=40,
         help_text="Unter welcher Nummer dürfen wir Sie zurückrufen?",
-        widget=forms.TextInput(attrs={"class": "uk-input", "type": "tel", "autocomplete": "tel"}),
+        widget=forms.TextInput(
+            attrs={
+                "class": "uk-input",
+                "type": "tel",
+                "autocomplete": "tel",
+                "pattern": PHONE_PATTERN,
+                "title": "Telefonnummer mit 6 bis 15 Ziffern, zum Beispiel +49 931 5550123",
+            }
+        ),
     )
     availability = forms.CharField(
         label="Erreichbarkeit",
@@ -20,8 +31,7 @@ class CallbackForm(forms.Form):
 
     def clean_phone(self):
         phone = self.cleaned_data["phone"]
-        digits = re.sub(r"[^0-9]", "", phone)
-        if not re.fullmatch(r"\+?[0-9 ()/.-]+", phone) or not 6 <= len(digits) <= 15:
+        if not re.fullmatch(PHONE_PATTERN, phone):
             raise forms.ValidationError(
                 "Bitte geben Sie eine gültige Telefonnummer mit 6 bis 15 Ziffern an."
             )

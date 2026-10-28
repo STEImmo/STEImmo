@@ -13,7 +13,7 @@
                 <article class="uk-card uk-card-default uk-card-body">
                     <h2 class="uk-card-title">Rückruf wünschen</h2>
                     <p class="uk-text-meta">Die mit * markierten Felder sind Pflichtfelder.</p>
-                    <form method="post" class="uk-form-stacked" novalidate>
+                    <form method="post" class="uk-form-stacked">
                         {% csrf_token %}
                         {% if form.non_field_errors %}
                         <div class="uk-alert-danger uk-padding-small" role="alert" tabindex="-1">
