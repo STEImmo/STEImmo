@@ -54,10 +54,10 @@ APARTMENTS = (
     ("5.01", "401", 4, "92.94"),
     ("5.02", "402", 4, "64.90"),
 )
-# Confirmed room counts from issue #158; used only when creating example apartments.
+# Confirmed room counts from issues #158/#165; only for new example apartments.
 ROOM_COUNTS = {
     "1": "1",
-    "2": "1",
+    "2": "2",
     "3": "1",
     "4": "2",
     "5": "2",
@@ -79,7 +79,7 @@ ROOM_COUNTS = {
     "304": "1",
     "305": "2",
     "306": "2",
-    "401": "3.5",
+    "401": "3",
     "402": "3",
 }
 
