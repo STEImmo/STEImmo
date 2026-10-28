@@ -27,6 +27,54 @@ class ConfirmedInventoryTests(TestCase):
                 )
                 self.assertEqual(Wohnung.objects.get(wohnungsnummer="2").zimmeranzahl, 2)
                 self.assertEqual(Wohnung.objects.get(wohnungsnummer="401").zimmeranzahl, 3)
+                self.assertEqual(
+                    Wohnung.objects.get(wohnungsnummer="401").groesse_qm, Decimal("92.90")
+                )
+                self.assertEqual(
+                    Wohnung.objects.get(wohnungsnummer="402").groesse_qm, Decimal("64.90")
+                )
+
+
+class ConfirmedAtticAreaTests(TestCase):
+    def test_duplicate_attic_numbers_abort_before_updating_either_area(self):
+        for number in ("401", "402", "402"):
+            Wohnung.objects.create(
+                gebaeudenummer="1", wohnungsnummer=number, etage=4, groesse_qm="111"
+            )
+        migration = import_module("wohnungsverwaltung.migrations.0034_confirmed_attic_areas")
+        with connection.schema_editor() as editor:
+            with self.assertRaisesMessage(RuntimeError, "Mehrdeutige Wohnungszuordnung"):
+                migration.correct_attic_areas(apps, editor)
+        self.assertEqual(Wohnung.objects.filter(groesse_qm=111).count(), 3)
+
+    def test_migration_replaces_incorrect_letter_areas_and_preserves_other_facts(self):
+        first = Wohnung.objects.create(
+            gebaeudenummer="1",
+            wohnungsnummer="401",
+            etage=4,
+            groesse_qm="111",
+            zimmeranzahl="3",
+            kaltmiete="850",
+        )
+        second = Wohnung.objects.create(
+            gebaeudenummer="1", wohnungsnummer="402", etage=4, groesse_qm="70"
+        )
+        other = Wohnung.objects.create(
+            gebaeudenummer="1", wohnungsnummer="201", etage=2, groesse_qm="28.01"
+        )
+        before = {row["wohnung_id"]: row for row in Wohnung.objects.values()}
+        migration = import_module("wohnungsverwaltung.migrations.0034_confirmed_attic_areas")
+        with connection.schema_editor() as editor:
+            migration.correct_attic_areas(apps, editor)
+        for row in Wohnung.objects.values():
+            expected = before[row["wohnung_id"]].copy()
+            if row["wohnung_id"] == first.pk:
+                expected["groesse_qm"] = Decimal("92.90")
+            elif row["wohnung_id"] == second.pk:
+                expected["groesse_qm"] = Decimal("64.90")
+            self.assertEqual(row, expected)
+        other.refresh_from_db()
+        self.assertEqual(other.groesse_qm, Decimal("28.01"))
 
 
 class InventoryCorrectionTests(TestCase):

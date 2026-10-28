@@ -2,6 +2,17 @@
 
 ## Korrektur vom 28. Oktober 2026 (#165)
 
+Ergänzende ausdrückliche Bestätigung: Wohnung 401 hat **92,9 m²**, Wohnung 402
+**64,9 m²**. Die Angabe von 111 m² aus dem älteren Brief ist falsch. Diese Werte
+sind die aktuellen Ausgangswerte, nicht nur eine Anzeigeformatierung. Die neue
+Migration `0034_confirmed_attic_areas` übernimmt sie einmalig für Gebäude 1 im DG;
+sie korrigiert ausschließlich die zwei Flächen. Andere Wohnungen, Zimmerzahlen,
+Nummern, IDs und Verknüpfungen bleiben erhalten. Fehlende Wohnungen werden nicht
+angelegt, mehrdeutige Nummern führen vor Änderungen zum Abbruch. Rückmigration
+bewahrt die bestätigten Werte. Spätere Änderungen werden bei regulären Starts
+nicht erneut überschrieben; erneutes Vorwärtsmigrieren nach Rückmigration wendet
+die Bestätigung erneut an. Standard-/Demodaten verwenden dieselben Flächen.
+
 Die aktualisierte Auftraggeberübersicht bestätigt Wohnung 002 mit 2 Zimmern und
 Wohnung 401 mit 3 Zimmern. Damit gelten nun 11 Einzimmer-, 12 Zweizimmer- und
 2 Dreizimmerwohnungen. Die bisherige Nummerierung ist bestätigt. Diese Angaben

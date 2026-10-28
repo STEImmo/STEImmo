@@ -106,6 +106,9 @@ Migrationen erhalten. Zimmerzahlen erscheinen einheitlich als ganze Zahl oder mi
 Dezimalkomma, etwa `2` und `3,5`. Wohnflächen werden mit genau einer Dezimalstelle
 angezeigt; weitere Stellen werden abgeschnitten (25,27 → 25,2 m²). Die genaueren
 gespeicherten Flächen bleiben für Pflege und Filter unverändert erhalten.
+Ausnahme gemäß ergänzender Bestätigung: Für 401 gelten 92,9 m² und für 402
+64,9 m². Migration `0034_confirmed_attic_areas` übernimmt diese zwei Ausgangswerte
+einmalig; eine ältere Briefangabe von 111 m² ist falsch. Andere Flächen bleiben erhalten.
 Zuordnung, Fehlerfälle und Rückmigration sind in der verlinkten
 Gebäudedokumentation beschrieben.
 

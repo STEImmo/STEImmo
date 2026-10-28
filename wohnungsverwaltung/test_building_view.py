@@ -837,4 +837,4 @@ class BuildingInventoryTests(TestCase):
         self.assertEqual(
             [Wohnung.objects.filter(etage=f).count() for f in range(5)], [5, 6, 6, 6, 2]
         )
-        self.assertEqual(Wohnung.objects.get(wohnungsnummer="401").groesse_qm, Decimal("92.94"))
+        self.assertEqual(Wohnung.objects.get(wohnungsnummer="401").groesse_qm, Decimal("92.90"))
