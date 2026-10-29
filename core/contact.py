@@ -40,10 +40,10 @@ def _reserve_attempt(request):
     now = timezone.now()
     # Expired counters are removed on the next submission; no background job is needed.
     CallbackThrottle.objects.filter(expires_at__lte=now).delete()
-    counter, _ = CallbackThrottle.objects.get_or_create(
+    # Lock on the first read so concurrent expiry cleanup cannot delete this counter.
+    counter, _ = CallbackThrottle.objects.select_for_update().get_or_create(
         client_hash=_client_hash(request), defaults={"expires_at": now + timedelta(minutes=15)}
     )
-    counter = CallbackThrottle.objects.select_for_update().get(pk=counter.pk)
     if counter.attempts >= 5:
         return max(1, int((counter.expires_at - now).total_seconds()) + 1)
     counter.attempts += 1

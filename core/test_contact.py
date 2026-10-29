@@ -1,12 +1,16 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from smtplib import SMTPException
+from threading import Event, local
+from time import monotonic
 from unittest.mock import patch
 
 from django.core import mail
-from django.db import close_old_connections
+from django.db import close_old_connections, connection
+from django.db.models.query import QuerySet
 from django.test import (
     Client,
+    RequestFactory,
     SimpleTestCase,
     TestCase,
     TransactionTestCase,
@@ -49,6 +53,74 @@ class CallbackPhoneTests(SimpleTestCase):
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
 )
 class ConcurrentCallbackThrottleTests(TransactionTestCase):
+    def test_expiring_counter_cannot_be_deleted_during_an_inflight_reservation(self):
+        from .contact import _client_hash, _reserve_attempt
+        from .models import CallbackThrottle
+
+        before_expiry = timezone.now()
+        after_expiry = before_expiry + timedelta(seconds=2)
+        request = RequestFactory().post("/kontakt/", REMOTE_ADDR="192.0.2.100")
+        CallbackThrottle.objects.create(
+            client_hash=_client_hash(request),
+            attempts=4,
+            expires_at=before_expiry + timedelta(seconds=1),
+        )
+        first_read = Event()
+        release_first = Event()
+        second_started = Event()
+        state = local()
+        second_pid = []
+        original_get_or_create = QuerySet.get_or_create
+
+        def pause_after_first_read(queryset, *args, **kwargs):
+            result = original_get_or_create(queryset, *args, **kwargs)
+            if queryset.model is CallbackThrottle and state.first:
+                first_read.set()
+                if not release_first.wait(10):
+                    raise TimeoutError("First reservation was not released")
+            return result
+
+        def reserve(first):
+            close_old_connections()
+            state.first = first
+            state.now = before_expiry if first else after_expiry
+            try:
+                if not first:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT pg_backend_pid()")
+                        second_pid.append(cursor.fetchone()[0])
+                    second_started.set()
+                return _reserve_attempt(request)
+            finally:
+                close_old_connections()
+
+        with (
+            patch("core.contact.timezone.now", side_effect=lambda: state.now),
+            patch.object(QuerySet, "get_or_create", pause_after_first_read),
+            ThreadPoolExecutor(max_workers=2) as workers,
+        ):
+            first = workers.submit(reserve, True)
+            try:
+                self.assertTrue(first_read.wait(5), "First request did not read the counter")
+                second = workers.submit(reserve, False)
+                self.assertTrue(second_started.wait(5), "Second request did not connect")
+                deadline = monotonic() + 5
+                while not second.done():
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT cardinality(pg_blocking_pids(%s))", second_pid)
+                        if cursor.fetchone()[0]:
+                            break
+                    self.assertLess(monotonic(), deadline, "Cleanup neither blocked nor finished")
+                    release_first.wait(0.01)
+            finally:
+                release_first.set()
+            self.assertEqual(first.result(timeout=5), 0)
+            self.assertEqual(second.result(timeout=5), 0)
+
+        counter = CallbackThrottle.objects.get()
+        self.assertEqual(counter.attempts, 1)
+        self.assertEqual(counter.expires_at, after_expiry + timedelta(minutes=15))
+
     def test_parallel_bot_requests_cannot_exceed_five_reserved_attempts(self):
         def attempt(_):
             close_old_connections()
