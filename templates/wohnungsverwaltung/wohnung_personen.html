@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Personen zuordnen – STE Immobilien eGbR{% endblock %}
+{% block content %}
+<section class="uk-section uk-section-default management-page">
+    <div class="uk-container uk-container-small">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
+        <a href="{% url 'verwaltung:wohnung_edit' wohnung.pk %}">Zur Wohnung</a>
+        <h1 class="uk-heading-small">Personen für {{ wohnung }}</h1>
+        <p>Die Zuordnung erfolgt nach der fachlichen Einzugsentscheidung. Sie ändert weder Wohnungsstatus noch Bewerbungen oder Kontorollen.</p>
+        <h2 class="uk-h3">Aktuell zugeordnet</h2>
+        <ul class="uk-list uk-list-divider">
+            {% for person in personen %}
+                <li><a href="{% url 'verwaltung:person_assignment' wohnung.pk person.pk %}">{{ person }} ({{ person.email }}) – Zuordnung und Konto ansehen</a></li>
+            {% empty %}
+                <li>Dieser Wohnung ist noch keine Person zugeordnet. Wählen Sie unten eine vorhandene Person aus.</li>
+            {% endfor %}
+        </ul>
+        <form method="get" class="uk-card uk-card-default uk-card-body uk-form-stacked">
+            {% include "wohnungsverwaltung/_form_field.html" with field=form.person %}
+            <button type="submit" class="uk-button uk-button-primary uk-margin-top">Zuordnung prüfen</button>
+        </form>
+        <p><a href="{% url 'wohnungsverwaltung:handover_protocol_create' %}?wohnung={{ wohnung.pk }}">Einzugsprotokoll anlegen</a></p>
+    </div>
+</section>
+{% endblock %}
