@@ -1,10 +1,20 @@
 from django.urls import path
 
-from . import views
+from . import assignment_views, views
 
 app_name = "verwaltung"
 
 urlpatterns = [
+    path(
+        "wohnungen/<uuid:wohnung_id>/personen/",
+        assignment_views.wohnung_personen,
+        name="wohnung_personen",
+    ),
+    path(
+        "wohnungen/<uuid:wohnung_id>/personen/<uuid:person_id>/",
+        assignment_views.person_assignment,
+        name="person_assignment",
+    ),
     path("", views.employee_dashboard, name="dashboard"),
     path("wohnungen/<uuid:wohnung_id>/fotos/", views.apartment_photos, name="apartment_photos"),
     path(

@@ -3395,7 +3395,11 @@ def user_account_list(request: HttpRequest) -> HttpResponse:
 
 @user_management_required
 def user_account_create(request: HttpRequest) -> HttpResponse:
-    form = UserAccountForm(request.POST or None, actor=request.user)
+    form = UserAccountForm(
+        request.POST or None,
+        actor=request.user,
+        initial={"person": _valid_person_id(request.GET.get("person"))},
+    )
     if request.method == "POST" and form.is_valid():
         try:
             account = form.save()

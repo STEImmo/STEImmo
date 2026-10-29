@@ -18,6 +18,9 @@
             <a class="uk-button uk-button-default" href="{% url 'verwaltung:wohnung_list' %}">Zur Übersicht</a>
         </div>
 
+        {% if apartment_is_saved %}
+            <p><a class="uk-button uk-button-default" href="{% url 'verwaltung:wohnung_personen' wohnung.pk %}">Personen zuordnen</a></p>
+        {% endif %}
         <form method="post">
             {% if apartment_is_saved %}<a class="uk-button uk-button-default uk-margin-bottom" href="{% url 'verwaltung:apartment_photos' wohnung.pk %}">Wohnungsfotos verwalten</a>{% endif %}
             {% csrf_token %}

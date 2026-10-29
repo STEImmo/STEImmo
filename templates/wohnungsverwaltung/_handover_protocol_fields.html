@@ -3,6 +3,12 @@
 {% endif %}
 
 <h2 class="uk-heading-divider">Übergabe und Beteiligte</h2>
+{% if form.selected_wohnung and not form.fields.person.queryset.exists %}
+    <div class="uk-alert-warning" uk-alert>
+        <p>Dieser Wohnung ist keine Person zugeordnet. Vor einem Einzug muss die Verwaltung die fachliche Einzugsentscheidung bestätigen und eine Person zuordnen.</p>
+        <p><a href="{% url 'verwaltung:wohnung_personen' form.selected_wohnung.pk %}">Person-Wohnungszuordnung pflegen</a></p>
+    </div>
+{% endif %}
 <div class="uk-child-width-1-2@m uk-grid-small" uk-grid>
     {% for field in form.main_fields %}
         <div>

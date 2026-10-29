@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Wohnungszuordnung prüfen – STE Immobilien eGbR{% endblock %}
+{% block content %}
+<section class="uk-section uk-section-default management-page">
+    <div class="uk-container uk-container-small">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" with area="management" %}
+        <a href="{% url 'verwaltung:wohnung_personen' wohnung.pk %}">Zur Personenauswahl</a>
+        <h1 class="uk-heading-small">Wohnungszuordnung prüfen</h1>
+        <dl class="uk-description-list uk-description-list-divider">
+            <dt>Person</dt><dd>{{ person }} ({{ person.email }})</dd>
+            <dt>Aktuelle Wohnung</dt><dd>{{ person.wohnung|default:"Keine Zuordnung" }}</dd>
+            <dt>Zielwohnung</dt><dd>{{ wohnung }}</dd>
+            <dt>Verknüpftes Benutzerkonto</dt><dd>{{ person.user|default:"Kein Konto verknüpft" }}</dd>
+            <dt>Vorhandene Rollen</dt><dd>{% for group in person.user.groups.all %}{{ group.name }}{% if not forloop.last %}, {% endif %}{% empty %}Keine Rollen{% endfor %}</dd>
+        </dl>
+        <p>Die Benutzerverwaltung ist für die Rolle „Mieter“ zuständig. Bei Bedarf „Mieter“ zusätzlich vergeben und „Bewerber“ beibehalten, damit der Bewerberzugriff erhalten bleibt. Diese Zuordnung erweitert keine Rollen.</p>
+        {% if perms.immobilien.manage_user_accounts %}
+            {% if person.user_id %}
+                <p><a href="{% url 'verwaltung:user_account_edit' person.user_id %}">Kontoverknüpfung und Rollen bearbeiten</a></p>
+            {% else %}
+                <p><a href="{% url 'verwaltung:user_account_create' %}?person={{ person.pk }}">Konto mit bestehender Person verknüpfen</a></p>
+            {% endif %}
+        {% else %}
+            <p>Für Kontoverknüpfung und Rollenpflege wenden Sie sich an die Benutzerverwaltung.</p>
+        {% endif %}
+        {% if person.wohnung_id and person.wohnung_id != wohnung.pk %}
+            <div class="uk-alert-warning" uk-alert><p>Wohnungswechsel: Die bisherige Zuordnung zu {{ person.wohnung }} wird ersetzt. Offene oder gesperrte Protokolle müssen vorher abgeschlossen werden.</p></div>
+        {% endif %}
+        <h2 class="uk-h3">Bestehende Protokolle</h2>
+        <p>Protokolle behalten ihre ursprüngliche Wohnung und Person. Abgeschlossene Protokolle bleiben unverändert.</p>
+        <ul class="uk-list uk-list-divider">
+            {% for protocol in protocols %}
+                <li><a href="{% url 'wohnungsverwaltung:handover_protocol_detail' protocol.pk %}">{{ protocol.wohnung }} – {{ protocol.uebergabe_zeitpunkt|date:"d.m.Y H:i" }}</a> – {% if protocol.status == "signed" %}Bestätigt{% elif protocol.status == "blocked" %}Gesperrt{% else %}In Bearbeitung{% endif %}</li>
+            {% empty %}<li>Keine Protokolle vorhanden.</li>{% endfor %}
+        </ul>
+        {% if person.wohnung_id == wohnung.pk %}
+            <p>Die Person ist dieser Wohnung bereits zugeordnet.</p>
+            <a class="uk-button uk-button-primary" href="{% url 'wohnungsverwaltung:handover_protocol_create' %}?wohnung={{ wohnung.pk }}&amp;person={{ person.pk }}">Einzugsprotokoll anlegen</a>
+        {% else %}
+            <form method="post" class="uk-card uk-card-default uk-card-body">
+                {% csrf_token %}
+                {% if form.non_field_errors %}<div class="uk-alert-danger" uk-alert>{{ form.non_field_errors }}</div>{% endif %}
+                {{ form.previous_wohnung }}
+                <label>{{ form.confirmed }} {{ form.confirmed.label }}</label>
+                {% include "wohnungsverwaltung/_form_field_feedback.html" with field=form.confirmed only %}
+                <p><button type="submit" class="uk-button uk-button-primary">Person dieser Wohnung zuordnen</button></p>
+            </form>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
