@@ -167,6 +167,9 @@ EMAIL_BACKEND = os.environ.get(
     else "django.core.mail.backends.smtp.EmailBackend",
 )
 DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "noreply@steimmo.local")
+CALLBACK_RECIPIENTS = env_list(
+    "DJANGO_CALLBACK_RECIPIENTS", "mitarbeiter@example.test" if DEBUG else ""
+)
 EMAIL_HOST = os.environ.get("DJANGO_EMAIL_HOST", "")
 EMAIL_PORT = int(os.environ.get("DJANGO_EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.environ.get("DJANGO_EMAIL_HOST_USER", "")

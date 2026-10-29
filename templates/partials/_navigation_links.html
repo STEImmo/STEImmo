@@ -33,4 +33,5 @@
         {% endif %}
         {% endif %}
     {% endif %}
+        {% if not hide_contact %}<li><a href="{% url 'contact' %}"{% if route == "contact" %} aria-current="page"{% endif %}>Kontakt</a></li>{% endif %}
 {% endwith %}

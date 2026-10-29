@@ -73,6 +73,8 @@ class SiteNavigationTests(TestCase):
                     ]
                     if response.context["user"].has_perm("immobilien.manage_user_accounts"):
                         destinations.append(reverse("verwaltung:user_account_list"))
+                if label != "Footernavigation":
+                    destinations.append(reverse("contact"))
                 self.assertEqual([href for href, _ in navigation[label]], destinations)
 
     def test_public_pages_use_the_company_name_instead_of_the_project_nickname(self):
@@ -186,7 +188,10 @@ class SiteNavigationTests(TestCase):
         home = self.client.get(reverse("home"))
         for section in ("unternehmen", "kontakt", "ablauf", "konto"):
             self.assertContains(home, f'id="{section}"')
-            self.assertContains(home, f'href="{reverse("home")}#{section}"')
+            destination = (
+                reverse("contact") if section == "kontakt" else f"{reverse('home')}#{section}"
+            )
+            self.assertContains(home, f'href="{destination}"')
         response = self.client.get(reverse("image_credits"))
         self.assertContains(response, "Simon Waldherr")
         self.assertContains(response, "CC BY-SA 4.0")
@@ -200,7 +205,7 @@ class SiteNavigationTests(TestCase):
                 self.assertContains(response, "Entwurf")
                 self.assertContains(response, "Angaben folgen")
                 self.assertContains(response, f'href="{reverse(name)}"')
-                self.assertContains(response, f'href="{reverse("home")}#kontakt"')
+                self.assertContains(response, f'href="{reverse("contact")}"')
         self.assertContains(
             self.client.get(reverse("home")), f'href="{reverse("imprint")}#kontakt"'
         )
