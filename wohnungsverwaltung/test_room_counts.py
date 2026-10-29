@@ -48,10 +48,13 @@ class RoomCountSetupTests(TestCase):
     def assert_inventory(self):
         actual = dict(Wohnung.objects.values_list("wohnungsnummer", "zimmeranzahl"))
         self.assertEqual(
-            actual, {number: Decimal(value) for number, value in EXPECTED_ROOMS.items()}
+            actual,
+            {number: Decimal(value) for number, value in EXPECTED_ROOMS.items()}
+            | {"2": Decimal("2"), "401": Decimal("3")},
         )
-        self.assertEqual(list(actual.values()).count(Decimal("1")), 12)
-        self.assertEqual(list(actual.values()).count(Decimal("2")), 11)
+        self.assertEqual(list(actual.values()).count(Decimal("1")), 11)
+        self.assertEqual(list(actual.values()).count(Decimal("2")), 12)
+        self.assertEqual(list(actual.values()).count(Decimal("3")), 2)
 
     def test_seed_assigns_confirmed_room_counts_to_all_25_apartments(self):
         call_command("seed_standard_data", stdout=StringIO())
@@ -187,7 +190,7 @@ class RoomCountMigrationTests(TransactionTestCase):
         unit.refresh_from_db()
         self.assertEqual(unit.zimmeranzahl, Decimal("4.25"))
 
-    def test_merging_from_room_count_branch_preserves_later_manual_room_edits(self):
+    def test_merging_from_room_count_branch_applies_new_correction_and_keeps_profile_schema(self):
         unit = self.Unit.objects.create(gebaeudenummer="1", etage=4, wohnungsnummer="401")
         self.migrate()
         self.Unit.objects.filter(pk=unit.pk).update(zimmeranzahl="4.25")
@@ -196,7 +199,7 @@ class RoomCountMigrationTests(TransactionTestCase):
         targets = executor.loader.graph.leaf_nodes()
         executor.migrate(targets)
         unit.refresh_from_db()
-        self.assertEqual(unit.zimmeranzahl, Decimal("4.25"))
+        self.assertEqual(unit.zimmeranzahl, Decimal("3"))
         final_apps = executor.loader.project_state(targets).apps
         Person = final_apps.get_model("immobilien", "Person")
         person = Person.objects.create(
@@ -233,7 +236,7 @@ class RoomCountMigrationTests(TransactionTestCase):
         executor = MigrationExecutor(connection)
         executor.migrate(executor.loader.graph.leaf_nodes())
         unit.refresh_from_db()
-        self.assertEqual(unit.zimmeranzahl, Decimal("3.5"))
+        self.assertEqual(unit.zimmeranzahl, Decimal("3"))
         self.assertEqual(Person.objects.values().get(pk=person.pk), before)
         self.assertEqual(Throttle.objects.get(user_id=user.pk).last_sent_at, sent_at)
 

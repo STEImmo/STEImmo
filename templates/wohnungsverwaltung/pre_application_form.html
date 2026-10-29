@@ -1,4 +1,5 @@
 {% extends "wohnungsverwaltung/application_base.html" %}
+{% load areas %}
 {% block title %}Besichtigungsanfrage – STE Immobilien eGbR{% endblock %}
 {% block application_heading %}{% if unit_is_preselected %}Zur Besichtigung anmelden{% else %}Bewerbung abgeben{% endif %}{% endblock %}
 {% block application_intro %}Teilen Sie uns mit, wer einziehen möchte. Den Termin bestätigen wir separat.{% endblock %}
@@ -8,7 +9,7 @@
     {% if unit_is_preselected %}
     <div class="application-unit">
         <span uk-icon="home" aria-hidden="true"></span>
-        <div><strong>Wohnung {{ selected_unit.display_number }}</strong><span>{{ selected_floor_label }}{% if selected_unit.groesse_qm > 0 %} · {{ selected_unit.groesse_qm }} m²{% endif %}</span><a class="uk-text-small" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' selected_unit.pk %}">Wohnungsdetails ansehen</a></div>
+        <div><strong>Wohnung {{ selected_unit.display_number }}</strong><span>{{ selected_floor_label }}{% if selected_unit.groesse_qm > 0 %} · {{ selected_unit.groesse_qm|area }} m²{% endif %}</span><a class="uk-text-small" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' selected_unit.pk %}">Wohnungsdetails ansehen</a></div>
         <a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung_public:apartment_search' %}">Andere Wohnung wählen</a>
     </div>
     <p class="uk-text-meta">Die gewünschte Wohnung ist bereits ausgewählt. Mit diesem Formular stellen Sie eine Besichtigungsanfrage. Ein Termin wird separat bestätigt; die vollständige Bewerbung folgt erst nach Besichtigung und Freigabe.</p>

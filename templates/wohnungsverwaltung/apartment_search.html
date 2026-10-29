@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load areas %}
 {% load room_counts %}
 {% block title %}Wohnungen finden – STE Immobilien eGbR{% endblock %}
 {% block content %}
@@ -39,7 +40,7 @@
     </a>
     <div class="uk-card-body apartment-search-card-content">
         <div class="apartment-search-card-heading"><div><p class="uk-text-meta">{{ row.floor }}</p><h3>Wohnung {{ row.unit.display_number }}</h3></div><span class="uk-label uk-label-success">Verfügbar</span></div>
-        <dl class="apartment-search-facts"><div><dt>Wohnfläche</dt><dd>{% if row.unit.groesse_qm > 0 %}{{ row.unit.groesse_qm }} m²{% else %}Wohnfläche noch nicht angegeben{% endif %}</dd></div><div><dt>Zimmer</dt><dd>{% if row.unit.zimmeranzahl > 0 %}{{ row.unit.zimmeranzahl|room_count }}{% else %}Noch nicht angegeben{% endif %}</dd></div></dl>
+        <dl class="apartment-search-facts"><div><dt>Wohnfläche</dt><dd>{% if row.unit.groesse_qm > 0 %}{{ row.unit.groesse_qm|area }} m²{% else %}Wohnfläche noch nicht angegeben{% endif %}</dd></div><div><dt>Zimmer</dt><dd>{% if row.unit.zimmeranzahl > 0 %}{{ row.unit.zimmeranzahl|room_count }}{% else %}Noch nicht angegeben{% endif %}</dd></div></dl>
         <div class="apartment-search-card-bottom"><div><span class="uk-text-meta">Kaltmiete / Monat</span><p>{% if row.unit.kaltmiete > 0 %}<strong>{{ row.unit.kaltmiete }} €</strong>{% else %}Noch nicht angegeben{% endif %}</p></div><a class="uk-button uk-button-default" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' row.unit.pk %}">Details ansehen <span uk-icon="arrow-right" aria-hidden="true"></span></a></div>
     </div>
 </article>{% endfor %}

@@ -49,7 +49,7 @@ class ApplicationUITests(TestCase):
         )
         self.assertContains(response, "Wohnung 203")
         self.assertContains(response, "2. Obergeschoss")
-        self.assertContains(response, "44,04 m²")
+        self.assertContains(response, "44,0 m²")
         self.assertContains(response, "Andere Wohnung wählen")
         self.assertNotContains(response, 'name="wohnung"')
         self.assertNotContains(response, "application-unit-choices")

@@ -144,7 +144,7 @@ class BuildingViewTests(TestCase):
         for url in (detail_url, floor_url, search_url):
             with self.subTest(url=url):
                 response = self.client.get(url)
-                self.assertContains(response, "53,21")
+                self.assertContains(response, "53,2")
                 self.assertContains(response, "3,5</dd>")
                 self.assertNotContains(response, "3,50")
                 self.assertContains(response, "654,32")
@@ -163,13 +163,13 @@ class BuildingViewTests(TestCase):
     def test_floor_labels_use_saved_area_even_for_a_known_inventory_number(self):
         unit = self.create_unit("401", 4)
         response = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[4]))
-        self.assertContains(response, "42,50 m²")
+        self.assertContains(response, "42,5 m²")
         self.assertNotContains(response, "92,94")
         unit.groesse_qm = Decimal("93.17")
         unit.save(update_fields=["groesse_qm"])
         updated = self.client.get(reverse("wohnungsverwaltung_public:floor_view", args=[4]))
-        self.assertContains(updated, "93,17 m²")
-        self.assertNotContains(updated, "42,50 m²")
+        self.assertContains(updated, "93,1 m²")
+        self.assertNotContains(updated, "42,5 m²")
 
     def test_detail_shows_each_missing_optional_information(self):
         unit = self.create_unit("1", 0)
@@ -395,7 +395,7 @@ class BuildingViewTests(TestCase):
             reverse("wohnungsverwaltung_public:apartment_detail_placeholder", args=[unit.pk])
         )
         self.assertContains(response, "A-17")
-        self.assertContains(response, "42,50")
+        self.assertContains(response, "42,5")
         self.assertContains(response, "600,00")
         self.assertContains(response, "750,00")
         self.assertContains(response, "1800,00")
@@ -837,4 +837,4 @@ class BuildingInventoryTests(TestCase):
         self.assertEqual(
             [Wohnung.objects.filter(etage=f).count() for f in range(5)], [5, 6, 6, 6, 2]
         )
-        self.assertEqual(Wohnung.objects.get(wohnungsnummer="401").groesse_qm, Decimal("92.94"))
+        self.assertEqual(Wohnung.objects.get(wohnungsnummer="401").groesse_qm, Decimal("92.90"))
