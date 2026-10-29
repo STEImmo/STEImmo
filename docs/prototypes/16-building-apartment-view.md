@@ -1,5 +1,32 @@
 # Gebäude- und Wohnungsansicht (US-02, #16)
 
+## Einheitliche Etagen-Hervorhebung (#170)
+
+Alle fünf Etagen verwenden bei Hover und Tastaturfokus das vorhandene helle
+Theme-Grün `--steimmo-color-success-surface-emphasis` (`#C8E2D0`) mit 35 %
+Deckkraft als Flächentönung. Kontur und Beschriftungsrahmen bleiben einheitlich
+waldgrün. Die helle Tönung hebt auch das dunkle Dach sichtbar hervor; es gibt
+keine farbliche Sonderbehandlung des Dachgeschosses.
+
+Auf der Startseite markiert Hover oder Tastaturfokus in der Zeichnung auch die
+zugehörige linke Etagenangabe mit waldgrünem Rahmen und Unterstreichung.
+Umgekehrt markiert die linke Angabe weiterhin die passende Zeichnungsfläche.
+Eine innere Rahmenverstärkung vermeidet Layoutverschiebungen. Die Zuordnung
+erfolgt über die vorhandenen `data-floor`-Attribute und CSS-`:has()`-Selektoren.
+
+Die lokalen CSS-Variablen `--facade-highlight-color` und
+`--facade-highlight-fill` an jeder `.facade-floor` versorgen sowohl die
+Gebäudeansicht als auch die Startseitenvorschau und deren Etagenlinks.
+Änderungen am Farbschema bleiben dadurch an die vorhandenen Theme-Werte gebunden.
+Es sind keine JavaScript- oder Datenbankänderungen erforderlich. Der
+Stylesheet-Link in `base.html` erhält für die Browser-Caches eine neue Version.
+
+Manuelle Browserprüfung: Hover und Tastaturfokus auf Dach und weiterer Etage,
+Startseiten-Dachlink per Hover/Fokus, Rücksetzen nach Verlassen/Fokuswechsel,
+Navigation zum Etagenplan sowie Gebäudeansicht bei 390 px Breite ohne
+horizontalen Seitenüberlauf. Automatisierte Response-Tests bleiben in
+`wohnungsverwaltung.test_building_view` und `core`.
+
 ## Korrektur vom 28. Oktober 2026 (#165)
 
 Ergänzende ausdrückliche Bestätigung: Wohnung 401 hat **92,9 m²**, Wohnung 402
