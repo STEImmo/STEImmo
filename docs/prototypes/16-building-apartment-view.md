@@ -27,6 +27,42 @@ Navigation zum Etagenplan sowie Gebäudeansicht bei 390 px Breite ohne
 horizontalen Seitenüberlauf. Automatisierte Response-Tests bleiben in
 `wohnungsverwaltung.test_building_view` und `core`.
 
+## Korrektur vom 28. Oktober 2026 (#165)
+
+Ergänzende ausdrückliche Bestätigung: Wohnung 401 hat **92,9 m²**, Wohnung 402
+**64,9 m²**. Die Angabe von 111 m² aus dem älteren Brief ist falsch. Diese Werte
+sind die aktuellen Ausgangswerte, nicht nur eine Anzeigeformatierung. Die neue
+Migration `0034_confirmed_attic_areas` übernimmt sie einmalig für Gebäude 1 im DG;
+sie korrigiert ausschließlich die zwei Flächen. Andere Wohnungen, Zimmerzahlen,
+Nummern, IDs und Verknüpfungen bleiben erhalten. Fehlende Wohnungen werden nicht
+angelegt, mehrdeutige Nummern führen vor Änderungen zum Abbruch. Rückmigration
+bewahrt die bestätigten Werte. Spätere Änderungen werden bei regulären Starts
+nicht erneut überschrieben; erneutes Vorwärtsmigrieren nach Rückmigration wendet
+die Bestätigung erneut an. Standard-/Demodaten verwenden dieselben Flächen.
+
+Die aktualisierte Auftraggeberübersicht bestätigt Wohnung 002 mit 2 Zimmern und
+Wohnung 401 mit 3 Zimmern. Damit gelten nun 11 Einzimmer-, 12 Zweizimmer- und
+2 Dreizimmerwohnungen. Die bisherige Nummerierung ist bestätigt. Diese Angaben
+ersetzen die frühere Verteilung im folgenden Abschnitt vom 24. Oktober.
+
+Die neue Datenmigration `0033_correct_confirmed_room_counts` korrigiert beim
+nächsten `migrate` einmalig nur diese zwei Zimmerzahlen in Gebäude 1 auf der
+passenden Etage. `2` und `002` sind im EG gleichwertig. Mehrdeutige Zuordnungen
+führen vor Änderungen zum Abbruch; fehlende Wohnungen werden nicht angelegt.
+Alle anderen Felder, IDs und Verknüpfungen bleiben erhalten. Die ursprüngliche
+Migration `0029_confirmed_room_counts` bleibt unverändert. Nach der neuen Migration
+erfolgende manuelle Änderungen bleiben bei weiteren Starts erhalten; Rückmigration
+bewahrt die Werte. Ein erneutes Vorwärtsmigrieren nach Rückmigration wendet die
+Korrektur erneut an. Neue Standard-/Demodaten enthalten die aktualisierten Zahlen.
+
+Wohnflächen werden in Suche, Etagenliste, Grundriss einschließlich zugänglicher
+Beschriftungen, Wohnungsdetails, Bewerbung und Verwaltung mit genau einer
+Dezimalstelle angezeigt. Weitere Stellen werden abgeschnitten, beispielsweise
+25,27 → 25,2 m² und 59,56 → 59,5 m². Der gemeinsame Templatefilter `area` arbeitet
+mit Dezimalarithmetik. Gespeicherte Ausgangswerte, Eingabefelder und Flächenfilter
+behalten ihre bisherige Präzision; fehlende Flächen bleiben als fehlend erkennbar.
+Es werden keine weiteren Flächenkorrekturen vorgenommen.
+
 ## Bestätigte Zimmerzahlen vom 24. Oktober 2026 (#158)
 
 Die im Issue #158 vollständig übertragene Auftraggebervorlage bestätigt die
