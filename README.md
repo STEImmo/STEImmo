@@ -94,15 +94,24 @@ Die Einrichtung, der Abgleich älterer Beispielwohnungen und die noch vorläufig
 Zuordnung sind in der [Dokumentation zu US-02](docs/prototypes/16-building-apartment-view.md)
 beschrieben.
 
-Die Zimmerzahlen aller 25 Wohnungen sind gemäß der bestätigten Vorlage aus
-[Issue #158](https://github.com/STEImmo/STEImmo/issues/158) hinterlegt. Neue
+Die Zimmerzahlen aller 25 Wohnungen berücksichtigen die korrigierte Vorlage vom
+28.10.2026 aus [Issue #165](https://github.com/STEImmo/STEImmo/issues/165): Wohnung
+002 hat 2 Zimmer, Wohnung 401 hat 3 Zimmer. Es gibt 11 Einzimmer-, 12 Zweizimmer-
+und 2 Dreizimmerwohnungen; die Nummerierung bleibt erhalten. Neue
 Beispiel- und Demo-Einrichtungen verwenden diese Werte. Bestehende Datenbanken
-übernehmen sie einmalig mit `python manage.py migrate` über Migration
-`0029_confirmed_room_counts`; dabei werden ausschließlich die Zimmerzahlen der
-zugeordneten Wohnungen in Gebäude 1 ersetzt. Spätere manuelle Änderungen bleiben
-bei weiteren Starts und Migrationen erhalten. Zimmerzahlen erscheinen einheitlich
-als ganze Zahl oder mit Dezimalkomma, etwa `2` und `3,5`. Zuordnung, Fehlerfälle
-und Rückmigration sind in der verlinkten Gebäudedokumentation beschrieben.
+übernehmen mit `python manage.py migrate` zunächst die ursprüngliche Vorlage über
+`0029_confirmed_room_counts`; die neue Migration `0033_correct_confirmed_room_counts`
+korrigiert anschließend einmalig ausschließlich die Zimmerzahlen von 002 und 401
+in Gebäude 1. Spätere manuelle Änderungen bleiben bei weiteren Starts und
+Migrationen erhalten. Zimmerzahlen erscheinen einheitlich als ganze Zahl oder mit
+Dezimalkomma, etwa `2` und `3,5`. Wohnflächen werden mit genau einer Dezimalstelle
+angezeigt; weitere Stellen werden abgeschnitten (25,27 → 25,2 m²). Die genaueren
+gespeicherten Flächen bleiben für Pflege und Filter unverändert erhalten.
+Ausnahme gemäß ergänzender Bestätigung: Für 401 gelten 92,9 m² und für 402
+64,9 m². Migration `0034_confirmed_attic_areas` übernimmt diese zwei Ausgangswerte
+einmalig; eine ältere Briefangabe von 111 m² ist falsch. Andere Flächen bleiben erhalten.
+Zuordnung, Fehlerfälle und Rückmigration sind in der verlinkten
+Gebäudedokumentation beschrieben.
 
 Der Stack ist festgelegt. Die Foundation ist umgesetzt; die fachlichen MVP-Vertical-Slices folgen.
 
