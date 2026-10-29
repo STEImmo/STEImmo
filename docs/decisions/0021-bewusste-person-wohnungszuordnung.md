@@ -24,6 +24,13 @@ Bestätigte Protokolle behalten Person, Wohnung und Inhalte. Die Person wird bei
 Speichern gesperrt und ihre bisherige Zuordnung erneut geprüft, damit konkurrierende
 Zuordnungsänderungen nicht unbemerkt überschrieben werden.
 
+Protokollerstellung und Bearbeitung sperren die gewählte Person innerhalb ihrer
+Schreibtransaktion ebenfalls und prüfen die aktuelle Wohnungszuordnung erneut.
+Wurde die Person nach der Formularvalidierung einer anderen Wohnung zugeordnet,
+wird der Schreibvorgang mit einer verständlichen Feldfehlermeldung abgewiesen.
+Gewinnt die Protokollerstellung die Sperre zuerst, wartet der Wohnungswechsel
+bis zum Commit und wird dann durch das vorhandene offene Protokoll blockiert.
+
 ## Konsequenzen
 
 Keine Migration oder weitere Technologie ist erforderlich. Es gibt keine

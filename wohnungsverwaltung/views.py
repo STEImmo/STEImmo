@@ -2240,6 +2240,18 @@ def handover_protocol_list(request: HttpRequest) -> HttpResponse:
     return render(request, "wohnungsverwaltung/handover_protocol_list.html", context)
 
 
+def _lock_handover_person(form: HandoverProtocolForm) -> None:
+    """Hold the assignment lock until the surrounding write transaction commits."""
+    person = Person.objects.select_for_update().filter(pk=form.cleaned_data["person"].pk).first()
+    if person is None or person.wohnung_id != form.cleaned_data["wohnung"].pk:
+        raise ValidationError(
+            {
+                "person": "Die Wohnungszuordnung wurde zwischenzeitlich geändert. "
+                "Bitte laden Sie das Formular neu und prüfen Sie die beteiligte Person."
+            }
+        )
+
+
 @employee_required
 def handover_protocol_create(request: HttpRequest) -> HttpResponse:
     draft_scope = "create"
@@ -2293,6 +2305,7 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
     ):
         try:
             with handover_photo_upload() as stored_photo_files:
+                _lock_handover_person(form)
                 protocol = form.save()
                 _save_inline_protocol_entries(
                     protocol,
@@ -2302,6 +2315,8 @@ def handover_protocol_create(request: HttpRequest) -> HttpResponse:
                     removed_rooms=form.cleaned_data["removed_rooms"],
                 )
                 _delete_draft(request, draft_scope)
+        except ValidationError as error:
+            form.add_error(None, error)
         except (HandoverPhotoStorageError, DatabaseError) as error:
             logger.error("Protocol creation failed (%s).", type(error).__name__)
             form.add_error(None, PHOTO_SAVE_ERROR)
@@ -2475,6 +2490,7 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
     ):
         try:
             with handover_photo_upload() as stored_photo_files:
+                _lock_handover_person(form)
                 protocol = form.save()
                 _save_inline_protocol_entries(
                     protocol,
@@ -2484,6 +2500,9 @@ def handover_protocol_edit(request: HttpRequest, protocol_id) -> HttpResponse:
                     removed_rooms=form.cleaned_data["removed_rooms"],
                 )
                 _delete_draft(request, draft_scope)
+        except ValidationError as error:
+            protocol.refresh_from_db()
+            form.add_error(None, error)
         except (HandoverPhotoStorageError, DatabaseError) as error:
             logger.error("Protocol edit failed (%s).", type(error).__name__)
             protocol.refresh_from_db()
