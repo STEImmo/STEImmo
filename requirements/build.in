@@ -1,0 +1,3 @@
+# Build tools for installing the local project without isolated dependency resolution.
+setuptools>=75
+wheel

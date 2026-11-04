@@ -4,6 +4,8 @@
 !.env.prod.example
 .DS_Store
 .venv/
+build/
+*.egg-info/
 .idea/
 __pycache__/
 *.py[cod]

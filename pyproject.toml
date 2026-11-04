@@ -19,6 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "ruff>=0.13,<0.14",
+    "uv==0.13.7",
 ]
 
 [tool.setuptools.packages.find]

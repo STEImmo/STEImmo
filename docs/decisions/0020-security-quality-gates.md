@@ -79,13 +79,12 @@ Der Updatebedarf wird nicht über Advisory-Ausnahmen verdeckt. Siehe
 [Pillow-13-Release-Notes](https://pillow.readthedocs.io/en/stable/releasenotes/13.0.0.html)
 und beispielsweise [CVE-2026-114501](https://github.com/advisories/GHSA-654x-cwwv-5j9c).
 
-Die Scanner-Version bzw. der Containerdigest sind festgelegt. Das bestehende
-Projekt löst Abhängigkeiten weiterhin aus Versionsbereichen in `pyproject.toml`
-auf. Ein vollständiges Lock-/Hash-Verfahren bleibt eine separate Entscheidung;
-dieser Change führt keine zweite handgepflegte Abhängigkeitsliste ein. Das Audit
-prüft die in seinem Job tatsächlich aufgelösten Versionen. Ein späterer Lauf kann
-wegen neuer Paketversionen oder aktualisierter Advisories anders ausfallen;
-Netzwerk- und Dienstfehler werden nicht als erfolgreiche Prüfung gewertet.
+Die Scanner-Version bzw. der Containerdigest sind festgelegt. Seit
+[ADR-0022](0022-reproduzierbare-python-abhaengigkeiten.md) installiert die
+Audit-Umgebung dieselben versionierten Build-/Dev-Paketlisten wie die übrige CI,
+einschließlich Prüfsummenprüfung. Das Audit prüft deren tatsächlich installierte
+Versionen. Aktualisierte Advisories können bei unverändertem Paketstand ein neues
+Finding ergeben; Netzwerk- und Dienstfehler gelten nicht als erfolgreiche Prüfung.
 
 ## Lokale Validierung
 
