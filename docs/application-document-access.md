@@ -95,37 +95,40 @@ und `Cache-Control: private, no-store`.
 
 Verweigerte Zugriffe werden zusätzlich darauf geprüft, dass keine private Datei
 geöffnet wird. Testdateien liegen in einem temporären Medienverzeichnis;
-Konten und Dokumente sind ausschließlich fiktiv.
+Konten und Dokumente sind ausschließlich fiktiv. Jede Person, Kategorie und
+Dateiform erhält einen unterscheidbaren PDF-Inhalt; erfolgreiche Downloads
+müssen bytegenau die angeforderte Datei liefern.
 
 Neue Tests auf bereits bestehende Schutzmechanismen können unmittelbar grün sein.
 Produktivcode wird nur geändert, falls ein Test einen tatsächlichen Fehler belegt.
 
 ## Ausführung und verbleibende Grenzen
 
-Prüfstand am 04.11.2026: Das Inventar und die Zuordnung bestehender Tests sind
-abgeschlossen. Die ergänzten Tests sind implementiert; ihre PostgreSQL-Abnahme
-steht noch aus. `manage.py check`, `ruff check .` und `ruff format --check .`
-sind erfolgreich. Der Container-Testlauf scheitert an einem Dateizugriffsfehler;
-ein frischer Prüfcontainer kann wegen des schreibgeschützten Docker-Dateisystems
-nicht starten. PostgreSQL meldet ein ungültiges Datenverzeichnis
-(`base/5/PG_VERSION`). Es wurden keine Datenbankdateien verändert oder zurückgesetzt.
+Prüfstand am 05.11.2026: Das Inventar und die Zuordnung bestehender Tests sind
+abgeschlossen. Die 14 ergänzten Tests bestehen in der regulären
+PostgreSQL-Testdatenbank mit unveränderten Migrationen. Verwendet wurden
+Python 3.13.16, Django 5.2.17 und der lokale PostgreSQL-18.6-Container.
+Der zuvor blockierende lokale Docker-/WSL-Startfehler ist behoben; die frühere
+SQLite-Ersatzprüfung ist damit nicht mehr die Grundlage der Abnahme.
 
-Ergänzende Ausführung mit Python 3.13 und Django 5.2.19: **63 Tests erfolgreich**
-(`test_application_document_access`: 14,
-`test_employee_dashboard`: 49). Dafür wurden ausschließlich im Prüfprozess
-`DATABASES` auf SQLite im Arbeitsspeicher und `MIGRATION_MODULES['immobilien']`
-auf `None` gesetzt; die Tabellen dieser App wurden direkt aus den Modellen
-erstellt. Die Projektkonfiguration wurde nicht verändert. Dies prüft das
-HTTP-Zugriffsverhalten, ersetzt aber weder PostgreSQL- noch Migrationsprüfungen.
-Der erste Ersatzlauf zeigte einen Fehler in der neuen Testvorbereitung beim
-Entfernen der Personenverknüpfung; nach dessen Korrektur bestehen alle 63 Tests.
+`manage.py check`, `makemigrations --check --dry-run`, `ruff check .` und
+`ruff format --check .` sind erfolgreich. Es sind keine neuen Migrationen oder
+Änderungen am Produktivcode erforderlich. Die vollständige Django-Testsuite
+(`python manage.py test --noinput`) besteht mit **929 Tests**, einschließlich
+der 14 ergänzten Zugriffstests. Laufzeit: 501 Sekunden. Der vollständige Diff
+und `git diff --check` wurden ebenfalls geprüft.
 
-`makemigrations --check --dry-run` meldet keine Modelländerungen, konnte jedoch
-die Migrationshistorie wegen des Datenbankfehlers nicht prüfen. Eine vollständige
-Testsuite wurde nicht erfolgreich ausgeführt. Die neuen Tests bleiben bis zur
-regulären PostgreSQL-Prüfung uncommittet.
+Im ersten PostgreSQL-Lauf schloss ein neuer Testhelfer bereits geschlossene
+HTTP-Antworten erneut. Das beendete die Testdatenbankverbindung; der Helfer
+schließt Antworten jetzt nur, wenn sie noch offen sind. Nach dieser Korrektur
+bestehen sowohl die 14 neuen Tests separat als auch die vollständige Suite.
 
-Die noch ausstehende gezielte PostgreSQL-Prüfung lautet:
+Damit ist der Teilpunkt Bewerbungsdokumente im hier dokumentierten Umfang
+abgenommen. In diesen isolierten Zugriffstests wurde kein objektübergreifendes
+Datenleck nachgewiesen. Daraus folgt keine vollständige Sicherheitsabnahme des
+Deployments oder des übergeordneten Issues.
+
+Gezielte Prüfung der neuen Tests und ihrer bestehenden fachlichen Nachbartests:
 
 ```text
 python manage.py test wohnungsverwaltung.test_application_document_access wohnungsverwaltung.tests.MainApplicationUploadTests wohnungsverwaltung.test_employee_dashboard --noinput
