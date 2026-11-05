@@ -134,8 +134,9 @@ Gezielte Prüfung der neuen Tests und ihrer bestehenden fachlichen Nachbartests:
 python manage.py test wohnungsverwaltung.test_application_document_access wohnungsverwaltung.tests.MainApplicationUploadTests wohnungsverwaltung.test_employee_dashboard --noinput
 ```
 
-Eine vollständige Abnahme von #140 erfordert zusätzlich die Foto- und
-Übergabe-PDF-Matrix sowie einen isolierten Nachweis, dass der tatsächliche Reverse
-Proxy private Medienpfade nicht direkt ausliefert. Ein Django-404 allein genügt
-für diese Serverprüfung nicht. Echte Personenunterlagen und produktive
-Angriffstests sind kein Bestandteil dieser Prüfung.
+Die ergänzende Foto-Matrix wird separat im
+[Foto-Prüfnachweis](photo-access.md) geführt. Für die vollständige Abnahme von
+#140 verbleiben die Übergabe-PDF-/Exporterstellungs-Matrix und ein isolierter
+Nachweis, dass der tatsächliche Reverse Proxy private Medienpfade nicht direkt
+ausliefert. Ein Django-404 allein genügt für diese Serverprüfung nicht. Echte
+Personenunterlagen und produktive Angriffstests sind kein Bestandteil dieser Prüfung.

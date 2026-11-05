@@ -2712,9 +2712,13 @@ def handover_protocol_checklist_item_photo_upload(
 
 
 @employee_required
+@never_cache
 def handover_protocol_checklist_item_photo_view(
     request: HttpRequest, protocol_id, room_id, item_id, photo_id
-) -> FileResponse:
+) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+
     photo = get_object_or_404(
         RaumMerkmalFoto.objects.select_related("raum_merkmal__raumprotokoll__protokoll"),
         pk=photo_id,
