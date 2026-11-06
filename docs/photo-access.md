@@ -116,15 +116,14 @@ Laufzeit 486 Sekunden. Der vollständige Diff und `git diff --check` sind geprü
 Es sind keine neuen Migrationen oder Abhängigkeiten erforderlich. Der
 Teilpunkt Fotozugriffe ist damit im dokumentierten Umfang abgeschlossen.
 
-Für den vollständigen Abschluss von #140 fehlen danach:
+Die PDF-Downloads und Exporterstellung werden im ergänzenden
+[PDF-Prüfnachweis](pdf-access.md) abgedeckt. Für den vollständigen Abschluss
+von #140 fehlen danach:
 
-1. PDF-Downloads und Exporterstellung: Endpunktinventar, vorhandene Assertions
-   zuordnen und Lücken der Rollen-/Objektmatrix einschließlich Sitzungswiderruf
-   schließen. Vorhandene Exporttests ersetzen diese Zuordnung nicht.
-2. Am tatsächlichen Reverse Proxy mit eigens erzeugten Testdateien prüfen,
+1. Am tatsächlichen Reverse Proxy mit eigens erzeugten Testdateien prüfen,
    dass private Bewerbungsunterlagen, Fotos, PDF-Archive und Signaturdateien
    nicht direkt über Medienpfade ausgeliefert werden. Ein Django-404 beweist
    diese Servereigenschaft nicht. Keine produktiven Angriffstests oder Echtdaten.
-3. Die Teilnachweise gemeinsam gegen alle Akzeptanzkriterien prüfen und den
+2. Die Teilnachweise gemeinsam gegen alle Akzeptanzkriterien prüfen und den
    Branch anschließend reviewen und mergen. Push, PR-/Issue-Aktionen und Merge
    werden hier nicht ausgeführt.
