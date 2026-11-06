@@ -130,11 +130,11 @@ Der Teilpunkt PDF-Downloads und Exporterstellung ist damit im dokumentierten
 Umfang abgeschlossen; in den isolierten Tests wurde kein objektübergreifender
 Zugriff nachgewiesen.
 
-Damit sind die drei Anwendungsbereiche von #140 inventarisiert. Für die
-vollständige Abnahme fehlt noch der isolierte Nachweis am **tatsächlichen
-Reverse Proxy**, dass private Medienpfade nicht direkt ausgeliefert werden.
-Die Django-404-Tests allein reichen dafür nicht. Es sind eigens erzeugte
-Testdateien zu verwenden; keine Echtdokumente und keine produktiven Angriffstests.
-Anschließend sind alle Teilnachweise gemeinsam gegen die Akzeptanzkriterien
-zu prüfen sowie Review und Merge abzuschließen. Push und externe PR-/Issue-Aktionen
-gehören nicht zu diesem Auftrag.
+Damit sind die drei Anwendungsbereiche von #140 inventarisiert. Der ergänzende
+[Proxy-Prüfnachweis](private-media-proxy.md) belegt die Sperre tatsächlich
+vorhandener künstlicher Dateien über einen laufenden Caddy auf localhost.
+Er grenzt die lokale Prüfung von einer späteren Abnahme der Zielinstallation ab.
+Vor produktivem Betrieb sind dort dieselbe Medienregel und Mount-Trennung zu
+bestätigen. Anschließend sind alle Teilnachweise gemeinsam gegen die
+Akzeptanzkriterien zu prüfen sowie Review und Merge abzuschließen. Push und
+externe PR-/Issue-Aktionen gehören nicht zu diesem Auftrag.

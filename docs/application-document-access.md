@@ -135,8 +135,9 @@ python manage.py test wohnungsverwaltung.test_application_document_access wohnun
 ```
 
 Die ergänzenden Matrizen stehen im [Foto-Prüfnachweis](photo-access.md) und im
-[PDF-/Exporterstellungs-Prüfnachweis](pdf-access.md). Für die vollständige
-Abnahme von #140 verbleibt ein isolierter Nachweis, dass der tatsächliche
-Reverse Proxy private Medienpfade nicht direkt ausliefert. Ein Django-404
-allein genügt für diese Serverprüfung nicht. Echte Personenunterlagen und
-produktive Angriffstests sind kein Bestandteil dieser Prüfung.
+[PDF-/Exporterstellungs-Prüfnachweis](pdf-access.md). Der zusätzliche
+[lokale Proxy-Prüfnachweis](private-media-proxy.md) bestätigt die Sperre
+tatsächlich vorhandener künstlicher Dateien über Caddy auf localhost.
+Vor produktivem Betrieb sind dieselbe Medienregel und Mount-Trennung auf
+der Zielinstallation zu bestätigen. Echte Personenunterlagen und produktive
+Angriffstests sind kein Bestandteil dieser Prüfung.

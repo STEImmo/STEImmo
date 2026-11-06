@@ -120,10 +120,10 @@ Die PDF-Downloads und Exporterstellung werden im ergänzenden
 [PDF-Prüfnachweis](pdf-access.md) abgedeckt. Für den vollständigen Abschluss
 von #140 fehlen danach:
 
-1. Am tatsächlichen Reverse Proxy mit eigens erzeugten Testdateien prüfen,
-   dass private Bewerbungsunterlagen, Fotos, PDF-Archive und Signaturdateien
-   nicht direkt über Medienpfade ausgeliefert werden. Ein Django-404 beweist
-   diese Servereigenschaft nicht. Keine produktiven Angriffstests oder Echtdaten.
+1. Der [lokale Proxy-Prüfnachweis](private-media-proxy.md) deckt den tatsächlich
+   laufenden Caddy auf localhost mit vorhandenen künstlichen Dateien ab.
+   Vor produktivem Betrieb sind dieselbe Medienregel und Mount-Trennung auf
+   der Zielinstallation zu bestätigen; ein bloßes Django-404 genügt dafür nicht.
 2. Die Teilnachweise gemeinsam gegen alle Akzeptanzkriterien prüfen und den
    Branch anschließend reviewen und mergen. Push, PR-/Issue-Aktionen und Merge
    werden hier nicht ausgeführt.
