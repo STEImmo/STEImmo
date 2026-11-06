@@ -11,6 +11,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from functools import partial
 from pathlib import Path
 from uuid import uuid4
 
@@ -105,9 +106,15 @@ else:
 """
 
 
-def docker(*args, stdin=None):
+def docker(*args, stdin=None, endpoint=None):
+    environment = os.environ.copy()
+    if endpoint is not None:
+        # Keep later commands (including cleanup) on the validated connection.
+        environment.pop("DOCKER_CONTEXT", None)
+        environment.pop("DOCKER_HOST", None)
     return subprocess.run(
-        ["docker", *args],
+        ["docker", *(["--host", endpoint] if endpoint is not None else []), *args],
+        env=environment,
         input=stdin,
         text=True,
         capture_output=True,
@@ -159,14 +166,19 @@ def local_config(source):
 
 def run(web_container):
     # Refuse remote Docker endpoints; the task is explicitly localhost-only.
-    endpoint = os.environ.get("DOCKER_HOST") or docker(
-        "context", "inspect", "--format", "{{.Endpoints.docker.Host}}"
-    )
+    context = os.environ.get("DOCKER_CONTEXT")
+    if context:
+        endpoint = docker("context", "inspect", context, "--format", "{{.Endpoints.docker.Host}}")
+    else:
+        endpoint = os.environ.get("DOCKER_HOST") or docker(
+            "context", "inspect", "--format", "{{.Endpoints.docker.Host}}"
+        )
     if not endpoint.startswith(("npipe://", "unix://")):
         raise RuntimeError("Only a local Docker endpoint is permitted")
-    if "Docker Desktop" not in docker("info", "--format", "{{.OperatingSystem}}"):
+    local_docker = partial(docker, endpoint=endpoint)
+    if "Docker Desktop" not in local_docker("info", "--format", "{{.OperatingSystem}}"):
         raise RuntimeError("This localhost runner requires Docker Desktop")
-    info = json.loads(docker("inspect", web_container))[0]
+    info = json.loads(local_docker("inspect", web_container))[0]
     ports = info["NetworkSettings"]["Ports"].get("8000/tcp") or []
     if ports != [{"HostIp": "127.0.0.1", "HostPort": "8000"}]:
         raise RuntimeError("Web container must publish only the expected localhost upstream")
@@ -180,7 +192,7 @@ def run(web_container):
 
     def media(action):
         return json.loads(
-            docker(
+            local_docker(
                 "exec",
                 "-i",
                 web_container,
@@ -198,7 +210,7 @@ def run(web_container):
         with tempfile.TemporaryDirectory(prefix="steimmo-140-caddy-") as directory:
             path = Path(directory, "Caddyfile")
             path.write_text(config, encoding="utf-8")
-            docker(
+            local_docker(
                 "create",
                 "--name",
                 name,
@@ -211,12 +223,12 @@ def run(web_container):
                 CADDY_IMAGE,
             )
             created = True
-            docker("cp", str(path), f"{name}:/etc/caddy/Caddyfile")
-            docker("start", name)
+            local_docker("cp", str(path), f"{name}:/etc/caddy/Caddyfile")
+            local_docker("start", name)
             certificate = None
             for _attempt in range(20):
                 try:
-                    certificate = docker(
+                    certificate = local_docker(
                         "exec", name, "cat", "/data/caddy/pki/authorities/local/root.crt"
                     )
                     break
@@ -224,7 +236,7 @@ def run(web_container):
                     time.sleep(0.25)
             if not certificate:
                 raise RuntimeError("Local Caddy CA was not ready")
-            port = docker(
+            port = local_docker(
                 "inspect",
                 "--format",
                 '{{(index (index .NetworkSettings.Ports "443/tcp") 0).HostPort}}',
@@ -264,7 +276,7 @@ def run(web_container):
                         )
             if media("verify") != manifest:
                 raise RuntimeError("Private probe files changed during HTTP checks")
-            mounts = json.loads(docker("inspect", "--format", "{{json .Mounts}}", name))
+            mounts = json.loads(local_docker("inspect", "--format", "{{json .Mounts}}", name))
             binds = [mount for mount in mounts if mount["Type"] == "bind"]
             if (
                 len(binds) != 1
@@ -285,12 +297,12 @@ def run(web_container):
                 report["files_cleaned"] = media("cleanup")["removed"]
         finally:
             if created:
-                label = docker(
+                label = local_docker(
                     "inspect", "--format", '{{index .Config.Labels "steimmo.issue-140.run"}}', name
                 )
                 if label != run_id:
                     raise RuntimeError("Container ownership label changed; refusing removal")
-                docker("rm", "--force", "--volumes", name)
+                local_docker("rm", "--force", "--volumes", name)
                 report["proxy_cleaned"] = True
     if not report.get("files_cleaned") or not report.get("proxy_cleaned"):
         raise RuntimeError("Probe cleanup was not confirmed")

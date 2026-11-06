@@ -28,6 +28,15 @@ Docker-Endpunkt und die ausschließliche Bindung des Upstreams an
 werden abgewiesen. Das bereits im Projekt verwendete Image `caddy:2.10.2`
 muss lokal verfügbar sein.
 
+Bei gleichzeitig gesetztem `DOCKER_CONTEXT` und `DOCKER_HOST` hat der Kontext
+wie bei der Docker-CLI Vorrang. Seine Endpunktadresse wird zunächst nur aus
+den lokalen Kontextmetadaten gelesen. Nach erfolgreicher Prüfung verwenden
+alle Docker-Befehle einschließlich der Bereinigung ausdrücklich denselben
+Endpunkt über `--host`. Die beiden Umgebungsvariablen werden ausschließlich
+aus der Umgebung dieser Unterprozesse entfernt; die Benutzerumgebung bleibt
+unverändert. So können widersprüchliche oder später geänderte Kontextwerte
+keine Datei- oder Containeroperationen auf einen anderen Docker-Daemon umlenken.
+
 Der Prüfer lädt `ops/caddy-steimmo.caddy`. Ausschließlich Domain, lokales
 Upstream-Ziel und interne TLS-Ausstellung werden für den Test angepasst:
 
@@ -104,7 +113,10 @@ identifiziert; ausschließlich seine anonymen Test-Volumes werden mit entfernt.
 `ops/tests/test_private_media.py` prüft insbesondere falsche Erfolgsmeldungen,
 Offenlegung in Fehlerseiten, Remote-Docker-Abweisung, unerwartete öffentliche
 Upstream-Bindungen, Überschreibschutz, geänderte Marker und die Begrenzung der
-Verzeichnisbereinigung. Die Tests laufen durch den vorhandenen CI-Schritt
+Verzeichnisbereinigung. Drei Regressionstests sichern außerdem den Vorrang
+des Kontexts bei widersprüchlichen Umgebungswerten, die feste Endpunktbindung
+und die unveränderte Benutzerumgebung ab. Die Tests laufen durch den vorhandenen
+CI-Schritt
 `python -m unittest discover -s ops/tests -v` mit.
 
 ## Ergebnis und Grenzen
@@ -113,8 +125,8 @@ Abschließender Durchlauf am 06.11.2026:
 
 | Merkmal | Beobachtetes Ergebnis |
 |---|---|
-| Laufkennung | `9ca952b1-7b27-4be0-9c0e-59d1650f80b1` |
-| temporärer HTTPS-Endpunkt | `https://localhost:51918` — nach der Prüfung entfernt |
+| Laufkennung | `9d9a28c7-c5a0-4545-9350-90bbc37f7f00` |
+| temporärer HTTPS-Endpunkt | `https://localhost:56525` — nach der Prüfung entfernt |
 | vorhandene Markerdateien | 8, vor und nach den HTTP-Abrufen vollständig und unverändert gelesen |
 | HTTP-Matrix | 64 von 64 Abrufen mit 404; keine Marker ausgeliefert |
 | Positivkontrollen | Healthcheck 200; öffentliches CSS 200 und bytegleich |
@@ -131,7 +143,8 @@ unter `.venv/steimmo-140-local-media-report.json`; der Prüfaufruf erzeugt sie e
 auf Standardausgabe. Der zufällige HTTPS-Port ist kein dauerhafter Dienst.
 
 Zusätzlich erfolgreich: **49 Django-Zugriffstests** der drei Teilbereiche gegen
-PostgreSQL, **27 Betriebs-/Deploy-Tests** einschließlich der neun Prüfer-Tests,
+PostgreSQL, **30 Betriebs-/Deploy-Tests** einschließlich der zwölf Prüfer-Tests
+(Deploy-Tests unter Linux, da sie `fcntl` benötigen),
 Django-Systemcheck, Migrationsprüfung, Ruff-Lint, Ruff-Format und
 `git diff --check`. Es wurden keine Fachmodelle, Migrationen, vorhandenen
 Dateien oder laufenden Anwendungskonfigurationen geändert.

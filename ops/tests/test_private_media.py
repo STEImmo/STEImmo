@@ -53,12 +53,82 @@ class PrivateMediaVerifierTests(unittest.TestCase):
 
     def test_remote_docker_endpoint_is_rejected_before_any_docker_call(self):
         with (
-            patch.dict(os.environ, {"DOCKER_HOST": "tcp://remote.example.test:2376"}),
+            patch.dict(
+                os.environ, {"DOCKER_HOST": "tcp://remote.example.test:2376", "DOCKER_CONTEXT": ""}
+            ),
             patch.object(probe, "docker") as docker,
             self.assertRaisesRegex(RuntimeError, "local Docker"),
         ):
             probe.run("web")
         docker.assert_not_called()
+
+    def test_remote_context_overrides_local_host_and_is_rejected_before_daemon_access(self):
+        def docker(*args, **kwargs):
+            if args == ("context", "inspect", "remote", "--format", "{{.Endpoints.docker.Host}}"):
+                return "ssh://remote.example.test"
+            raise AssertionError("Remote daemon must not be contacted")
+
+        with (
+            patch.dict(
+                os.environ,
+                {"DOCKER_HOST": "npipe:////./pipe/local", "DOCKER_CONTEXT": "remote"},
+            ),
+            patch.object(probe, "docker", side_effect=docker) as command,
+            self.assertRaisesRegex(RuntimeError, "local Docker"),
+        ):
+            probe.run("web")
+        command.assert_called_once_with(
+            "context", "inspect", "remote", "--format", "{{.Endpoints.docker.Host}}"
+        )
+
+    def test_pinned_docker_calls_ignore_conflicting_environment_without_changing_it(self):
+        endpoint = "npipe:////./pipe/local"
+        with (
+            patch.dict(
+                os.environ,
+                {"DOCKER_HOST": "tcp://remote.example.test", "DOCKER_CONTEXT": "remote"},
+            ),
+            patch.object(
+                probe.subprocess, "run", return_value=SimpleNamespace(stdout="ok\n")
+            ) as command,
+        ):
+            for args in (("info",), ("exec", "web", "python"), ("rm", "proxy")):
+                self.assertEqual(probe.docker(*args, endpoint=endpoint, stdin="payload"), "ok")
+                call = command.call_args
+                self.assertEqual(call.args[0], ["docker", "--host", endpoint, *args])
+                self.assertNotIn("DOCKER_CONTEXT", call.kwargs["env"])
+                self.assertNotIn("DOCKER_HOST", call.kwargs["env"])
+                self.assertEqual(call.kwargs["input"], "payload")
+            self.assertEqual(os.environ["DOCKER_CONTEXT"], "remote")
+            self.assertEqual(os.environ["DOCKER_HOST"], "tcp://remote.example.test")
+
+    def test_local_context_overrides_remote_host_and_stays_pinned_after_environment_changes(self):
+        endpoint = "npipe:////./pipe/local"
+
+        def docker(*args, **kwargs):
+            if args[0] == "context":
+                self.assertEqual(
+                    args, ("context", "inspect", "local", "--format", "{{.Endpoints.docker.Host}}")
+                )
+                os.environ["DOCKER_CONTEXT"] = "remote"
+                return endpoint
+            self.assertEqual(kwargs["endpoint"], endpoint)
+            if args[0] == "info":
+                return "Docker Desktop"
+            if args == ("inspect", "web"):
+                return json.dumps([{"NetworkSettings": {"Ports": {}}}])
+            raise AssertionError("Unexpected Docker command")
+
+        with (
+            patch.dict(
+                os.environ,
+                {"DOCKER_HOST": "tcp://remote.example.test", "DOCKER_CONTEXT": "local"},
+            ),
+            patch.object(probe, "docker", side_effect=docker) as command,
+            self.assertRaisesRegex(RuntimeError, "localhost"),
+        ):
+            probe.run("web")
+        self.assertEqual(command.call_count, 3)
 
 
 class MediaProbeOwnershipTests(unittest.TestCase):
@@ -139,7 +209,7 @@ class MediaProbeOwnershipTests(unittest.TestCase):
             raise AssertionError("Probe files must not be created with unexpected bindings")
 
         with (
-            patch.dict(os.environ, {"DOCKER_HOST": "npipe:////./pipe/test"}),
+            patch.dict(os.environ, {"DOCKER_HOST": "npipe:////./pipe/test", "DOCKER_CONTEXT": ""}),
             patch.object(probe, "docker", side_effect=docker),
             self.assertRaisesRegex(RuntimeError, "localhost"),
         ):
