@@ -16,6 +16,8 @@ tmp/
 *.key
 ops/tests/
 .venv
+build/
+*.egg-info/
 __pycache__/
 *.py[cod]
 media/

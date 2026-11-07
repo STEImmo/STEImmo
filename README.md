@@ -642,6 +642,11 @@ docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.d
 
 Für eine erfolgreiche Foundation-Prüfung müssen alle vier Befehle ohne Fehler durchlaufen.
 
+Python-Pakete werden in Docker und CI aus versionierten Listen mit exakten
+Versionen und SHA-256-Prüfsummen installiert. Runtime und Entwicklung verwenden
+dieselben Versionen gemeinsamer Pakete. Installation ohne Docker und kontrollierte
+Paketupdates beschreibt [ADR-0022](docs/decisions/0022-reproduzierbare-python-abhaengigkeiten.md).
+
 ### 4. Entwicklungsumgebung beenden
 
 ~~~bash
