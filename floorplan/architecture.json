@@ -1,0 +1,281 @@
+{
+  "project": {
+    "name": "STEImmo",
+    "summary": "STEImmo ist eine serverseitig gerenderte Webanwendung für Vermarktung und Verwaltung einer Immobilie. Python und Django verarbeiten Anfragen; UIkit gestaltet die Oberfläche, PostgreSQL speichert Daten.",
+    "entrypoints": [
+      "manage.py",
+      "config/wsgi.py"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "web",
+      "label": "Webseiten",
+      "kind": "ui",
+      "summary": "Zeigt öffentliche Seiten, persönliche Bereiche und die Verwaltung an.",
+      "paths": [
+        "templates/**",
+        "static/**"
+      ]
+    },
+    {
+      "id": "domain",
+      "label": "Wohnungsverwaltung",
+      "kind": "service",
+      "summary": "Bearbeitet Wohnungen, Bewerbungen, Besichtigungen und Übergaben.",
+      "paths": [
+        "wohnungsverwaltung/**"
+      ]
+    },
+    {
+      "id": "domain.data",
+      "parent": "domain",
+      "label": "Datenmodell",
+      "kind": "data",
+      "summary": "Definiert Wohnungsdaten und Änderungen am Datenbankschema.",
+      "paths": [
+        "wohnungsverwaltung/models.py",
+        "wohnungsverwaltung/migrations/**"
+      ]
+    },
+    {
+      "id": "core",
+      "label": "Konten und Einstieg",
+      "kind": "service",
+      "summary": "Verwaltet Anmeldung, Konten und allgemeine Seiten.",
+      "paths": [
+        "core/**"
+      ]
+    },
+    {
+      "id": "config",
+      "label": "Konfiguration",
+      "kind": "config",
+      "summary": "Verbindet Anwendungseinstellungen und Einstiegspunkte.",
+      "paths": [
+        "config/**",
+        "manage.py"
+      ]
+    },
+    {
+      "id": "ops",
+      "label": "Betrieb",
+      "kind": "infra",
+      "summary": "Enthält Betriebs- und Bereitstellungsskripte.",
+      "paths": [
+        "ops/**",
+        "docker/**"
+      ]
+    },
+    {
+      "id": "db",
+      "label": "PostgreSQL",
+      "kind": "data",
+      "summary": "Speichert die Daten der Anwendung."
+    },
+    {
+      "id": "web.pages",
+      "parent": "web",
+      "label": "Seitenvorlagen",
+      "kind": "ui",
+      "summary": "Stellt die Vorlagen für öffentliche Seiten, Konten und Verwaltung bereit.",
+      "paths": [
+        "templates/**"
+      ]
+    },
+    {
+      "id": "web.assets",
+      "parent": "web",
+      "label": "Gestaltung und Interaktion",
+      "kind": "ui",
+      "summary": "Gestaltet die Seiten und ergänzt ihre Bedienung im Browser.",
+      "paths": [
+        "static/**"
+      ]
+    },
+    {
+      "id": "domain.tests",
+      "parent": "domain",
+      "label": "Fachliche Prüfungen",
+      "kind": "test",
+      "summary": "Prüft die Wohnungsverwaltung automatisch auf erwartetes Verhalten.",
+      "paths": [
+        "wohnungsverwaltung/test*.py"
+      ]
+    },
+    {
+      "id": "domain.commands",
+      "parent": "domain",
+      "label": "Verwaltungsbefehle",
+      "kind": "script",
+      "summary": "Stellt Befehle für wiederkehrende Verwaltungsaufgaben bereit.",
+      "paths": [
+        "wohnungsverwaltung/management/**"
+      ]
+    },
+    {
+      "id": "core.tests",
+      "parent": "core",
+      "label": "Konto- und Seitenprüfungen",
+      "kind": "test",
+      "summary": "Prüft Anmeldung, Konten und allgemeine Seiten automatisch.",
+      "paths": [
+        "core/test*.py"
+      ]
+    },
+    {
+      "id": "ops.scripts",
+      "parent": "ops",
+      "label": "Betriebsabläufe",
+      "kind": "script",
+      "summary": "Prüft und begleitet Bereitstellung und Betrieb.",
+      "paths": [
+        "ops/**"
+      ]
+    },
+    {
+      "id": "ops.start",
+      "parent": "ops",
+      "label": "Anwendungsstart",
+      "kind": "infra",
+      "summary": "Bereitet den Start vor und prüft die Erreichbarkeit.",
+      "paths": [
+        "docker/**"
+      ]
+    },
+    {
+      "id": "prototype",
+      "label": "Prototyp",
+      "kind": "script",
+      "summary": "Enthält einen eigenständigen Entwurf für den visuellen Auftritt.",
+      "paths": [
+        "docs/prototypes/**"
+      ]
+    },
+    {
+      "id": "web.pages.housing",
+      "parent": "web.pages",
+      "label": "Wohnungen und Verwaltung",
+      "kind": "ui",
+      "summary": "Zeigt Wohnungen, Bewerbungen und Aufgaben der Verwaltung.",
+      "paths": [
+        "templates/wohnungsverwaltung/**"
+      ]
+    },
+    {
+      "id": "web.pages.common",
+      "parent": "web.pages",
+      "label": "Allgemeine Seiten",
+      "kind": "ui",
+      "summary": "Zeigt allgemeine Inhalte und gemeinsame Seitenelemente.",
+      "paths": [
+        "templates/core/**",
+        "templates/partials/**"
+      ]
+    },
+    {
+      "id": "web.pages.account",
+      "parent": "web.pages",
+      "label": "Anmeldung",
+      "kind": "ui",
+      "summary": "Zeigt die Seiten für Anmeldung und Registrierung.",
+      "paths": [
+        "templates/registration/**"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "domain.data",
+      "to": "db",
+      "kind": "data",
+      "label": "liest und speichert"
+    },
+    {
+      "from": "web",
+      "to": "domain",
+      "kind": "http",
+      "label": "Wohnungen und Bewerbungen",
+      "description": "Auf den Webseiten ausgelöste Anfragen werden von der Wohnungsverwaltung beantwortet."
+    },
+    {
+      "from": "web",
+      "to": "core",
+      "kind": "http",
+      "label": "Anmeldung und Konten",
+      "description": "Die Konto- und Einstiegsseiten senden Anfragen an den Kontenbereich."
+    }
+  ],
+  "flows": [
+    {
+      "id": "bewerbung",
+      "title": "Von der Wohnung zur Bewerbung",
+      "steps": [
+        {
+          "node": "web",
+          "note": "Interessierte suchen eine Wohnung und öffnen ihre Details."
+        },
+        {
+          "node": "domain",
+          "note": "Die Wohnungsverwaltung bearbeitet die Bewerbung."
+        },
+        {
+          "node": "domain.data",
+          "note": "Die Datenmodelle bilden die gespeicherten Angaben ab."
+        },
+        {
+          "node": "db",
+          "note": "Die Datenbank hält die Informationen vor."
+        }
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "node": "web",
+      "title": "Oberfläche",
+      "note": "Die Anwendung liefert Seiten serverseitig aus; UIkit und wenig JavaScript gestalten die Bedienung."
+    },
+    {
+      "node": "domain",
+      "title": "Wohnungsverwaltung",
+      "note": "Dieser Bereich bündelt Wohnungen, Bewerbungen, Besichtigungen und Übergaben."
+    },
+    {
+      "node": "core",
+      "title": "Konten und Einstieg",
+      "note": "Hier liegen unter anderem Anmeldung, Registrierung und persönliche Konten."
+    },
+    {
+      "node": "domain.data",
+      "title": "Datenmodell",
+      "note": "Modelle und Datenbankänderungen beschreiben die gespeicherten Informationen."
+    },
+    {
+      "node": "db",
+      "title": "PostgreSQL",
+      "note": "Die Datenbank speichert die Informationen; Bereitstellung und Start werden über Docker Compose beschrieben."
+    },
+    {
+      "node": "templates/base.html",
+      "title": "Gemeinsamer Seitenrahmen",
+      "note": "Diese Vorlage bildet den gemeinsamen Rahmen der Webseiten."
+    }
+  ],
+  "annotations": [
+    {
+      "path": "core/urls.py",
+      "note": "Die automatisch erkannten Adressen verschachtelter Profilseiten können unvollständig sein: Sie beginnen tatsächlich mit /accounts/profil/.",
+      "tags": [
+        "Hinweis"
+      ]
+    },
+    {
+      "path": "core/tests.py",
+      "note": "Der automatische Scan zeigt eine Testadresse; sie gehört nicht zu den regulären öffentlichen Webadressen.",
+      "tags": [
+        "Hinweis"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "files": {
+    "docker/entrypoint.sh": {
+      "name": "Anwendungsstart",
+      "description": "Führt bei entsprechender Einstellung vorbereitende Datenbankarbeiten aus und startet den Dienst."
+    },
+    "docker/healthcheck.py": {
+      "name": "Dienstprüfung",
+      "description": "Prüft über eine lokale Anfrage, ob der Anwendungsdienst antwortet."
+    },
+    "ops/bootstrap-server.sh": {
+      "name": "Server vorbereiten",
+      "description": "Bereitet einen Ubuntu-ARM64-Server für den Betrieb vor."
+    },
+    "ops/check_private_media.py": {
+      "name": "Schutz privater Dateien prüfen",
+      "description": "Prüft mit einem lokalen Vermittlungsserver, ob private Dateien geschützt bleiben."
+    },
+    "ops/demo-smoke.py": {
+      "name": "Demozugänge prüfen",
+      "description": "Prüft Demokonten und Mitarbeitendenanmeldung über HTTPS."
+    },
+    "ops/deploy.sh": {
+      "name": "Version bereitstellen",
+      "description": "Führt die Schritte für die Bereitstellung einer Anwendungsversion aus."
+    },
+    "ops/proxy-source.sh": {
+      "name": "Netzwerkquelle prüfen",
+      "description": "Misst, welche Gegenstellenadresse beim Vermittlungsserver ankommt."
+    },
+    "ops/ship.sh": {
+      "name": "Auslieferung starten",
+      "description": "Bereitet die Auslieferung einer Version vor und ruft das Bereitstellungsskript auf."
+    },
+    "ops/smoke-development.sh": {
+      "name": "Entwicklung prüfen",
+      "description": "Prüft die Erstellung von Datenbankänderungen mit den Dateirechten eines Linux-Checkouts."
+    },
+    "ops/smoke.sh": {
+      "name": "Serverbetrieb prüfen",
+      "description": "Prüft Produktionseinstellungen und Datenerhalt mit kurzlebigen lokalen Ressourcen."
+    },
+    "ops/tests/test_deploy.py": {
+      "name": "Bereitstellung prüfen",
+      "description": "Prüft Auslieferung und Start bei kontrollierten Fehlern."
+    },
+    "ops/tests/test_private_media.py": {
+      "name": "Dateischutz prüfen",
+      "description": "Prüft die Schutzprüfung für private Dateien und verhindert irreführende Erfolgsmeldungen."
+    }
+  }
+}

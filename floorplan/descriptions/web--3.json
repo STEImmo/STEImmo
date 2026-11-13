@@ -1,0 +1,108 @@
+{
+  "files": {
+    "templates/wohnungsverwaltung/handover_export_error.html": {
+      "name": "PDF nicht verfügbar",
+      "description": "Zeigt eine Fehlermeldung, wenn das Übergabeprotokoll nicht als PDF bereitsteht."
+    },
+    "templates/wohnungsverwaltung/handover_protocol_detail.html": {
+      "name": "Übergabeprotokoll ansehen",
+      "description": "Zeigt Zuordnung, Zählerstände und weitere Angaben einer Übergabe."
+    },
+    "templates/wohnungsverwaltung/handover_protocol_finalize.html": {
+      "name": "Übergabe unterschreiben",
+      "description": "Zeigt die abschließende Prüfung und Unterschriftsfelder für eine Übergabe."
+    },
+    "templates/wohnungsverwaltung/handover_protocol_form.html": {
+      "name": "Übergabe bearbeiten",
+      "description": "Zeigt das Formular für ein Übergabeprotokoll."
+    },
+    "templates/wohnungsverwaltung/handover_protocol_key_form.html": {
+      "name": "Schlüsselübergabe",
+      "description": "Zeigt das Formular zur Erfassung übergebener Schlüssel."
+    },
+    "templates/wohnungsverwaltung/handover_protocol_list.html": {
+      "name": "Übergabeprotokolle",
+      "description": "Zeigt gespeicherte Entwürfe und Übergabeprotokolle in einer Liste."
+    },
+    "templates/wohnungsverwaltung/handover_protocol_mine.html": {
+      "name": "Meine Übergabeprotokolle",
+      "description": "Zeigt die eigenen Einzugs- und Auszugsprotokolle."
+    },
+    "templates/wohnungsverwaltung/handover_protocol_room_detail.html": {
+      "name": "Prüfpunkte im Raum",
+      "description": "Zeigt erfasste Prüfpunkte eines Raums und erlaubt das Hinzufügen weiterer Punkte."
+    },
+    "templates/wohnungsverwaltung/handover_protocol_room_form.html": {
+      "name": "Raum erfassen",
+      "description": "Zeigt das Formular zur Erfassung eines Raums im Übergabeprotokoll."
+    },
+    "templates/wohnungsverwaltung/main_application_status.html": {
+      "name": "Hauptbewerbung und Nachweise",
+      "description": "Zeigt den Stand der Hauptbewerbung und erforderliche Unterlagen."
+    },
+    "templates/wohnungsverwaltung/merkmal_form.html": {
+      "name": "Prüfvorlage bearbeiten",
+      "description": "Zeigt das Formular für eine Prüfvorlage und ihre zusätzlichen Angaben."
+    },
+    "templates/wohnungsverwaltung/merkmal_list.html": {
+      "name": "Prüfvorlagen",
+      "description": "Zeigt die Liste der Vorlagen für Prüfpunkte."
+    },
+    "templates/wohnungsverwaltung/person_assignment.html": {
+      "name": "Wohnungszuordnung prüfen",
+      "description": "Zeigt die Zuordnung einer Person und dazugehörige Protokolle."
+    },
+    "templates/wohnungsverwaltung/pre_application_form.html": {
+      "name": "Besichtigungsanfrage",
+      "description": "Zeigt das Formular für eine wohnungsbezogene Besichtigungsanfrage."
+    },
+    "templates/wohnungsverwaltung/pre_application_list.html": {
+      "name": "Meine Bewerbungen",
+      "description": "Zeigt eigene Bewerbungen und gegebenenfalls Aktionen zu Besichtigungsterminen."
+    },
+    "templates/wohnungsverwaltung/pre_application_preview.html": {
+      "name": "Bewerbungsformular als Vorschau",
+      "description": "Zeigt das künftige Bewerbungsformular; die Vorschau speichert keine Angaben."
+    },
+    "templates/wohnungsverwaltung/raum_form.html": {
+      "name": "Raum bearbeiten",
+      "description": "Zeigt das Formular für Angaben zu einem Raum."
+    },
+    "templates/wohnungsverwaltung/stellplatz_form.html": {
+      "name": "Stellplatz bearbeiten",
+      "description": "Zeigt Stammdaten eines Stellplatzes und seine Zuordnung zu einer Wohnung."
+    },
+    "templates/wohnungsverwaltung/stellplatz_list.html": {
+      "name": "Stellplätze",
+      "description": "Zeigt und filtert die Liste der Stellplätze."
+    },
+    "templates/wohnungsverwaltung/user_account_form.html": {
+      "name": "Benutzerkonto bearbeiten",
+      "description": "Zeigt Angaben zur Person und zum Zugriff eines Benutzerkontos."
+    },
+    "templates/wohnungsverwaltung/user_account_list.html": {
+      "name": "Benutzerkonten",
+      "description": "Zeigt die Liste der verwalteten Benutzerkonten."
+    },
+    "templates/wohnungsverwaltung/viewing_proposal_form.html": {
+      "name": "Besichtigungstermin vorschlagen",
+      "description": "Zeigt das Formular für einen vorgeschlagenen Besichtigungstermin."
+    },
+    "templates/wohnungsverwaltung/viewing_request_unavailable.html": {
+      "name": "Besichtigungsanfrage gesperrt",
+      "description": "Erklärt fehlenden Bewerberzugang oder eine fehlende Verknüpfung des Personenprofils."
+    },
+    "templates/wohnungsverwaltung/wohnung_form.html": {
+      "name": "Wohnung bearbeiten",
+      "description": "Zeigt Wohnungsstammdaten und öffentliche Detailangaben zur Bearbeitung."
+    },
+    "templates/wohnungsverwaltung/wohnung_list.html": {
+      "name": "Wohnungen verwalten",
+      "description": "Zeigt und filtert die Liste der Wohnungen."
+    },
+    "templates/wohnungsverwaltung/wohnung_personen.html": {
+      "name": "Personen einer Wohnung",
+      "description": "Zeigt die einer Wohnung zugeordneten Personen."
+    }
+  }
+}

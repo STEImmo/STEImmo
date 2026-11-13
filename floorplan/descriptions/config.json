@@ -1,0 +1,40 @@
+{
+  "files": {
+    "config/__init__.py": {
+      "name": "Konfigurationspaket",
+      "description": "Kennzeichnet den Ordner mit den Anwendungseinstellungen als Python-Paket."
+    },
+    "config/asgi.py": {
+      "name": "Asynchroner Einstieg",
+      "description": "Stellt einen Einstieg zum Starten der Anwendung über ASGI bereit."
+    },
+    "config/settings_demo.py": {
+      "name": "Demoeinstellungen",
+      "description": "Aktiviert den Demobetrieb und unterbindet den ausgehenden E-Mail-Versand."
+    },
+    "config/settings_deployment.py": {
+      "name": "Servereinstellungen",
+      "description": "Prüft gemeinsame Anforderungen an Datenbank und HTTPS für Serverbetrieb."
+    },
+    "config/settings_production.py": {
+      "name": "Produktionseinstellungen",
+      "description": "Aktiviert E-Mail-Versand und verlangt die notwendigen Einstellungen für den Echtbetrieb."
+    },
+    "config/settings.py": {
+      "name": "Grundeinstellungen",
+      "description": "Legt zentrale Einstellungen für Anmeldung, Datenbank, Dateien und E-Mail fest."
+    },
+    "config/urls.py": {
+      "name": "Webadressen verteilen",
+      "description": "Leitet Adressen an Wohnungsverwaltung, Übergaben und allgemeine Seiten weiter."
+    },
+    "config/wsgi.py": {
+      "name": "Servereinstieg",
+      "description": "Stellt den Einstieg zum Starten der Anwendung über WSGI bereit."
+    },
+    "manage.py": {
+      "name": "Verwaltungsbefehle",
+      "description": "Startet Befehle für Entwicklung, Prüfungen und Datenbankänderungen."
+    }
+  }
+}

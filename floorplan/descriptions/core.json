@@ -1,0 +1,198 @@
+{
+  "files": {
+    "core/__init__.py": {
+      "name": "Bereichsordnung",
+      "description": "Kennzeichnet diesen Ordner als Teil der Anwendung."
+    },
+    "core/account_views.py": {
+      "name": "Kontodaten ändern",
+      "description": "Bearbeitet Passwort- und E-Mail-Änderungen und beendet betroffene Anmeldungen."
+    },
+    "core/apps.py": {
+      "name": "Anwendungsbereich",
+      "description": "Meldet den allgemeinen Bereich der Anwendung an."
+    },
+    "core/contact.py": {
+      "name": "Rückrufanfragen",
+      "description": "Nimmt Rückrufanfragen entgegen und begrenzt wiederholte Anfragen."
+    },
+    "core/context_processors.py": {
+      "name": "Demomodus anzeigen",
+      "description": "Stellt den Seiten bereit, ob der Demomodus eingeschaltet ist."
+    },
+    "core/forms.py": {
+      "name": "Rückrufformular",
+      "description": "Prüft die Angaben aus dem Rückrufformular."
+    },
+    "core/management/__init__.py": {
+      "name": "Bereichsordnung",
+      "description": "Kennzeichnet diesen Ordner als Teil der Anwendung."
+    },
+    "core/management/commands/__init__.py": {
+      "name": "Bereichsordnung",
+      "description": "Kennzeichnet diesen Ordner als Teil der Anwendung."
+    },
+    "core/management/commands/deployment_preflight.py": {
+      "name": "Betrieb prüfen",
+      "description": "Prüft Betriebseinstellungen und meldet ausstehende Datenbankänderungen."
+    },
+    "core/management/commands/setup_demo.py": {
+      "name": "Demodaten vorbereiten",
+      "description": "Richtet Beispieldaten und Konten für den Demomodus ein."
+    },
+    "core/migrations/__init__.py": {
+      "name": "Bereichsordnung",
+      "description": "Kennzeichnet diesen Ordner als Teil der Anwendung."
+    },
+    "core/migrations/0001_initial.py": {
+      "name": "Anfragezähler anlegen",
+      "description": "Legt die Speicherung für die Begrenzung von Rückrufanfragen an."
+    },
+    "core/models.py": {
+      "name": "Anfragezähler",
+      "description": "Speichert kurzlebige Zähler für Rückrufanfragen ohne Klartext-IP-Adressen."
+    },
+    "core/test_account_recovery.py": {
+      "name": "Prüfung: Kontowiederherstellung und Fehler beim E-Mail-Versand",
+      "description": "Prüft automatisch Kontowiederherstellung und Fehler beim E-Mail-Versand."
+    },
+    "core/test_admin_login.py": {
+      "name": "Prüfung: Absicherung des Administrationszugangs",
+      "description": "Prüft automatisch Absicherung des Administrationszugangs."
+    },
+    "core/test_auth_revocation.py": {
+      "name": "Prüfung: Anmeldungen bei Änderungen am Benutzerkonto",
+      "description": "Prüft automatisch Anmeldungen bei Änderungen am Benutzerkonto."
+    },
+    "core/test_auth_ui.py": {
+      "name": "Prüfung: Darstellung der Anmeldeseiten",
+      "description": "Prüft automatisch Darstellung der Anmeldeseiten."
+    },
+    "core/test_contact.py": {
+      "name": "Prüfung: Rückrufformular und Anfragebegrenzung",
+      "description": "Prüft automatisch Rückrufformular und Anfragebegrenzung."
+    },
+    "core/test_demo.py": {
+      "name": "Prüfung: Demomodus und Einrichtung von Beispieldaten",
+      "description": "Prüft automatisch Demomodus und Einrichtung von Beispieldaten."
+    },
+    "core/test_homepage.py": {
+      "name": "Prüfung: Inhalte der Startseite",
+      "description": "Prüft automatisch Inhalte der Startseite."
+    },
+    "core/test_login_email.py": {
+      "name": "Prüfung: Anmeldung mit E-Mail-Adresse",
+      "description": "Prüft automatisch Anmeldung mit E-Mail-Adresse."
+    },
+    "core/test_navigation_reachability.py": {
+      "name": "Prüfung: Erreichbarkeit der Navigationsziele",
+      "description": "Prüft automatisch Erreichbarkeit der Navigationsziele."
+    },
+    "core/test_personal_profile.py": {
+      "name": "Prüfung: persönliche Profilangaben",
+      "description": "Prüft automatisch persönliche Profilangaben."
+    },
+    "core/test_production_settings.py": {
+      "name": "Prüfung: Betriebseinstellungen",
+      "description": "Prüft automatisch Betriebseinstellungen."
+    },
+    "core/test_profile_settings.py": {
+      "name": "Prüfung: Profiländerungen und E-Mail-Wechsel",
+      "description": "Prüft automatisch Profiländerungen und E-Mail-Wechsel."
+    },
+    "core/test_secret_key_settings.py": {
+      "name": "Prüfung: Einstellungen für den Anwendungsschlüssel",
+      "description": "Prüft automatisch Einstellungen für den Anwendungsschlüssel."
+    },
+    "core/test_site_navigation.py": {
+      "name": "Prüfung: Navigation und gemeinsamen Seitenrahmen",
+      "description": "Prüft automatisch Navigation und gemeinsamen Seitenrahmen."
+    },
+    "core/tests.py": {
+      "name": "Allgemeine Prüfungen",
+      "description": "Prüft Fehlerseiten, gemeinsame Formulare und allgemeine Ansichten."
+    },
+    "core/urls.py": {
+      "name": "Einstiege und Konten",
+      "description": "Ordnet allgemeine Seiten und Kontofunktionen ihren Adressen zu."
+    },
+    "core/views.py": {
+      "name": "Anmeldung und Profil",
+      "description": "Zeigt Startseite und Profil und bearbeitet Registrierung, Anmeldung und Bestätigung."
+    }
+  },
+  "routes": {
+    "ANY /failure/<int:code>": {
+      "name": "Fehlerfall prüfen",
+      "description": "Löst für automatische Prüfungen Fehlerantworten aus."
+    },
+    "ANY /": {
+      "name": "Startseite",
+      "description": "Zeigt den Einstieg und Informationen zu verfügbaren Wohnungen."
+    },
+    "ANY /kontakt": {
+      "name": "Kontakt aufnehmen",
+      "description": "Zeigt das Rückrufformular und bearbeitet eingereichte Anfragen."
+    },
+    "ANY /impressum": {
+      "name": "Impressum",
+      "description": "Zeigt die Anbieterangaben."
+    },
+    "ANY /datenschutz": {
+      "name": "Datenschutz",
+      "description": "Zeigt die Datenschutzseite."
+    },
+    "ANY /bildnachweise": {
+      "name": "Bildnachweise",
+      "description": "Zeigt die Herkunft und Nachweise verwendeter Bilder."
+    },
+    "ANY /health": {
+      "name": "Betriebsstatus",
+      "description": "Meldet, ob die Anwendung erreichbar ist."
+    },
+    "ANY /bearbeiten": {
+      "name": "Profil bearbeiten",
+      "description": "Zeigt und bearbeitet persönliche Profilangaben. Tatsächliche Adresse: /accounts/profil/bearbeiten/."
+    },
+    "ANY /passwort": {
+      "name": "Passwort ändern",
+      "description": "Prüft und ändert das Passwort des angemeldeten Kontos. Tatsächliche Adresse: /accounts/profil/passwort/."
+    },
+    "ANY /email": {
+      "name": "E-Mail ändern",
+      "description": "Beginnt die Änderung der E-Mail-Adresse mit einem Bestätigungscode. Tatsächliche Adresse: /accounts/profil/email/."
+    },
+    "ANY /email/bestaetigen": {
+      "name": "E-Mail bestätigen",
+      "description": "Prüft den Bestätigungscode und übernimmt die neue Adresse. Tatsächliche Adresse: /accounts/profil/email/bestaetigen/."
+    },
+    "ANY /email/abbrechen": {
+      "name": "E-Mail-Wechsel abbrechen",
+      "description": "Bricht die laufende Änderung der E-Mail-Adresse ab. Tatsächliche Adresse: /accounts/profil/email/abbrechen/."
+    },
+    "ANY /accounts/login": {
+      "name": "Anmelden",
+      "description": "Meldet Benutzer an und berücksichtigt den Zugang für Mitarbeiter."
+    },
+    "ANY /accounts/registrieren": {
+      "name": "Konto registrieren",
+      "description": "Nimmt die Angaben für ein neues Benutzerkonto entgegen."
+    },
+    "ANY /accounts/registrieren/bestaetigen": {
+      "name": "Registrierung bestätigen",
+      "description": "Prüft den Bestätigungscode für ein neues Benutzerkonto."
+    },
+    "ANY /accounts/registrieren/code-erneut-senden": {
+      "name": "Code erneut senden",
+      "description": "Sendet den Registrierungscode unter den geltenden Wartezeiten erneut."
+    },
+    "ANY /accounts/mitarbeiter-mfa": {
+      "name": "Mitarbeiteranmeldung bestätigen",
+      "description": "Prüft den zusätzlichen Bestätigungscode bei der Mitarbeiteranmeldung."
+    },
+    "ANY /accounts/logout": {
+      "name": "Abmelden",
+      "description": "Beendet die Anmeldung des Benutzerkontos."
+    }
+  }
+}

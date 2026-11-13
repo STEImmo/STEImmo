@@ -1,0 +1,52 @@
+{
+  "files": {
+    "wohnungsverwaltung/migrations/0026_merge_20261009_2049.py": {
+      "name": "Änderungen zusammenführen",
+      "description": "Führt parallele Änderungen am Datenbankschema in einen gemeinsamen Verlauf zusammen."
+    },
+    "wohnungsverwaltung/migrations/0027_merge_20261012_1201.py": {
+      "name": "Änderungen zusammenführen",
+      "description": "Führt parallele Änderungen am Datenbankschema in einen gemeinsamen Verlauf zusammen."
+    },
+    "wohnungsverwaltung/migrations/0028_viewing_appointments.py": {
+      "name": "Besichtigungstermine",
+      "description": "Legt die Speicherung von Besichtigungsterminen und zugehörigen Angaben an."
+    },
+    "wohnungsverwaltung/migrations/0029_account_profile_settings.py": {
+      "name": "Persönliche Kontoeinstellungen",
+      "description": "Ergänzt Angaben für persönliche Profile und Änderungen am Benutzerkonto."
+    },
+    "wohnungsverwaltung/migrations/0029_confirmed_room_counts.py": {
+      "name": "Bestätigte Zimmerzahlen",
+      "description": "Übernimmt bestätigte Zimmerzahlen für Wohnungen."
+    },
+    "wohnungsverwaltung/migrations/0029_viewingappointment_proposed_start_and_more.py": {
+      "name": "Vorgeschlagene Besichtigungen",
+      "description": "Ergänzt Angaben zu vorgeschlagenen Beginnzeiten von Besichtigungsterminen."
+    },
+    "wohnungsverwaltung/migrations/0030_account_email_change_throttle.py": {
+      "name": "E-Mail-Wechsel begrenzen",
+      "description": "Ergänzt die Begrenzung von Bestätigungsmails und erhält vorhandene Versandzeiten."
+    },
+    "wohnungsverwaltung/migrations/0031_merge_room_counts_and_account_settings.py": {
+      "name": "Änderungen zusammenführen",
+      "description": "Führt parallele Änderungen am Datenbankschema in einen gemeinsamen Verlauf zusammen."
+    },
+    "wohnungsverwaltung/migrations/0032_merge_viewing_proposals_and_main.py": {
+      "name": "Änderungen zusammenführen",
+      "description": "Führt parallele Änderungen am Datenbankschema in einen gemeinsamen Verlauf zusammen."
+    },
+    "wohnungsverwaltung/migrations/0033_correct_confirmed_room_counts.py": {
+      "name": "Zimmerzahlen korrigieren",
+      "description": "Korrigiert zwei bestätigte Angaben zur Zimmerzahl."
+    },
+    "wohnungsverwaltung/migrations/0034_confirmed_attic_areas.py": {
+      "name": "Dachgeschossflächen korrigieren",
+      "description": "Übernimmt bestätigte Korrekturen der Dachgeschossflächen."
+    },
+    "wohnungsverwaltung/models.py": {
+      "name": "Wohnungsdaten",
+      "description": "Definiert Wohnungen, Personen, Bewerbungen, Besichtigungen und Übergabeprotokolle samt Regeln."
+    }
+  }
+}

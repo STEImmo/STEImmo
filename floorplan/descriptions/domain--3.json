@@ -1,0 +1,12 @@
+{
+  "files": {
+    "wohnungsverwaltung/viewings.py": {
+      "name": "Besichtigungstermine",
+      "description": "Prüft Termine, dokumentiert deren Verlauf und versendet Benachrichtigungen."
+    },
+    "wohnungsverwaltung/views.py": {
+      "name": "Abläufe der Wohnungsverwaltung",
+      "description": "Bearbeitet öffentliche Wohnungssuche, Bewerbungen und Übergabeprotokolle."
+    }
+  }
+}

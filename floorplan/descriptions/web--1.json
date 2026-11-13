@@ -1,0 +1,164 @@
+{
+  "files": {
+    "static/css/app.css": {
+      "name": "Gestaltung der Seiten",
+      "description": "Legt Farben, Abstände und Darstellung der Seiten und Formulare fest."
+    },
+    "static/js/apartment-gallery.js": {
+      "name": "Fotogalerie schließen",
+      "description": "Räumt die vergrößerte Fotoansicht nach dem Schließen auf."
+    },
+    "static/js/application-row-navigation.js": {
+      "name": "Bewerbungszeile öffnen",
+      "description": "Öffnet die Bewerbungsdetails beim Klick auf eine Tabellenzeile."
+    },
+    "static/js/auth-password.js": {
+      "name": "Passwort anzeigen",
+      "description": "Schaltet die Sichtbarkeit von Passworteingaben um."
+    },
+    "static/js/dashboard-calendar.js": {
+      "name": "Kalenderbedienung",
+      "description": "Steuert die Kalenderansicht der Verwaltungsübersicht."
+    },
+    "static/js/handover-photo-picker.js": {
+      "name": "Übergabefotos auswählen",
+      "description": "Unterstützt die Auswahl von Fotos für Übergabeprotokolle."
+    },
+    "static/js/handover-signatures.js": {
+      "name": "Unterschriften erfassen",
+      "description": "Steuert die handschriftliche Unterschrift bei der Übergabe."
+    },
+    "static/js/main_application_uploads.js": {
+      "name": "Bewerbungsunterlagen auswählen",
+      "description": "Unterstützt das Auswählen und Anzeigen von Nachweisen zur Hauptbewerbung."
+    },
+    "static/js/site-navigation.js": {
+      "name": "Seitennavigation bedienen",
+      "description": "Steuert die Navigation der Website auf verschiedenen Bildschirmgrößen."
+    },
+    "static/js/table-filters.js": {
+      "name": "Tabellen filtern",
+      "description": "Wendet Tabellenfilter an und hält sie mit der Adresszeile im Einklang."
+    },
+    "static/js/viewing-time-validation.js": {
+      "name": "Besichtigungszeiten prüfen",
+      "description": "Prüft Zeitangaben für geplante Besichtigungen direkt im Formular."
+    },
+    "templates/base.html": {
+      "name": "Gemeinsamer Seitenrahmen",
+      "description": "Bindet Kopfbereich, Inhalte und Fußbereich für die Seiten zusammen."
+    },
+    "templates/core/_legal_draft_notice.html": {
+      "name": "Hinweis zum Rechtsentwurf",
+      "description": "Kennzeichnet rechtliche Angaben als ungeprüften Entwurf."
+    },
+    "templates/core/account_change.html": {
+      "name": "Kontoeinstellungen ändern",
+      "description": "Zeigt ein Formular zum Ändern von Kontoeinstellungen."
+    },
+    "templates/core/contact.html": {
+      "name": "Kontakt und Rückruf",
+      "description": "Zeigt Kontaktinformationen und das Formular für einen Rückruf."
+    },
+    "templates/core/error.html": {
+      "name": "Fehlerseite",
+      "description": "Zeigt eine verständliche Meldung, wenn eine Seite nicht verfügbar ist."
+    },
+    "templates/core/home.html": {
+      "name": "Startseite",
+      "description": "Stellt das Haus vor und führt zur Wohnungssuche und zu weiteren Angeboten."
+    },
+    "templates/core/image_credits.html": {
+      "name": "Bildnachweise",
+      "description": "Nennt die Herkunft und Lizenzinformationen verwendeter Bilder."
+    },
+    "templates/core/imprint.html": {
+      "name": "Impressum",
+      "description": "Zeigt Anbieter-, Anschrifts- und Kontaktangaben mit Entwurfshinweis."
+    },
+    "templates/core/personal_profile.html": {
+      "name": "Persönliches Profil",
+      "description": "Zeigt und bearbeitet persönliche Angaben und verweist auf Kontoeinstellungen."
+    },
+    "templates/core/privacy.html": {
+      "name": "Datenschutzhinweise",
+      "description": "Zeigt die Datenschutzhinweise mit Kennzeichnung als Entwurf."
+    },
+    "templates/partials/_account_actions.html": {
+      "name": "Kontomenü",
+      "description": "Zeigt je nach Anmeldung Links zum Profil, zur Abmeldung oder zur Registrierung."
+    },
+    "templates/partials/_demo_notice.html": {
+      "name": "Hinweis zur Testumgebung",
+      "description": "Kennzeichnet die Testumgebung und zeigt Zugangsdaten für das Demo-Konto."
+    },
+    "templates/partials/_management_links.html": {
+      "name": "Links zur Verwaltung",
+      "description": "Zeigt Verwaltungsbereiche entsprechend den Berechtigungen des Kontos."
+    },
+    "templates/partials/_navigation_links.html": {
+      "name": "Navigationslinks",
+      "description": "Stellt die Links für die Navigation der Website zusammen."
+    },
+    "templates/partials/_site_footer.html": {
+      "name": "Fußbereich",
+      "description": "Zeigt den gemeinsamen Fußbereich der Website mit weiterführenden Links."
+    },
+    "templates/partials/_site_header.html": {
+      "name": "Kopfbereich",
+      "description": "Zeigt den gemeinsamen Kopfbereich mit Navigation und Kontozugang."
+    },
+    "templates/partials/_status_notice.html": {
+      "name": "Statushinweis",
+      "description": "Zeigt eine Meldung mit Status, Fehlern und möglichen nächsten Schritten."
+    },
+    "templates/registration/_auth_errors.html": {
+      "name": "Anmeldefehler",
+      "description": "Zeigt allgemeine Fehler eines Anmeldeformulars an."
+    },
+    "templates/registration/_auth_field.html": {
+      "name": "Anmeldeformularfeld",
+      "description": "Zeigt ein beschriftetes Eingabefeld mit Hilfe und Fehlermeldungen."
+    },
+    "templates/registration/auth_base.html": {
+      "name": "Rahmen für Kontoseiten",
+      "description": "Stellt den gemeinsamen Rahmen für Anmeldung und Registrierung bereit."
+    },
+    "templates/registration/employee_mfa_verify.html": {
+      "name": "Zusätzliche Anmeldeprüfung",
+      "description": "Zeigt das Formular zur Eingabe des Bestätigungscodes für Mitarbeitende."
+    },
+    "templates/registration/login.html": {
+      "name": "Anmeldung",
+      "description": "Zeigt das Formular für die Anmeldung am Konto."
+    },
+    "templates/registration/register.html": {
+      "name": "Registrierung",
+      "description": "Zeigt das Formular zum Anlegen eines Kontos."
+    },
+    "templates/registration/verify_registration.html": {
+      "name": "Registrierung bestätigen",
+      "description": "Fordert zur Eingabe eines Bestätigungscodes für die Registrierung auf."
+    },
+    "templates/wohnungsverwaltung/_apartment_gallery.html": {
+      "name": "Wohnungsfotos",
+      "description": "Zeigt die Fotogalerie einer Wohnung."
+    },
+    "templates/wohnungsverwaltung/_apartment_image_placeholder.html": {
+      "name": "Wohnungsbild als Platzhalter",
+      "description": "Zeigt eine Ersatzdarstellung, wenn kein Wohnungsfoto vorliegt."
+    },
+    "templates/wohnungsverwaltung/_apartment_search_field.html": {
+      "name": "Suchfeld",
+      "description": "Zeigt ein beschriftetes Suchfeld und zugehörige Fehler."
+    },
+    "templates/wohnungsverwaltung/_application_progress.html": {
+      "name": "Bewerbungsfortschritt",
+      "description": "Zeigt die Schritte und den Fortschritt einer Bewerbung."
+    },
+    "templates/wohnungsverwaltung/_attic_floor_architecture.html": {
+      "name": "Dachgeschoss im Plan",
+      "description": "Zeichnet die baulichen Elemente des Dachgeschossplans."
+    }
+  }
+}

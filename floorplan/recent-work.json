@@ -1,0 +1,26 @@
+{
+  "tasks": [
+    {
+      "title": "Floorplan vervollständigen",
+      "request": "Floorplan fertigstellen und auf Secrets prüfen",
+      "summary": "Die Übersicht wurde mit Beschreibungen der erkannten Dateien und Webadressen sowie einer Führung ergänzt. Die Secret-Warnungen wurden gesondert geprüft.",
+      "items": [
+        {
+          "ref": "web",
+          "change": "changed",
+          "note": "Die Oberfläche ist für die Techstack-Erklärung in Seitenvorlagen und Gestaltung gegliedert."
+        },
+        {
+          "ref": "domain",
+          "change": "changed",
+          "note": "Die Wohnungsverwaltung und ihre Daten und Prüfungen sind für die Übersicht eingeordnet."
+        },
+        {
+          "ref": "core",
+          "change": "changed",
+          "note": "Konten und allgemeine Seiten wurden für die Übersicht beschrieben."
+        }
+      ]
+    }
+  ]
+}

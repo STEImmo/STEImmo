@@ -1,0 +1,164 @@
+{
+  "files": {
+    "wohnungsverwaltung/migrations/__init__.py": {
+      "name": "Änderungsverlauf",
+      "description": "Kennzeichnet den Ordner für Änderungen an der Datenbankstruktur."
+    },
+    "wohnungsverwaltung/migrations/0001_initial.py": {
+      "name": "Grunddaten anlegen",
+      "description": "Legt Personen, Wohnungen, Bewerbungen, Stellplätze, Schlüssel und Übergabeprotokolle an."
+    },
+    "wohnungsverwaltung/migrations/0002_protokoll_anlagenblaetter_anzahl_and_more.py": {
+      "name": "Übergaben erweitern",
+      "description": "Ergänzt Übergabezeitpunkt, Zähler, Nachweise, Anlagen und übergebene Schlüssel."
+    },
+    "wohnungsverwaltung/migrations/0002_stellplatz_zuordnung.py": {
+      "name": "Stellplätze zuordnen",
+      "description": "Führt Zuordnungen von Stellplätzen ein und übernimmt bestehende Angaben."
+    },
+    "wohnungsverwaltung/migrations/0003_protokoll_bestaetigung_erklaert_and_more.py": {
+      "name": "Übergabe bestätigen",
+      "description": "Ergänzt Angaben zur Bestätigung und Schlüsselprüfung bei Übergaben."
+    },
+    "wohnungsverwaltung/migrations/0003_stellplatz_eigenstaendige_miete.py": {
+      "name": "Stellplatzmiete",
+      "description": "Verlegt die Miete von der Zuordnung zum Stellplatz und übernimmt vorhandene Werte."
+    },
+    "wohnungsverwaltung/migrations/0004_person_wohnung.py": {
+      "name": "Personen und Wohnungen",
+      "description": "Erlaubt die Zuordnung einer Person zu einer Wohnung."
+    },
+    "wohnungsverwaltung/migrations/0005_alter_protokoll_mieter_zukuenftige_anschrift.py": {
+      "name": "Anschrift bei Übergabe",
+      "description": "Macht die zukünftige Anschrift im Übergabeprotokoll optional."
+    },
+    "wohnungsverwaltung/migrations/0006_person_is_employee.py": {
+      "name": "Mitarbeiter kennzeichnen",
+      "description": "Ergänzt eine Mitarbeiterkennzeichnung bei Personen."
+    },
+    "wohnungsverwaltung/migrations/0007_protokollentwurf.py": {
+      "name": "Protokollentwürfe",
+      "description": "Legt die Speicherung von Entwürfen für Übergabeprotokolle an."
+    },
+    "wohnungsverwaltung/migrations/0008_alter_bewerbung_personenanzahl_and_more.py": {
+      "name": "Bewerbungen absichern",
+      "description": "Ändert Angaben zu Haushaltsgröße und Selbstauskunft und ergänzt eine Datenregel."
+    },
+    "wohnungsverwaltung/migrations/0008_merge_stellplatz_und_protokoll.py": {
+      "name": "Änderungen zusammenführen",
+      "description": "Führt parallele Änderungen am Datenbankschema in einen gemeinsamen Verlauf zusammen."
+    },
+    "wohnungsverwaltung/migrations/0009_person_user.py": {
+      "name": "Person und Benutzerkonto",
+      "description": "Verbindet eine Person optional mit einem Benutzerkonto."
+    },
+    "wohnungsverwaltung/migrations/0009_raumstammdaten.py": {
+      "name": "Räume und Protokolle",
+      "description": "Legt Räume an, verknüpft Raumprotokolle damit und übernimmt bestehende Angaben."
+    },
+    "wohnungsverwaltung/migrations/0010_merge_20260929_1146.py": {
+      "name": "Änderungen zusammenführen",
+      "description": "Führt parallele Änderungen am Datenbankschema in einen gemeinsamen Verlauf zusammen."
+    },
+    "wohnungsverwaltung/migrations/0011_merge_rooms_and_applicants.py": {
+      "name": "Änderungen zusammenführen",
+      "description": "Führt parallele Änderungen am Datenbankschema in einen gemeinsamen Verlauf zusammen."
+    },
+    "wohnungsverwaltung/migrations/0011_person_access_permissions.py": {
+      "name": "Personenberechtigungen",
+      "description": "Ändert Berechtigungen für Personen und übernimmt die notwendigen Anpassungen."
+    },
+    "wohnungsverwaltung/migrations/0012_raummerkmalfoto.py": {
+      "name": "Fotos von Raummerkmalen",
+      "description": "Ermöglicht die Speicherung von Fotos zu Raummerkmalen."
+    },
+    "wohnungsverwaltung/migrations/0012_registration_verification.py": {
+      "name": "Registrierung bestätigen",
+      "description": "Legt die Speicherung von Bestätigungen zur Registrierung an."
+    },
+    "wohnungsverwaltung/migrations/0013_employee_login_verification.py": {
+      "name": "Mitarbeiteranmeldung bestätigen",
+      "description": "Legt die Speicherung von Bestätigungen für Mitarbeiteranmeldungen an."
+    },
+    "wohnungsverwaltung/migrations/0013_raummerkmalfoto_inhalt_hash_sha256_and_more.py": {
+      "name": "Doppelte Fotos erkennen",
+      "description": "Ergänzt eine Inhaltsprüfsumme und eine Datenregel für Fotos von Raummerkmalen."
+    },
+    "wohnungsverwaltung/migrations/0014_merge_20260930_1742.py": {
+      "name": "Änderungen zusammenführen",
+      "description": "Führt parallele Änderungen am Datenbankschema in einen gemeinsamen Verlauf zusammen."
+    },
+    "wohnungsverwaltung/migrations/0015_loginipthrottle_accountloginthrottle.py": {
+      "name": "Anmeldeversuche begrenzen",
+      "description": "Legt Zähler für Anmeldeversuche je Adresse und Benutzerkonto an."
+    },
+    "wohnungsverwaltung/migrations/0016_merge_20261001_2020.py": {
+      "name": "Änderungen zusammenführen",
+      "description": "Führt parallele Änderungen am Datenbankschema in einen gemeinsamen Verlauf zusammen."
+    },
+    "wohnungsverwaltung/migrations/0017_handover_pdf_signatures.py": {
+      "name": "Übergaben archivieren",
+      "description": "Ergänzt Unterschriften, Abschlussdaten und gespeicherte Angaben für Übergabeprotokolle."
+    },
+    "wohnungsverwaltung/migrations/0017_raummerkmal_eindeutig_pro_raumprotokoll.py": {
+      "name": "Raummerkmale eindeutig",
+      "description": "Bereinigt Raummerkmale und sichert ihre Eindeutigkeit pro Raumprotokoll ab."
+    },
+    "wohnungsverwaltung/migrations/0018_main_application_access_and_withdrawal.py": {
+      "name": "Bewerbungsfreigabe",
+      "description": "Ergänzt die Freigabe der Hauptbewerbung und den Rückzug des Interesses."
+    },
+    "wohnungsverwaltung/migrations/0018_merge_photo_safety_and_pdf.py": {
+      "name": "Änderungen zusammenführen",
+      "description": "Führt parallele Änderungen am Datenbankschema in einen gemeinsamen Verlauf zusammen."
+    },
+    "wohnungsverwaltung/migrations/0019_bewerbung_credit_report_proof_and_more.py": {
+      "name": "Bewerbungsunterlagen",
+      "description": "Ergänzt Einkommens-, Identitäts- und Bonitätsnachweise sowie den Einreichungszeitpunkt."
+    },
+    "wohnungsverwaltung/migrations/0019_merge_application_access_and_pdf.py": {
+      "name": "Änderungen zusammenführen",
+      "description": "Führt parallele Änderungen am Datenbankschema in einen gemeinsamen Verlauf zusammen."
+    },
+    "wohnungsverwaltung/migrations/0020_apartment_photos.py": {
+      "name": "Wohnungsfotos",
+      "description": "Legt die Speicherung von Fotos zu Wohnungen an."
+    },
+    "wohnungsverwaltung/migrations/0020_bewerbung_proof_original_names.py": {
+      "name": "Namen der Unterlagen",
+      "description": "Speichert die ursprünglichen Dateinamen von Bewerbungsunterlagen."
+    },
+    "wohnungsverwaltung/migrations/0021_apartment_public_details.py": {
+      "name": "Öffentliche Wohnungsangaben",
+      "description": "Ergänzt Beschreibung, Ausstattung, Heizung, Energieangaben und geplanten Einzug."
+    },
+    "wohnungsverwaltung/migrations/0021_applicationproof.py": {
+      "name": "Bewerbungsnachweise",
+      "description": "Legt die Speicherung einzelner Bewerbungsnachweise an."
+    },
+    "wohnungsverwaltung/migrations/0022_merge_main_and_application_proofs.py": {
+      "name": "Änderungen zusammenführen",
+      "description": "Führt parallele Änderungen am Datenbankschema in einen gemeinsamen Verlauf zusammen."
+    },
+    "wohnungsverwaltung/migrations/0023_application_proof_cleanup_queue.py": {
+      "name": "Alte Nachweise entfernen",
+      "description": "Legt Aufträge zur Bereinigung von Bewerbungsnachweisen an."
+    },
+    "wohnungsverwaltung/migrations/0024_bewerbung_review_priority_and_more.py": {
+      "name": "Bewerbungen prüfen",
+      "description": "Ergänzt Priorität und Prüfverlauf sowie Anforderungen an die Wohnungsbelegung."
+    },
+    "wohnungsverwaltung/migrations/0024_handover_photo_cleanup_queue.py": {
+      "name": "Übergabefotos bereinigen",
+      "description": "Legt Aufträge zur Bereinigung von Übergabefotos an."
+    },
+    "wohnungsverwaltung/migrations/0025_alter_applicationreviewevent_kind.py": {
+      "name": "Prüfereignisse erweitern",
+      "description": "Ändert die verfügbaren Arten von Ereignissen bei der Bewerbungsprüfung."
+    },
+    "wohnungsverwaltung/migrations/0025_handover_archive_cleanup_queue.py": {
+      "name": "Übergabearchive bereinigen",
+      "description": "Legt Aufträge zur Bereinigung von Übergabearchiven an."
+    }
+  }
+}

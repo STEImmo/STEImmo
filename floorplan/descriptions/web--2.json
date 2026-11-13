@@ -1,0 +1,164 @@
+{
+  "files": {
+    "templates/wohnungsverwaltung/_building_facade.html": {
+      "name": "Gebäudefassade",
+      "description": "Zeichnet die Gebäudeansicht für die Etagenwahl."
+    },
+    "templates/wohnungsverwaltung/_dashboard_entries.html": {
+      "name": "Einträge der Übersicht",
+      "description": "Zeigt Einträge für die Verwaltungsübersicht."
+    },
+    "templates/wohnungsverwaltung/_employee_application_row.html": {
+      "name": "Bewerbungszeile",
+      "description": "Zeigt eine Bewerbung als Zeile in der Verwaltungsliste."
+    },
+    "templates/wohnungsverwaltung/_employee_viewings.html": {
+      "name": "Besichtigung bearbeiten",
+      "description": "Zeigt Besichtigungstermine und das Formular zur Planung oder Nachtragung."
+    },
+    "templates/wohnungsverwaltung/_floor_plan_architecture.html": {
+      "name": "Grundriss zeichnen",
+      "description": "Stellt die baulichen Elemente eines Etagenplans dar."
+    },
+    "templates/wohnungsverwaltung/_floor_plan.html": {
+      "name": "Etagenplan",
+      "description": "Zeigt Wohnungen und ihre Auswahlmöglichkeiten auf einem Etagenplan."
+    },
+    "templates/wohnungsverwaltung/_form_field_feedback.html": {
+      "name": "Hinweise zum Formularfeld",
+      "description": "Zeigt Hilfe und Fehlermeldungen für ein Formularfeld."
+    },
+    "templates/wohnungsverwaltung/_form_field.html": {
+      "name": "Formularfeld",
+      "description": "Stellt ein beschriftetes Formularfeld mit Hinweisen und Fehlern dar."
+    },
+    "templates/wohnungsverwaltung/_handover_photo_upload_hint.html": {
+      "name": "Hinweis zu Übergabefotos",
+      "description": "Zeigt Hinweise für das Hochladen von Übergabefotos."
+    },
+    "templates/wohnungsverwaltung/_handover_protocol_fields.html": {
+      "name": "Übergabedaten",
+      "description": "Zeigt Felder für Beteiligte, Zählerstände und Nachweise einer Übergabe."
+    },
+    "templates/wohnungsverwaltung/_handover_snapshot_rooms.html": {
+      "name": "Gespeicherte Übergaberäume",
+      "description": "Zeigt Räume und ihre festgehaltenen Angaben aus einem Übergabeprotokoll."
+    },
+    "templates/wohnungsverwaltung/_merkmal_option_row.html": {
+      "name": "Zeile für Prüfmerkmal",
+      "description": "Zeigt eine auswählbare Prüfvorlage mit ihren Angaben."
+    },
+    "templates/wohnungsverwaltung/_move_in_reference.html": {
+      "name": "Einzug zum Vergleich",
+      "description": "Zeigt Angaben des Einzugsprotokolls zum Vergleich bei der Übergabe."
+    },
+    "templates/wohnungsverwaltung/_photo_picker.html": {
+      "name": "Fotoauswahl",
+      "description": "Zeigt Bedienelemente zur Auswahl von Fotos."
+    },
+    "templates/wohnungsverwaltung/_pre_application_fields.html": {
+      "name": "Felder zur Besichtigungsanfrage",
+      "description": "Zeigt die Eingabefelder einer Besichtigungsanfrage."
+    },
+    "templates/wohnungsverwaltung/_protocol_pdf_action.html": {
+      "name": "Protokoll als PDF",
+      "description": "Zeigt die Aktion zum Abruf eines Übergabeprotokolls als PDF."
+    },
+    "templates/wohnungsverwaltung/_protocol_saved_photos.html": {
+      "name": "Gespeicherte Protokollfotos",
+      "description": "Zeigt bereits gespeicherte Fotos eines Übergabeprotokolls."
+    },
+    "templates/wohnungsverwaltung/_raum_merkmal_fotos.html": {
+      "name": "Fotos zum Prüfpunkt",
+      "description": "Zeigt Fotos, die einem Prüfpunkt im Raum zugeordnet sind."
+    },
+    "templates/wohnungsverwaltung/_raum_merkmal_move_in_reference.html": {
+      "name": "Prüfpunkt beim Einzug",
+      "description": "Zeigt die gespeicherten Einzugsangaben eines Prüfpunkts zum Vergleich."
+    },
+    "templates/wohnungsverwaltung/_raum_merkmal_move_out_current.html": {
+      "name": "Prüfpunkt beim Auszug",
+      "description": "Zeigt die aktuellen Angaben eines Prüfpunkts für den Auszug."
+    },
+    "templates/wohnungsverwaltung/_regular_floor_architecture.html": {
+      "name": "Regelgeschoss im Plan",
+      "description": "Zeichnet die baulichen Elemente eines regulären Etagenplans."
+    },
+    "templates/wohnungsverwaltung/_room_move_in_unmatched_references.html": {
+      "name": "Nicht zugeordnete Einzugsangaben",
+      "description": "Zeigt Einzugsangaben, denen im aktuellen Raum kein Prüfpunkt zugeordnet ist."
+    },
+    "templates/wohnungsverwaltung/_schluessel_form_row.html": {
+      "name": "Schlüssel erfassen",
+      "description": "Zeigt eine Formularzeile zur Erfassung eines Schlüssels."
+    },
+    "templates/wohnungsverwaltung/_signature_pad.html": {
+      "name": "Unterschriftsfeld",
+      "description": "Zeigt die Fläche zur handschriftlichen Unterschrift."
+    },
+    "templates/wohnungsverwaltung/_stellplatz_zuordnung_form_row.html": {
+      "name": "Stellplatz zuordnen",
+      "description": "Zeigt eine Formularzeile zur Zuordnung eines Stellplatzes."
+    },
+    "templates/wohnungsverwaltung/_table_filter_dropdown.html": {
+      "name": "Tabellenfilter auswählen",
+      "description": "Zeigt die auswählbaren Werte eines Tabellenfilters."
+    },
+    "templates/wohnungsverwaltung/_table_filter_summary.html": {
+      "name": "Aktive Tabellenfilter",
+      "description": "Zeigt aktive Filter und Möglichkeiten zum Zurücksetzen."
+    },
+    "templates/wohnungsverwaltung/_viewing_proposal_summary.html": {
+      "name": "Vorgeschlagener Besichtigungstermin",
+      "description": "Fasst einen vorgeschlagenen Besichtigungstermin zusammen."
+    },
+    "templates/wohnungsverwaltung/_viewing_summary.html": {
+      "name": "Besichtigung im Überblick",
+      "description": "Fasst Angaben zu einer Besichtigung zusammen."
+    },
+    "templates/wohnungsverwaltung/_workspace_navigation.html": {
+      "name": "Navigation im Arbeitsbereich",
+      "description": "Zeigt die Navigation zwischen Bereichen der Wohnungsverwaltung."
+    },
+    "templates/wohnungsverwaltung/apartment_detail_placeholder.html": {
+      "name": "Wohnungsdetails",
+      "description": "Zeigt Angaben, Fotos und den Einstieg zur Besichtigungsanfrage für eine Wohnung."
+    },
+    "templates/wohnungsverwaltung/apartment_photos.html": {
+      "name": "Wohnungsfotos verwalten",
+      "description": "Zeigt die Fotoverwaltung für eine Wohnung."
+    },
+    "templates/wohnungsverwaltung/apartment_search.html": {
+      "name": "Wohnungssuche",
+      "description": "Zeigt verfügbare Wohnungen und Filter für die Suche."
+    },
+    "templates/wohnungsverwaltung/application_base.html": {
+      "name": "Rahmen für Bewerbungen",
+      "description": "Stellt den gemeinsamen Seitenrahmen für die Bewerbung bereit."
+    },
+    "templates/wohnungsverwaltung/application_withdraw_confirm.html": {
+      "name": "Bewerbung beenden",
+      "description": "Fragt vor dem Beenden einer Bewerbung nach Bestätigung."
+    },
+    "templates/wohnungsverwaltung/building_view.html": {
+      "name": "Gebäude erkunden",
+      "description": "Zeigt das Gebäude und führt zur Auswahl einer Etage."
+    },
+    "templates/wohnungsverwaltung/employee_application_detail.html": {
+      "name": "Bewerbung prüfen",
+      "description": "Zeigt Bewerbungsdetails, interne Prüfung und Besichtigungsangaben."
+    },
+    "templates/wohnungsverwaltung/employee_application_list.html": {
+      "name": "Bewerbungen verwalten",
+      "description": "Zeigt und filtert Bewerbungen je Wohnung."
+    },
+    "templates/wohnungsverwaltung/employee_dashboard.html": {
+      "name": "Verwaltungsübersicht",
+      "description": "Zeigt Aufgaben und Termine für die Wohnungsverwaltung."
+    },
+    "templates/wohnungsverwaltung/floor_view.html": {
+      "name": "Etage erkunden",
+      "description": "Zeigt den Etagenplan und die Wohnungen auf dieser Etage."
+    }
+  }
+}

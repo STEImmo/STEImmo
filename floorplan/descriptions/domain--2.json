@@ -1,0 +1,410 @@
+{
+  "files": {
+    "wohnungsverwaltung/test_checkpoint_details_validation.py": {
+      "name": "Test: Prüfung von Prüfpunkten",
+      "description": "Prüft automatisch Prüfung von Prüfpunkten."
+    },
+    "wohnungsverwaltung/test_checkpoint_photo_replacement.py": {
+      "name": "Test: Austausch von Prüfpunktfotos",
+      "description": "Prüft automatisch Austausch von Prüfpunktfotos."
+    },
+    "wohnungsverwaltung/test_confirmed_inventory.py": {
+      "name": "Test: bestätigter Wohnungsbestand",
+      "description": "Prüft automatisch bestätigter Wohnungsbestand."
+    },
+    "wohnungsverwaltung/test_dashboard_navigation.py": {
+      "name": "Test: Navigation der Mitarbeiterübersicht",
+      "description": "Prüft automatisch Navigation der Mitarbeiterübersicht."
+    },
+    "wohnungsverwaltung/test_employee_dashboard.py": {
+      "name": "Test: Mitarbeiterübersicht",
+      "description": "Prüft automatisch Mitarbeiterübersicht."
+    },
+    "wohnungsverwaltung/test_floor_plan_labels.py": {
+      "name": "Test: Beschriftungen der Etagenpläne",
+      "description": "Prüft automatisch Beschriftungen der Etagenpläne."
+    },
+    "wohnungsverwaltung/test_form_accessibility.py": {
+      "name": "Test: Barrierefreiheit von Formularen",
+      "description": "Prüft automatisch Barrierefreiheit von Formularen."
+    },
+    "wohnungsverwaltung/test_handover_archive_recovery.py": {
+      "name": "Test: Bereinigung von Übergabearchiven",
+      "description": "Prüft automatisch Bereinigung von Übergabearchiven."
+    },
+    "wohnungsverwaltung/test_handover_archived_assignment.py": {
+      "name": "Test: Zuordnungen archivierter Übergaben",
+      "description": "Prüft automatisch Zuordnungen archivierter Übergaben."
+    },
+    "wohnungsverwaltung/test_handover_archived_display.py": {
+      "name": "Test: Anzeige archivierter Übergaben",
+      "description": "Prüft automatisch Anzeige archivierter Übergaben."
+    },
+    "wohnungsverwaltung/test_handover_archived_tenant.py": {
+      "name": "Test: Mieterangaben archivierter Übergaben",
+      "description": "Prüft automatisch Mieterangaben archivierter Übergaben."
+    },
+    "wohnungsverwaltung/test_handover_availability.py": {
+      "name": "Test: Verfügbarkeit von Übergaben",
+      "description": "Prüft automatisch Verfügbarkeit von Übergaben."
+    },
+    "wohnungsverwaltung/test_handover_chronology.py": {
+      "name": "Test: zeitliche Reihenfolge von Übergaben",
+      "description": "Prüft automatisch zeitliche Reihenfolge von Übergaben."
+    },
+    "wohnungsverwaltung/test_handover_draft_session.py": {
+      "name": "Test: Sitzung bei Übergabeentwürfen",
+      "description": "Prüft automatisch Sitzung bei Übergabeentwürfen."
+    },
+    "wohnungsverwaltung/test_handover_draft_validation.py": {
+      "name": "Test: Prüfung von Übergabeentwürfen",
+      "description": "Prüft automatisch Prüfung von Übergabeentwürfen."
+    },
+    "wohnungsverwaltung/test_handover_export.py": {
+      "name": "Test: Archivierung und PDF-Ausgabe",
+      "description": "Prüft automatisch Archivierung und PDF-Ausgabe."
+    },
+    "wohnungsverwaltung/test_handover_form_chronology.py": {
+      "name": "Test: zeitliche Prüfung im Übergabeformular",
+      "description": "Prüft automatisch zeitliche Prüfung im Übergabeformular."
+    },
+    "wohnungsverwaltung/test_inherited_room.py": {
+      "name": "Test: Raumzuordnung bei Prüfpunkten",
+      "description": "Prüft automatisch Raumzuordnung bei Prüfpunkten."
+    },
+    "wohnungsverwaltung/test_inline_checkpoint_replacement.py": {
+      "name": "Test: Austausch von Prüfpunkten",
+      "description": "Prüft automatisch Austausch von Prüfpunkten."
+    },
+    "wohnungsverwaltung/test_inline_room_removal.py": {
+      "name": "Test: Entfernen von Räumen",
+      "description": "Prüft automatisch Entfernen von Räumen."
+    },
+    "wohnungsverwaltung/test_management_dashboard.py": {
+      "name": "Test: Verwaltungsübersicht",
+      "description": "Prüft automatisch Verwaltungsübersicht."
+    },
+    "wohnungsverwaltung/test_management_room_forms.py": {
+      "name": "Test: Raumformulare der Verwaltung",
+      "description": "Prüft automatisch Raumformulare der Verwaltung."
+    },
+    "wohnungsverwaltung/test_management.py": {
+      "name": "Test: Verwaltungsseiten",
+      "description": "Prüft automatisch Verwaltungsseiten."
+    },
+    "wohnungsverwaltung/test_migrations.py": {
+      "name": "Test: Datenbankänderungen",
+      "description": "Prüft automatisch Datenbankänderungen."
+    },
+    "wohnungsverwaltung/test_parking_assignment.py": {
+      "name": "Test: Zuordnung von Stellplätzen",
+      "description": "Prüft automatisch Zuordnung von Stellplätzen."
+    },
+    "wohnungsverwaltung/test_pdf_access.py": {
+      "name": "Test: Zugriff auf PDF-Dokumente",
+      "description": "Prüft automatisch Zugriff auf PDF-Dokumente."
+    },
+    "wohnungsverwaltung/test_person_assignment.py": {
+      "name": "Test: Zuordnung von Personen",
+      "description": "Prüft automatisch Zuordnung von Personen."
+    },
+    "wohnungsverwaltung/test_photo_access.py": {
+      "name": "Test: Zugriff auf Fotos",
+      "description": "Prüft automatisch Zugriff auf Fotos."
+    },
+    "wohnungsverwaltung/test_photo_deletion.py": {
+      "name": "Test: Bereinigung gelöschter Fotos",
+      "description": "Prüft automatisch Bereinigung gelöschter Fotos."
+    },
+    "wohnungsverwaltung/test_photo_duplicates.py": {
+      "name": "Test: doppelte Fotos und Uploadgrenzen",
+      "description": "Prüft automatisch doppelte Fotos und Uploadgrenzen."
+    },
+    "wohnungsverwaltung/test_photo_recovery.py": {
+      "name": "Test: Fehlerbehandlung bei Fotodateien",
+      "description": "Prüft automatisch Fehlerbehandlung bei Fotodateien."
+    },
+    "wohnungsverwaltung/test_protocol_edit.py": {
+      "name": "Test: Bearbeitung von Übergabeprotokollen",
+      "description": "Prüft automatisch Bearbeitung von Übergabeprotokollen."
+    },
+    "wohnungsverwaltung/test_room_counts.py": {
+      "name": "Test: Zimmerzahlen",
+      "description": "Prüft automatisch Zimmerzahlen."
+    },
+    "wohnungsverwaltung/test_table_filters.py": {
+      "name": "Test: Tabellenfilter",
+      "description": "Prüft automatisch Tabellenfilter."
+    },
+    "wohnungsverwaltung/test_unsaved_apartment.py": {
+      "name": "Test: Räume ungespeicherter Wohnungen",
+      "description": "Prüft automatisch Räume ungespeicherter Wohnungen."
+    },
+    "wohnungsverwaltung/test_viewings.py": {
+      "name": "Test: Besichtigungstermine",
+      "description": "Prüft automatisch Besichtigungstermine."
+    },
+    "wohnungsverwaltung/tests.py": {
+      "name": "Wohnungsverwaltung prüfen",
+      "description": "Prüft automatisch Wohnungssuche, Bewerbungen, Übergaben und Stammdaten."
+    },
+    "wohnungsverwaltung/upload_limits.py": {
+      "name": "Grenzen für Uploads",
+      "description": "Begrenzt Dateigröße und Anfragen für Bewerbungsnachweise und Wohnungsfotos frühzeitig."
+    },
+    "wohnungsverwaltung/urls.py": {
+      "name": "Übergaben und Bewerbungen",
+      "description": "Verbindet die Adressen für Übergaben und Bewerbungen mit ihrer Verarbeitung."
+    },
+    "wohnungsverwaltung/verwaltung_urls.py": {
+      "name": "Adressen der Verwaltung",
+      "description": "Verbindet die Adressen der Mitarbeiterverwaltung mit ihrer Verarbeitung."
+    }
+  },
+  "routes": {
+    "ANY /uebergaben/meine": {
+      "name": "Meine Übergaben",
+      "description": "Zeigt eigene Übergabeprotokolle."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/abschluss": {
+      "name": "Übergabe abschließen",
+      "description": "Zeigt den Abschluss eines Übergabeprotokolls."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/pdf": {
+      "name": "Übergabe-PDF",
+      "description": "Stellt das PDF eines Übergabeprotokolls bereit."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/pdf/erstellen": {
+      "name": "Übergabe-PDF erstellen",
+      "description": "Erstellt ein PDF zum Übergabeprotokoll."
+    },
+    "ANY /uebergaben/bewerbung/meine": {
+      "name": "Meine Bewerbungen",
+      "description": "Zeigt die eigenen Bewerbungen."
+    },
+    "ANY /uebergaben/bewerbungen/mitarbeiter/<uuid:application_id>/besichtigungen/neu": {
+      "name": "Besichtigung anlegen",
+      "description": "Legt einen Besichtigungstermin zu einer Bewerbung an."
+    },
+    "ANY /uebergaben/bewerbungen/mitarbeiter/<uuid:application_id>/besichtigungen/<uuid:appointment_id>": {
+      "name": "Besichtigung bearbeiten",
+      "description": "Bearbeitet einen Besichtigungstermin."
+    },
+    "ANY /uebergaben/bewerbungen/mitarbeiter/<uuid:application_id>/besichtigungen/<uuid:appointment_id>/versand": {
+      "name": "Terminnachricht erneut senden",
+      "description": "Sendet die Nachricht zu einem Besichtigungstermin erneut."
+    },
+    "ANY /uebergaben/bewerbung/<uuid:application_id>/besichtigungen/<uuid:appointment_id>/antwort": {
+      "name": "Auf Termin antworten",
+      "description": "Nimmt die Antwort auf einen Besichtigungstermin entgegen."
+    },
+    "ANY /uebergaben/bewerbung/neu": {
+      "name": "Vorbewerbung erstellen",
+      "description": "Ermöglicht das Anlegen einer Vorbewerbung."
+    },
+    "ANY /uebergaben/bewerbung/<uuid:application_id>/besichtigungen/<uuid:appointment_id>/alternativtermin": {
+      "name": "Alternativtermin vorschlagen",
+      "description": "Nimmt einen alternativen Besichtigungstermin entgegen."
+    },
+    "ANY /uebergaben/bewerbung/neu/<uuid:unit_id>": {
+      "name": "Wohnung auswählen",
+      "description": "Startet eine Vorbewerbung für eine ausgewählte Wohnung."
+    },
+    "ANY /uebergaben/bewerbung/vorschau": {
+      "name": "Bewerbungsvorschau",
+      "description": "Zeigt eine Vorschau der Vorbewerbung."
+    },
+    "ANY /uebergaben/bewerbung/<uuid:application_id>/main": {
+      "name": "Hauptbewerbung",
+      "description": "Zeigt den Stand der Hauptbewerbung und ermöglicht deren Bearbeitung."
+    },
+    "ANY /uebergaben/bewerbung/<uuid:application_id>/nachweise/<str:document_type>": {
+      "name": "Eigener Nachweis",
+      "description": "Zeigt einen Nachweis der eigenen Bewerbung."
+    },
+    "ANY /uebergaben/bewerbung/<uuid:application_id>/nachweise/datei/<uuid:proof_id>": {
+      "name": "Eigene Nachweisdatei",
+      "description": "Stellt eine Datei der eigenen Bewerbung bereit."
+    },
+    "ANY /uebergaben/bewerbung/<uuid:application_id>/zurueckziehen": {
+      "name": "Bewerbung zurückziehen",
+      "description": "Ermöglicht das Zurückziehen einer Bewerbung."
+    },
+    "ANY /uebergaben/bewerbungen/mitarbeiter": {
+      "name": "Bewerbungen verwalten",
+      "description": "Zeigt Mitarbeitern die Bewerbungen."
+    },
+    "ANY /uebergaben/bewerbungen/mitarbeiter/<uuid:application_id>": {
+      "name": "Bewerbung prüfen",
+      "description": "Zeigt Mitarbeitern die Details einer Bewerbung."
+    },
+    "ANY /uebergaben/bewerbungen/mitarbeiter/<uuid:application_id>/prioritaet": {
+      "name": "Priorität ändern",
+      "description": "Ändert die Priorität einer Bewerbung."
+    },
+    "ANY /uebergaben/bewerbungen/mitarbeiter/<uuid:application_id>/einzelfall-freigeben": {
+      "name": "Einzelfall freigeben",
+      "description": "Gibt eine Bewerbung zur Einzelfallprüfung frei."
+    },
+    "ANY /uebergaben/bewerbungen/mitarbeiter/<uuid:application_id>/main-einladen": {
+      "name": "Zur Hauptbewerbung einladen",
+      "description": "Lädt zur Hauptbewerbung ein."
+    },
+    "ANY /uebergaben/bewerbungen/mitarbeiter/<uuid:application_id>/einladung-erneut-senden": {
+      "name": "Einladung erneut senden",
+      "description": "Sendet eine Einladung zur Hauptbewerbung erneut."
+    },
+    "ANY /uebergaben/bewerbungen/mitarbeiter/<uuid:application_id>/nachweise/<str:document_type>": {
+      "name": "Bewerbungsnachweis prüfen",
+      "description": "Zeigt Mitarbeitern einen Bewerbungsnachweis."
+    },
+    "ANY /uebergaben/bewerbungen/mitarbeiter/<uuid:application_id>/nachweise/datei/<uuid:proof_id>": {
+      "name": "Nachweisdatei abrufen",
+      "description": "Stellt Mitarbeitern eine Datei zur Bewerbung bereit."
+    },
+    "ANY /uebergaben": {
+      "name": "Übergaben anzeigen",
+      "description": "Zeigt die Liste der Übergabeprotokolle."
+    },
+    "ANY /uebergaben/neu": {
+      "name": "Übergabe anlegen",
+      "description": "Legt ein Übergabeprotokoll an."
+    },
+    "ANY /uebergaben/entwuerfe/speichern": {
+      "name": "Entwurf speichern",
+      "description": "Speichert einen Entwurf für eine Übergabe."
+    },
+    "ANY /uebergaben/entwuerfe/<uuid:draft_id>/loeschen": {
+      "name": "Entwurf löschen",
+      "description": "Entfernt einen gespeicherten Übergabeentwurf."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/raeume/neu": {
+      "name": "Raum hinzufügen",
+      "description": "Fügt einem Übergabeprotokoll einen Raum hinzu."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/raeume/<uuid:room_id>/loeschen": {
+      "name": "Raum entfernen",
+      "description": "Entfernt einen Raum aus einem Übergabeprotokoll."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/raeume/<uuid:room_id>/pruefpunkte/<uuid:item_id>/loeschen": {
+      "name": "Prüfpunkt entfernen",
+      "description": "Entfernt einen Prüfpunkt aus einem Raum des Übergabeprotokolls."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/raeume/<uuid:room_id>/pruefpunkte/<uuid:item_id>/fotos": {
+      "name": "Prüfpunktfotos",
+      "description": "Verwaltet Fotos zu einem Prüfpunkt."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/raeume/<uuid:room_id>/pruefpunkte/<uuid:item_id>/fotos/<uuid:photo_id>": {
+      "name": "Prüfpunktfoto anzeigen",
+      "description": "Zeigt das Foto eines Prüfpunkts."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/raeume/<uuid:room_id>/pruefpunkte/<uuid:item_id>/fotos/<uuid:photo_id>/loeschen": {
+      "name": "Prüfpunktfoto entfernen",
+      "description": "Entfernt das Foto eines Prüfpunkts."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/raeume/<uuid:room_id>": {
+      "name": "Raum bearbeiten",
+      "description": "Zeigt und bearbeitet einen Raum im Übergabeprotokoll."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/schluessel/neu": {
+      "name": "Schlüssel hinzufügen",
+      "description": "Fügt einen Schlüssel zum Übergabeprotokoll hinzu."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/schluessel/<uuid:key_id>/loeschen": {
+      "name": "Schlüssel entfernen",
+      "description": "Entfernt einen Schlüssel aus dem Übergabeprotokoll."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/bestaetigen": {
+      "name": "Übergabe bestätigen",
+      "description": "Nimmt die Bestätigung eines Übergabeprotokolls entgegen."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>": {
+      "name": "Übergabe ansehen",
+      "description": "Zeigt ein Übergabeprotokoll."
+    },
+    "ANY /uebergaben/<uuid:protocol_id>/bearbeiten": {
+      "name": "Übergabe bearbeiten",
+      "description": "Bearbeitet ein Übergabeprotokoll."
+    },
+    "ANY /verwaltung/wohnungen/<uuid:wohnung_id>/personen": {
+      "name": "Wohnungspersonen",
+      "description": "Zeigt und verwaltet Personen einer Wohnung."
+    },
+    "ANY /verwaltung/wohnungen/<uuid:wohnung_id>/personen/<uuid:person_id>": {
+      "name": "Personenzuordnung",
+      "description": "Bearbeitet die Zuordnung einer Person zu einer Wohnung."
+    },
+    "ANY /verwaltung": {
+      "name": "Verwaltungsübersicht",
+      "description": "Zeigt die Übersicht für Mitarbeiter."
+    },
+    "ANY /verwaltung/wohnungen/<uuid:wohnung_id>/fotos": {
+      "name": "Wohnungsfotos",
+      "description": "Verwaltet Fotos einer Wohnung."
+    },
+    "ANY /verwaltung/wohnungen/<uuid:wohnung_id>/fotos/<uuid:photo_id>/loeschen": {
+      "name": "Wohnungsfoto löschen",
+      "description": "Entfernt ein Foto einer Wohnung."
+    },
+    "ANY /verwaltung/benutzer": {
+      "name": "Benutzer anzeigen",
+      "description": "Zeigt die Benutzerverwaltung."
+    },
+    "ANY /verwaltung/benutzer/neu": {
+      "name": "Benutzer anlegen",
+      "description": "Legt ein Benutzerkonto an."
+    },
+    "ANY /verwaltung/benutzer/<int:user_id>": {
+      "name": "Benutzer bearbeiten",
+      "description": "Bearbeitet ein Benutzerkonto."
+    },
+    "ANY /verwaltung/wohnungen": {
+      "name": "Wohnungen verwalten",
+      "description": "Zeigt die Wohnungen in der Verwaltung."
+    },
+    "ANY /verwaltung/wohnungen/neu": {
+      "name": "Wohnung anlegen",
+      "description": "Legt eine Wohnung in der Verwaltung an."
+    },
+    "ANY /verwaltung/wohnungen/<uuid:wohnung_id>": {
+      "name": "Wohnung bearbeiten",
+      "description": "Zeigt und bearbeitet eine Wohnung."
+    },
+    "ANY /verwaltung/wohnungen/<uuid:wohnung_id>/raeume/neu": {
+      "name": "Wohnungsraum anlegen",
+      "description": "Fügt einer Wohnung einen Raum hinzu."
+    },
+    "ANY /verwaltung/wohnungen/<uuid:wohnung_id>/raeume/<uuid:raum_id>": {
+      "name": "Wohnungsraum bearbeiten",
+      "description": "Bearbeitet einen Raum einer Wohnung."
+    },
+    "ANY /verwaltung/wohnungen/<uuid:wohnung_id>/raeume/<uuid:raum_id>/loeschen": {
+      "name": "Wohnungsraum löschen",
+      "description": "Entfernt einen Raum aus einer Wohnung."
+    },
+    "ANY /verwaltung/merkmale": {
+      "name": "Prüfmerkmale",
+      "description": "Zeigt die verwalteten Prüfmerkmale."
+    },
+    "ANY /verwaltung/merkmale/neu": {
+      "name": "Prüfmerkmal anlegen",
+      "description": "Legt ein Prüfmerkmal an."
+    },
+    "ANY /verwaltung/merkmale/<uuid:merkmal_id>": {
+      "name": "Prüfmerkmal bearbeiten",
+      "description": "Bearbeitet ein Prüfmerkmal."
+    },
+    "ANY /verwaltung/stellplaetze": {
+      "name": "Stellplätze",
+      "description": "Zeigt die verwalteten Stellplätze."
+    },
+    "ANY /verwaltung/stellplaetze/neu": {
+      "name": "Stellplatz anlegen",
+      "description": "Legt einen Stellplatz an."
+    },
+    "ANY /verwaltung/stellplaetze/<uuid:stellplatz_id>": {
+      "name": "Stellplatz bearbeiten",
+      "description": "Bearbeitet einen Stellplatz."
+    }
+  }
+}

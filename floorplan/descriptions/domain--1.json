@@ -1,0 +1,190 @@
+{
+  "files": {
+    "wohnungsverwaltung/__init__.py": {
+      "name": "Wohnungsverwaltungspaket",
+      "description": "Kennzeichnet den Ordner als Paket der Wohnungsverwaltung."
+    },
+    "wohnungsverwaltung/access.py": {
+      "name": "Rollen und Zugriff",
+      "description": "Prüft fachliche Berechtigungen und richtet feste Rollen ein."
+    },
+    "wohnungsverwaltung/admin.py": {
+      "name": "Benutzerverwaltung",
+      "description": "Entfernt Benutzer und Gruppen aus der Standardverwaltung."
+    },
+    "wohnungsverwaltung/apps.py": {
+      "name": "Start der Wohnungsverwaltung",
+      "description": "Richtet nach Datenbankänderungen die Zugriffsrollen ein."
+    },
+    "wohnungsverwaltung/assignment_forms.py": {
+      "name": "Personen zuordnen",
+      "description": "Prüft Eingaben zur Auswahl und Zuordnung von Personen zu Wohnungen."
+    },
+    "wohnungsverwaltung/assignment_views.py": {
+      "name": "Wohnungszuordnungen",
+      "description": "Zeigt und bearbeitet die Zuordnung von Personen zu Wohnungen."
+    },
+    "wohnungsverwaltung/building_plans.py": {
+      "name": "Gebäude und Etagenpläne",
+      "description": "Stellt Zeichenpositionen und Beschriftungen für die Gebäudeansicht bereit."
+    },
+    "wohnungsverwaltung/dashboard.py": {
+      "name": "Übersicht für Mitarbeiter",
+      "description": "Bereitet Kennzahlen, Termine und Verweise aus Bewerbungen und Übergaben auf."
+    },
+    "wohnungsverwaltung/export_forms.py": {
+      "name": "Unterschrift bestätigen",
+      "description": "Prüft die Eingaben für die Unterzeichnung eines Übergabeprotokolls."
+    },
+    "wohnungsverwaltung/export_limits.py": {
+      "name": "Größenbegrenzung für Unterschriften",
+      "description": "Begrenzt große Anfragen und Dateiuploads vor der Verarbeitung der Unterschrift."
+    },
+    "wohnungsverwaltung/export_views.py": {
+      "name": "Abschluss und PDF",
+      "description": "Bearbeitet Abschluss, Bestätigung und PDF-Ausgabe von Übergabeprotokollen."
+    },
+    "wohnungsverwaltung/fields.py": {
+      "name": "Feste Datenbankwerte",
+      "description": "Unterstützt benannte Auswahllisten in PostgreSQL und ein Textfeld bei anderen Datenbanken."
+    },
+    "wohnungsverwaltung/formatting.py": {
+      "name": "Flächen und Zimmerzahlen",
+      "description": "Formatiert Flächen und Zimmerzahlen für die Anzeige mit deutschem Dezimalkomma."
+    },
+    "wohnungsverwaltung/forms.py": {
+      "name": "Formulare und Eingaben",
+      "description": "Prüft Eingaben für Konten, Wohnungen, Bewerbungen und Übergabeprotokolle."
+    },
+    "wohnungsverwaltung/handover_archive_files.py": {
+      "name": "Archivdateien aufräumen",
+      "description": "Speichert und bereinigt private PDF- und Unterschriftsdateien nach fehlgeschlagenem Archivieren."
+    },
+    "wohnungsverwaltung/handover_export.py": {
+      "name": "Übergabe archivieren",
+      "description": "Erstellt geschützte, unveränderliche Übergabedokumente und prüft deren Inhalte."
+    },
+    "wohnungsverwaltung/handover_lock.py": {
+      "name": "Übergaben gleichzeitig bearbeiten",
+      "description": "Verhindert konkurrierende Änderungen während der Bearbeitung und des Abschlusses eines Protokolls."
+    },
+    "wohnungsverwaltung/handover_photos.py": {
+      "name": "Fotos speichern und entfernen",
+      "description": "Verwaltet Wohnungs- und Übergabefotos und behandelt Fehler beim Speichern und Löschen."
+    },
+    "wohnungsverwaltung/management/__init__.py": {
+      "name": "Verwaltungsbefehle",
+      "description": "Kennzeichnet den Bereich für Verwaltungsbefehle."
+    },
+    "wohnungsverwaltung/management/commands/__init__.py": {
+      "name": "Verwaltungsbefehle",
+      "description": "Kennzeichnet den Bereich für Verwaltungsbefehle."
+    },
+    "wohnungsverwaltung/management/commands/create_development_employee.py": {
+      "name": "Entwicklungskonto für Mitarbeiter",
+      "description": "Stellt einen Befehl zum Anlegen eines Mitarbeiterkontos für die Entwicklung bereit."
+    },
+    "wohnungsverwaltung/management/commands/create_initial_user_manager.py": {
+      "name": "Erste Benutzerverwaltung",
+      "description": "Stellt einen Befehl zum Anlegen eines ersten Benutzerverwalters bereit."
+    },
+    "wohnungsverwaltung/management/commands/create_test_applicant.py": {
+      "name": "Testkonto für Bewerber",
+      "description": "Stellt einen Befehl zum Anlegen eines Testkontos für Bewerber bereit."
+    },
+    "wohnungsverwaltung/management/commands/retry_application_proof_cleanup.py": {
+      "name": "Bewerbungsnachweise bereinigen",
+      "description": "Versucht die ausstehende Löschung von Bewerbungsnachweisen erneut."
+    },
+    "wohnungsverwaltung/management/commands/retry_handover_archive_cleanup.py": {
+      "name": "Archivdateien bereinigen",
+      "description": "Versucht die Bereinigung fehlgeschlagener PDF- und Unterschriftsdateien erneut."
+    },
+    "wohnungsverwaltung/management/commands/retry_handover_photo_cleanup.py": {
+      "name": "Fotos bereinigen",
+      "description": "Versucht die Bereinigung von Wohnungs- und Übergabefotos erneut."
+    },
+    "wohnungsverwaltung/management/commands/seed_standard_data.py": {
+      "name": "Stammdaten einrichten",
+      "description": "Stellt einen Befehl zum Einrichten der Standarddaten für die Immobilie bereit."
+    },
+    "wohnungsverwaltung/management/commands/sync_building_inventory.py": {
+      "name": "Gebäudebestand abgleichen",
+      "description": "Gleicht den Gebäudebestand mit den hinterlegten Standarddaten ab."
+    },
+    "wohnungsverwaltung/public_urls.py": {
+      "name": "Öffentliche Wohnungsseiten",
+      "description": "Verbindet öffentliche Gebäude-, Etagen- und Wohnungsseiten mit ihrer Verarbeitung."
+    },
+    "wohnungsverwaltung/templatetags/__init__.py": {
+      "name": "Anzeigehilfen",
+      "description": "Kennzeichnet den Bereich für wiederverwendbare Anzeigehilfen."
+    },
+    "wohnungsverwaltung/templatetags/areas.py": {
+      "name": "Flächenanzeige",
+      "description": "Stellt die Formatierung von Flächen für Seiten bereit."
+    },
+    "wohnungsverwaltung/templatetags/room_counts.py": {
+      "name": "Zimmerzahlanzeige",
+      "description": "Stellt die Formatierung von Zimmerzahlen für Seiten bereit."
+    },
+    "wohnungsverwaltung/test_access_control.py": {
+      "name": "Test: Zugriff und Anmeldung",
+      "description": "Prüft automatisch Zugriff und Anmeldung."
+    },
+    "wohnungsverwaltung/test_apartment_photo_recovery.py": {
+      "name": "Test: Wiederherstellung von Wohnungsfotos",
+      "description": "Prüft automatisch Wiederherstellung von Wohnungsfotos."
+    },
+    "wohnungsverwaltung/test_apartment_search_ui.py": {
+      "name": "Test: Wohnungssuche",
+      "description": "Prüft automatisch Wohnungssuche."
+    },
+    "wohnungsverwaltung/test_application_document_access.py": {
+      "name": "Test: Zugriff auf Bewerbungsnachweise",
+      "description": "Prüft automatisch Zugriff auf Bewerbungsnachweise."
+    },
+    "wohnungsverwaltung/test_application_ui.py": {
+      "name": "Test: Bewerbungsoberfläche",
+      "description": "Prüft automatisch Bewerbungsoberfläche."
+    },
+    "wohnungsverwaltung/test_application_unit_choice.py": {
+      "name": "Test: Wohnungsauswahl bei Bewerbungen",
+      "description": "Prüft automatisch Wohnungsauswahl bei Bewerbungen."
+    },
+    "wohnungsverwaltung/test_assignment_concurrency.py": {
+      "name": "Test: gleichzeitige Zuordnungen",
+      "description": "Prüft automatisch gleichzeitige Zuordnungen."
+    },
+    "wohnungsverwaltung/test_building_view.py": {
+      "name": "Test: Gebäudeansicht und Wohnungsfotos",
+      "description": "Prüft automatisch Gebäudeansicht und Wohnungsfotos."
+    }
+  },
+  "routes": {
+    "ANY /wohnungen/gebaeude": {
+      "name": "Gebäudeansicht",
+      "description": "Zeigt das Gebäude und seine Etagen."
+    },
+    "ANY /wohnungen/etagen/<int:floor_number>": {
+      "name": "Etagenansicht",
+      "description": "Zeigt Wohnungen auf einer ausgewählten Etage."
+    },
+    "ANY /wohnungen/fotos/<uuid:photo_id>": {
+      "name": "Wohnungsfoto",
+      "description": "Zeigt ein öffentliches Foto einer Wohnung."
+    },
+    "ANY /wohnungen/<uuid:unit_id>/besichtigung": {
+      "name": "Besichtigung anfragen",
+      "description": "Nimmt eine wohnungsbezogene Besichtigungsanfrage entgegen."
+    },
+    "ANY /wohnungen/<uuid:unit_id>": {
+      "name": "Wohnungsdetails",
+      "description": "Zeigt die Details einer Wohnung."
+    },
+    "ANY /wohnungen": {
+      "name": "Wohnungssuche",
+      "description": "Zeigt und filtert Wohnungen."
+    }
+  }
+}

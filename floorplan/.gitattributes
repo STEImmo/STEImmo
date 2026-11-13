@@ -1,0 +1,3 @@
+# Unverändertes, von Floorplan erzeugtes HTML enthält Leerzeichen in Vendor-Kommentaren.
+index.html whitespace=-blank-at-eol
+steimmo-map.html whitespace=-blank-at-eol
