@@ -21,10 +21,6 @@ for (const [name, element] of [['zoom in',zoomIn],['zoom out',zoomOut],['fit',fi
   if (!await element.isVisible()) throw Error(name + ' control is missing');
 }
 await zoomIn.click(); await zoomOut.click(); await fit.click();
-const searchBtn = page.locator('#search-btn');
-if (!await searchBtn.isVisible()) throw Error('Search control is missing');
-await searchBtn.click();
-await page.keyboard.press('Escape');
 const state = await page.evaluate(() => ({
   text: document.body.innerText.slice(0,3000),
   svg: document.querySelectorAll('svg').length,
@@ -38,6 +34,14 @@ await page.setViewportSize({width:5120,height:2880});
 await fit.click();
 await page.waitForTimeout(1500);
 await page.screenshot({ path: out + '/steimmo-architektur-5k.png', fullPage: false, animations: 'disabled' });
+const searchBtn = page.locator('#search-btn');
+if (!await searchBtn.isVisible()) throw Error('Search control is missing');
+await searchBtn.click();
+const paletteOpen = await page.locator('#palette').evaluate(el => el.classList.contains('open'));
+if (!paletteOpen) throw Error('Search palette did not open');
+await page.keyboard.press('Escape');
+const paletteClosed = await page.locator('#palette').evaluate(el => !el.classList.contains('open'));
+if (!paletteClosed) console.warn('Search palette remains open after Escape');
 console.log(JSON.stringify({ title, state, errors }, null, 2));
 if (errors.length) throw Error('Browser errors: ' + errors.slice(0, 5).join(' | '));
 await browser.close();
