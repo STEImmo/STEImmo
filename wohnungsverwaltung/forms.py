@@ -827,6 +827,40 @@ class MultipleFileField(forms.FileField):
         return cleaned_uploads
 
 
+def _validate_pdf(upload, *, allow_encrypted=True):
+    try:
+        reader = PdfReader(upload, strict=True)
+        if not allow_encrypted and reader.is_encrypted:
+            raise forms.ValidationError("Bitte laden Sie ein unverschlüsseltes PDF hoch.")
+        if not reader.pages:
+            raise forms.ValidationError("Das PDF enthält keine Seiten.")
+    except (AttributeError, KeyError, TypeError, RecursionError, OverflowError) as error:
+        raise forms.ValidationError("Das PDF kann nicht verarbeitet werden.") from error
+
+
+class RentalContractForm(forms.Form):
+    contract = forms.FileField(
+        label="Mietvertrag",
+        help_text="Unverschlüsseltes PDF, höchstens 5 MiB.",
+        widget=forms.ClearableFileInput(attrs={"accept": ".pdf,application/pdf"}),
+    )
+
+    def clean_contract(self):
+        upload = self.cleaned_data["contract"]
+        if upload.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("Der Mietvertrag darf höchstens 5 MiB groß sein.")
+        try:
+            if upload.read(5) != b"%PDF-":
+                raise forms.ValidationError("Bitte laden Sie ein gültiges PDF hoch.")
+            upload.seek(0)
+            _validate_pdf(upload, allow_encrypted=False)
+        except (OSError, PyPdfError, SyntaxError, ValueError, NotImplementedError) as error:
+            raise forms.ValidationError("Bitte laden Sie ein gültiges PDF hoch.") from error
+        finally:
+            upload.seek(0)
+        return upload
+
+
 class ApplicationProofStorageError(Exception):
     """Raised when an uploaded proof cannot be written to private storage."""
 
@@ -1000,18 +1034,7 @@ class MainApplicationForm(forms.Form):
             header = upload.read(1024)
             if header.startswith(b"%PDF-"):
                 upload.seek(0)
-                try:
-                    reader = PdfReader(upload, strict=True)
-                    if not reader.pages:
-                        raise forms.ValidationError("Das PDF enthält keine Seiten.")
-                except (
-                    AttributeError,
-                    KeyError,
-                    TypeError,
-                    RecursionError,
-                    OverflowError,
-                ) as error:
-                    raise forms.ValidationError("Das PDF kann nicht verarbeitet werden.") from error
+                _validate_pdf(upload)
                 return upload
 
             upload.seek(0)

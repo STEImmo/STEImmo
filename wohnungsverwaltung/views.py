@@ -11,8 +11,9 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage, send_mail
 from django.core.paginator import Paginator
+from django.core.validators import validate_email
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import (
     BooleanField,
@@ -85,6 +86,7 @@ from .forms import (
     MerkmalOptionFormSet,
     ParkingManagementFilterForm,
     RaumForm,
+    RentalContractForm,
     RoomChecklistItemForm,
     RoomChecklistPhotoUploadForm,
     RoomProtocolForm,
@@ -1188,7 +1190,7 @@ def employee_application_detail(request: HttpRequest, application_id: UUID) -> H
 
 
 def _employee_application_detail_response(
-    request, application_id, viewing_form=None, editing_form=None, status=200
+    request, application_id, viewing_form=None, editing_form=None, status=200, contract_form=None
 ):
     application = get_object_or_404(
         Bewerbung.objects.select_related("person", "wohnung").prefetch_related(
@@ -1279,6 +1281,7 @@ def _employee_application_detail_response(
             ),
             "eligibility_form": EligibilityApprovalForm(auto_id="id_eligibility_%s"),
             "invitation_form": MainApplicationInvitationForm(auto_id="id_invitation_%s"),
+            "contract_form": (contract_form if contract_form is not None else RentalContractForm()),
             "invitation_url": reverse(
                 "wohnungsverwaltung:employee_application_invitation_resend",
                 args=[application.pk],
@@ -1291,6 +1294,93 @@ def _employee_application_detail_response(
         },
         status=status,
     )
+
+
+@never_cache
+@employee_required
+def employee_application_accept(request, application_id):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    with transaction.atomic():
+        application = get_object_or_404(Bewerbung.objects.select_for_update(), pk=application_id)
+        if not application.acceptance_eligible:
+            messages.error(request, "Diese Bewerbung kann nicht angenommen werden.")
+        elif application.accepted_at is None:
+            application.accepted_at = timezone.now()
+            application.save(update_fields=["accepted_at", "updated_at"])
+            ApplicationReviewEvent.objects.create(
+                application=application,
+                actor=request.user,
+                kind=ApplicationReviewEvent.Kind.ACCEPTED,
+            )
+            messages.success(request, "Bewerbung angenommen.")
+    return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
+
+
+@never_cache
+@employee_required
+def employee_application_send_contract(request, application_id):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    application = get_object_or_404(
+        Bewerbung.objects.select_related("person", "wohnung"), pk=application_id
+    )
+    detail = redirect(
+        "wohnungsverwaltung:employee_application_detail", application_id=application_id
+    )
+    if not application.acceptance_eligible or application.accepted_at is None:
+        messages.error(request, "Der Versand ist nur für eine angenommene Bewerbung möglich.")
+        return detail
+
+    form = RentalContractForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return _employee_application_detail_response(
+            request, application_id, status=400, contract_form=form
+        )
+
+    application.refresh_from_db()
+    if not application.acceptance_eligible or application.accepted_at is None:
+        messages.error(request, "Der Versand ist nur für eine angenommene Bewerbung möglich.")
+        return detail
+
+    sent = 0
+    failure_message = (
+        "Der Mietvertrag konnte nicht versendet werden. Prüfen Sie die Empfängeradresse "
+        "oder versuchen Sie es erneut."
+    )
+    if settings.EMAIL_BACKEND in {
+        "django.core.mail.backends.console.EmailBackend",
+        "django.core.mail.backends.filebased.EmailBackend",
+        "django.core.mail.backends.dummy.EmailBackend",
+    }:
+        failure_message = "Der E-Mail-Versand für Mietverträge ist nicht aktiv."
+    else:
+        recipient = application.person.email
+        try:
+            validate_email(recipient)
+            message = EmailMessage(
+                subject="Ihr Mietvertrag bei STE Immobilien eGbR",
+                body=(
+                    "Guten Tag,\n\n"
+                    f"im Anhang erhalten Sie den Mietvertrag für {application.wohnung}."
+                ),
+                to=[recipient],
+            )
+            message.attach(
+                "Mietvertrag.pdf", form.cleaned_data["contract"].read(), "application/pdf"
+            )
+            sent = message.send()
+        except (OSError, ValidationError, ValueError):
+            pass
+
+    if sent:
+        kind = ApplicationReviewEvent.Kind.CONTRACT_SENT
+        messages.success(request, "Der Mietvertrag wurde zum Versand übergeben.")
+    else:
+        kind = ApplicationReviewEvent.Kind.CONTRACT_FAILED
+        messages.error(request, failure_message)
+    ApplicationReviewEvent.objects.create(application=application, actor=request.user, kind=kind)
+    return detail
 
 
 def _lock_viewing_application(application_id):
