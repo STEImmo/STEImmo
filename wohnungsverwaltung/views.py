@@ -3,6 +3,7 @@ import logging
 from collections import Counter
 from copy import copy
 from datetime import timedelta
+from io import BytesIO
 from urllib.parse import urlencode
 from uuid import UUID
 
@@ -10,6 +11,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import EmailMessage, send_mail
 from django.core.paginator import Paginator
@@ -48,9 +50,11 @@ from PIL import Image
 from .access import (
     APPLICANT_ACCESS_PERMISSION,
     EMPLOYEE_ACCESS_PERMISSION,
+    ROLE_TENANT,
     applicant_required,
     employee_required,
     has_permission,
+    tenant_required,
     user_management_required,
 )
 from .building_plans import (
@@ -86,6 +90,7 @@ from .forms import (
     MerkmalOptionFormSet,
     ParkingManagementFilterForm,
     RaumForm,
+    RentalCompletionForm,
     RentalContractForm,
     RoomChecklistItemForm,
     RoomChecklistPhotoUploadForm,
@@ -131,6 +136,7 @@ from .models import (
     RaumMerkmal,
     RaumMerkmalFoto,
     Raumprotokoll,
+    Rental,
     Stellplatz,
     StellplatzZuordnung,
     ViewingAppointment,
@@ -1190,10 +1196,16 @@ def employee_application_detail(request: HttpRequest, application_id: UUID) -> H
 
 
 def _employee_application_detail_response(
-    request, application_id, viewing_form=None, editing_form=None, status=200, contract_form=None
+    request,
+    application_id,
+    viewing_form=None,
+    editing_form=None,
+    status=200,
+    contract_form=None,
+    rental_form=None,
 ):
     application = get_object_or_404(
-        Bewerbung.objects.select_related("person", "wohnung").prefetch_related(
+        Bewerbung.objects.select_related("person__user", "wohnung").prefetch_related(
             "bewerbung_stellplaetze__stellplatz"
         ),
         pk=application_id,
@@ -1282,6 +1294,17 @@ def _employee_application_detail_response(
             "eligibility_form": EligibilityApprovalForm(auto_id="id_eligibility_%s"),
             "invitation_form": MainApplicationInvitationForm(auto_id="id_invitation_%s"),
             "contract_form": (contract_form if contract_form is not None else RentalContractForm()),
+            "rental_form": (
+                rental_form
+                if rental_form is not None
+                else RentalCompletionForm(
+                    initial={"account": application.person.user_id}, auto_id="id_rental_%s"
+                )
+            ),
+            "rental_completed": (
+                application.accepted_at is not None
+                and Rental.objects.filter(application=application).exists()
+            ),
             "invitation_url": reverse(
                 "wohnungsverwaltung:employee_application_invitation_resend",
                 args=[application.pk],
@@ -1393,6 +1416,98 @@ def _lock_viewing_application(application_id):
     )
     application.wohnung = unit
     return application
+
+
+@never_cache
+@employee_required
+def employee_rental_complete(request, application_id):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    application = get_object_or_404(Bewerbung, pk=application_id)
+    detail = redirect(
+        "wohnungsverwaltung:employee_application_detail", application_id=application_id
+    )
+    if Rental.objects.filter(application=application).exists():
+        messages.info(request, "Diese Vermietung ist bereits abgeschlossen.")
+        return detail
+    if not application.acceptance_eligible or application.accepted_at is None:
+        messages.error(request, "Der Abschluss ist nur für eine angenommene Bewerbung möglich.")
+        return detail
+
+    form = RentalCompletionForm(request.POST, request.FILES, auto_id="id_rental_%s")
+    if not form.is_valid():
+        return _employee_application_detail_response(
+            request, application_id, status=400, rental_form=form
+        )
+    contract = form.cleaned_data["contract"].read()
+
+    with transaction.atomic():
+        application = _lock_viewing_application(application_id)
+        if Rental.objects.filter(application=application).exists():
+            messages.info(request, "Diese Vermietung ist bereits abgeschlossen.")
+            return detail
+        if not application.acceptance_eligible or application.accepted_at is None:
+            messages.error(request, "Der Abschluss ist nur für eine angenommene Bewerbung möglich.")
+            return detail
+        if Rental.objects.filter(wohnung=application.wohnung).exists():
+            messages.error(
+                request, "Für diese Wohnung wurde bereits eine Vermietung abgeschlossen."
+            )
+            return detail
+
+        account = (
+            get_user_model()
+            .objects.select_for_update()
+            .filter(pk=application.person.user_id, is_active=True)
+            .first()
+        )
+        person = Person.objects.select_for_update().get(pk=application.person_id)
+        if (
+            account is None
+            or person.user_id != account.pk
+            or form.cleaned_data["account"] != account.pk
+        ):
+            messages.error(request, "Das angezeigte Benutzerkonto ist nicht mehr gültig.")
+            return detail
+        if person.wohnung_id != application.wohnung_id and (
+            person.wohnung_id is not None
+            or person.protokolle.exclude(status=ProtokollStatus.SIGNED).exists()
+        ):
+            messages.error(request, "Bitte klären Sie zuerst die bestehende Wohnungszuordnung.")
+            return detail
+
+        Rental.objects.create(
+            application=application,
+            wohnung=application.wohnung,
+            tenant=account,
+            contract_pdf=contract,
+        )
+        person.wohnung = application.wohnung
+        person.save(update_fields=["wohnung", "updated_at"])
+        account.groups.add(Group.objects.get(name=ROLE_TENANT))
+
+    messages.success(request, "Vermietung abgeschlossen. Der Mietvertrag ist im Konto verfügbar.")
+    return detail
+
+
+@never_cache
+@tenant_required
+def tenant_rental_contract(request, application_id):
+    if request.method not in {"GET", "HEAD"}:
+        return HttpResponseNotAllowed(["GET", "HEAD"])
+    rental = get_object_or_404(
+        Rental.objects.for_tenant(request.user), application_id=application_id
+    )
+    response = FileResponse(
+        BytesIO(rental.contract_pdf),
+        as_attachment=True,
+        filename="Mietvertrag.pdf",
+        content_type="application/pdf",
+    )
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @never_cache

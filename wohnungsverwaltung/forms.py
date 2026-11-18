@@ -72,6 +72,7 @@ from .models import (
     WohnungStatus,
     calculate_photo_checksum,
 )
+from .upload_limits import RENTAL_CONTRACT_MAX_SIZE
 
 HANDOVER_TYPE_LABELS = {
     ProtokollTyp.MOVE_IN: "Einzug",
@@ -847,7 +848,7 @@ class RentalContractForm(forms.Form):
 
     def clean_contract(self):
         upload = self.cleaned_data["contract"]
-        if upload.size > 5 * 1024 * 1024:
+        if upload.size > RENTAL_CONTRACT_MAX_SIZE:
             raise forms.ValidationError("Der Mietvertrag darf höchstens 5 MiB groß sein.")
         try:
             if upload.read(5) != b"%PDF-":
@@ -859,6 +860,10 @@ class RentalContractForm(forms.Form):
         finally:
             upload.seek(0)
         return upload
+
+
+class RentalCompletionForm(RentalContractForm):
+    account = forms.IntegerField(widget=forms.HiddenInput)
 
 
 class ApplicationProofStorageError(Exception):

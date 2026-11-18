@@ -28,6 +28,7 @@ from django.views.decorators.http import require_http_methods, require_safe
 from wohnungsverwaltung.access import (
     APPLICANT_ACCESS_PERMISSION,
     EMPLOYEE_ACCESS_PERMISSION,
+    TENANT_ACCESS_PERMISSION,
     USER_MANAGEMENT_PERMISSION,
 )
 from wohnungsverwaltung.building_plans import building_overview
@@ -46,6 +47,7 @@ from wohnungsverwaltung.models import (
     PendingEmailChange,
     Person,
     RegistrationVerification,
+    Rental,
     Wohnung,
 )
 
@@ -87,11 +89,20 @@ def personal_profile(request):
     with transaction.atomic():
         account = _locked_profile_account(request)
         person = Person.objects.select_for_update().filter(user=account).first()
+    rentals = ()
+    if account.has_perm(TENANT_ACCESS_PERMISSION):
+        rentals = (
+            Rental.objects.for_tenant(account)
+            .select_related("wohnung")
+            .defer("contract_pdf")
+            .order_by("-completed_at")
+        )
     return render(
         request,
         "core/personal_profile.html",
         {
             "person": person,
+            "rentals": rentals,
             "pending_email_change": PendingEmailChange.objects.filter(user=request.user).exists(),
         },
     )

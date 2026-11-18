@@ -5,6 +5,11 @@ from . import export_views, views
 app_name = "wohnungsverwaltung"
 
 urlpatterns = [
+    path(
+        "mietvertrag/<uuid:application_id>/",
+        views.tenant_rental_contract,
+        name="tenant_rental_contract",
+    ),
     path("meine/", export_views.handover_protocol_mine, name="handover_protocol_mine"),
     path(
         "<uuid:protocol_id>/abschluss/",
@@ -100,6 +105,11 @@ urlpatterns = [
         "bewerbungen/mitarbeiter/<uuid:application_id>/mietvertrag/",
         views.employee_application_send_contract,
         name="employee_application_send_contract",
+    ),
+    path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/vermietung-abschliessen/",
+        views.employee_rental_complete,
+        name="employee_rental_complete",
     ),
     path(
         "bewerbungen/mitarbeiter/<uuid:application_id>/einzelfall-freigeben/",

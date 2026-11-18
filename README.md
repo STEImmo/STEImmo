@@ -425,10 +425,11 @@ Kennzahl für heute und die nächsten sieben Tage nicht.
 Die Parameter `woche` und `datum` erwarten `YYYY-MM-DD`; andere Formate fallen auf
 die aktuelle Woche beziehungsweise die Standardterminliste zurück.
 
-Eingereichte Hauptbewerbungen bleiben bis zu ihrem fachlichen Abschluss als
-Mitarbeiteraufgabe sichtbar. Die Erfassung einer finalen Zu- oder Absage ist noch
-nicht Bestandteil der Anwendung und bleibt eine gesonderte Folgeaufgabe. Ebenso
-bleiben das Einblenden anderer Kalender, Kalenderabonnements und Synchronisation
+Eingereichte Hauptbewerbungen bleiben bis zum Vermietungsabschluss als
+Mitarbeiteraufgabe sichtbar. Mitarbeitende können die angenommene Bewerbung mit
+einem aktiven Mieterkonto verknüpfen und den endgültigen Mietvertrag für dieses
+Konto freigeben. Der abgeschlossene Vorgang bleibt in der Bewerbungsübersicht
+abrufbar. Das Einblenden anderer Kalender, Kalenderabonnements und Synchronisation bleiben
 einem separaten Folgeissue nach Fertigstellung des Dashboards vorbehalten.
 
 ## Bewerbungen im Betreiberbereich

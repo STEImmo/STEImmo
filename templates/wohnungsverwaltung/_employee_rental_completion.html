@@ -1,0 +1,22 @@
+{% if rental_completed or application.accepted_at and application.acceptance_eligible %}
+    <article class="management-panel uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
+        <h2 class="uk-card-title">Vermietungsabschluss</h2>
+        {% if rental_completed %}
+            <p>Vermietung abgeschlossen.</p>
+        {% elif application.person.user.is_active %}
+            <p>Mieterkonto: <strong>{{ application.person.user.get_username }}</strong></p>
+            <p>Die Wohnung und der hier hochgeladene Mietvertrag werden für dieses Konto freigegeben.</p>
+            <form method="post" enctype="multipart/form-data"
+                  action="{% url 'wohnungsverwaltung:employee_rental_complete' application.pk %}"
+                  class="uk-form-stacked">
+                {% csrf_token %}
+                {{ rental_form.account }}
+                {% if rental_form.account.errors %}<p class="uk-text-danger" role="alert">Bitte laden Sie die Bewerbung neu und prüfen Sie das Mieterkonto.</p>{% endif %}
+                {% include "wohnungsverwaltung/_form_field.html" with field=rental_form.contract only %}
+                <button class="uk-button uk-button-primary uk-margin-top" type="submit">Vermietung abschließen</button>
+            </form>
+        {% else %}
+            <p>Für den Abschluss braucht die Person ein aktives verknüpftes Benutzerkonto.</p>
+        {% endif %}
+    </article>
+{% endif %}

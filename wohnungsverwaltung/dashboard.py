@@ -55,7 +55,9 @@ def filter_application_workflow(applications, workflow, now):
     """Keep dashboard counts and both levels of the application workspace consistent."""
     if workflow not in ("open", "waiting"):
         return applications
-    applications = applications.filter(status="open", interest_withdrawn_at__isnull=True)
+    applications = applications.filter(
+        status="open", interest_withdrawn_at__isnull=True, rental__isnull=True
+    )
     if workflow == "waiting":
         applications = applications.annotate(
             waiting_for_main=Case(
