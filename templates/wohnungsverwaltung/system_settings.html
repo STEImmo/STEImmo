@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Systemeinstellungen – STE Immobilien eGbR{% endblock %}
+{% block content %}
+    <section class="uk-section management-page">
+        <div class="uk-container uk-container-small">
+            <h1>Systemeinstellungen</h1>
+            <div class="uk-card uk-card-default uk-card-body management-panel">
+                <h2 class="uk-card-title">Zugriffsrechte</h2>
+                <p>Konten mit dem Einzelrecht werden hier aufgeführt.</p>
+                <ul class="uk-list uk-list-divider">
+                    {% for admin in admins %}
+                        <li>{{ admin.get_username }}{% if not admin.is_active %} <span class="uk-label">Inaktiv</span>{% endif %}</li>
+                    {% endfor %}
+                </ul>
+                <form method="post" action="{% url 'verwaltung:system_settings_access' %}" class="uk-form-stacked">
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+                    {% include "wohnungsverwaltung/_form_field.html" with field=form.username only %}
+                    {{ form.action.errors }}
+                    <div class="uk-flex uk-flex-wrap">
+                        <button type="submit" name="action" value="grant" class="uk-button uk-button-primary uk-margin-small-right uk-margin-small-bottom">Zugriff erteilen</button>
+                        <button type="submit" name="action" value="revoke" class="uk-button uk-button-default uk-margin-small-bottom">Zugriff entziehen</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+{% endblock %}

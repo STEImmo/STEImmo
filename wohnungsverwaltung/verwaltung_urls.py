@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import assignment_views, views
+from . import assignment_views, system_settings, views
 
 app_name = "verwaltung"
 
@@ -16,6 +16,12 @@ urlpatterns = [
         name="person_assignment",
     ),
     path("", views.employee_dashboard, name="dashboard"),
+    path("systemeinstellungen/", system_settings.system_settings, name="system_settings"),
+    path(
+        "systemeinstellungen/zugriff/",
+        system_settings.system_settings_access,
+        name="system_settings_access",
+    ),
     path("wohnungen/<uuid:wohnung_id>/fotos/", views.apartment_photos, name="apartment_photos"),
     path(
         "wohnungen/<uuid:wohnung_id>/fotos/<uuid:photo_id>/loeschen/",

@@ -13,7 +13,6 @@ from django.contrib.sessions.models import Session
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
 from django.db import IntegrityError, connection, transaction
-from django.db.models import Q
 from django.db.utils import OperationalError
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -28,7 +27,11 @@ from django.views.decorators.http import require_http_methods, require_safe
 from wohnungsverwaltung.access import (
     APPLICANT_ACCESS_PERMISSION,
     EMPLOYEE_ACCESS_PERMISSION,
+    SYSTEM_SETTINGS_SESSION_KEY,
     USER_MANAGEMENT_PERMISSION,
+    has_system_settings_grant,
+    login_identifier_filter,
+    requires_email_mfa,
 )
 from wohnungsverwaltung.building_plans import building_overview
 from wohnungsverwaltung.forms import (
@@ -236,16 +239,10 @@ def _client_ip_fingerprint(request: HttpRequest) -> str | None:
 
 def _account_for_login_identifier(identifier: str):
     user_model = get_user_model()
-    lookup = user_model.USERNAME_FIELD
-    identifiers = Q(**{lookup: identifier})
-    if "@" in identifier:
-        lookup += "__iexact"
-        # Registration uses Python's Unicode lowercase mapping. Keep the raw
-        # spelling as well so legacy addresses remain usable and ambiguous
-        # canonical/legacy pairs are rejected together.
-        identifiers |= Q(**{lookup: identifier}) | Q(**{lookup: identifier.lower()})
     try:
-        return user_model._default_manager.select_for_update().get(identifiers)
+        return user_model._default_manager.select_for_update().get(
+            login_identifier_filter(user_model, identifier)
+        )
     except user_model.DoesNotExist:
         return None
     except user_model.MultipleObjectsReturned:
@@ -421,9 +418,7 @@ class RoleAwareLoginView(LoginView):
             user.backend = authenticated_user.backend
             form.user_cache = user
             _clear_account_login_throttle(user)
-            if user.has_perm(EMPLOYEE_ACCESS_PERMISSION) or user.has_perm(
-                USER_MANAGEMENT_PERMISSION
-            ):
+            if requires_email_mfa(user):
                 verification, _created = (
                     EmployeeLoginVerification.objects.select_for_update().get_or_create(
                         user=user,
@@ -438,6 +433,7 @@ class RoleAwareLoginView(LoginView):
                     self.get_redirect_url() or self.get_default_redirect_url_for_user(user)
                 )
             else:
+                self.request.session.pop(SYSTEM_SETTINGS_SESSION_KEY, None)
                 response = super().form_valid(form)
                 # SessionMiddleware runs after this transaction. Persist now so a
                 # subsequent account change can revoke even this unfinished response.
@@ -462,6 +458,8 @@ class RoleAwareLoginView(LoginView):
             return reverse("verwaltung:dashboard")
         if user.has_perm(USER_MANAGEMENT_PERMISSION):
             return reverse("verwaltung:user_account_list")
+        if has_system_settings_grant(user):
+            return reverse("verwaltung:system_settings")
         if user.has_perm(APPLICANT_ACCESS_PERMISSION):
             return reverse("wohnungsverwaltung:pre_application_list")
         return reverse("home")
@@ -528,7 +526,7 @@ def send_registration_code(email: str, code: str) -> bool:
 def send_employee_mfa_code(email: str, code: str) -> bool:
     return (
         send_mail(
-            subject="STE Immobilien eGbR: Einmalcode für die Mitarbeiteranmeldung",
+            subject="STE Immobilien eGbR: Einmalcode für Ihre Anmeldung",
             message=(
                 "Ihr Einmalcode lautet: "
                 f"{code}\n\n"
@@ -563,16 +561,15 @@ def register_verify(request: HttpRequest) -> HttpResponse:
                     next_url = _registration_redirect_url(
                         request, request.session.pop("registration_redirect_url", "")
                     )
-                    if user.has_perm(EMPLOYEE_ACCESS_PERMISSION) or user.has_perm(
-                        USER_MANAGEMENT_PERMISSION
-                    ):
+                    if requires_email_mfa(user):
                         messages.success(
                             request,
                             "Ihr Konto wurde bestätigt. Bitte melden Sie sich mit Passwort und "
-                            "Mitarbeiter-Einmalcode an.",
+                            "E-Mail-Einmalcode an.",
                         )
                         return redirect("login")
                     login(request, user)
+                    request.session.pop(SYSTEM_SETTINGS_SESSION_KEY, None)
                     request.session.save()
                     messages.success(request, "Ihr Konto wurde bestätigt.")
                     return redirect(next_url or "wohnungsverwaltung:pre_application_list")
@@ -652,6 +649,10 @@ def employee_mfa_verify(request: HttpRequest) -> HttpResponse:
                     # checked destination before login() changes the session.
                     login(request, user)
                     _clear_pending_employee_login(request)
+                    if has_system_settings_grant(user):
+                        request.session[SYSTEM_SETTINGS_SESSION_KEY] = user.pk
+                    else:
+                        request.session.pop(SYSTEM_SETTINGS_SESSION_KEY, None)
                     request.session.save()
                     if url_has_allowed_host_and_scheme(
                         url=redirect_url,

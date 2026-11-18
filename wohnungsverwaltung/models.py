@@ -208,6 +208,7 @@ class Person(models.Model):
             ("access_tenant_area", "Kann auf den vorbereiteten Mieterbereich zugreifen"),
             ("access_employee_area", "Kann auf den Mitarbeiterbereich zugreifen"),
             ("manage_user_accounts", "Kann Konten und Zugriffsrechte verwalten"),
+            ("manage_system_settings", "Kann Systemeinstellungen verwalten"),
         ]
 
     def __str__(self) -> str:

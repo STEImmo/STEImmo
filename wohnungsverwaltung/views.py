@@ -50,6 +50,8 @@ from .access import (
     applicant_required,
     employee_required,
     has_permission,
+    has_system_settings_grant,
+    system_settings_permission,
     user_management_required,
 )
 from .building_plans import (
@@ -3413,7 +3415,16 @@ def user_account_list(request: HttpRequest) -> HttpResponse:
         .prefetch_related("groups", "user_permissions")
         .order_by("username")
     )
-    return render(request, "wohnungsverwaltung/user_account_list.html", {"accounts": accounts})
+    protected_accounts = set(
+        user_model.objects.filter(user_permissions=system_settings_permission()).values_list(
+            "pk", flat=True
+        )
+    )
+    return render(
+        request,
+        "wohnungsverwaltung/user_account_list.html",
+        {"accounts": accounts, "protected_accounts": protected_accounts},
+    )
 
 
 @user_management_required
@@ -3444,6 +3455,8 @@ def user_account_create(request: HttpRequest) -> HttpResponse:
 @user_management_required
 def user_account_edit(request: HttpRequest, user_id: int) -> HttpResponse:
     account = get_object_or_404(get_user_model(), pk=user_id)
+    if has_system_settings_grant(account):
+        raise PermissionDenied("Dieses Konto hat Zugriff auf die Systemeinstellungen.")
     form = UserAccountForm(request.POST or None, account=account, actor=request.user)
     if request.method == "POST" and form.is_valid():
         try:

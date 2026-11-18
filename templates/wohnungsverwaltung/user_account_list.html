@@ -31,7 +31,13 @@
                             <td data-label="E-Mail-Adresse">{{ account.email|default:account.username }}</td>
                             <td data-label="Rollen">{% for group in account.groups.all %}<span class="uk-label uk-margin-small-right">{{ group.name }}</span>{% empty %}<span class="uk-text-muted">Keine Rolle</span>{% endfor %}</td>
                             <td data-label="Status">{% if account.is_active %}<span class="uk-label uk-label-success">Aktiv</span>{% else %}<span class="uk-label uk-label-danger">Deaktiviert</span>{% endif %}</td>
-                            <td class="uk-text-right" data-label="Aktion"><a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:user_account_edit' account.pk %}">Bearbeiten</a></td>
+                            <td class="uk-text-right" data-label="Aktion">
+                                {% if account.pk in protected_accounts %}
+                                    <span class="uk-text-meta">Geschütztes Administrationskonto</span>
+                                {% else %}
+                                    <a class="uk-button uk-button-default uk-button-small" href="{% url 'verwaltung:user_account_edit' account.pk %}">Bearbeiten</a>
+                                {% endif %}
+                            </td>
                         </tr>
                     {% empty %}
                         <tr><td colspan="5" class="uk-text-muted">Noch keine Benutzerkonten vorhanden.</td></tr>

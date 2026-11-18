@@ -253,6 +253,12 @@ Eine Roadmap-Phase gilt erst als abgeschlossen, wenn ihre Akzeptanzkriterien erf
 | `Mitarbeiter` | Verwaltungsbereich und Übergabeprotokolle |
 | `Benutzerverwaltung` | Mitarbeiterzugriff sowie Konten, Rollen und Seitenrechte verwalten |
 
+Für **Systemeinstellungen** ist ein eigenes Einzelrecht erforderlich. Nach den
+Migrationen kann der Betrieb den ersten Zugriff mit
+`python manage.py grant_system_settings_access <Anmeldename>` vergeben.
+Danach ist die Zugriffsverwaltung im Kontomenü nach Anmeldung per E-Mail-Einmalcode
+erreichbar. Weitere Einzelheiten stehen in [ADR-0025](docs/decisions/0025-systemeinstellungen-berechtigen.md).
+
 Konten mit Mitarbeiterzugriff oder Benutzerverwaltung – auch bei direkt zugewiesenem Einzelrecht – benötigen bei jeder Anmeldung zusätzlich zum Passwort einen sechsstelligen E-Mail-Einmalcode. Der Code ist 15 Minuten gültig, wird nur gehasht gespeichert und erlaubt höchstens fünf Versuche. Es gibt bewusst keine dauerhafte Browserfreigabe. Erhält ein zuvor nicht privilegiertes Konto Mitarbeiter- oder Benutzerverwaltungsrechte, werden bestehende Sitzungen beendet; der nächste Zugriff erfordert eine neue Anmeldung mit Einmalcode. In der lokalen Entwicklungsumgebung erscheint der Code im automatisch gestarteten Mailpit-Postfach unter [http://localhost:8025](http://localhost:8025); Produktion verwendet den konfigurierten SMTP-Backend.
 
 Die reguläre Anmeldung unter `/accounts/login/` sperrt nach drei falschen Passwörtern das betroffene Konto für 15 Minuten. Zusätzlich werden zehn fehlgeschlagene Anmeldungen derselben IP-Adresse innerhalb von 15 Minuten begrenzt. Die Anwendung speichert dafür nie die IP-Adresse selbst, sondern nur einen mit dem Servergeheimnis abgeleiteten Fingerprint. Falsches Passwort, unbekanntes Konto und Sperren liefern dieselbe neutrale Meldung. Der ungenutzte Django-Admin ist unter `/admin/` nicht erreichbar; auch Staff- und Superuser-Konten verwenden die reguläre Anmeldung mit MFA. Hinter einem Reverse-Proxy darf `DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS` ausschließlich mit dessen vertrauenswürdigen IP-Adressen gesetzt werden; nur dann wird dessen `X-Forwarded-For` berücksichtigt.

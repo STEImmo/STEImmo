@@ -16,7 +16,6 @@ from django.contrib.auth.password_validation import (
     password_validators_help_text_html,
     validate_password,
 )
-from django.contrib.sessions.models import Session
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.storage import Storage
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -35,6 +34,9 @@ from .access import (
     ROLE_NAMES,
     ROLE_USER_MANAGEMENT,
     USER_MANAGEMENT_PERMISSION,
+    has_system_settings_grant,
+    lock_account_administration,
+    revoke_account_sessions,
 )
 from .formatting import format_room_count
 from .handover_photos import (
@@ -631,7 +633,7 @@ class UserAccountForm(forms.Form):
             # Serialize account administration across different users before
             # locking an individual account. NO KEY UPDATE leaves foreign-key
             # references to this stable role available to authentication.
-            Group.objects.select_for_update(no_key=True).get(name=ROLE_USER_MANAGEMENT)
+            lock_account_administration()
             if self.actor is not None:
                 actor = user_model.objects.select_for_update().filter(pk=self.actor.pk).first()
                 if (
@@ -652,6 +654,8 @@ class UserAccountForm(forms.Form):
                 if self.account is not None
                 else None
             )
+            if original_account is not None and has_system_settings_grant(original_account):
+                raise PermissionDenied("Dieses Konto hat Zugriff auf die Systemeinstellungen.")
             was_active_manager = original_account is not None and copy(original_account).has_perm(
                 USER_MANAGEMENT_PERMISSION
             )
@@ -756,9 +760,7 @@ class UserAccountForm(forms.Form):
                 PendingEmailChange.objects.filter(user=account).delete()
                 # Login completion persists its session under the same user-row
                 # lock, so this also catches sessions from concurrent requests.
-                for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator():
-                    if session.get_decoded().get("_auth_user_id") == str(account.pk):
-                        session.delete()
+                revoke_account_sessions(account)
         return account
 
 
