@@ -17,7 +17,9 @@ from wohnungsverwaltung.access import (
     ROLE_EMPLOYEE,
     ROLE_TENANT,
     ROLE_USER_MANAGEMENT,
+    SYSTEM_SETTINGS_SESSION_KEY,
 )
+from wohnungsverwaltung.models import SystemSettings, SystemSettingsChange
 
 
 class SystemSettingsAccessTests(AccountChangesMixin, TestCase):
@@ -92,7 +94,7 @@ class SystemSettingsAccessTests(AccountChangesMixin, TestCase):
         self.assertEqual(self.client.get(reverse("verwaltung:dashboard")).status_code, 403)
 
     def test_grant_requires_post_with_csrf_and_retires_preexisting_sessions(self):
-        admin = self.create_account(email="admin@example.test")
+        admin = self.create_account(ROLE_USER_MANAGEMENT, email="admin@example.test")
         target = self.create_account(email="target@example.test")
         self.bootstrap(admin)
         old_session = Client()
@@ -102,25 +104,34 @@ class SystemSettingsAccessTests(AccountChangesMixin, TestCase):
         client.cookies.update(self.client.cookies)
         self.assertEqual(client.get(self.action_url).status_code, 405)
         self.assertEqual(client.get(self.settings_url).status_code, 200)
-        data = {"action": "grant", "username": target.username}
+        data = {
+            "action": "grant",
+            "username": target.username,
+            "version": SystemSettings.objects.get(pk=1).version,
+        }
         self.assertEqual(client.post(self.action_url, data).status_code, 403)
         token = client.cookies["csrftoken"].value
         self.assertRedirects(
-            client.post(self.action_url, data, HTTP_X_CSRFTOKEN=token), self.settings_url
+            client.post(self.action_url, data, HTTP_X_CSRFTOKEN=token),
+            reverse("verwaltung:user_account_list"),
         )
         self.assertIn(self.permission, target.user_permissions.all())
         self.assertEqual(old_session.get(reverse("profile:detail")).status_code, 302)
         self.assertRedirects(self.login_with_code(target, old_session), self.settings_url)
 
     def test_revocation_keeps_last_usable_admin_and_logs_out_a_departing_admin(self):
-        first = self.create_account(email="first@example.test")
+        first = self.create_account(ROLE_USER_MANAGEMENT, email="first@example.test")
         backup = self.create_account(email="backup@example.test")
         self.bootstrap(first)
         self.bootstrap(backup)
         backup.set_unusable_password()
         backup.save(update_fields=["password"])
         self.login_with_code(first)
-        data = {"action": "revoke", "username": first.username}
+        data = {
+            "action": "revoke",
+            "username": first.username,
+            "version": SystemSettings.objects.get(pk=1).version,
+        }
         denied = self.client.post(self.action_url, data)
         self.assertContains(denied, "mindestens ein funktionsfähiges", status_code=400)
         self.assertIn(self.permission, first.user_permissions.all())
@@ -180,7 +191,7 @@ class SystemSettingsAccessTests(AccountChangesMixin, TestCase):
         self.assertNotIn(self.permission, absent.user_permissions.all())
 
     def test_revocation_invalidates_a_pending_mail_code(self):
-        first = self.create_account(email="first@example.test")
+        first = self.create_account(ROLE_USER_MANAGEMENT, email="first@example.test")
         second = self.create_account(email="second@example.test")
         self.bootstrap(first)
         self.bootstrap(second)
@@ -192,8 +203,15 @@ class SystemSettingsAccessTests(AccountChangesMixin, TestCase):
         )
         code = self.mailed_code()
         self.assertRedirects(
-            self.client.post(self.action_url, {"action": "revoke", "username": second.username}),
-            self.settings_url,
+            self.client.post(
+                self.action_url,
+                {
+                    "action": "revoke",
+                    "username": second.username,
+                    "version": SystemSettings.objects.get(pk=1).version,
+                },
+            ),
+            reverse("verwaltung:user_account_list"),
         )
         self.assertRedirects(
             pending.post(reverse("employee_mfa_verify"), {"code": code}), reverse("login")
@@ -202,8 +220,41 @@ class SystemSettingsAccessTests(AccountChangesMixin, TestCase):
 
 
 class SystemSettingsConcurrentRevocationTests(AccountChangesMixin, TransactionTestCase):
+    def test_simultaneous_setting_changes_do_not_overwrite_each_other(self):
+        clients = []
+        for index in range(2):
+            admin = self.create_account(email=f"settings-{index}@example.test")
+            call_command("grant_system_settings_access", admin.username, stdout=StringIO())
+            client = Client()
+            client.force_login(admin)
+            session = client.session
+            session[SYSTEM_SETTINGS_SESSION_KEY] = admin.pk
+            session.save()
+            clients.append(client)
+        version = SystemSettings.objects.get(pk=1).version
+        barrier = Barrier(2, timeout=10)
+
+        def save(client):
+            close_old_connections()
+            try:
+                barrier.wait()
+                return client.post(
+                    reverse("verwaltung:system_settings"), {"version": version}
+                ).status_code
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            requests = [pool.submit(save, client) for client in clients]
+            self.assertCountEqual([request.result(timeout=15) for request in requests], [302, 409])
+        self.assertFalse(SystemSettings.objects.get(pk=1).optional_user_emails_enabled)
+        self.assertEqual(SystemSettingsChange.objects.filter(kind="settings").count(), 1)
+
     def test_simultaneous_self_revocations_leave_one_admin(self):
-        admins = [self.create_account(email=f"admin-{index}@example.test") for index in range(2)]
+        admins = [
+            self.create_account(ROLE_USER_MANAGEMENT, email=f"admin-{index}@example.test")
+            for index in range(2)
+        ]
         clients = []
         for admin in admins:
             call_command("grant_system_settings_access", admin.username, stdout=StringIO())
@@ -214,10 +265,11 @@ class SystemSettingsConcurrentRevocationTests(AccountChangesMixin, TransactionTe
             )
             self.assertRedirects(
                 client.post(reverse("employee_mfa_verify"), {"code": self.mailed_code()}),
-                reverse("verwaltung:system_settings"),
+                reverse("verwaltung:dashboard"),
             )
             clients.append(client)
 
+        version = SystemSettings.objects.get(pk=1).version
         barrier = Barrier(len(admins), timeout=10)
         url = reverse("verwaltung:system_settings_access")
 
@@ -226,7 +278,7 @@ class SystemSettingsConcurrentRevocationTests(AccountChangesMixin, TransactionTe
             try:
                 barrier.wait()
                 return client.post(
-                    url, {"action": "revoke", "username": admin.username}
+                    url, {"action": "revoke", "username": admin.username, "version": version}
                 ).status_code
             finally:
                 close_old_connections()
@@ -236,7 +288,7 @@ class SystemSettingsConcurrentRevocationTests(AccountChangesMixin, TransactionTe
                 pool.submit(revoke, client, admin)
                 for client, admin in zip(clients, admins, strict=True)
             ]
-            self.assertCountEqual([request.result(timeout=15) for request in requests], [302, 400])
+            self.assertCountEqual([request.result(timeout=15) for request in requests], [302, 409])
         self.assertEqual(
             get_user_model()
             .objects.filter(user_permissions__codename="manage_system_settings")

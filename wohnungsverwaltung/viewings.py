@@ -13,6 +13,7 @@ from .models import (
     ApplicationReviewEvent,
     Bewerbung,
     BewerbungStatus,
+    SystemSettings,
     ViewingAppointment,
     ViewingAppointmentEvent,
 )
@@ -51,7 +52,13 @@ def record_viewing_event(
         before=before or {},
         after=appointment.snapshot(),
         appointment_version=appointment.version,
-        notification_status="pending" if notify else "none",
+        notification_status=(
+            "suppressed"
+            if notify and kind != "proposal_changed" and not SystemSettings.user_emails_enabled()
+            else "pending"
+            if notify
+            else "none"
+        ),
         notification_url=notification_url,
     )
     if notify:
@@ -104,10 +111,17 @@ def send_viewing_notification(event_id, actor=None):
         )
         appointment.application = application
         event = ViewingAppointmentEvent.objects.select_for_update().get(pk=event_id)
+        # Suppression is terminal: re-enabling never replays an old event.
+        if event.notification_status == "suppressed":
+            return False
         if not notification_is_current(event, appointment):
             if event.notification_status != "none":
                 event.notification_status = "obsolete"
                 event.save(update_fields=("notification_status",))
+            return False
+        if event.kind != "proposal_changed" and not SystemSettings.user_emails_enabled():
+            event.notification_status = "suppressed"
+            event.save(update_fields=("notification_status",))
             return False
         start = timezone.localtime(appointment.starts_at, BERLIN)
         end = timezone.localtime(appointment.ends_at, BERLIN)

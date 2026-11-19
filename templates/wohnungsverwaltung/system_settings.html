@@ -1,28 +1,41 @@
 {% extends "base.html" %}
-{% block title %}Systemeinstellungen – STE Immobilien eGbR{% endblock %}
+{% block title %}Einstellungen – STE Immobilien eGbR{% endblock %}
 {% block content %}
-    <section class="uk-section management-page">
-        <div class="uk-container uk-container-small">
-            <h1>Systemeinstellungen</h1>
-            <div class="uk-card uk-card-default uk-card-body management-panel">
-                <h2 class="uk-card-title">Zugriffsrechte</h2>
-                <p>Konten mit dem Einzelrecht werden hier aufgeführt.</p>
-                <ul class="uk-list uk-list-divider">
-                    {% for admin in admins %}
-                        <li>{{ admin.get_username }}{% if not admin.is_active %} <span class="uk-label">Inaktiv</span>{% endif %}</li>
-                    {% endfor %}
-                </ul>
-                <form method="post" action="{% url 'verwaltung:system_settings_access' %}" class="uk-form-stacked">
-                    {% csrf_token %}
-                    {% if form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
-                    {% include "wohnungsverwaltung/_form_field.html" with field=form.username only %}
-                    {{ form.action.errors }}
-                    <div class="uk-flex uk-flex-wrap">
-                        <button type="submit" name="action" value="grant" class="uk-button uk-button-primary uk-margin-small-right uk-margin-small-bottom">Zugriff erteilen</button>
-                        <button type="submit" name="action" value="revoke" class="uk-button uk-button-default uk-margin-small-bottom">Zugriff entziehen</button>
-                    </div>
-                </form>
-            </div>
+<section class="uk-section management-page">
+    <div class="uk-container uk-container-small">
+        <h1>Systemeinstellungen</h1>
+        <p>Globale Vorgaben für die fachliche Verwaltung. Persönliche Benachrichtigungen werden getrennt im eigenen Konto gepflegt.</p>
+        <form method="post" class="uk-card uk-card-default uk-card-body uk-form-stacked management-panel">
+            {% csrf_token %}
+            {{ form.version }}
+            {{ form.version.errors }}
+            {% if form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+            <h2 class="uk-card-title">Benachrichtigungen an Nutzer</h2>
+            {% include "wohnungsverwaltung/_form_field.html" with field=form.optional_user_emails_enabled only %}
+            <p class="uk-text-meta">Die Freigabe gilt für optionale Hinweise an Bewerber und Mieter. Persönliche Abwahlen bleiben erhalten. Sicherheits- und Kontobestätigungen, Verwaltungsbenachrichtigungen, Rückrufzustellung und ausdrücklich ausgelöster Vertragsversand sind davon unabhängig.</p>
+            <p class="uk-text-meta">Erneutes Aktivieren versendet keine zuvor unterdrückten Ereignismails nachträglich.</p>
+            <button type="submit" class="uk-button uk-button-primary">Einstellungen speichern</button>
+        </form>
+        <div class="uk-grid-small uk-child-width-1-2@s uk-margin-top" uk-grid>
+            <section><div class="uk-card uk-card-default uk-card-body">
+                <h2 class="uk-card-title">Mailadressen und Testversand</h2>
+                <p>Rückrufempfänger, optionale Antwortadresse und Testmail werden mit der Mailadressen-Funktion bereitgestellt. Hier sind noch keine Änderungen möglich.</p>
+            </div></section>
+            <section><div class="uk-card uk-card-default uk-card-body">
+                <h2 class="uk-card-title">Organisations- und Kontaktangaben</h2>
+                <p>Zentral verwendete Organisationsdaten werden mit der Kontaktangaben-Funktion bereitgestellt. Hier sind noch keine Änderungen möglich.</p>
+            </div></section>
         </div>
-    </section>
+        <section class="uk-card uk-card-default uk-card-body uk-margin-top">
+            <h2 class="uk-card-title">Letzte Änderungen</h2>
+            <p class="uk-text-meta">Bis zu 30 letzte erfolgreiche Änderungen. Angezeigt werden Konto, Zeitpunkt, betroffene Felder und Aktion; keine Feldinhalte. „Betrieb“ bezeichnet eine Vergabe über den Betriebsbefehl.</p>
+            <ul class="uk-list uk-list-divider">
+                {% for change in changes %}
+                    <li><time datetime="{{ change.created_at|date:'c' }}">{{ change.created_at|date:'d.m.Y H:i:s' }}</time> · {% if change.actor %}{{ change.actor.get_username }}{% else %}Betrieb / Konto nicht mehr vorhanden{% endif %}<br>
+                    {% for label in change.field_labels %}{{ label }}{% if not forloop.last %}, {% endif %}{% endfor %} · {{ change.get_action_display }}{% if change.target %} · Konto: {{ change.target.get_username }}{% endif %}</li>
+                {% empty %}<li>Noch keine Änderungen gespeichert.</li>{% endfor %}
+            </ul>
+        </section>
+    </div>
+</section>
 {% endblock %}

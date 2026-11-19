@@ -1,0 +1,14 @@
+<section class="uk-card uk-card-default uk-card-body uk-margin-bottom">
+    <h2 class="uk-card-title">Zugriff auf Systemeinstellungen</h2>
+    <p>Dieses Einzelrecht erfordert zusätzlich eine Anmeldung mit E-Mail-Einmalcode. Mindestens ein funktionsfähiges berechtigtes Konto bleibt erhalten.</p>
+    <form method="post" action="{% url 'verwaltung:system_settings_access' %}" class="uk-form-stacked">
+        {% csrf_token %}
+        {{ form.version }}
+        {{ form.version.errors }}
+        {% if form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+        {% include "wohnungsverwaltung/_form_field.html" with field=form.username only %}
+        {{ form.action.errors }}
+        <button type="submit" name="action" value="grant" class="uk-button uk-button-primary uk-margin-small-bottom">Zugriff erteilen</button>
+        <button type="submit" name="action" value="revoke" class="uk-button uk-button-default uk-margin-small-bottom">Zugriff entziehen</button>
+    </form>
+</section>

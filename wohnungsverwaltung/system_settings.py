@@ -8,10 +8,11 @@ from django.contrib.sessions.models import Session
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
+from django.db.models import OuterRef, Subquery
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_POST, require_safe
+from django.views.decorators.http import require_POST
 
 from .access import (
     SYSTEM_SETTINGS_SESSION_KEY,
@@ -21,11 +22,97 @@ from .access import (
     revoke_account_sessions,
     system_settings_permission,
     system_settings_required,
+    user_management_required,
 )
-from .models import EmployeeLoginVerification, PendingEmailChange
+from .models import (
+    ApplicationReviewEvent,
+    Bewerbung,
+    BewerbungStatus,
+    EmployeeLoginVerification,
+    PendingEmailChange,
+    SystemSettings,
+    SystemSettingsChange,
+    ViewingAppointmentEvent,
+)
 
 
-class SettingsAccessForm(forms.Form):
+class SettingsConflict(ValidationError):
+    pass
+
+
+class RevisionForm(forms.Form):
+    version = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
+
+    def clean(self):
+        cleaned = super().clean()
+        if set(self.data) - {*self.fields, "csrfmiddlewaretoken"}:
+            raise ValidationError("Die Anfrage enthält unzulässige Felder.")
+        return cleaned
+
+
+class GlobalSettingsForm(RevisionForm):
+    optional_user_emails_enabled = forms.BooleanField(
+        required=False,
+        label="Optionale E-Mails an Nutzer aktivieren",
+        widget=forms.CheckboxInput(attrs={"class": "uk-checkbox"}),
+    )
+
+
+def settings_state():
+    return SystemSettings.objects.get_or_create(pk=1)[0]
+
+
+def _lock_settings(version):
+    settings_state()
+    state = SystemSettings.objects.select_for_update().get(pk=1)
+    if version is not None and version != state.version:
+        raise SettingsConflict(
+            "Die Einstellungen wurden zwischenzeitlich geändert. "
+            "Bitte laden Sie die Seite neu und prüfen Sie Ihre Auswahl."
+        )
+    return state
+
+
+def _record_change(state, *, actor, kind, changed_fields, action="save", target=None):
+    SystemSettingsChange.objects.create(
+        actor=actor, target=target, kind=kind, changed_fields=changed_fields, action=action
+    )
+    state.version += 1
+    state.save(update_fields=["version", "optional_user_emails_enabled"])
+
+
+def _suppress_waiting_user_mail(actor):
+    ViewingAppointmentEvent.objects.filter(notification_status__in=("pending", "failed")).exclude(
+        kind="proposal_changed"
+    ).update(notification_status="suppressed")
+    last_notice = ApplicationReviewEvent.objects.filter(
+        application_id=OuterRef("pk"),
+        kind__in=("invitation_sent", "invitation_failed", "invitation_suppressed"),
+    ).values("kind")[:1]
+    waiting = (
+        Bewerbung.objects.filter(
+            main_application_unlocked=True,
+            submitted_at__isnull=True,
+            status=BewerbungStatus.OPEN,
+            interest_withdrawn_at__isnull=True,
+        )
+        .annotate(last_notice=Subquery(last_notice))
+        .filter(last_notice="invitation_failed")
+    )
+    ApplicationReviewEvent.objects.bulk_create(
+        [
+            ApplicationReviewEvent(
+                application=application,
+                actor=actor,
+                kind="invitation_suppressed",
+                to_value="suppressed",
+            )
+            for application in waiting
+        ]
+    )
+
+
+class SettingsAccessForm(RevisionForm):
     username = forms.CharField(
         label="Anmeldename",
         max_length=150,
@@ -56,7 +143,8 @@ def _can_sign_in(account):
 def _authorize_change(request):
     actor = (
         get_user_model()
-        .objects.select_for_update()
+        # Keep history foreign-key inserts available while serializing account changes.
+        .objects.select_for_update(no_key=True)
         .filter(pk=request.user.pk, is_active=True)
         .first()
     )
@@ -78,13 +166,17 @@ def _authorize_change(request):
         )
     ):
         raise PermissionDenied
+    return actor
 
 
 @transaction.atomic
-def change_system_settings_access(username, *, grant, request=None):
+def change_system_settings_access(username, *, grant, request=None, version=None):
     lock_account_administration()
     if request is not None:
-        _authorize_change(request)
+        actor = _authorize_change(request)
+        if not actor.has_perm("immobilien.manage_user_accounts"):
+            raise PermissionDenied
+    state = _lock_settings(version)
 
     permission = system_settings_permission()
     users = get_user_model().objects
@@ -116,32 +208,75 @@ def change_system_settings_access(username, *, grant, request=None):
     EmployeeLoginVerification.objects.filter(user=account).delete()
     PendingEmailChange.objects.filter(user=account).delete()
     revoke_account_sessions(account)
+    _record_change(
+        state,
+        actor=request.user if request is not None else None,
+        kind="access",
+        changed_fields=["manage_system_settings"],
+        action="grant" if grant else "revoke",
+        target=account,
+    )
     return account
 
 
 def _render_settings(request, form, status=200):
-    admins = (
-        get_user_model()
-        .objects.filter(user_permissions=system_settings_permission())
-        .order_by("username")
-    )
     return render(
         request,
         "wohnungsverwaltung/system_settings.html",
-        {"form": form, "admins": admins},
+        {
+            "form": form,
+            "changes": SystemSettingsChange.objects.select_related("actor", "target")[:30],
+        },
         status=status,
     )
 
 
 @never_cache
 @system_settings_required
-@require_safe
 def system_settings(request):
-    return _render_settings(request, SettingsAccessForm())
+    if request.method not in ("GET", "HEAD", "POST"):
+        from django.http import HttpResponseNotAllowed
+
+        return HttpResponseNotAllowed(["GET", "HEAD", "POST"])
+    state = settings_state()
+    form = GlobalSettingsForm(
+        request.POST if request.method == "POST" else None,
+        initial={
+            "version": state.version,
+            "optional_user_emails_enabled": state.optional_user_emails_enabled,
+        },
+    )
+    if request.method == "POST":
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    lock_account_administration()
+                    _authorize_change(request)
+                    state = _lock_settings(form.cleaned_data["version"])
+                    enabled = form.cleaned_data["optional_user_emails_enabled"]
+                    if state.optional_user_emails_enabled != enabled:
+                        state.optional_user_emails_enabled = enabled
+                        if not enabled:
+                            _suppress_waiting_user_mail(request.user)
+                        _record_change(
+                            state,
+                            actor=request.user,
+                            kind="settings",
+                            changed_fields=["optional_user_emails_enabled"],
+                        )
+            except SettingsConflict as error:
+                form.add_error(None, error)
+                return _render_settings(request, form, status=409)
+            else:
+                messages.success(request, "Die Einstellungen wurden gespeichert.")
+                return redirect("verwaltung:system_settings")
+        return _render_settings(request, form, status=400)
+    return _render_settings(request, form)
 
 
 @never_cache
 @system_settings_required
+@user_management_required
 @require_POST
 def system_settings_access(request):
     form = SettingsAccessForm(request.POST)
@@ -149,8 +284,14 @@ def system_settings_access(request):
         grant = form.cleaned_data["action"] == "grant"
         try:
             account = change_system_settings_access(
-                form.cleaned_data["username"], grant=grant, request=request
+                form.cleaned_data["username"],
+                grant=grant,
+                request=request,
+                version=form.cleaned_data["version"],
             )
+        except SettingsConflict as error:
+            form.add_error(None, error)
+            return _render_access(request, form, status=409)
         except ValidationError as error:
             form.add_error(None, error)
         else:
@@ -159,5 +300,24 @@ def system_settings_access(request):
                 messages.info(request, "Ihr Zugriff auf die Systemeinstellungen wurde entzogen.")
                 return redirect("login")
             messages.success(request, "Die Zugriffsrechte wurden gespeichert.")
-            return redirect("verwaltung:system_settings")
-    return _render_settings(request, form, status=400)
+            return redirect("verwaltung:user_account_list")
+    return _render_access(request, form, status=400)
+
+
+def access_context(request):
+    if (
+        has_system_settings_grant(request.user)
+        and request.session.get(SYSTEM_SETTINGS_SESSION_KEY) == request.user.pk
+    ):
+        return {
+            "settings_access_form": SettingsAccessForm(
+                initial={"version": settings_state().version}
+            )
+        }
+    return {}
+
+
+def _render_access(request, form, status):
+    from .views import user_account_list
+
+    return user_account_list(request, settings_access_form=form, status=status)

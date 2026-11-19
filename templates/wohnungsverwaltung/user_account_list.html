@@ -13,6 +13,9 @@
             </div>
             <a class="uk-button uk-button-primary" href="{% url 'verwaltung:user_account_create' %}">Konto anlegen</a>
         </div>
+        {% if settings_access_form %}
+            {% include "wohnungsverwaltung/_settings_access_form.html" with form=settings_access_form %}
+        {% endif %}
         <div class="management-table uk-overflow-auto" tabindex="0" role="region" aria-label="Verwaltungstabelle">
             <table class="uk-table uk-table-responsive workspace-table uk-table-divider uk-table-middle uk-table-small">
                 <thead>

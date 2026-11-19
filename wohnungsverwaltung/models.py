@@ -12,6 +12,55 @@ from django.utils import timezone
 from .fields import PostgreSQLEnumField
 
 
+class SystemSettings(models.Model):
+    """The one global settings record; personal choices remain separate."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    version = models.PositiveIntegerField(default=1)
+    optional_user_emails_enabled = models.BooleanField(default=True)
+
+    @classmethod
+    def user_emails_enabled(cls):
+        # Before the first settings visit, the documented default is enabled.
+        return (
+            cls.objects.filter(pk=1).values_list("optional_user_emails_enabled", flat=True).first()
+            is not False
+        )
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(pk=1), name="one_system_settings")]
+
+
+class SystemSettingsChange(models.Model):
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    target = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="settings_access_changes",
+    )
+    kind = models.CharField(
+        max_length=16, choices=(("settings", "Einstellung"), ("access", "Zugriffsrecht"))
+    )
+    changed_fields = models.JSONField(default=list)
+    action = models.CharField(
+        max_length=16,
+        choices=(("save", "Gespeichert"), ("grant", "Erteilt"), ("revoke", "Entzogen")),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+
+    @property
+    def field_labels(self):
+        labels = {
+            "optional_user_emails_enabled": "Optionale Nutzer-E-Mails",
+            "manage_system_settings": "Zugriff auf Systemeinstellungen",
+        }
+        return [labels.get(field, "Einstellung") for field in self.changed_fields]
+
+
 def handover_photo_upload_path(instance, _filename: str) -> str:
     """Return an opaque, protocol-scoped storage name for a checklist photo."""
     checklist_item = instance.raum_merkmal
@@ -641,6 +690,7 @@ class ApplicationReviewEvent(models.Model):
         MAIN_UNLOCKED = "main_unlocked", "Main-Bewerbung freigeschaltet"
         INVITATION_SENT = "invitation_sent", "Einladung per E-Mail versendet"
         INVITATION_FAILED = "invitation_failed", "Einladungsversand fehlgeschlagen"
+        INVITATION_SUPPRESSED = "invitation_suppressed", "Einladungsmail global deaktiviert"
 
     review_event_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     application = models.ForeignKey(
@@ -774,6 +824,7 @@ class ViewingAppointmentEvent(models.Model):
         SENT = "sent", "Versendet"
         FAILED = "failed", "Versand fehlgeschlagen"
         OBSOLETE = "obsolete", "Überholt"
+        SUPPRESSED = "suppressed", "Durch globale Versandfreigabe unterdrückt"
 
     event_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     appointment = models.ForeignKey(

@@ -997,6 +997,7 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
                 kind__in=(
                     ApplicationReviewEvent.Kind.INVITATION_SENT,
                     ApplicationReviewEvent.Kind.INVITATION_FAILED,
+                    ApplicationReviewEvent.Kind.INVITATION_SUPPRESSED,
                 ),
             )
             .order_by("-created_at", "-review_event_id")
@@ -1571,9 +1572,16 @@ def employee_viewing_resend(request, application_id, appointment_id):
         messages.error(request, "Bitte wählen Sie die aktuelle Benachrichtigung.")
     else:
         event = get_object_or_404(ViewingAppointmentEvent, pk=event_id, appointment=appointment)
-        if event.notification_status in ("none", "obsolete") or not notification_is_current(
-            event, appointment
-        ):
+        if event.notification_status == "suppressed":
+            messages.info(
+                request,
+                "Diese optionale Benachrichtigung wurde durch die globale "
+                "Versandfreigabe unterdrückt.",
+            )
+        elif event.notification_status in (
+            "none",
+            "obsolete",
+        ) or not notification_is_current(event, appointment):
             messages.error(
                 request,
                 "Diese Benachrichtigung ist überholt und kann nicht erneut gesendet werden.",
@@ -1672,7 +1680,22 @@ def employee_application_suitability_approve(
     return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
 
 
-def _send_application_invitation(application: Bewerbung, actor, base_url: str) -> bool:
+def _send_application_invitation(application: Bewerbung, actor, base_url: str) -> bool | None:
+    from .models import SystemSettings
+
+    previous = application.review_events.filter(
+        kind__in=("invitation_sent", "invitation_failed", "invitation_suppressed")
+    ).first()
+    if previous is not None and previous.kind == "invitation_suppressed":
+        return None
+    if not SystemSettings.user_emails_enabled():
+        ApplicationReviewEvent.objects.create(
+            application=application,
+            actor=actor,
+            kind=ApplicationReviewEvent.Kind.INVITATION_SUPPRESSED,
+            to_value="suppressed",
+        )
+        return None
     recipient = application.person.email
     detail_url = reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
     subject = "Ihre Hauptbewerbung bei STE Immobilien eGbR"
@@ -1769,6 +1792,12 @@ def employee_application_invite(request: HttpRequest, application_id: UUID) -> H
             messages.success(
                 request, "Die Hauptbewerbung wurde freigeschaltet und die Einladung versendet."
             )
+        elif sent is None:
+            messages.info(
+                request,
+                "Die Hauptbewerbung ist freigeschaltet. Die optionale Einladungsmail "
+                "wurde durch die globale Versandfreigabe unterdrückt.",
+            )
         else:
             messages.error(
                 request,
@@ -1798,10 +1827,16 @@ def employee_application_invitation_resend(
         return redirect(
             "wohnungsverwaltung:employee_application_detail", application_id=application_id
         )
-    if _send_application_invitation(
+    sent = _send_application_invitation(
         application, request.user, request.build_absolute_uri("/").rstrip("/")
-    ):
+    )
+    if sent:
         messages.success(request, "Die Einladung wurde erneut versendet.")
+    elif sent is None:
+        messages.info(
+            request,
+            "Diese optionale Einladungsmail ist global deaktiviert oder wurde bereits unterdrückt.",
+        )
     else:
         messages.error(
             request, "Die E-Mail konnte nicht versendet werden. Bitte versuchen Sie es erneut."
@@ -3408,7 +3443,11 @@ def _stellplatz_form(request: HttpRequest, stellplatz: Stellplatz, title: str) -
 
 
 @user_management_required
-def user_account_list(request: HttpRequest) -> HttpResponse:
+def user_account_list(
+    request: HttpRequest, *, settings_access_form=None, status=200
+) -> HttpResponse:
+    from .system_settings import access_context
+
     user_model = get_user_model()
     accounts = (
         user_model.objects.select_related("person_profile")
@@ -3423,7 +3462,17 @@ def user_account_list(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "wohnungsverwaltung/user_account_list.html",
-        {"accounts": accounts, "protected_accounts": protected_accounts},
+        {
+            "accounts": accounts,
+            "protected_accounts": protected_accounts,
+            **access_context(request),
+            **(
+                {"settings_access_form": settings_access_form}
+                if settings_access_form is not None
+                else {}
+            ),
+        },
+        status=status,
     )
 
 

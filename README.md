@@ -256,8 +256,19 @@ Eine Roadmap-Phase gilt erst als abgeschlossen, wenn ihre Akzeptanzkriterien erf
 Für **Systemeinstellungen** ist ein eigenes Einzelrecht erforderlich. Nach den
 Migrationen kann der Betrieb den ersten Zugriff mit
 `python manage.py grant_system_settings_access <Anmeldename>` vergeben.
-Danach ist die Zugriffsverwaltung im Kontomenü nach Anmeldung per E-Mail-Einmalcode
-erreichbar. Weitere Einzelheiten stehen in [ADR-0025](docs/decisions/0025-systemeinstellungen-berechtigen.md).
+Danach sind die Systemeinstellungen im Kontomenü nach Anmeldung per E-Mail-Einmalcode
+erreichbar. Weitere Rechte werden in **Verwaltung → Benutzer** erteilt oder entzogen;
+dafür sind beide Verwaltungsrechte und die bestätigte Anmeldung erforderlich.
+Der Einstellungsbereich enthält die globale Freigabe optionaler Nutzer-Mails und
+eine Historie erfolgreicher Änderungen ohne Feldinhalte. Veraltete Formulare werden
+mit einem Konflikthinweis abgewiesen. Persönliche Mailpräferenzen bleiben getrennt
+und werden durch globales Aus-/Einschalten nicht verändert. Unterdrückte alte
+Termin- und Einladungsmails werden nicht nachgesendet. Sicherheitscodes,
+Verwaltungsbenachrichtigungen und funktionale Versandwege bleiben unabhängig.
+Mailadresspflege/Testversand (#188), Organisationsdaten (#192) und persönliche
+Kategorien (#205) sind eigene Folgeumsetzungen. Details stehen in
+[ADR-0025](docs/decisions/0025-systemeinstellungen-berechtigen.md) und
+[ADR-0026](docs/decisions/0026-schlanker-einstellungsbereich.md).
 
 Konten mit Mitarbeiterzugriff oder Benutzerverwaltung – auch bei direkt zugewiesenem Einzelrecht – benötigen bei jeder Anmeldung zusätzlich zum Passwort einen sechsstelligen E-Mail-Einmalcode. Der Code ist 15 Minuten gültig, wird nur gehasht gespeichert und erlaubt höchstens fünf Versuche. Es gibt bewusst keine dauerhafte Browserfreigabe. Erhält ein zuvor nicht privilegiertes Konto Mitarbeiter- oder Benutzerverwaltungsrechte, werden bestehende Sitzungen beendet; der nächste Zugriff erfordert eine neue Anmeldung mit Einmalcode. In der lokalen Entwicklungsumgebung erscheint der Code im automatisch gestarteten Mailpit-Postfach unter [http://localhost:8025](http://localhost:8025); Produktion verwendet den konfigurierten SMTP-Backend.
 

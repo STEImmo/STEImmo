@@ -4,6 +4,11 @@
 - Datum: 2026-11-18
 - Issue: [#185](https://github.com/STEImmo/STEImmo/issues/185)
 
+Ergänzung vom 19.11.2026: #185 ist in #186 aufgegangen. Die Rechtevergabe ist
+gemäß [ADR-0026](0026-schlanker-einstellungsbereich.md) in die bestehende
+Benutzerverwaltung integriert und erfordert zusätzlich deren Verwaltungsrecht.
+Die nachfolgende ursprüngliche Entscheidung dokumentiert die Sicherheitsgrundlage.
+
 ## Entscheidung
 
 Das Einzelrecht `immobilien.manage_system_settings` wird ausdrücklich einem
@@ -32,5 +37,6 @@ berechtigtes Konto erhalten. Dafür zählen aktive Konten mit verwendbarem
 Passwort und gültiger E-Mail-Adresse. Die tatsächliche Mailzustellung ist eine
 Betriebsvoraussetzung.
 
-Dieser Schritt stellt den Zugriffsschutz bereit. Die Konfigurationsansicht
-und SMTP-Einstellungen folgen in den zugehörigen Stories des Epics #184.
+Dieser Schritt stellt den Zugriffsschutz bereit. Der aktuelle fachliche Umfang
+des Einstellungsbereichs ist in ADR-0026 dokumentiert; SMTP-Verbindungsdaten
+bleiben ausschließlich Betriebsaufgabe.
