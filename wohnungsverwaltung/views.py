@@ -12,6 +12,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
+from django.contrib.sessions.models import Session
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import EmailMessage, send_mail
 from django.core.paginator import Paginator
@@ -1367,6 +1368,23 @@ def employee_application_send_contract(request, application_id):
             request, application_id, status=400, contract_form=form
         )
 
+    # PDF parsing can outlast an account change or a session revocation.
+    actor = get_user_model().objects.filter(pk=request.user.pk, is_active=True).first()
+    if (
+        actor is None
+        or not actor.has_perm(EMPLOYEE_ACCESS_PERMISSION)
+        or any(
+            getattr(actor, field) != getattr(request.user, field)
+            for field in ("password", "username", "email")
+        )
+        or not Session.objects.filter(
+            session_key=request.session.session_key, expire_date__gt=timezone.now()
+        ).exists()
+    ):
+        raise PermissionDenied(
+            "Ihre Versandberechtigung ist nicht mehr gültig. Bitte melden Sie sich erneut an."
+        )
+
     application.refresh_from_db()
     if not application.acceptance_eligible or application.accepted_at is None:
         messages.error(request, "Der Versand ist nur für eine angenommene Bewerbung möglich.")
@@ -1424,7 +1442,7 @@ def employee_application_send_contract(request, application_id):
     else:
         kind = ApplicationReviewEvent.Kind.CONTRACT_FAILED
         messages.error(request, failure_message)
-    ApplicationReviewEvent.objects.create(application=application, actor=request.user, kind=kind)
+    ApplicationReviewEvent.objects.create(application=application, actor=actor, kind=kind)
     return detail
 
 

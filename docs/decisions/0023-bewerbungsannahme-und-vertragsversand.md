@@ -33,7 +33,11 @@ In der Anwendung bleiben Zeitpunkt, Akteur und Ergebnis im
 und Versand verarbeitet.
 
 SMTP läuft außerhalb einer Datenbanktransaktion. Die Anwendung prüft den
-Bewerbungsstand nach der PDF-Prüfung erneut. Das Ergebnis beschreibt die
+Bewerbungsstand nach der PDF-Prüfung erneut. Vor dem Versand werden außerdem
+das aktive Mitarbeiterkonto, dessen aktuelle Rechte, unveränderte Zugangsdaten
+und die weiterhin gültige Datenbanksitzung erneut geprüft. Ein während der
+Dateiprüfung erfolgter Widerruf beendet den Versuch mit HTTP 403 ohne Mailversand.
+Das Ergebnis beschreibt die
 Übergabe an das Mail-Backend, eine Bestätigung der Zustellung gibt es dabei
 nicht. Nach einem Fehler kann ein Mitarbeiter die Datei erneut zum Versand
 auswählen. Jeder ausdrücklich ausgelöste Versand ist ein eigener Versuch.
