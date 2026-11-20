@@ -1,10 +1,11 @@
 from django.urls import path
 
-from . import assignment_views, views
+from . import assignment_views, settings_views, views
 
 app_name = "verwaltung"
 
 urlpatterns = [
+    path("einstellungen/", settings_views.global_settings, name="global_settings"),
     path(
         "wohnungen/<uuid:wohnung_id>/personen/",
         assignment_views.wohnung_personen,
