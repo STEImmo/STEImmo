@@ -1216,3 +1216,20 @@ class ProtokollSchluessel(models.Model):
 
     class Meta:
         db_table = "protokoll_schluessel"
+
+
+class GlobalSettings(models.Model):
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    optional_user_emails_enabled = models.BooleanField(default=True)
+    version = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(id=1), name="global_settings_singleton"),
+        ]
+
+
+class GlobalSettingsChange(models.Model):
+    actor_account_id = models.PositiveBigIntegerField()
+    changed_at = models.DateTimeField(auto_now_add=True)
+    changed_fields = models.JSONField()
