@@ -9,3 +9,7 @@
 {% if perms.immobilien.manage_user_accounts %}
     <li><a href="{% url 'verwaltung:user_account_list' %}"{% if namespace == 'verwaltung' and 'user_account' in route %} aria-current="{% if route == 'user_account_list' %}page{% else %}true{% endif %}"{% endif %}>Benutzerkonten</a></li>
 {% endif %}
+
+{% if perms.immobilien.access_employee_area and perms.immobilien.manage_global_settings %}
+    <li><a href="{% url 'verwaltung:global_settings' %}"{% if namespace == 'verwaltung' and route == 'global_settings' %} aria-current="page"{% endif %}>Einstellungen</a></li>
+{% endif %}
