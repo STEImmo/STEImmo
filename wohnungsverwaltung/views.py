@@ -1205,6 +1205,7 @@ def _employee_application_detail_response(
     contract_form=None,
     rental_form=None,
     contract_notice="",
+    rental_notice="",
 ):
     application = get_object_or_404(
         Bewerbung.objects.select_related("person__user", "wohnung").prefetch_related(
@@ -1305,9 +1306,12 @@ def _employee_application_detail_response(
                 rental_form
                 if rental_form is not None
                 else RentalCompletionForm(
-                    initial={"account": application.person.user_id}, auto_id="id_rental_%s"
+                    application=application,
+                    initial={"account": application.person.user_id},
+                    auto_id="id_rental_%s",
                 )
             ),
+            "rental_notice": rental_notice,
             "rental_completed": (
                 application.accepted_at is not None
                 and Rental.objects.filter(application=application).exists()
@@ -1347,6 +1351,27 @@ def employee_application_accept(request, application_id):
     return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
 
 
+def _current_employee_for_contract_action(request):
+    # PDF parsing can outlast an account change or a session revocation.
+    actor = get_user_model().objects.filter(pk=request.user.pk, is_active=True).first()
+    if (
+        actor is None
+        or not actor.has_perm(EMPLOYEE_ACCESS_PERMISSION)
+        or any(
+            getattr(actor, field) != getattr(request.user, field)
+            for field in ("password", "username", "email")
+        )
+        or not Session.objects.filter(
+            session_key=request.session.session_key, expire_date__gt=timezone.now()
+        ).exists()
+    ):
+        raise PermissionDenied(
+            "Ihre Versandberechtigung ist nicht mehr gültig. Bitte melden Sie sich erneut an."
+        )
+
+    return actor
+
+
 @never_cache
 @employee_required
 def employee_application_send_contract(request, application_id):
@@ -1368,22 +1393,7 @@ def employee_application_send_contract(request, application_id):
             request, application_id, status=400, contract_form=form
         )
 
-    # PDF parsing can outlast an account change or a session revocation.
-    actor = get_user_model().objects.filter(pk=request.user.pk, is_active=True).first()
-    if (
-        actor is None
-        or not actor.has_perm(EMPLOYEE_ACCESS_PERMISSION)
-        or any(
-            getattr(actor, field) != getattr(request.user, field)
-            for field in ("password", "username", "email")
-        )
-        or not Session.objects.filter(
-            session_key=request.session.session_key, expire_date__gt=timezone.now()
-        ).exists()
-    ):
-        raise PermissionDenied(
-            "Ihre Versandberechtigung ist nicht mehr gültig. Bitte melden Sie sich erneut an."
-        )
+    actor = _current_employee_for_contract_action(request)
 
     application.refresh_from_db()
     if not application.acceptance_eligible or application.accepted_at is None:
@@ -1475,7 +1485,9 @@ def employee_rental_complete(request, application_id):
         messages.error(request, "Der Abschluss ist nur für eine angenommene Bewerbung möglich.")
         return detail
 
-    form = RentalCompletionForm(request.POST, request.FILES, auto_id="id_rental_%s")
+    form = RentalCompletionForm(
+        request.POST, request.FILES, application=application, auto_id="id_rental_%s"
+    )
     if not form.is_valid():
         return _employee_application_detail_response(
             request, application_id, status=400, rental_form=form
@@ -1484,6 +1496,7 @@ def employee_rental_complete(request, application_id):
 
     with transaction.atomic():
         application = _lock_viewing_application(application_id)
+        _current_employee_for_contract_action(request)
         if Rental.objects.filter(application=application).exists():
             messages.info(request, "Diese Vermietung ist bereits abgeschlossen.")
             return detail
@@ -1510,6 +1523,19 @@ def employee_rental_complete(request, application_id):
         ):
             messages.error(request, "Das angezeigte Benutzerkonto ist nicht mehr gültig.")
             return detail
+        if form.cleaned_data["assignment_confirmation"] != form.assignment_payload(
+            application, person.user_id
+        ):
+            return _employee_application_detail_response(
+                request,
+                application_id,
+                status=409,
+                rental_notice=(
+                    "Das Benutzerkonto oder die Wohnung hat sich geändert. Es wurde keine "
+                    "Vermietung abgeschlossen. Bitte prüfen Sie die angezeigte Zuordnung erneut "
+                    "und wählen Sie den Mietvertrag nochmals aus."
+                ),
+            )
         if person.wohnung_id != application.wohnung_id and (
             person.wohnung_id is not None
             or person.protokolle.exclude(status=ProtokollStatus.SIGNED).exists()

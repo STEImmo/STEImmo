@@ -901,7 +901,42 @@ class RentalContractForm(RentalContractUploadForm):
 
 
 class RentalCompletionForm(RentalContractUploadForm):
+    ASSIGNMENT_SALT = "wohnungsverwaltung.rental_completion_assignment"
+
     account = forms.IntegerField(widget=forms.HiddenInput)
+    assignment_confirmation = forms.CharField(
+        widget=forms.HiddenInput,
+        error_messages={
+            "required": "Bitte laden Sie die Bewerbung neu und prüfen Sie die Zuordnung."
+        },
+    )
+
+    def __init__(self, *args, application, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.initial["assignment_confirmation"] = signing.dumps(
+            self.assignment_payload(application, application.person.user_id),
+            salt=self.ASSIGNMENT_SALT,
+        )
+
+    @staticmethod
+    def assignment_payload(application, account_id):
+        return {
+            "application": str(application.pk),
+            "person": str(application.person_id),
+            "unit": str(application.wohnung_id),
+            "account": account_id,
+        }
+
+    def clean_assignment_confirmation(self):
+        try:
+            return signing.loads(
+                self.cleaned_data["assignment_confirmation"], salt=self.ASSIGNMENT_SALT
+            )
+        except signing.BadSignature as error:
+            raise forms.ValidationError(
+                "Bitte laden Sie die Bewerbung neu und prüfen Sie "
+                "das Benutzerkonto und die Wohnung."
+            ) from error
 
 
 class ApplicationProofStorageError(Exception):

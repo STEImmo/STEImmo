@@ -54,10 +54,16 @@ class RentalCompletionTests(TestCase):
     def complete(self, *, contract=None, account=None, follow=True):
         account = self.applicant.pk if account is None else account
         contract = self.pdf_bytes() if contract is None else contract
+        page = self.client.get(
+            reverse("wohnungsverwaltung:employee_application_detail", args=[self.application.pk])
+        )
         return self.client.post(
             self.completion_url,
             {
                 "account": account,
+                "assignment_confirmation": page.context["rental_form"][
+                    "assignment_confirmation"
+                ].value(),
                 "contract": SimpleUploadedFile("vertrag.pdf", contract, "application/pdf"),
             },
             follow=follow,

@@ -1,6 +1,7 @@
 {% if rental_completed or application.accepted_at and application.acceptance_eligible %}
     <article class="management-panel uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
         <h2 class="uk-card-title">Vermietungsabschluss</h2>
+        {% if rental_notice %}<div class="uk-alert-warning" role="alert"><p>{{ rental_notice }}</p></div>{% endif %}
         {% if rental_completed %}
             <p>Vermietung abgeschlossen.</p>
         {% elif application.person.user.is_active %}
@@ -11,6 +12,8 @@
                   class="uk-form-stacked">
                 {% csrf_token %}
                 {{ rental_form.account }}
+                {{ rental_form.assignment_confirmation }}
+                {% if rental_form.assignment_confirmation.errors %}<div class="uk-alert-danger" role="alert">{{ rental_form.assignment_confirmation.errors }}</div>{% endif %}
                 {% if rental_form.account.errors %}<p class="uk-text-danger" role="alert">Bitte laden Sie die Bewerbung neu und prüfen Sie das Mieterkonto.</p>{% endif %}
                 {% include "wohnungsverwaltung/_form_field.html" with field=rental_form.contract only %}
                 <button class="uk-button uk-button-primary uk-margin-top" type="submit">Vermietung abschließen</button>
