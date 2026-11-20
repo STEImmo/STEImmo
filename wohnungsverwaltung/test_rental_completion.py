@@ -10,7 +10,7 @@ from django.utils import timezone
 from pypdf import PdfWriter
 
 from .access import ROLE_APPLICANT, ROLE_EMPLOYEE, ROLE_TENANT
-from .models import Bewerbung, Person, Wohnung
+from .models import Bewerbung, Person, Wohnung, WohnungStatus
 
 
 class RentalCompletionTests(TestCase):
@@ -80,7 +80,7 @@ class RentalCompletionTests(TestCase):
         self.person.refresh_from_db()
         self.assertEqual(self.person.wohnung_id, self.unit.pk)
         self.unit.refresh_from_db()
-        self.assertEqual(self.unit.status, self.application.wohnung.status)
+        self.assertEqual(self.unit.status, WohnungStatus.TAKEN)
         self.assertTrue(self.applicant.groups.filter(name=ROLE_APPLICANT).exists())
         self.assertTrue(self.applicant.groups.filter(name=ROLE_TENANT).exists())
         self.client.logout()

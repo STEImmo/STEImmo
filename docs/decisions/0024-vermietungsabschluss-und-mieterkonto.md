@@ -30,7 +30,8 @@ gesperrte Übergabeprotokolle blockieren eine Änderung der Wohnungszuordnung.
 Je Bewerbung und Wohnung ist im aktuellen Ablauf ein Abschluss möglich.
 Wiederholtes Ausführen behält die gespeicherte Zuordnung und Vertragsfassung.
 Eine Beendigung mit anschließender Neuvermietung erfordert einen eigenen
-fachlichen Ablauf. Der Wohnungsstatus folgt in #182.
+fachlichen Ablauf. Der Wohnungsstatus wird mit #182 beim Abschluss gesetzt;
+siehe [ADR-0025](0025-wohnungsstatus-beim-vermietungsabschluss.md).
 Abgeschlossene Bewerbungen stehen in der allgemeinen Bewerbungsübersicht zur
 Verfügung und werden im offenen Arbeitsablauf ausgeblendet.
 

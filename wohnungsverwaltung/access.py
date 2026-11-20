@@ -17,20 +17,31 @@ TENANT_ACCESS_PERMISSION = f"{APP_LABEL}.access_tenant_area"
 EMPLOYEE_ACCESS_PERMISSION = f"{APP_LABEL}.access_employee_area"
 USER_MANAGEMENT_PERMISSION = f"{APP_LABEL}.manage_user_accounts"
 
+GLOBAL_SETTINGS_PERMISSION = f"{APP_LABEL}.manage_global_settings"
+
 ACCESS_PERMISSION_CODENAMES = (
     "access_applicant_area",
     "access_tenant_area",
     "access_employee_area",
     "manage_user_accounts",
+    "manage_global_settings",
 )
 
 ROLE_APPLICANT = "Bewerber"
 ROLE_TENANT = "Mieter"
 ROLE_EMPLOYEE = "Mitarbeiter"
 ROLE_USER_MANAGEMENT = "Benutzerverwaltung"
-ROLE_NAMES = (ROLE_APPLICANT, ROLE_TENANT, ROLE_EMPLOYEE, ROLE_USER_MANAGEMENT)
+ROLE_GLOBAL_SETTINGS = "Einstellungsverwaltung"
+ROLE_NAMES = (
+    ROLE_APPLICANT,
+    ROLE_TENANT,
+    ROLE_EMPLOYEE,
+    ROLE_USER_MANAGEMENT,
+    ROLE_GLOBAL_SETTINGS,
+)
 
 ROLE_PERMISSION_CODENAMES = {
+    ROLE_GLOBAL_SETTINGS: ("access_employee_area", "manage_global_settings"),
     ROLE_APPLICANT: ("access_applicant_area",),
     ROLE_TENANT: ("access_tenant_area",),
     ROLE_EMPLOYEE: ("access_employee_area",),
@@ -38,6 +49,7 @@ ROLE_PERMISSION_CODENAMES = {
 }
 
 PERMISSION_NAMES = {
+    "manage_global_settings": "Kann globale Einstellungen verwalten",
     "access_applicant_area": "Kann auf den Bewerberbereich zugreifen",
     "access_tenant_area": "Kann auf den vorbereiteten Mieterbereich zugreifen",
     "access_employee_area": "Kann auf den Mitarbeiterbereich zugreifen",
@@ -77,6 +89,7 @@ def handover_reader_required(view):
 
 employee_required = _access_required(EMPLOYEE_ACCESS_PERMISSION)
 user_management_required = _access_required(USER_MANAGEMENT_PERMISSION)
+global_settings_required = _access_required(GLOBAL_SETTINGS_PERMISSION)
 
 
 def has_permission(request: HttpRequest, permission: str) -> bool:

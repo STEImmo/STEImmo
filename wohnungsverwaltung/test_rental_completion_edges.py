@@ -14,7 +14,7 @@ from django.utils import timezone
 from . import test_handover_export, test_rental_completion
 from .access import ROLE_EMPLOYEE, ROLE_TENANT
 from .forms import RentalCompletionForm
-from .models import Bewerbung, Person, Rental, Wohnung
+from .models import Bewerbung, Person, Rental, Wohnung, WohnungStatus
 
 
 class RentalCompletionEdgeTests(TestCase):
@@ -44,6 +44,8 @@ class RentalCompletionEdgeTests(TestCase):
 
     def assert_no_completion(self):
         self.assertFalse(Rental.objects.exists())
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.status, WohnungStatus.FREE)
         self.person.refresh_from_db()
         self.assertIsNone(self.person.wohnung_id)
         self.assertFalse(self.applicant.groups.filter(name=ROLE_TENANT).exists())
@@ -258,5 +260,7 @@ class ConcurrentRentalCompletionTests(TransactionTestCase):
         rental = Rental.objects.get()
         self.person.refresh_from_db()
         self.assertEqual(self.person.wohnung_id, rental.wohnung_id)
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.status, WohnungStatus.TAKEN)
         self.assertEqual(rental.tenant_id, self.applicant.pk)
         self.assertEqual(bytes(rental.contract_pdf), self.pdf_bytes())

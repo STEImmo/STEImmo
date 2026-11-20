@@ -1551,6 +1551,8 @@ def employee_rental_complete(request, application_id):
         )
         person.wohnung = application.wohnung
         person.save(update_fields=["wohnung", "updated_at"])
+        application.wohnung.status = WohnungStatus.TAKEN
+        application.wohnung.save(update_fields=["status", "updated_at"])
         account.groups.add(Group.objects.get(name=ROLE_TENANT))
 
     messages.success(request, "Vermietung abgeschlossen. Der Mietvertrag ist im Konto verfügbar.")
@@ -3405,11 +3407,23 @@ def wohnung_create(request: HttpRequest) -> HttpResponse:
 
 @employee_required
 def wohnung_edit(request: HttpRequest, wohnung_id) -> HttpResponse:
-    wohnung = get_object_or_404(Wohnung, pk=wohnung_id)
+    wohnung = get_object_or_404(
+        Wohnung.objects.annotate(
+            rental_confirmation=Subquery(
+                Rental.objects.filter(wohnung_id=OuterRef("pk")).values("pk")[:1]
+            )
+        ),
+        pk=wohnung_id,
+    )
     return _wohnung_form(request, wohnung, "Wohnung bearbeiten")
 
 
 def _wohnung_form(request: HttpRequest, wohnung: Wohnung, title: str) -> HttpResponse:
+    rental_confirmation = (
+        request.POST.get("rental_confirmation", "")
+        if request.method == "POST"
+        else str(getattr(wohnung, "rental_confirmation", "") or "")
+    )
     if request.method == "POST":
         form = WohnungForm(request.POST, instance=wohnung)
         schluessel_formset = SchluesselFormSet(
@@ -3436,6 +3450,20 @@ def _wohnung_form(request: HttpRequest, wohnung: Wohnung, title: str) -> HttpRes
                             "Änderungen erneut.",
                         )
                         return redirect("verwaltung:wohnung_edit", wohnung_id=wohnung.pk)
+                    current_rental = str(
+                        Rental.objects.filter(wohnung_id=wohnung.pk)
+                        .values_list("pk", flat=True)
+                        .first()
+                        or ""
+                    )
+                    if rental_confirmation != current_rental:
+                        messages.warning(
+                            request,
+                            "Die Vermietung wurde zwischenzeitlich abgeschlossen. "
+                            "Bitte prüfen Sie den aktuellen Wohnungsstatus und speichern "
+                            "Sie Ihre Änderungen erneut.",
+                        )
+                        return redirect("verwaltung:wohnung_edit", wohnung_id=wohnung.pk)
                 wohnung = form.save()
                 schluessel_formset.instance = wohnung
                 schluessel_formset.save()
@@ -3455,6 +3483,7 @@ def _wohnung_form(request: HttpRequest, wohnung: Wohnung, title: str) -> HttpRes
             "schluessel_formset": schluessel_formset,
             "title": title,
             "wohnung": wohnung,
+            "rental_confirmation": rental_confirmation,
             "requirements_version": (
                 request.POST.get("requirements_version", "")
                 if request.method == "POST"
