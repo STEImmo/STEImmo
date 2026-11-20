@@ -11,7 +11,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.mail import EmailMessage, send_mail
+from django.core.mail import EmailMessage
 from django.core.paginator import Paginator
 from django.core.validators import validate_email
 from django.db import DatabaseError, IntegrityError, transaction
@@ -44,6 +44,8 @@ from django.utils import timezone
 from django.utils.crypto import salted_hmac
 from django.views.decorators.cache import never_cache
 from PIL import Image
+
+from core.mail_settings import send_repliable_mail
 
 from .access import (
     APPLICANT_ACCESS_PERMISSION,
@@ -1798,7 +1800,7 @@ def _send_application_invitation(application: Bewerbung, actor, base_url: str) -
         f"Zur Hauptbewerbung: {base_url}{detail_url}\n"
     )
     try:
-        sent = send_mail(subject, body, None, [recipient], fail_silently=False)
+        sent = send_repliable_mail(subject, body, [recipient])
     except Exception:
         sent = 0
     kind = (
