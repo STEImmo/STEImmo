@@ -859,6 +859,8 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.assertEqual(self.match.review_priority, Bewerbung.Priority.UNRATED)
 
     def test_pet_invitation_requires_current_approval_and_repeated_unlock_is_idempotent(self):
+        self.pet_exception.person.user = self.applicant_user
+        self.pet_exception.person.save(update_fields=["user"])
         self.record_completed_viewing(self.pet_exception)
         self.configure_requirements()
         invite_url = reverse(
@@ -998,6 +1000,31 @@ class EmployeeApplicationSelectionTests(TestCase):
         )
         self.assertContains(dashboard_response, "Einladung versendet")
         self.assertNotContains(dashboard_response, "Einladung fehlgeschlagen")
+
+    def test_invitation_suppression_keeps_unlock_and_prevents_later_resend(self):
+        from .models import GlobalSettings
+
+        self.record_completed_viewing(self.match)
+        self.match.person.user = self.applicant_user
+        self.match.person.save(update_fields=["user"])
+        policy = GlobalSettings.objects.create(user_mail_types={"main_application_invited": False})
+        self.client.post(
+            reverse("wohnungsverwaltung:employee_application_invite", args=[self.match.pk]),
+            {"confirm_positive_decision": "on", "reason": "Positive Prüfung"},
+        )
+        self.match.refresh_from_db()
+        self.assertTrue(self.match.main_application_unlocked)
+        self.assertTrue(self.match.review_events.filter(kind="invitation_suppressed").exists())
+        policy.user_mail_types = {}
+        policy.save()
+        with patch("wohnungsverwaltung.views.send_mail") as send:
+            self.client.post(
+                reverse(
+                    "wohnungsverwaltung:employee_application_invitation_resend",
+                    args=[self.match.pk],
+                )
+            )
+        send.assert_not_called()
 
     def test_empty_reasons_and_get_requests_cannot_change_review_state(self):
         self.configure_requirements()

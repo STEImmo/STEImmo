@@ -1,4 +1,3 @@
-from django import forms
 from django.contrib import messages
 from django.db import transaction
 from django.shortcuts import redirect, render
@@ -7,23 +6,8 @@ from django.views.decorators.http import require_http_methods
 
 from .access import employee_required, global_settings_required
 from .models import GlobalSettings, GlobalSettingsChange
-
-
-class GlobalSettingsForm(forms.Form):
-    version = forms.IntegerField(min_value=0, max_value=2**63 - 1, widget=forms.HiddenInput)
-    optional_user_emails_enabled = forms.BooleanField(
-        label="Optionale E-Mails an Nutzer aktivieren",
-        required=False,
-        widget=forms.CheckboxInput(attrs={"class": "uk-checkbox"}),
-    )
-
-    def clean(self):
-        cleaned = super().clean()
-        if self.data.getlist("optional_user_emails_enabled") not in ([], ["on"]):
-            self.add_error("optional_user_emails_enabled", "Ungültige Auswahl.")
-        if len(self.data.getlist("version")) != 1:
-            self.add_error("version", "Ungültige Formularversion.")
-        return cleaned
+from .notification_forms import GlobalNotificationForm
+from .notification_preferences import USER_MAIL_TYPES
 
 
 @employee_required
@@ -32,41 +16,46 @@ class GlobalSettingsForm(forms.Form):
 @csrf_protect
 def global_settings(request):
     status = 200
-    current = None
     if request.method == "POST":
-        form = GlobalSettingsForm(request.POST)
+        form = GlobalNotificationForm(request.POST)
         if form.is_valid():
-            enabled = form.cleaned_data["optional_user_emails_enabled"]
             with transaction.atomic():
                 current, _ = GlobalSettings.objects.select_for_update().get_or_create(pk=1)
                 if current.version != form.cleaned_data["version"]:
-                    form.add_error(None, "Die Einstellungen wurden inzwischen geändert.")
                     status = 409
-                elif current.optional_user_emails_enabled != enabled:
-                    current.optional_user_emails_enabled = enabled
-                    current.version += 1
-                    current.save(update_fields=["optional_user_emails_enabled", "version"])
-                    GlobalSettingsChange.objects.create(
-                        actor_account_id=request.user.pk,
-                        changed_fields=["optional_user_emails_enabled"],
-                    )
+                else:
+                    choices = {key: form.cleaned_data[key] for key in USER_MAIL_TYPES}
+                    changed = [
+                        key
+                        for key, value in choices.items()
+                        if current.user_mail_types.get(key, True) != value
+                    ]
+                    if changed:
+                        current.user_mail_types = choices
+                        current.version += 1
+                        current.save(update_fields=["user_mail_types", "version"])
+                        GlobalSettingsChange.objects.create(
+                            actor_account_id=request.user.pk, changed_fields=changed
+                        )
             if status != 409:
                 messages.success(request, "Einstellungen gespeichert.")
                 return redirect("verwaltung:global_settings")
         else:
             status = 400
-    else:
-        settings = GlobalSettings.objects.filter(pk=1).first() or GlobalSettings()
-        form = GlobalSettingsForm(
+    if request.method == "GET" or status == 409:
+        current = GlobalSettings.objects.filter(pk=1).first() or GlobalSettings()
+        form = GlobalNotificationForm(
             initial={
-                "version": settings.version,
-                "optional_user_emails_enabled": settings.optional_user_emails_enabled,
+                "version": current.version,
+                **{key: current.user_mail_types.get(key, True) for key in USER_MAIL_TYPES},
             }
         )
-
     return render(
         request,
         "wohnungsverwaltung/global_settings.html",
-        {"form": form, "conflict": status == 409, "current": current},
+        {
+            "form": form,
+            "conflict": status == 409,
+        },
         status=status,
     )

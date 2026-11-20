@@ -648,6 +648,7 @@ class ApplicationReviewEvent(models.Model):
         OCCUPANCY_DECLINED = "occupancy_declined", "Wegen Belegungsgrenze abgelehnt"
         MAIN_UNLOCKED = "main_unlocked", "Main-Bewerbung freigeschaltet"
         INVITATION_SENT = "invitation_sent", "Einladung per E-Mail versendet"
+        INVITATION_SUPPRESSED = "invitation_suppressed", "Einladungsversand unterdrückt"
         INVITATION_FAILED = "invitation_failed", "Einladungsversand fehlgeschlagen"
         ACCEPTED = "accepted", "Bewerbung angenommen"
         CONTRACT_SENT = "contract_sent", "Mietvertrag zum Versand übergeben"
@@ -780,6 +781,7 @@ class ViewingAppointmentEvent(models.Model):
         PROPOSAL_CHANGED = "proposal_changed", "Alternativtermin vorgeschlagen / geändert"
 
     class NotificationStatus(models.TextChoices):
+        SUPPRESSED = "suppressed", "Durch Einstellungen oder fehlenden Zugang unterdrückt"
         NONE = "none", "Keine Benachrichtigung erforderlich"
         PENDING = "pending", "Versand ausstehend"
         SENT = "sent", "Versendet"
@@ -806,6 +808,7 @@ class ViewingAppointmentEvent(models.Model):
         max_length=16, choices=NotificationStatus.choices, default=NotificationStatus.NONE
     )
     notification_url = models.URLField(max_length=2048, blank=True, default="")
+    recipient_results = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     @property
@@ -1232,13 +1235,19 @@ class ProtokollSchluessel(models.Model):
 
 class GlobalSettings(models.Model):
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
-    optional_user_emails_enabled = models.BooleanField(default=True)
+    user_mail_types = models.JSONField(default=dict, blank=True)
     version = models.PositiveBigIntegerField(default=0)
 
     class Meta:
         constraints = [
             models.CheckConstraint(condition=models.Q(id=1), name="global_settings_singleton"),
         ]
+
+
+class NotificationPreference(models.Model):
+    account = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    choices = models.JSONField(default=dict, blank=True)
+    version = models.PositiveBigIntegerField(default=0)
 
 
 class GlobalSettingsChange(models.Model):
