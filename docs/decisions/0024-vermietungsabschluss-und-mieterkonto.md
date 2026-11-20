@@ -31,6 +31,13 @@ Je Bewerbung und Wohnung ist im aktuellen Ablauf ein Abschluss möglich.
 Wiederholtes Ausführen behält die gespeicherte Zuordnung und Vertragsfassung.
 Eine Beendigung mit anschließender Neuvermietung erfordert einen eigenen
 fachlichen Ablauf. Der Wohnungsstatus folgt in #182.
+Eine abgeschlossene Bewerbung kann nicht mehr zurückgezogen werden; der Link
+wird ausgeblendet und der direkte Aufruf abgewiesen. Beim POST wird die
+Vermietung nach Erwerb derselben Bewerbungssperre wie beim Abschluss erneut
+geprüft. Die manuelle Person-Wohnungszuordnung lehnt abweichende Wohnungen bei
+bestehender Vermietung unter der gemeinsamen Personsperre ab. Maßgeblich ist
+die Person der Bewerbung, auch nach einer Änderung der Kontoverknüpfung.
+Die erneute Bestätigung derselben Wohnung bleibt möglich.
 Abgeschlossene Bewerbungen stehen in der allgemeinen Bewerbungsübersicht zur
 Verfügung und werden im offenen Arbeitsablauf ausgeblendet.
 
@@ -49,8 +56,20 @@ Anmeldung, unveränderte freigegebene Übergabeprotokolle, private Downloads,
 ungültige PDFs, veränderte Konten und Wohnungen, Rechteentzug während der
 Dateiprüfung, vollständigen Rollback und gleichzeitige Abschlussversuche ab.
 Eine offene Übergabe blockiert eine neue Zuordnung weiterhin.
+Regressionstests decken außerdem ausgeblendeten und direkten Rückzug nach
+Abschluss, widersprüchliche manuelle Zuordnungen und parallele Abschluss- und
+Änderungsanfragen mit beobachteten PostgreSQL-Zeilensperren ab.
+Die leere Merge-Migration `0037_merge_rental_completion_and_global_settings`
+führt den Vermietungszweig mit den inzwischen auf `main` integrierten globalen
+Einstellungen zusammen; vorhandene Migrationen bleiben unverändert.
 
 Am 20.11.2026 bestanden alle 1.013 Django-Tests auf PostgreSQL sowie
 System-, Migrations- und Ruff-Prüfungen. Der interne Browser-Smoke-Test mit
 isolierten synthetischen Daten bestätigte Abschluss, Abmeldung, erneute
 Mieteranmeldung, Wohnungsanzeige und Download der bytegleichen Vertragsdatei.
+
+Die anschließende Review-Korrektur bestand nach Integration des aktuellen
+`main` alle 1.025 Django-Tests auf PostgreSQL sowie System-, Migrations- und
+Ruff-Prüfungen. Ein weiterer Browser-Smoke-Test mit isolierten synthetischen
+Daten bestätigte den ausgeblendeten Rückzugslink und die weiterhin sichtbare
+Wohnung mit Vertragslink nach der Mieteranmeldung.

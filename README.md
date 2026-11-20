@@ -429,7 +429,10 @@ Eingereichte Hauptbewerbungen bleiben bis zum Vermietungsabschluss als
 Mitarbeiteraufgabe sichtbar. Mitarbeitende können die angenommene Bewerbung mit
 einem aktiven Mieterkonto verknüpfen und den endgültigen Mietvertrag für dieses
 Konto freigeben. Der abgeschlossene Vorgang bleibt in der Bewerbungsübersicht
-abrufbar. Das Einblenden anderer Kalender, Kalenderabonnements und Synchronisation bleiben
+abrufbar. Nach dem Abschluss ist ein Rückzug der Bewerbung nicht mehr möglich.
+Eine manuelle Person-Wohnungszuordnung darf der gespeicherten Vermietung nicht
+widersprechen; ein Wohnungswechsel benötigt einen eigenen Vermietungsablauf.
+Das Einblenden anderer Kalender, Kalenderabonnements und Synchronisation bleiben
 einem separaten Folgeissue nach Fertigstellung des Dashboards vorbehalten.
 
 ## Bewerbungen im Betreiberbereich

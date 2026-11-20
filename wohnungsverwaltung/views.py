@@ -2243,6 +2243,8 @@ def application_withdraw(request: HttpRequest, application_id: UUID) -> HttpResp
             eligible_applications.select_related("wohnung"),
             pk=application_id,
         )
+        if Rental.objects.filter(application=application).exists():
+            raise Http404("Eine abgeschlossene Vermietung kann nicht zurückgezogen werden.")
         return render(
             request,
             "wohnungsverwaltung/application_withdraw_confirm.html",
@@ -2254,6 +2256,10 @@ def application_withdraw(request: HttpRequest, application_id: UUID) -> HttpResp
             eligible_applications.select_for_update(),
             pk=application_id,
         )
+        # Completion takes the same application lock. Query the rental afterwards
+        # so a completion committed while this request waited is also visible.
+        if Rental.objects.filter(application=application).exists():
+            raise Http404("Eine abgeschlossene Vermietung kann nicht zurückgezogen werden.")
         application.interest_withdrawn_at = timezone.now()
         application.save(update_fields=["interest_withdrawn_at", "updated_at"])
         cancel_open_viewings(
