@@ -131,12 +131,15 @@ class DemoSetupTests(TestCase):
         self.assertRedirects(response, reverse("wohnungsverwaltung:pre_application_list"))
         self.assertTrue(get_user_model().objects.get(email="neu@example.test").is_active)
 
-    def test_demo_login_shows_test_accounts_and_code(self):
+    def test_demo_login_hides_test_accounts_and_code(self):
         response = self.client.get(reverse("login"))
-        self.assertContains(response, "Testumgebung mit Beispieldaten")
-        self.assertContains(response, "<code>user</code>", html=True)
+        self.assertNotContains(response, "Testumgebung mit Beispieldaten")
+        self.assertNotContains(response, "<code>user</code>", html=True)
+        self.assertNotContains(response, "<code>verwaltung</code>", html=True)
+        self.assertNotContains(response, "jonas.jansen@example.test")
+        self.assertNotContains(response, "DemoFjord!7294Komet")
         self.assertContains(response, "Benutzername oder E-Mail-Adresse")
-        self.assertContains(response, "000000")
+        self.assertNotContains(response, "000000")
 
     @override_settings(DEMO_MODE=False)
     def test_regular_login_has_no_demo_notice(self):

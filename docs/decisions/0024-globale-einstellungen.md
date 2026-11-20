@@ -1,4 +1,4 @@
-# ADR 0023 · Globale Einstellungen
+# ADR 0024 · Globale Einstellungen
 
 ## Entscheidung
 

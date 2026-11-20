@@ -1,0 +1,28 @@
+{% if application.acceptance_eligible or application.accepted_at %}
+    <article class="management-panel uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">
+        <h2 class="uk-card-title">Annahme und Mietvertrag</h2>
+        {% if application.accepted_at %}
+            <p>Bewerbung angenommen am {{ application.accepted_at|date:"d.m.Y, H:i" }} Uhr.</p>
+        {% endif %}
+        {% if application.acceptance_eligible %}
+            {% if application.accepted_at %}
+                {% if contract_notice %}<div class="uk-alert-warning" role="alert"><p>{{ contract_notice }}</p></div>{% endif %}
+                <p>Empfänger: <strong>{{ application.person.email }}</strong></p>
+                <form method="post" enctype="multipart/form-data"
+                      action="{% url 'wohnungsverwaltung:employee_application_send_contract' application.pk %}"
+                      class="uk-form-stacked">
+                    {% csrf_token %}
+                    {{ contract_form.recipient_confirmation }}
+                    {% if contract_form.recipient_confirmation.errors %}<div class="uk-alert-danger" role="alert">{{ contract_form.recipient_confirmation.errors }}</div>{% endif %}
+                    {% include "wohnungsverwaltung/_form_field.html" with field=contract_form.contract only %}
+                    <button class="uk-button uk-button-primary uk-margin-top" type="submit">Mietvertrag senden</button>
+                </form>
+            {% else %}
+                <form method="post" action="{% url 'wohnungsverwaltung:employee_application_accept' application.pk %}">
+                    {% csrf_token %}
+                    <button class="uk-button uk-button-primary" type="submit">Bewerbung annehmen</button>
+                </form>
+            {% endif %}
+        {% endif %}
+    </article>
+{% endif %}

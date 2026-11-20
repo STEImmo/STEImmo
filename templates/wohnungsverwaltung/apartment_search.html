@@ -36,7 +36,7 @@
                 {% if rows %}<div class="apartment-search-result-grid">
                     {% for row in rows %}<article class="uk-card uk-card-default apartment-search-card">
     <a class="apartment-search-image" href="{% url 'wohnungsverwaltung_public:apartment_detail_placeholder' row.unit.pk %}" aria-label="Wohnung {{ row.unit.display_number }} ansehen">
-        {% if row.photo %}<img src="{% url 'wohnungsverwaltung_public:apartment_photo' row.photo.pk %}" alt="{{ row.photo.caption|default:'Wohnungsfoto' }}" loading="lazy" width="800" height="600"><span class="apartment-search-caption">{{ row.photo.caption|default:'Wohnungsfoto' }}</span>{% else %}<span class="apartment-search-photo-placeholder"><span uk-icon="icon: image; ratio: 2" aria-hidden="true"></span><span>Wohnungsfoto folgt</span></span>{% endif %}
+        {% if row.photo %}<img src="{% url 'wohnungsverwaltung_public:apartment_photo' row.photo.pk %}" alt="{{ row.photo.caption|default:'Wohnungsfoto' }}" loading="lazy" width="800" height="600">{% else %}<span class="apartment-search-photo-placeholder"><span uk-icon="icon: image; ratio: 2" aria-hidden="true"></span><span>Wohnungsfoto folgt</span></span>{% endif %}
     </a>
     <div class="uk-card-body apartment-search-card-content">
         <div class="apartment-search-card-heading"><div><p class="uk-text-meta">{{ row.floor }}</p><h3>Wohnung {{ row.unit.display_number }}</h3></div><span class="uk-label uk-label-success">Verfügbar</span></div>

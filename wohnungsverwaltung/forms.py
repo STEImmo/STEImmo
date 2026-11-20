@@ -17,6 +17,7 @@ from django.contrib.auth.password_validation import (
     validate_password,
 )
 from django.contrib.sessions.models import Session
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.storage import Storage
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -827,6 +828,74 @@ class MultipleFileField(forms.FileField):
         return cleaned_uploads
 
 
+def _validate_pdf(upload, *, allow_encrypted=True):
+    try:
+        reader = PdfReader(upload, strict=True)
+        if not allow_encrypted and reader.is_encrypted:
+            raise forms.ValidationError("Bitte laden Sie ein unverschlüsseltes PDF hoch.")
+        if not reader.pages:
+            raise forms.ValidationError("Das PDF enthält keine Seiten.")
+    except (AttributeError, KeyError, TypeError, RecursionError, OverflowError) as error:
+        raise forms.ValidationError("Das PDF kann nicht verarbeitet werden.") from error
+
+
+class RentalContractForm(forms.Form):
+    RECIPIENT_SALT = "wohnungsverwaltung.rental_contract_recipient"
+
+    recipient_confirmation = forms.CharField(
+        label="Empfängerbestätigung",
+        widget=forms.HiddenInput,
+        error_messages={
+            "required": "Bitte laden Sie die Seite neu und prüfen Sie die Empfängeradresse."
+        },
+    )
+    contract = forms.FileField(
+        label="Mietvertrag",
+        help_text="Unverschlüsseltes PDF, höchstens 5 MiB.",
+        widget=forms.ClearableFileInput(attrs={"accept": ".pdf,application/pdf"}),
+    )
+
+    def __init__(self, *args, application, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.initial["recipient_confirmation"] = signing.dumps(
+            self.recipient_payload(application, application.person.email), salt=self.RECIPIENT_SALT
+        )
+
+    @staticmethod
+    def recipient_payload(application, recipient):
+        return {
+            "application": str(application.pk),
+            "person": str(application.person_id),
+            "recipient": recipient,
+        }
+
+    def clean_recipient_confirmation(self):
+        try:
+            return signing.loads(
+                self.cleaned_data["recipient_confirmation"], salt=self.RECIPIENT_SALT
+            )
+        except signing.BadSignature as error:
+            raise forms.ValidationError(
+                "Die Empfängerbestätigung ist ungültig. Bitte laden Sie die Seite neu "
+                "und prüfen Sie die Empfängeradresse."
+            ) from error
+
+    def clean_contract(self):
+        upload = self.cleaned_data["contract"]
+        if upload.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("Der Mietvertrag darf höchstens 5 MiB groß sein.")
+        try:
+            if upload.read(5) != b"%PDF-":
+                raise forms.ValidationError("Bitte laden Sie ein gültiges PDF hoch.")
+            upload.seek(0)
+            _validate_pdf(upload, allow_encrypted=False)
+        except (OSError, PyPdfError, SyntaxError, ValueError, NotImplementedError) as error:
+            raise forms.ValidationError("Bitte laden Sie ein gültiges PDF hoch.") from error
+        finally:
+            upload.seek(0)
+        return upload
+
+
 class ApplicationProofStorageError(Exception):
     """Raised when an uploaded proof cannot be written to private storage."""
 
@@ -1000,18 +1069,7 @@ class MainApplicationForm(forms.Form):
             header = upload.read(1024)
             if header.startswith(b"%PDF-"):
                 upload.seek(0)
-                try:
-                    reader = PdfReader(upload, strict=True)
-                    if not reader.pages:
-                        raise forms.ValidationError("Das PDF enthält keine Seiten.")
-                except (
-                    AttributeError,
-                    KeyError,
-                    TypeError,
-                    RecursionError,
-                    OverflowError,
-                ) as error:
-                    raise forms.ValidationError("Das PDF kann nicht verarbeitet werden.") from error
+                _validate_pdf(upload)
                 return upload
 
             upload.seek(0)
