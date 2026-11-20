@@ -16,8 +16,16 @@ Vermietungsabschluss in #181 und #182.
 
 Der Versand ist eine eigene Aktion. Sie nimmt ein unverschlüsseltes PDF mit
 höchstens 5 MiB entgegen. Die Detailansicht zeigt die hinterlegte Adresse der
-Person aus der Bewerbung an. Der Server liest die Adresse beim Versand erneut
-aus der Bewerbung. Das PDF wird als Anhang über das konfigurierte Django-Mail-
+Person aus der Bewerbung an. Eine serverseitige Signatur bindet Bewerbung,
+zugeordnete Person und exakt angezeigte Adresse an das Formular. Nach der
+PDF-Prüfung liest der Server den Bewerbungsstand und die Adresse erneut.
+Bei abweichender Zuordnung oder Adresse wird nichts versendet; HTTP 409 zeigt
+die aktuelle Adresse und ein frisches Formular zur erneuten Bestätigung.
+Das PDF muss nochmals ausgewählt werden. Fehlende oder manipulierte Signaturen
+werden als ungültiges Formular abgewiesen. Vergleich und Versand verwenden
+denselben einmal ermittelten Adresswert. Dafür ist keine SMTP-Datenbanksperre
+und keine neue Migration erforderlich. Ergänzt nach Review zu PR #198 am 20.11.2026.
+Das PDF wird als Anhang über das konfigurierte Django-Mail-
 Backend versendet. Konsolen-, Datei- und Dummy-Backends werden für Verträge
 abgewiesen, damit sie weder in Logs noch in lokalen E-Mail-Dateien landen.
 In der Anwendung bleiben Zeitpunkt, Akteur und Ergebnis im
