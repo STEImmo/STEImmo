@@ -562,6 +562,7 @@ class Bewerbung(models.Model):
     )
     credit_report_proof_original_name = models.CharField(max_length=255, blank=True, default="")
     submitted_at = models.DateTimeField(blank=True, null=True, editable=False)
+    accepted_at = models.DateTimeField(blank=True, null=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -584,6 +585,14 @@ class Bewerbung(models.Model):
                 condition=models.Q(score__gte=0), name="bewerbung_score_nicht_negativ"
             ),
         ]
+
+    @property
+    def acceptance_eligible(self) -> bool:
+        return (
+            self.status == BewerbungStatus.OPEN
+            and self.submitted_at is not None
+            and self.interest_withdrawn_at is None
+        )
 
     @property
     def main_application_accessible(self) -> bool:
@@ -640,6 +649,9 @@ class ApplicationReviewEvent(models.Model):
         MAIN_UNLOCKED = "main_unlocked", "Main-Bewerbung freigeschaltet"
         INVITATION_SENT = "invitation_sent", "Einladung per E-Mail versendet"
         INVITATION_FAILED = "invitation_failed", "Einladungsversand fehlgeschlagen"
+        ACCEPTED = "accepted", "Bewerbung angenommen"
+        CONTRACT_SENT = "contract_sent", "Mietvertrag zum Versand übergeben"
+        CONTRACT_FAILED = "contract_failed", "Mietvertragsversand fehlgeschlagen"
 
     review_event_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     application = models.ForeignKey(

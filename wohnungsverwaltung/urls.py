@@ -92,6 +92,16 @@ urlpatterns = [
         name="employee_application_priority_update",
     ),
     path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/annehmen/",
+        views.employee_application_accept,
+        name="employee_application_accept",
+    ),
+    path(
+        "bewerbungen/mitarbeiter/<uuid:application_id>/mietvertrag/",
+        views.employee_application_send_contract,
+        name="employee_application_send_contract",
+    ),
+    path(
         "bewerbungen/mitarbeiter/<uuid:application_id>/einzelfall-freigeben/",
         views.employee_application_suitability_approve,
         name="employee_application_suitability_approve",
