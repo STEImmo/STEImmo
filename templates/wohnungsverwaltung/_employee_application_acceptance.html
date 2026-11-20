@@ -6,11 +6,14 @@
         {% endif %}
         {% if application.acceptance_eligible %}
             {% if application.accepted_at %}
+                {% if contract_notice %}<div class="uk-alert-warning" role="alert"><p>{{ contract_notice }}</p></div>{% endif %}
                 <p>Empfänger: <strong>{{ application.person.email }}</strong></p>
                 <form method="post" enctype="multipart/form-data"
                       action="{% url 'wohnungsverwaltung:employee_application_send_contract' application.pk %}"
                       class="uk-form-stacked">
                     {% csrf_token %}
+                    {{ contract_form.recipient_confirmation }}
+                    {% if contract_form.recipient_confirmation.errors %}<div class="uk-alert-danger" role="alert">{{ contract_form.recipient_confirmation.errors }}</div>{% endif %}
                     {% include "wohnungsverwaltung/_form_field.html" with field=contract_form.contract only %}
                     <button class="uk-button uk-button-primary uk-margin-top" type="submit">Mietvertrag senden</button>
                 </form>

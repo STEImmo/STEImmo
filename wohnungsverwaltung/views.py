@@ -1190,7 +1190,13 @@ def employee_application_detail(request: HttpRequest, application_id: UUID) -> H
 
 
 def _employee_application_detail_response(
-    request, application_id, viewing_form=None, editing_form=None, status=200, contract_form=None
+    request,
+    application_id,
+    viewing_form=None,
+    editing_form=None,
+    status=200,
+    contract_form=None,
+    contract_notice="",
 ):
     application = get_object_or_404(
         Bewerbung.objects.select_related("person", "wohnung").prefetch_related(
@@ -1281,7 +1287,12 @@ def _employee_application_detail_response(
             ),
             "eligibility_form": EligibilityApprovalForm(auto_id="id_eligibility_%s"),
             "invitation_form": MainApplicationInvitationForm(auto_id="id_invitation_%s"),
-            "contract_form": (contract_form if contract_form is not None else RentalContractForm()),
+            "contract_form": (
+                contract_form
+                if contract_form is not None
+                else RentalContractForm(application=application)
+            ),
+            "contract_notice": contract_notice,
             "invitation_url": reverse(
                 "wohnungsverwaltung:employee_application_invitation_resend",
                 args=[application.pk],
@@ -1332,7 +1343,7 @@ def employee_application_send_contract(request, application_id):
         messages.error(request, "Der Versand ist nur für eine angenommene Bewerbung möglich.")
         return detail
 
-    form = RentalContractForm(request.POST, request.FILES)
+    form = RentalContractForm(request.POST, request.FILES, application=application)
     if not form.is_valid():
         return _employee_application_detail_response(
             request, application_id, status=400, contract_form=form
@@ -1342,6 +1353,23 @@ def employee_application_send_contract(request, application_id):
     if not application.acceptance_eligible or application.accepted_at is None:
         messages.error(request, "Der Versand ist nur für eine angenommene Bewerbung möglich.")
         return detail
+
+    # Capture once after PDF validation. Comparison and send must use this same value.
+    recipient = application.person.email
+    if form.cleaned_data["recipient_confirmation"] != form.recipient_payload(
+        application, recipient
+    ):
+        return _employee_application_detail_response(
+            request,
+            application_id,
+            status=409,
+            contract_notice=(
+                "Die Empfängeradresse hat sich geändert oder die Empfängerbestätigung gehört "
+                "nicht mehr zu dieser Bewerbung. Es wurde keine E-Mail versendet. "
+                "Bitte prüfen Sie den angezeigten Empfänger erneut und wählen Sie "
+                "den Mietvertrag nochmals aus."
+            ),
+        )
 
     sent = 0
     failure_message = (
@@ -1355,7 +1383,6 @@ def employee_application_send_contract(request, application_id):
     }:
         failure_message = "Der E-Mail-Versand für Mietverträge ist nicht aktiv."
     else:
-        recipient = application.person.email
         try:
             validate_email(recipient)
             message = EmailMessage(

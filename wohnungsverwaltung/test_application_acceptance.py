@@ -52,6 +52,116 @@ class ApplicationAcceptanceTests(TestCase):
         self.application.refresh_from_db()
         self.assertIsNotNone(self.application.accepted_at)
 
+    def contract_data(self, response=None, **changes):
+        if response is None:
+            response = self.client.get(self.url("detail"))
+        form = response.context["contract_form"]
+        data = {
+            "contract": self.pdf(),
+            "recipient_confirmation": form["recipient_confirmation"].value(),
+        }
+        data.update(changes)
+        return data
+
+    def test_address_change_requires_confirmation_again_before_any_mail_is_sent(self):
+        self.client.force_login(self.employee)
+        self.accept()
+        data = self.contract_data()
+        Person.objects.filter(pk=self.person.pk).update(email="new-recipient@example.test")
+        response = self.client.post(self.url("send_contract"), data)
+        self.assertContains(response, "Empfängeradresse hat sich geändert", status_code=409)
+        self.assertContains(response, "new-recipient@example.test", status_code=409)
+        self.assertEqual(mail.outbox, [])
+        self.assertFalse(
+            self.application.review_events.filter(
+                kind__in=["contract_sent", "contract_failed"]
+            ).exists()
+        )
+        self.assertRedirects(
+            self.client.post(self.url("send_contract"), self.contract_data(response)),
+            self.url("detail"),
+        )
+        self.assertEqual(mail.outbox[0].to, ["new-recipient@example.test"])
+
+    def test_missing_tampered_or_other_application_confirmation_cannot_send(self):
+        self.client.force_login(self.employee)
+        self.accept()
+        token = self.contract_data()["recipient_confirmation"]
+        other = Bewerbung.objects.create(
+            person=Person.objects.create(
+                vorname="Weitere", nachname="Person", email="other@example.test"
+            ),
+            wohnung=Wohnung.objects.create(gebaeudenummer="1", wohnungsnummer="05"),
+            accepted_at=timezone.now(),
+            submitted_at=timezone.now(),
+        )
+        other_response = self.client.get(
+            reverse("wohnungsverwaltung:employee_application_detail", args=[other.pk])
+        )
+        other_token = other_response.context["contract_form"]["recipient_confirmation"].value()
+        for confirmation, status in ((None, 400), (token + "tampered", 400), (other_token, 409)):
+            with self.subTest(confirmation=confirmation):
+                data = {"contract": self.pdf()}
+                if confirmation is not None:
+                    data["recipient_confirmation"] = confirmation
+                response = self.client.post(self.url("send_contract"), data)
+                self.assertEqual(response.status_code, status)
+                if status == 400:
+                    self.assertContains(response, "Seite neu", status_code=400)
+        self.assertEqual(mail.outbox, [])
+
+    def test_recipient_changed_during_pdf_validation_is_rechecked(self):
+        from .forms import RentalContractForm
+
+        self.client.force_login(self.employee)
+        self.accept()
+        data = self.contract_data()
+        clean_contract = RentalContractForm.clean_contract
+
+        def change_address(form):
+            upload = clean_contract(form)
+            Person.objects.filter(pk=self.person.pk).update(
+                email="changed-during-validation@example.test"
+            )
+            return upload
+
+        with patch.object(RentalContractForm, "clean_contract", change_address):
+            self.assertEqual(self.client.post(self.url("send_contract"), data).status_code, 409)
+        self.assertEqual(mail.outbox, [])
+
+    def test_changed_person_requires_confirmation_even_when_email_is_unchanged(self):
+        self.client.force_login(self.employee)
+        self.accept()
+        data = self.contract_data()
+        Person.objects.filter(pk=self.person.pk).update(email="previous-person@example.test")
+        replacement = Person.objects.create(
+            vorname="Andere", nachname="Person", email=self.person.email
+        )
+        Bewerbung.objects.filter(pk=self.application.pk).update(person=replacement)
+        self.assertEqual(self.client.post(self.url("send_contract"), data).status_code, 409)
+        self.assertEqual(mail.outbox, [])
+
+    def test_comparison_and_send_use_the_same_captured_recipient(self):
+        from django.core.validators import validate_email
+
+        self.client.force_login(self.employee)
+        self.accept()
+        data = self.contract_data()
+
+        def validate_then_change_address(recipient):
+            validate_email(recipient)
+            Person.objects.filter(pk=self.person.pk).update(
+                email="changed-after-comparison@example.test"
+            )
+
+        with patch(
+            "wohnungsverwaltung.views.validate_email", side_effect=validate_then_change_address
+        ):
+            self.assertRedirects(
+                self.client.post(self.url("send_contract"), data), self.url("detail")
+            )
+        self.assertEqual(mail.outbox[0].to, [self.person.email])
+
     def test_employee_can_accept_once_and_see_acceptance_again(self):
         self.client.force_login(self.employee)
         self.assertContains(self.client.get(self.url("detail")), "Bewerbung annehmen")
@@ -77,7 +187,7 @@ class ApplicationAcceptanceTests(TestCase):
         contract.seek(0)
         response = self.client.post(
             self.url("send_contract"),
-            {"contract": contract, "recipient": "wrong@example.test"},
+            self.contract_data(contract=contract, recipient="wrong@example.test"),
             follow=True,
         )
         self.assertContains(response, "Mietvertrag wurde zum Versand übergeben")
@@ -100,7 +210,7 @@ class ApplicationAcceptanceTests(TestCase):
                 patch("django.core.mail.EmailMessage.send", **failure),
             ):
                 response = self.client.post(
-                    self.url("send_contract"), {"contract": self.pdf()}, follow=True
+                    self.url("send_contract"), self.contract_data(), follow=True
                 )
                 self.assertContains(response, "Der Mietvertrag konnte nicht versendet werden")
                 self.assertNotContains(response, "Mietvertrag wurde zum Versand übergeben")
@@ -115,9 +225,7 @@ class ApplicationAcceptanceTests(TestCase):
                 kind=ApplicationReviewEvent.Kind.CONTRACT_SENT
             ).exists()
         )
-        response = self.client.post(
-            self.url("send_contract"), {"contract": self.pdf()}, follow=True
-        )
+        response = self.client.post(self.url("send_contract"), self.contract_data(), follow=True)
         self.assertContains(response, "Mietvertrag wurde zum Versand übergeben")
 
     def test_console_file_and_dummy_backends_do_not_receive_contracts(self):
@@ -130,7 +238,7 @@ class ApplicationAcceptanceTests(TestCase):
                 patch("django.core.mail.EmailMessage.send") as send,
             ):
                 response = self.client.post(
-                    self.url("send_contract"), {"contract": self.pdf()}, follow=True
+                    self.url("send_contract"), self.contract_data(), follow=True
                 )
                 self.assertContains(response, "Der E-Mail-Versand für Mietverträge ist nicht aktiv")
                 send.assert_not_called()
@@ -160,9 +268,7 @@ class ApplicationAcceptanceTests(TestCase):
 
     def test_contract_requires_an_active_acceptance_and_a_valid_pdf(self):
         self.client.force_login(self.employee)
-        response = self.client.post(
-            self.url("send_contract"), {"contract": self.pdf()}, follow=True
-        )
+        response = self.client.post(self.url("send_contract"), self.contract_data(), follow=True)
         self.assertContains(response, "Versand ist nur für eine angenommene Bewerbung möglich")
         self.accept()
         for upload in (
@@ -170,14 +276,14 @@ class ApplicationAcceptanceTests(TestCase):
             SimpleUploadedFile("large.pdf", b"x" * (5 * 1024 * 1024 + 1), "application/pdf"),
         ):
             with self.subTest(upload=upload.name):
-                response = self.client.post(self.url("send_contract"), {"contract": upload})
+                response = self.client.post(
+                    self.url("send_contract"), self.contract_data(contract=upload)
+                )
                 self.assertEqual(response.status_code, 400)
         Bewerbung.objects.filter(pk=self.application.pk).update(
             interest_withdrawn_at=timezone.now()
         )
-        response = self.client.post(
-            self.url("send_contract"), {"contract": self.pdf()}, follow=True
-        )
+        response = self.client.post(self.url("send_contract"), self.contract_data(), follow=True)
         self.assertContains(response, "Versand ist nur für eine angenommene Bewerbung möglich")
         self.assertEqual(mail.outbox, [])
 

@@ -17,6 +17,7 @@ from django.contrib.auth.password_validation import (
     validate_password,
 )
 from django.contrib.sessions.models import Session
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.storage import Storage
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -839,11 +840,45 @@ def _validate_pdf(upload, *, allow_encrypted=True):
 
 
 class RentalContractForm(forms.Form):
+    RECIPIENT_SALT = "wohnungsverwaltung.rental_contract_recipient"
+
+    recipient_confirmation = forms.CharField(
+        label="Empfängerbestätigung",
+        widget=forms.HiddenInput,
+        error_messages={
+            "required": "Bitte laden Sie die Seite neu und prüfen Sie die Empfängeradresse."
+        },
+    )
     contract = forms.FileField(
         label="Mietvertrag",
         help_text="Unverschlüsseltes PDF, höchstens 5 MiB.",
         widget=forms.ClearableFileInput(attrs={"accept": ".pdf,application/pdf"}),
     )
+
+    def __init__(self, *args, application, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.initial["recipient_confirmation"] = signing.dumps(
+            self.recipient_payload(application, application.person.email), salt=self.RECIPIENT_SALT
+        )
+
+    @staticmethod
+    def recipient_payload(application, recipient):
+        return {
+            "application": str(application.pk),
+            "person": str(application.person_id),
+            "recipient": recipient,
+        }
+
+    def clean_recipient_confirmation(self):
+        try:
+            return signing.loads(
+                self.cleaned_data["recipient_confirmation"], salt=self.RECIPIENT_SALT
+            )
+        except signing.BadSignature as error:
+            raise forms.ValidationError(
+                "Die Empfängerbestätigung ist ungültig. Bitte laden Sie die Seite neu "
+                "und prüfen Sie die Empfängeradresse."
+            ) from error
 
     def clean_contract(self):
         upload = self.cleaned_data["contract"]
