@@ -9,7 +9,7 @@
             <span class="uk-label{% if not application.interest_withdrawn_at %}{% if application.status == 'declined' or application.status == 'blocked' %} uk-label-danger{% endif %}{% endif %}">{{ application.get_applicant_status_display }}</span>
             <h2 class="uk-card-title">Hauptbewerbung für {{ application.wohnung }}</h2>
             {% if not application.submitted_at %}<p>Die Hauptbewerbung ist freigeschaltet.</p>{% endif %}
-            <div class="application-next-step"><span uk-icon="arrow-right" aria-hidden="true"></span><div><strong>Ihr nächster Schritt</strong><p>{{ application.get_applicant_next_step }}</p></div></div>
+            <div class="application-next-step"><span uk-icon="arrow-right" aria-hidden="true"></span><div><strong>Ihr nächster Schritt</strong><p>Nächster Akteur: {{ application.get_next_actor_display }}</p><p>{{ application.get_applicant_next_step }}</p></div></div>
             {% if application.submitted_at %}
                 <p class="uk-text-meta">
                     Eingereicht am {{ application.submitted_at|date:"d.m.Y, H:i" }} Uhr.

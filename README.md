@@ -517,7 +517,7 @@ Main-Freischaltungen bleiben erhalten.
 
 Einladungen, Verschiebungen und Mitarbeiterabsagen senden nach erfolgreicher
 Speicherung eine E-Mail. Versandfehler ändern den Termin nicht; die aktuelle
-Benachrichtigung kann erneut gesendet werden. Interne Notizen werden nicht an
+Benachrichtigung kann bei eindeutig fehlgeschlagenem Versand begrenzt erneut gesendet werden. Unklare SMTP-Ergebnisse werden nicht automatisch wiederholt. Interne Notizen werden nicht an
 Bewerber versendet. Rückzug und automatische Personenlimit-Ablehnung sagen offene
 Termine ebenfalls ab; bei der automatischen Ablehnung wird eine Absage versendet.
 Änderungen der Priorität oder Haustierregeln stornieren vorhandene Termine nicht,
@@ -703,3 +703,32 @@ GitHub-Secrets und der Releaseablauf stehen in
 Die Anwendung bleibt durch Docker Compose, PostgreSQL, Umgebungsvariablen und persistente Volumes auf andere Server portierbar. 
 
 Die persönlichen Bewerbungsseiten verwenden das gewählte Design A mit Ablaufübersicht, Statuskarten und getrennten Nachweisbereichen. Die Designvergleichsroute ist entfernt; Anmeldung und fachliche Freigabe bleiben erforderlich.
+
+
+### Bewerbungseingänge und Verwaltungsbenachrichtigungen (#201)
+
+Nach einer verbindlich gespeicherten Besichtigungsanfrage oder Hauptbewerbung
+bestätigt eine E-Mail den Eingang und nennt die Verwaltung als nächsten Akteur.
+Berechtigte aktive Verwaltungskonten erhalten je eine eigene Aufgabenmail.
+Terminzusagen, Absagen und zurückgezogene Zusagen informieren nur die Verwaltung;
+Alternativvorschläge verwenden weiterhin den Versand aus #148. Entwürfe, einzelne
+Uploads und Wiederholungen desselben Stands erzeugen keine zusätzlichen Nachrichten.
+Nachweise und interne Bewertungen werden nicht angehängt oder in Mails übernommen.
+Ein Vertragsrücklauf wird mangels eines dokumentierten Rücklaufereignisses nicht
+als neue Funktion eingeführt.
+
+Unter **Mein Konto → Benachrichtigungen** lassen sich die hier verwendeten Gruppen
+persönlich auswählen. Die Verwaltung gibt unter **Einstellungen** jede Nutzer-Mailart einzeln frei. Auch persönliches An
+benötigt diese Freigabe; Aus unterdrückt immer. Aufgaben bleiben im vorhandenen
+Dashboard und Vorgang sichtbar, unabhängig vom Mailversand. Die vorhandenen
+Präferenzen, Formulare und Versandprüfungen aus #205 werden wiederverwendet.
+
+Versandstatus und Versuchszahl erscheinen im Bewerbungsdetail. SMTP läuft nach dem
+Commit ohne offene Datenbank-Zeilensperren. Das lokale bzw. betrieblich ausdrücklich
+aufgerufene Kommando `python manage.py retry_process_notifications` verarbeitet je
+Aufruf höchstens 100 offene Absichten mit maximal drei eindeutigen Versuchen je
+Empfänger. Unterdrückte, überholte, erfolgreiche oder unklare Zustellungen werden
+nicht automatisch wiederholt. Ein späteres Einschalten führt nicht zum Nachversand.
+Die Demo bleibt ohne echten Transport; ein Zeitgeber und produktive Aktivierung
+bleiben Betriebsaufgaben aus #194. Regeln und Grenzen stehen in
+[ADR 0027](docs/decisions/0027-prozessbezogene-eingangs-und-aufgabenmails.md).
