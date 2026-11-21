@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Person, ProtokollStatus
+from .models import Person, ProtokollStatus, Rental
 
 
 class PersonSelectionForm(forms.Form):
@@ -39,6 +39,15 @@ class PersonAssignmentForm(forms.Form):
         if data.get("previous_wohnung", "") != str(self.person.wohnung_id or ""):
             raise forms.ValidationError(
                 "Die Zuordnung wurde zwischenzeitlich geändert. Bitte laden Sie die Seite neu."
+            )
+        if (
+            Rental.objects.filter(application__person=self.person)
+            .exclude(wohnung=self.wohnung)
+            .exists()
+        ):
+            raise forms.ValidationError(
+                "Für diese Person besteht eine abgeschlossene Vermietung. "
+                "Eine abweichende Wohnungszuordnung ist nicht möglich."
             )
         if (
             self.person.wohnung_id != self.wohnung.pk

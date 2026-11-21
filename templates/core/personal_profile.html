@@ -15,6 +15,19 @@
             </nav>
         </aside>
         <div class="profile-main">
+            {% if rentals %}
+                <section class="uk-card uk-card-default profile-panel" aria-labelledby="profile-rentals-title">
+                    <h2 id="profile-rentals-title">Meine Wohnung</h2>
+                    <ul class="uk-list uk-list-divider">
+                        {% for rental in rentals %}
+                            <li>
+                                <p>{{ rental.wohnung }}</p>
+                                <a href="{% url 'wohnungsverwaltung:tenant_rental_contract' rental.application_id %}">Mietvertrag herunterladen</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            {% endif %}
             <section class="uk-card uk-card-default profile-panel" aria-labelledby="profile-contact-title">
                 <div class="profile-panel-heading"><span class="profile-section-icon" uk-icon="user" aria-hidden="true"></span><div><h2 id="profile-contact-title">Persönliche Daten</h2><p>So sind Ihre Kontaktdaten bei uns hinterlegt.</p></div></div>
                 {% if not person %}<div class="uk-alert-primary" role="status"><p>Ihrem Konto ist noch kein Personendatensatz zugeordnet.</p><p>Bitte wenden Sie sich an die Benutzerverwaltung, um Ihre persönlichen Daten zuzuordnen.</p></div>

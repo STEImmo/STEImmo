@@ -73,6 +73,7 @@ from .models import (
     WohnungStatus,
     calculate_photo_checksum,
 )
+from .upload_limits import RENTAL_CONTRACT_MAX_SIZE
 
 HANDOVER_TYPE_LABELS = {
     ProtokollTyp.MOVE_IN: "Einzug",
@@ -839,7 +840,30 @@ def _validate_pdf(upload, *, allow_encrypted=True):
         raise forms.ValidationError("Das PDF kann nicht verarbeitet werden.") from error
 
 
-class RentalContractForm(forms.Form):
+class RentalContractUploadForm(forms.Form):
+    contract = forms.FileField(
+        label="Mietvertrag",
+        help_text="Unverschlüsseltes PDF, höchstens 5 MiB.",
+        widget=forms.ClearableFileInput(attrs={"accept": ".pdf,application/pdf"}),
+    )
+
+    def clean_contract(self):
+        upload = self.cleaned_data["contract"]
+        if upload.size > RENTAL_CONTRACT_MAX_SIZE:
+            raise forms.ValidationError("Der Mietvertrag darf höchstens 5 MiB groß sein.")
+        try:
+            if upload.read(5) != b"%PDF-":
+                raise forms.ValidationError("Bitte laden Sie ein gültiges PDF hoch.")
+            upload.seek(0)
+            _validate_pdf(upload, allow_encrypted=False)
+        except (OSError, PyPdfError, SyntaxError, ValueError, NotImplementedError) as error:
+            raise forms.ValidationError("Bitte laden Sie ein gültiges PDF hoch.") from error
+        finally:
+            upload.seek(0)
+        return upload
+
+
+class RentalContractForm(RentalContractUploadForm):
     RECIPIENT_SALT = "wohnungsverwaltung.rental_contract_recipient"
 
     recipient_confirmation = forms.CharField(
@@ -848,11 +872,6 @@ class RentalContractForm(forms.Form):
         error_messages={
             "required": "Bitte laden Sie die Seite neu und prüfen Sie die Empfängeradresse."
         },
-    )
-    contract = forms.FileField(
-        label="Mietvertrag",
-        help_text="Unverschlüsseltes PDF, höchstens 5 MiB.",
-        widget=forms.ClearableFileInput(attrs={"accept": ".pdf,application/pdf"}),
     )
 
     def __init__(self, *args, application, **kwargs):
@@ -880,20 +899,44 @@ class RentalContractForm(forms.Form):
                 "und prüfen Sie die Empfängeradresse."
             ) from error
 
-    def clean_contract(self):
-        upload = self.cleaned_data["contract"]
-        if upload.size > 5 * 1024 * 1024:
-            raise forms.ValidationError("Der Mietvertrag darf höchstens 5 MiB groß sein.")
+
+class RentalCompletionForm(RentalContractUploadForm):
+    ASSIGNMENT_SALT = "wohnungsverwaltung.rental_completion_assignment"
+
+    account = forms.IntegerField(widget=forms.HiddenInput)
+    assignment_confirmation = forms.CharField(
+        widget=forms.HiddenInput,
+        error_messages={
+            "required": "Bitte laden Sie die Bewerbung neu und prüfen Sie die Zuordnung."
+        },
+    )
+
+    def __init__(self, *args, application, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.initial["assignment_confirmation"] = signing.dumps(
+            self.assignment_payload(application, application.person.user_id),
+            salt=self.ASSIGNMENT_SALT,
+        )
+
+    @staticmethod
+    def assignment_payload(application, account_id):
+        return {
+            "application": str(application.pk),
+            "person": str(application.person_id),
+            "unit": str(application.wohnung_id),
+            "account": account_id,
+        }
+
+    def clean_assignment_confirmation(self):
         try:
-            if upload.read(5) != b"%PDF-":
-                raise forms.ValidationError("Bitte laden Sie ein gültiges PDF hoch.")
-            upload.seek(0)
-            _validate_pdf(upload, allow_encrypted=False)
-        except (OSError, PyPdfError, SyntaxError, ValueError, NotImplementedError) as error:
-            raise forms.ValidationError("Bitte laden Sie ein gültiges PDF hoch.") from error
-        finally:
-            upload.seek(0)
-        return upload
+            return signing.loads(
+                self.cleaned_data["assignment_confirmation"], salt=self.ASSIGNMENT_SALT
+            )
+        except signing.BadSignature as error:
+            raise forms.ValidationError(
+                "Bitte laden Sie die Bewerbung neu und prüfen Sie "
+                "das Benutzerkonto und die Wohnung."
+            ) from error
 
 
 class ApplicationProofStorageError(Exception):
