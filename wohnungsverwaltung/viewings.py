@@ -97,10 +97,9 @@ def send_viewing_notification(event_id, actor=None):
     if initial is None:
         return False
     with transaction.atomic():
-        application = (
-            Bewerbung.objects.select_for_update(of=("self",))
-            .select_related("person", "wohnung")
-            .get(pk=initial["appointment__application_id"])
+        # Load the person only after the application lock is acquired.
+        application = Bewerbung.objects.select_for_update().get(
+            pk=initial["appointment__application_id"]
         )
         appointment = ViewingAppointment.objects.select_for_update().get(
             pk=initial["appointment_id"]

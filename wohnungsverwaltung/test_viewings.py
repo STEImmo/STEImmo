@@ -1,6 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from queue import Queue
 from threading import Barrier
+from time import monotonic, sleep
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -1216,6 +1218,74 @@ class ViewingProposalTests(TestCase):
 class ConcurrentViewingTests(TransactionTestCase):
     setUp = ViewingTests.setUp
     payload = ViewingTests.payload
+
+    def test_waiting_viewing_notification_rechecks_account_assignment(self):
+        other = get_user_model().objects.create_user(
+            username="new-viewing-recipient", email="new-recipient@example.test"
+        )
+        other.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+        start = timezone.now() + timedelta(days=1)
+        appointment = ViewingAppointment.objects.create(
+            application=self.application, starts_at=start, ends_at=start + timedelta(minutes=30)
+        )
+        person = self.application.person
+        for current_account in (other, None):
+            with self.subTest(current_account=current_account):
+                person.user = self.user
+                person.save(update_fields=["user"])
+                event = ViewingAppointmentEvent.objects.create(
+                    appointment=appointment,
+                    kind="created",
+                    appointment_version=appointment.version,
+                    notification_status="pending",
+                    notification_url="https://example.test/viewings/",
+                )
+                worker_pid = Queue()
+
+                def send_notification():
+                    try:
+                        with connection.cursor() as cursor:
+                            cursor.execute("SELECT pg_backend_pid()")
+                            worker_pid.put(cursor.fetchone()[0])
+                        return send_viewing_notification(event.pk)
+                    finally:
+                        connections.close_all()
+
+                with (
+                    patch(
+                        "wohnungsverwaltung.viewings.send_repliable_mail", return_value=1
+                    ) as send,
+                    ThreadPoolExecutor(max_workers=1) as executor,
+                ):
+                    with transaction.atomic():
+                        Bewerbung.objects.select_for_update().get(pk=self.application.pk)
+                        future = executor.submit(send_notification)
+                        pid = worker_pid.get(timeout=5)
+                        deadline = monotonic() + 5
+                        with connection.cursor() as cursor:
+                            while True:
+                                cursor.execute(
+                                    "SELECT pg_backend_pid() = ANY(pg_blocking_pids(%s))", [pid]
+                                )
+                                if cursor.fetchone()[0]:
+                                    break
+                                if monotonic() >= deadline:
+                                    self.fail(
+                                        "Der Terminversand wartet nicht auf die Bewerbungssperre."
+                                    )
+                                sleep(0.01)
+                        person.user = current_account
+                        person.save(update_fields=["user"])
+                    self.assertEqual(future.result(timeout=5), current_account is not None)
+
+                event.refresh_from_db()
+                if current_account:
+                    send.assert_called_once()
+                    self.assertEqual(send.call_args.args[2], [current_account.email])
+                    self.assertEqual(event.notification_status, "sent")
+                else:
+                    send.assert_not_called()
+                    self.assertEqual(event.notification_status, "suppressed")
 
     def test_concurrent_proposals_preserve_first_accepted_version(self):
         for _ in range(2):
