@@ -616,6 +616,8 @@ class Bewerbung(models.Model):
             return "Abgelehnt"
         if self.status == BewerbungStatus.BLOCKED:
             return "Gesperrt"
+        if self.accepted_at is not None and self.acceptance_eligible:
+            return "Als Mieter angenommen"
         if self.submitted_at is not None:
             return "Hauptbewerbung eingereicht"
         if self.main_application_unlocked:
@@ -634,6 +636,8 @@ class Bewerbung(models.Model):
             return "Die Bewerbung wurde beendet."
         if self.status == BewerbungStatus.BLOCKED:
             return "Die Bewerbung ist derzeit gesperrt."
+        if self.accepted_at is not None and self.acceptance_eligible:
+            return "Bitte beachten Sie die Informationen der Verwaltung zu Ihrem Mietvertrag."
         if self.submitted_at is not None:
             return "Bitte warten Sie auf die Rückmeldung des Mitarbeiters."
         if self.main_application_unlocked:
