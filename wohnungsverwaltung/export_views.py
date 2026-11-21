@@ -2,7 +2,6 @@ import logging
 from io import BytesIO
 
 from django.contrib import messages
-from django.core.files.storage import default_storage
 from django.db import transaction
 from django.db.models import Q
 from django.http import FileResponse, Http404, JsonResponse
@@ -18,6 +17,7 @@ from .access import (
     handover_reader_required,
     tenant_required,
 )
+from .decision_notifications import queue_decision_notification
 from .export_forms import ProtocolSigningForm
 from .handover_archive_files import cleanup_archive_files
 from .handover_export import (
@@ -25,9 +25,9 @@ from .handover_export import (
     archive_protocol,
     build_snapshot,
     content_token,
-    digest,
     employee_name,
     load_protocol,
+    read_archived_pdf,
     token_matches,
 )
 from .models import Protokoll, ProtokollStatus, ProtokollTyp, Wohnung, WohnungStatus
@@ -37,6 +37,16 @@ logger = logging.getLogger(__name__)
 
 def _detail_url(pk):
     return reverse("wohnungsverwaltung:handover_protocol_detail", args=[pk])
+
+
+def _queue_protocol_notification(request, protocol):
+    queue_decision_notification(
+        "handover_finalized",
+        protocol.pk,
+        protocol.dokument_hash_sha256,
+        protocol.person.user_id,
+        origin=request.build_absolute_uri("/"),
+    )
 
 
 def _allowed_protocol(request, pk):
@@ -152,6 +162,7 @@ def handover_protocol_confirm(request, protocol_id):
                 reason=form.cleaned_data["reason"],
                 user=request.user,
             )
+            _queue_protocol_notification(request, protocol)
     except ExportLimitExceeded as error:
         cleanup_archive_files(stored)
         return JsonResponse({"error": str(error)}, status=413)
@@ -195,10 +206,7 @@ def handover_protocol_pdf(request, protocol_id):
     if not protocol.dokument_pfad:
         raise Http404("Für dieses Protokoll wurde noch kein PDF gesichert.")
     try:
-        with default_storage.open(protocol.dokument_pfad, "rb") as source:
-            data = source.read()
-        if digest(data) != protocol.dokument_hash_sha256:
-            raise OSError
+        data = read_archived_pdf(protocol)
     except OSError:
         return render(request, "wohnungsverwaltung/handover_export_error.html", status=503)
     response = FileResponse(
@@ -234,6 +242,7 @@ def handover_protocol_pdf_create(request, protocol_id):
                 archive_protocol(
                     protocol, build_snapshot(protocol), {}, timezone.now(), stored, legacy=True
                 )
+                _queue_protocol_notification(request, protocol)
     except ExportLimitExceeded as error:
         cleanup_archive_files(stored)
         messages.error(request, str(error))

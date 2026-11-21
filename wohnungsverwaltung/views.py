@@ -14,7 +14,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.contrib.sessions.models import Session
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator
 from django.core.validators import validate_email
 from django.db import DatabaseError, IntegrityError, transaction
@@ -42,6 +42,7 @@ from django.http import (
     QueryDict,
 )
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.crypto import salted_hmac
@@ -67,6 +68,7 @@ from .building_plans import (
     floor_label,
 )
 from .dashboard import dashboard_context, dashboard_links, filter_application_workflow
+from .decision_notifications import queue_decision_notification
 from .forms import (
     ACCEPTANCE_STATUS_LABELS,
     HANDOVER_STATUS_LABELS,
@@ -486,7 +488,7 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
                         form.instance.status = BewerbungStatus.DECLINED
                     application = form.save()
                     if exceeds_occupancy_limit:
-                        ApplicationReviewEvent.objects.create(
+                        rejection = ApplicationReviewEvent.objects.create(
                             application=application,
                             kind=ApplicationReviewEvent.Kind.OCCUPANCY_DECLINED,
                             to_value=BewerbungStatus.DECLINED,
@@ -494,6 +496,13 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
                                 application.personenanzahl
                             ),
                             requirements_version=selected_unit.requirements_version,
+                        )
+                        queue_decision_notification(
+                            "application_rejected",
+                            application.pk,
+                            rejection.pk,
+                            applicant.user_id,
+                            origin=request.build_absolute_uri("/"),
                         )
                     application_created = True
         except IntegrityError:
@@ -1359,6 +1368,13 @@ def employee_application_accept(request, application_id):
                 actor=request.user,
                 kind=ApplicationReviewEvent.Kind.ACCEPTED,
             )
+            queue_decision_notification(
+                "application_accepted",
+                application.pk,
+                application.accepted_at,
+                application.person.user_id,
+                origin=request.build_absolute_uri("/"),
+            )
             messages.success(request, "Bewerbung angenommen.")
     return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
 
@@ -1429,6 +1445,7 @@ def employee_application_send_contract(request, application_id):
             ),
         )
 
+    status_url = request.build_absolute_uri(reverse("wohnungsverwaltung:pre_application_list"))
     sent = 0
     failure_message = (
         "Der Mietvertrag konnte nicht versendet werden. Prüfen Sie die Empfängeradresse "
@@ -1443,13 +1460,23 @@ def employee_application_send_contract(request, application_id):
     else:
         try:
             validate_email(recipient)
-            message = EmailMessage(
+            body = (
+                "Guten Tag,\n\n"
+                f"die Verwaltung hat Ihre Bewerbung für {application.wohnung} angenommen. "
+                "Bitte prüfen Sie den Mietvertrag im Anhang."
+            )
+            link_label = "Bewerbungsstatus öffnen"
+            message = EmailMultiAlternatives(
                 subject="Ihr Mietvertrag bei STE Immobilien eGbR",
-                body=(
-                    "Guten Tag,\n\n"
-                    f"im Anhang erhalten Sie den Mietvertrag für {application.wohnung}."
-                ),
+                body=f"{body}\n\n{link_label}: {status_url}",
                 to=[recipient],
+            )
+            message.attach_alternative(
+                render_to_string(
+                    "wohnungsverwaltung/email/notification_link.html",
+                    {"body": body, "link_label": link_label, "link_url": status_url},
+                ),
+                "text/html",
             )
             message.attach(
                 "Mietvertrag.pdf", form.cleaned_data["contract"].read(), "application/pdf"
@@ -2321,6 +2348,12 @@ def application_withdraw(request: HttpRequest, application_id: UUID) -> HttpResp
             raise Http404("Eine abgeschlossene Vermietung kann nicht zurückgezogen werden.")
         application.interest_withdrawn_at = timezone.now()
         application.save(update_fields=["interest_withdrawn_at", "updated_at"])
+        queue_decision_notification(
+            "application_withdrawn",
+            application.pk,
+            application.interest_withdrawn_at,
+            origin=request.build_absolute_uri("/"),
+        )
         cancel_open_viewings(
             application.pk, reason="Bewerber hat die Bewerbung zurückgezogen", actor=request.user
         )
@@ -3527,7 +3560,9 @@ def _wohnung_form(request: HttpRequest, wohnung: Wohnung, title: str) -> HttpRes
                             "Sie Ihre Änderungen erneut.",
                         )
                         return redirect("verwaltung:wohnung_edit", wohnung_id=wohnung.pk)
-                wohnung = form.save()
+                wohnung = form.save(commit=False)
+                wohnung.save(notification_origin=request.build_absolute_uri("/"))
+                form.save_m2m()
                 schluessel_formset.instance = wohnung
                 schluessel_formset.save()
             messages.success(request, "Die Wohnungsstammdaten wurden gespeichert.")

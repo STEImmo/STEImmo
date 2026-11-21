@@ -427,7 +427,7 @@ class Wohnung(models.Model):
             f"{self.occupancy_requirement_reason}"
         ).strip()
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, notification_origin="", **kwargs):
         requirement_fields = (
             "max_occupants",
             "occupancy_requirement_reason",
@@ -485,14 +485,23 @@ class Wohnung(models.Model):
                         status=BewerbungStatus.DECLINED,
                         updated_at=now,
                     )
-                    ApplicationReviewEvent.objects.create(
+                    rejection = ApplicationReviewEvent.objects.create(
                         application_id=application_id,
                         kind=ApplicationReviewEvent.Kind.OCCUPANCY_DECLINED,
                         to_value=BewerbungStatus.DECLINED,
                         reason=self.occupancy_decline_reason(people_count),
                         requirements_version=self.requirements_version,
                     )
+                    from .decision_notifications import queue_decision_notification
                     from .viewings import cancel_open_viewings
+
+                    queue_decision_notification(
+                        "application_rejected",
+                        application_id,
+                        rejection.pk,
+                        rejection.application.person.user_id,
+                        origin=notification_origin,
+                    )
 
                     cancel_open_viewings(
                         application_id,
@@ -616,6 +625,8 @@ class Bewerbung(models.Model):
             return "Abgelehnt"
         if self.status == BewerbungStatus.BLOCKED:
             return "Gesperrt"
+        if self.accepted_at is not None:
+            return "Angenommen"
         if self.submitted_at is not None:
             return "Hauptbewerbung eingereicht"
         if self.main_application_unlocked:
@@ -634,6 +645,8 @@ class Bewerbung(models.Model):
             return "Die Bewerbung wurde beendet."
         if self.status == BewerbungStatus.BLOCKED:
             return "Die Bewerbung ist derzeit gesperrt."
+        if self.accepted_at is not None:
+            return "Bitte prüfen Sie den Mietvertrag, sobald er Ihnen vorliegt."
         if self.submitted_at is not None:
             return "Bitte warten Sie auf die Rückmeldung des Mitarbeiters."
         if self.main_application_unlocked:
@@ -1280,3 +1293,31 @@ class MailTestAttempt(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True
     )
     next_allowed_at = models.DateTimeField()
+
+
+class DecisionNotification(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Vorgemerkt"
+        SENDING = "sending", "Versand begonnen"
+        SENT = "sent", "Versendet"
+        RETRY = "retry", "Wiederholung vorgemerkt"
+        SUPPRESSED = "suppressed", "Unterdrückt"
+        FAILED = "failed", "Versand fehlgeschlagen"
+
+    kind = models.CharField(max_length=32)
+    object_id = models.UUIDField()
+    version = models.CharField(max_length=64)
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    origin = models.URLField(max_length=255, blank=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("kind", "object_id", "version", "recipient"),
+                name="decision_notification_event_recipient",
+            )
+        ]
+        indexes = [models.Index(fields=("status", "created_at"), name="decision_notice_status_idx")]

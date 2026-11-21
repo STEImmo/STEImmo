@@ -78,6 +78,14 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def read_archived_pdf(protocol):
+    with default_storage.open(protocol.dokument_pfad, "rb") as source:
+        data = source.read()
+    if digest(data) != protocol.dokument_hash_sha256:
+        raise OSError("Ungültige Prüfsumme des archivierten Protokolls.")
+    return data
+
+
 def display(value):
     if value is None or value == "":
         return "Nicht angegeben"
