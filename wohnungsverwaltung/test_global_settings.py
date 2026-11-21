@@ -13,6 +13,7 @@ from .access import (
     ROLE_USER_MANAGEMENT,
 )
 from .models import GlobalSettings, GlobalSettingsChange
+from .notification_preferences import USER_MAIL_TYPES
 
 
 class GlobalSettingsTests(TestCase):
@@ -37,34 +38,37 @@ class GlobalSettingsTests(TestCase):
         self.assertFalse(GlobalSettings.objects.exists())
 
     def test_default_save_and_audit(self):
+        other_types = dict.fromkeys(USER_MAIL_TYPES.keys() - {"viewing_invited"}, "on")
         self.client.force_login(self.account)
         response = self.client.get(self.url)
-        self.assertTrue(response.context["form"]["optional_user_emails_enabled"].value())
+        self.assertTrue(response.context["form"]["viewing_invited"].value())
         self.assertContains(response, 'aria-current="page">Einstellungen')
         self.assertFalse(GlobalSettings.objects.exists())
 
-        response = self.client.post(self.url, {"version": 0})
+        response = self.client.post(self.url, {"version": 0, **other_types})
         self.assertRedirects(response, self.url)
         current = GlobalSettings.objects.get()
-        self.assertFalse(current.optional_user_emails_enabled)
+        self.assertFalse(current.user_mail_types.get("viewing_invited", True))
         self.assertEqual(current.version, 1)
         change = GlobalSettingsChange.objects.get()
         self.assertEqual(change.actor_account_id, self.account.pk)
         self.assertIsNotNone(change.changed_at)
-        self.assertEqual(change.changed_fields, ["optional_user_emails_enabled"])
+        self.assertEqual(change.changed_fields, ["viewing_invited"])
 
-        self.assertRedirects(self.client.post(self.url, {"version": 1}), self.url)
+        self.assertRedirects(self.client.post(self.url, {"version": 1, **other_types}), self.url)
         self.assertEqual(GlobalSettingsChange.objects.count(), 1)
         current.refresh_from_db()
         self.assertEqual(current.version, 1)
 
-    def test_stale_form_keeps_current_value_and_submitted_selection(self):
+    def test_stale_form_displays_current_value(self):
         self.client.force_login(self.account)
         self.client.post(self.url, {"version": 0})
-        response = self.client.post(self.url, {"version": 0, "optional_user_emails_enabled": "on"})
-        self.assertContains(response, "Aktuell gespeichert: Deaktiviert", status_code=409)
-        self.assertTrue(response.context["form"]["optional_user_emails_enabled"].value())
-        self.assertFalse(GlobalSettings.objects.get().optional_user_emails_enabled)
+        response = self.client.post(self.url, {"version": 0, "viewing_invited": "on"})
+        self.assertContains(
+            response, "Die Einstellungen wurden inzwischen geändert", status_code=409
+        )
+        self.assertFalse(response.context["form"]["viewing_invited"].value())
+        self.assertFalse(GlobalSettings.objects.get().user_mail_types["viewing_invited"])
         self.assertEqual(GlobalSettingsChange.objects.count(), 1)
 
     def test_invalid_values_and_missing_csrf_do_not_write(self):
@@ -76,8 +80,8 @@ class GlobalSettingsTests(TestCase):
         for data in (
             {"version": "bad"},
             {"version": [0, 1]},
-            {"version": 0, "optional_user_emails_enabled": "bad"},
-            {"version": 0, "optional_user_emails_enabled": ["on", "on"]},
+            {"version": 0, "viewing_invited": "bad"},
+            {"version": 0, "viewing_invited": ["on", "on"]},
         ):
             with self.subTest(data=data):
                 response = client.post(self.url, data, HTTP_X_CSRFTOKEN=token)
@@ -94,6 +98,6 @@ class GlobalSettingsTests(TestCase):
         ):
             self.client.post(self.url, {"version": 0})
         current = GlobalSettings.objects.get()
-        self.assertTrue(current.optional_user_emails_enabled)
+        self.assertTrue(current.user_mail_types.get("viewing_invited", True))
         self.assertEqual(current.version, 0)
         self.assertFalse(GlobalSettingsChange.objects.exists())

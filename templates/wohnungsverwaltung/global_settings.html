@@ -1,27 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Einstellungen · Verwaltung{% endblock %}
+{% block title %}Nutzer-Benachrichtigungen · Verwaltung{% endblock %}
 
 {% block content %}
 <section class="uk-section">
     <div class="uk-container uk-container-small">
         {% include "wohnungsverwaltung/_workspace_navigation.html" %}
-        <h1>Einstellungen</h1>
+        <h1>Nutzer-Benachrichtigungen</h1>
         <p><a href="{% url 'verwaltung:mail_settings' %}">Mailadressen</a></p>
-        <form method="post" class="uk-form-stacked">
-            {% csrf_token %}
-            {{ form.version }}
-            {{ form.version.errors }}
-            {{ form.non_field_errors }}
-            {% include "wohnungsverwaltung/_form_field.html" with field=form.optional_user_emails_enabled only %}
-            <p class="uk-text-meta">Die Versandprüfung wird separat angebunden. Der gespeicherte Wert wirkt sich derzeit noch nicht auf den Mailversand aus.</p>
-            {% if conflict %}
-                <p>Aktuell gespeichert: {{ current.optional_user_emails_enabled|yesno:"Aktiviert,Deaktiviert" }}.</p>
-                <a class="uk-button uk-button-default" href="{% url 'verwaltung:global_settings' %}">Aktuellen Stand laden</a>
-            {% else %}
-                <button class="uk-button uk-button-primary" type="submit">Einstellungen speichern</button>
-            {% endif %}
-        </form>
+        <p>Freigaben für einzelne E-Mail-Arten an Bewerber und Mieter. Eine ausgeschaltete Mailart bleibt auch bei persönlicher Auswahl „An“ gesperrt.</p>
+        {% include "partials/_notification_form.html" %}
     </div>
 </section>
 {% endblock %}

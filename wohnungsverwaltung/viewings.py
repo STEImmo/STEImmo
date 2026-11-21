@@ -18,6 +18,7 @@ from .models import (
     ViewingAppointment,
     ViewingAppointmentEvent,
 )
+from .notification_preferences import mail_allowed
 
 logger = logging.getLogger(__name__)
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -96,16 +97,17 @@ def send_viewing_notification(event_id, actor=None):
     if initial is None:
         return False
     with transaction.atomic():
-        application = (
-            Bewerbung.objects.select_for_update(of=("self",))
-            .select_related("person", "wohnung")
-            .get(pk=initial["appointment__application_id"])
+        # Load the person only after the application lock is acquired.
+        application = Bewerbung.objects.select_for_update().get(
+            pk=initial["appointment__application_id"]
         )
         appointment = ViewingAppointment.objects.select_for_update().get(
             pk=initial["appointment_id"]
         )
         appointment.application = application
         event = ViewingAppointmentEvent.objects.select_for_update().get(pk=event_id)
+        if event.notification_status not in ("pending", "failed"):
+            return False
         if not notification_is_current(event, appointment):
             if event.notification_status != "none":
                 event.notification_status = "obsolete"
@@ -120,7 +122,14 @@ def send_viewing_notification(event_id, actor=None):
             f"Status: {appointment.get_status_display()}\n\n"
             f"Ihre Termine und Rückmeldung: {event.notification_url}\n"
         )
-        recipients = [application.person.email]
+        account_id = application.person.user_id
+        recipient_ids = [str(account_id)] if account_id else []
+        if appointment.status == ViewingAppointment.Status.CANCELLED:
+            mail_type = "viewing_cancelled"
+        elif event.kind == "rescheduled":
+            mail_type = "viewing_rescheduled"
+        else:
+            mail_type = "viewing_invited"
         subject = "Ihr Besichtigungstermin bei STEImmo"
         if event.kind == "proposal_changed":
             proposed = timezone.localtime(appointment.proposed_start, BERLIN)
@@ -133,32 +142,51 @@ def send_viewing_notification(event_id, actor=None):
                 f"Bewerbung prüfen und verbindlichen Termin planen: {event.notification_url}\n"
                 "Der Vorschlag ist keine verbindliche Buchung.\n"
             )
-            recipients = list(
-                get_user_model()
+            mail_type = "viewing_proposal_changed"
+            recipient_ids = [
+                str(account_id)
+                for account_id in get_user_model()
                 .objects.with_perm(EMPLOYEE_ACCESS_PERMISSION)
-                .exclude(email="")
-                .values_list("email", flat=True)
-                .distinct()
-            )
-        try:
-            if (
-                event.kind == "proposal_changed"
-                or appointment.status == ViewingAppointment.Status.CANCELLED
-            ):
-                sent = bool(send_mail(subject, body, None, recipients))
-            else:
-                sent = bool(send_repliable_mail(subject, body, recipients))
-        except Exception:
-            logger.warning("Terminbenachrichtigung konnte nicht versendet werden.")
-            sent = False
-        event.notification_status = "sent" if sent else "failed"
-        event.save(update_fields=("notification_status",))
-        record_viewing_event(
-            appointment,
-            kind="mail_sent" if sent else "mail_failed",
-            actor=actor or event.actor,
+                .values_list("pk", flat=True)
+            ]
+        results = event.recipient_results
+        pending = (
+            [key for key, outcome in results.items() if outcome == "failed"]
+            if results
+            else recipient_ids
         )
-        return sent
+        for key in pending:
+            recipient = (
+                get_user_model().objects.filter(pk=key).first() if key in recipient_ids else None
+            )
+            if not mail_allowed(recipient, mail_type):
+                results[key] = "suppressed"
+                continue
+            try:
+                if mail_type in ("viewing_cancelled", "viewing_proposal_changed"):
+                    sent = send_mail(subject, body, None, [recipient.email])
+                else:
+                    sent = send_repliable_mail(subject, body, [recipient.email])
+            except Exception:
+                logger.warning("Terminbenachrichtigung konnte nicht versendet werden.")
+                sent = False
+            results[key] = "sent" if sent else "failed"
+
+        if "failed" in results.values():
+            status = "failed"
+        elif "sent" in results.values():
+            status = "sent"
+        else:
+            status = "suppressed"
+        event.notification_status = status
+        event.save(update_fields=("notification_status", "recipient_results"))
+        if status != "suppressed":
+            record_viewing_event(
+                appointment,
+                kind="mail_sent" if status == "sent" else "mail_failed",
+                actor=actor or event.actor,
+            )
+        return status == "sent"
 
 
 def cancel_open_viewings(application_id, *, reason, actor=None, notify=False):

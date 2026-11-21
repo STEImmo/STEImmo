@@ -10,8 +10,9 @@ automatisch. Für die Anmeldung gilt die bestehende Mitarbeiterprüfung.
 
 Die Datenbank erlaubt höchstens einen globalen Einstellungsdatensatz mit ID 1. Solange noch
 kein Datensatz gespeichert wurde, gilt der Modellstandard. Der Schalter für optionale
-Nutzer-E-Mails startet aktiviert. Seine Versandanbindung erfolgt im Rahmen von #205 und
-#200. Mailadressen und Testversand gehören zu #188, Organisationsdaten zu #192.
+Nutzer-E-Mails startet aktiviert. ADR 0026 beschreibt die Ablösung durch Freigaben je
+Mailart im Rahmen von #205. Mailadressen und Testversand gehören zu #188,
+Organisationsdaten zu #192.
 
 Beim Speichern wird der globale Datensatz gesperrt und seine Version mit der Formularversion
 verglichen. Bei einem Konflikt wird der aktuelle Wert zur Prüfung angezeigt. Eine wirksame
