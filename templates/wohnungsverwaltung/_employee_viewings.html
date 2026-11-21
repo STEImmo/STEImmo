@@ -12,11 +12,13 @@
             {% endif %}
             {% if appointment.current_notice %}
                 <p>Benachrichtigung: <strong>{{ appointment.current_notice.get_notification_status_display }}</strong></p>
+                {% if appointment.current_notice.notification_status == "failed" or appointment.current_notice.notification_status == "pending" %}
                 <form method="post" action="{% url 'wohnungsverwaltung:employee_viewing_resend' application.pk appointment.pk %}">
                     {% csrf_token %}
                     <input type="hidden" name="event" value="{{ appointment.current_notice.pk }}">
                     <button type="submit" class="uk-button uk-button-default">{% if appointment.current_notice.kind == "proposal_changed" %}Verwaltung erneut über Vorschlag benachrichtigen{% else %}Aktuelle Terminbenachrichtigung erneut versenden{% endif %}</button>
                 </form>
+                {% endif %}
             {% endif %}
             {% if appointment.is_open %}
                 {% if not viewing_eligibility_error %}
@@ -26,7 +28,7 @@
                             {% csrf_token %}
                             {% if appointment.edit_form.non_field_errors %}<div class="uk-alert-danger" role="alert">{{ appointment.edit_form.non_field_errors }}</div>{% endif %}
                             {% for field in appointment.edit_form %}{% if field.is_hidden %}{{ field }}{% else %}{% include "wohnungsverwaltung/_form_field.html" with field=field only %}{% endif %}{% endfor %}
-                            <p class="uk-text-meta">Eine bestehende Zusage wird bei Verschiebung zurückgesetzt. Der Bewerber erhält eine neue E-Mail.</p>
+                            <p class="uk-text-meta">Eine bestehende Zusage wird bei Verschiebung zurückgesetzt. Eine E-Mail wird gemäß den Benachrichtigungseinstellungen versendet.</p>
                             <button type="submit" class="uk-button uk-button-default">Verschiebung speichern</button>
                         </form>
                     </details>

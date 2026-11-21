@@ -87,11 +87,14 @@
             <h3 class="uk-h4">Hauptbewerbung freischalten</h3>
             {% if application.main_application_unlocked %}
                 <p>Die Hauptbewerbung ist freigeschaltet.</p>
+                {% if invitation_event %}<p>{{ invitation_event.get_kind_display }}</p>{% endif %}
                 {% if not application.submitted_at and application.status == "open" and not application.interest_withdrawn_at %}
+                    {% if not invitation_event or invitation_event.kind == "invitation_failed" %}
                     <form method="post" action="{{ invitation_url }}">
                         {% csrf_token %}
-                        <button class="uk-button uk-button-default" type="submit">Einladung erneut versenden</button>
+                        <button class="uk-button uk-button-default" type="submit">Einladungsversand versuchen</button>
                     </form>
+                    {% endif %}
                 {% endif %}
             {% elif application.status == "open" and not application.interest_withdrawn_at and not application.submitted_at %}
                 {% if not has_completed_viewing %}

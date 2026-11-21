@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Benachrichtigungen · Mein Konto{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        <a class="uk-button uk-button-text" href="{% url 'profile:detail' %}">Mein Konto</a>
+        <h1>Benachrichtigungen</h1>
+        <p>„Verwaltungsstandard“ übernimmt die Freigabe der jeweiligen Mailart. „An“ gilt für freigegebene Mailarten Ihrer Gruppe. Aufgaben und Fristen gelten unabhängig von Ihrer Auswahl.</p>
+        <p><strong>Sicherheits- und Kontobestätigungen – erforderlich.</strong> Registrierung, Mitarbeiteranmeldung und Änderung der E-Mail-Adresse verwenden weiterhin Bestätigungscodes.</p>
+        <p>Die Dokumentenauswahl steuert Hinweise zur Bereitstellung. Ein ausdrücklich durch die Verwaltung veranlasster Vertragsversand erfolgt unabhängig davon.</p>
+        {% include "partials/_notification_form.html" %}
+    </div>
+</section>
+{% endblock %}

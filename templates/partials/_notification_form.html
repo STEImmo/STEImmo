@@ -1,0 +1,20 @@
+<form method="post" class="uk-form-stacked">
+    {% csrf_token %}
+    {{ form.version }}
+    {{ form.version.errors }}
+    {{ form.non_field_errors }}
+    {% if conflict %}
+        <p role="alert" class="uk-alert-warning">Die Einstellungen wurden inzwischen geändert. Prüfen Sie die unten angezeigten gespeicherten Werte vor dem Speichern.</p>
+    {% endif %}
+    {% for heading, fields in form.sections %}
+        <fieldset class="uk-fieldset uk-margin">
+            <legend class="uk-legend">{{ heading }}</legend>
+            {% for field in fields %}
+                {% include "wohnungsverwaltung/_form_field.html" with field=field only %}
+            {% endfor %}
+        </fieldset>
+    {% endfor %}
+    {% if form.visible_fields %}
+        <button class="uk-button uk-button-primary" type="submit">Einstellungen speichern</button>
+    {% endif %}
+</form>

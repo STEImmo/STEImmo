@@ -1,6 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from queue import Queue
 from threading import Barrier
+from time import monotonic, sleep
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -8,7 +10,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core import mail
 from django.db import IntegrityError, connection, connections, transaction
-from django.test import Client, TestCase, TransactionTestCase
+from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -21,18 +23,22 @@ from .models import (
     Bewerbung,
     BewerbungStatus,
     GlobalSettings,
+    NotificationPreference,
     Person,
     ViewingAppointment,
     ViewingAppointmentEvent,
     Wohnung,
 )
+from .viewings import send_viewing_notification
 
 
 class ViewingTests(TestCase):
     def setUp(self):
         self.employee = get_user_model().objects.create_user(username="viewing-employee")
         self.employee.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
-        self.user = get_user_model().objects.create_user(username="viewing-applicant")
+        self.user = get_user_model().objects.create_user(
+            username="viewing-applicant", email="ada@example.test"
+        )
         self.user.groups.add(Group.objects.get(name=ROLE_APPLICANT))
         self.unit = Wohnung.objects.create(gebaeudenummer="1", wohnungsnummer="1.01")
         self.person = Person.objects.create(
@@ -926,8 +932,6 @@ class ViewingProposalTests(TestCase):
         self.assertEqual(self.client.post(mixed, self.proposal_data(appointment)).status_code, 404)
 
     def test_past_proposal_notification_is_not_sent(self):
-        from .viewings import send_viewing_notification
-
         appointment = self.decline()
         with self.captureOnCommitCallbacks(execute=False):
             self.client.post(self.proposal_url(appointment), self.proposal_data(appointment))
@@ -983,16 +987,85 @@ class ViewingProposalTests(TestCase):
         appointment = self.decline()
         mail.outbox.clear()
         self.post(self.proposal_url(appointment), self.proposal_data(appointment))
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertCountEqual(mail.outbox[0].to, [self.employee.email, direct.email])
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertCountEqual(
+            [message.to for message in mail.outbox], [[self.employee.email], [direct.email]]
+        )
 
-    def test_no_recipient_records_failed_notification_instead_of_losing_proposal(self):
+    @override_settings(DEMO_MODE=True, EMAIL_BACKEND="django.core.mail.backends.dummy.EmailBackend")
+    def test_demo_viewing_notification_stays_in_dummy_backend(self):
+        mail.outbox.clear()
+        self.client.force_login(self.employee)
+        with patch("django.core.mail.backends.smtp.EmailBackend.open") as connect:
+            self.post(self.create_url, self.payload())
+        connect.assert_not_called()
+        self.assertEqual(mail.outbox, [])
+        self.assertTrue(
+            self.application.viewings.get().events.filter(notification_status="sent").exists()
+        )
+
+    def test_pending_viewing_mail_is_suppressed_and_not_replayed(self):
+        with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            self.client.force_login(self.employee)
+            self.client.post(self.create_url, self.payload())
+        event = self.application.viewings.get().events.get(notification_status="pending")
+        policy = GlobalSettings.objects.create(user_mail_types={"viewing_invited": False})
+        with patch("wohnungsverwaltung.viewings.send_repliable_mail") as send:
+            for callback in callbacks:
+                callback()
+            event.refresh_from_db()
+            self.assertEqual(event.notification_status, "suppressed")
+            policy.user_mail_types = {}
+            policy.save()
+            send_viewing_notification(event.pk)
+        send.assert_not_called()
+
+    def test_retry_targets_only_unsent_and_still_subscribed_staff(self):
+        self.employee.email = "staff@example.test"
+        self.employee.save(update_fields=["email"])
+
+        def staff(name):
+            account = get_user_model().objects.create_user(
+                username=name, email=f"{name}@example.test"
+            )
+            account.groups.add(Group.objects.get(name=ROLE_EMPLOYEE))
+            return account
+
+        retry = staff("retry")
+        revokes = staff("revokes")
+        opted_out = staff("opted-out")
+        preference = NotificationPreference.objects.create(
+            account=opted_out, choices={"viewing_responses": "off"}
+        )
+
+        def partial_delivery(subject, body, sender, recipients, **kwargs):
+            return int(recipients == [self.employee.email])
+
+        appointment = self.decline()
+        with patch("wohnungsverwaltung.viewings.send_mail", side_effect=partial_delivery) as send:
+            self.post(self.proposal_url(appointment), self.proposal_data(appointment))
+        self.assertEqual(send.call_count, 3)
+        event = appointment.events.get(kind="proposal_changed")
+        self.assertEqual(event.notification_status, "failed")
+        revokes.groups.clear()
+        preference.delete()
+        with patch("wohnungsverwaltung.viewings.send_mail", return_value=1) as send:
+            self.assertTrue(send_viewing_notification(event.pk))
+        self.assertEqual(send.call_args.args[3], [retry.email])
+        event.refresh_from_db()
+        self.assertEqual(event.recipient_results[str(revokes.pk)], "suppressed")
+        self.assertEqual(event.recipient_results[str(opted_out.pk)], "suppressed")
+        with patch("wohnungsverwaltung.viewings.send_mail") as send:
+            send_viewing_notification(event.pk)
+        send.assert_not_called()
+
+    def test_no_recipient_suppresses_notification_instead_of_losing_proposal(self):
         appointment = self.decline()
         self.post(self.proposal_url(appointment), self.proposal_data(appointment))
         appointment.refresh_from_db()
         self.assertIsNotNone(appointment.proposed_start)
         self.assertEqual(
-            appointment.events.get(kind="proposal_changed").notification_status, "failed"
+            appointment.events.get(kind="proposal_changed").notification_status, "suppressed"
         )
 
     def test_rollback_discards_proposal_history_and_notification(self):
@@ -1118,8 +1191,6 @@ class ViewingProposalTests(TestCase):
         self.assertIsNone(form.initial["end_time"])
 
     def test_superseded_proposal_callback_and_retry_do_not_send_stale_mail(self):
-        from .viewings import send_viewing_notification
-
         self.employee.email = "employee@example.test"
         self.employee.save(update_fields=["email"])
         appointment = self.decline()
@@ -1147,6 +1218,74 @@ class ViewingProposalTests(TestCase):
 class ConcurrentViewingTests(TransactionTestCase):
     setUp = ViewingTests.setUp
     payload = ViewingTests.payload
+
+    def test_waiting_viewing_notification_rechecks_account_assignment(self):
+        other = get_user_model().objects.create_user(
+            username="new-viewing-recipient", email="new-recipient@example.test"
+        )
+        other.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+        start = timezone.now() + timedelta(days=1)
+        appointment = ViewingAppointment.objects.create(
+            application=self.application, starts_at=start, ends_at=start + timedelta(minutes=30)
+        )
+        person = self.application.person
+        for current_account in (other, None):
+            with self.subTest(current_account=current_account):
+                person.user = self.user
+                person.save(update_fields=["user"])
+                event = ViewingAppointmentEvent.objects.create(
+                    appointment=appointment,
+                    kind="created",
+                    appointment_version=appointment.version,
+                    notification_status="pending",
+                    notification_url="https://example.test/viewings/",
+                )
+                worker_pid = Queue()
+
+                def send_notification():
+                    try:
+                        with connection.cursor() as cursor:
+                            cursor.execute("SELECT pg_backend_pid()")
+                            worker_pid.put(cursor.fetchone()[0])
+                        return send_viewing_notification(event.pk)
+                    finally:
+                        connections.close_all()
+
+                with (
+                    patch(
+                        "wohnungsverwaltung.viewings.send_repliable_mail", return_value=1
+                    ) as send,
+                    ThreadPoolExecutor(max_workers=1) as executor,
+                ):
+                    with transaction.atomic():
+                        Bewerbung.objects.select_for_update().get(pk=self.application.pk)
+                        future = executor.submit(send_notification)
+                        pid = worker_pid.get(timeout=5)
+                        deadline = monotonic() + 5
+                        with connection.cursor() as cursor:
+                            while True:
+                                cursor.execute(
+                                    "SELECT pg_backend_pid() = ANY(pg_blocking_pids(%s))", [pid]
+                                )
+                                if cursor.fetchone()[0]:
+                                    break
+                                if monotonic() >= deadline:
+                                    self.fail(
+                                        "Der Terminversand wartet nicht auf die Bewerbungssperre."
+                                    )
+                                sleep(0.01)
+                        person.user = current_account
+                        person.save(update_fields=["user"])
+                    self.assertEqual(future.result(timeout=5), current_account is not None)
+
+                event.refresh_from_db()
+                if current_account:
+                    send.assert_called_once()
+                    self.assertEqual(send.call_args.args[2], [current_account.email])
+                    self.assertEqual(event.notification_status, "sent")
+                else:
+                    send.assert_not_called()
+                    self.assertEqual(event.notification_status, "suppressed")
 
     def test_concurrent_proposals_preserve_first_accepted_version(self):
         for _ in range(2):
