@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth.models import Group
 from django.db import transaction
 from django.test import TestCase
@@ -5,8 +7,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from . import test_rental_completion as fixtures
-from .access import ROLE_APPLICANT
-from .models import Bewerbung, BewerbungStatus, Person
+from .access import APPLICANT_ACCESS_PERMISSION, ROLE_APPLICANT, ROLE_TENANT
+from .models import Bewerbung, BewerbungStatus, Person, Wohnung, WohnungStatus
 
 
 class ApplicantAcceptanceStatusTests(TestCase):
@@ -76,3 +78,134 @@ class ApplicantAcceptanceStatusTests(TestCase):
         )
         self.assertContains(self.client.get(self.list_url), "Als Mieter angenommen")
         self.assertContains(self.client.get(self.detail_url), "Als Mieter angenommen")
+
+
+class TenantProfileStatusTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        fixtures.RentalCompletionTests.setUpTestData.__func__(cls)
+
+    completion_url = fixtures.RentalCompletionTests.completion_url
+    contract_url = fixtures.RentalCompletionTests.contract_url
+    pdf_bytes = staticmethod(fixtures.RentalCompletionTests.pdf_bytes)
+    complete = fixtures.RentalCompletionTests.complete
+
+    def setUp(self):
+        self.profile_url = reverse("profile:detail")
+        self.client.force_login(self.applicant)
+
+    def complete_as_employee(self):
+        self.client.force_login(self.employee)
+        self.assertContains(self.complete(), "Vermietung abgeschlossen")
+        self.client.force_login(self.applicant)
+
+    def test_profile_shows_own_acceptance_before_rental_is_completed(self):
+        response = self.client.get(self.profile_url)
+        self.assertContains(response, "Als Mieter angenommen")
+        self.assertContains(response, str(self.unit))
+        self.assertContains(response, "Der Vermietungsabschluss steht noch aus.")
+        self.assertNotContains(response, "Vermietet")
+        self.assertNotContains(response, self.contract_url)
+
+    def test_completed_rental_shows_unit_status_and_contract_after_new_login(self):
+        self.applicant.set_password("Synthetic-status-test-4826")
+        self.applicant.save(update_fields=["password"])
+        self.complete_as_employee()
+        self.client.logout()
+        self.assertTrue(
+            self.client.login(
+                username=self.applicant.username, password="Synthetic-status-test-4826"
+            )
+        )
+        response = self.client.get(self.profile_url)
+        self.assertContains(response, str(self.unit))
+        self.assertContains(response, "Wohnungsstatus:")
+        self.assertContains(response, "Vermietet")
+        self.assertContains(response, "Vermietung abgeschlossen")
+        self.assertContains(response, self.contract_url)
+        self.assertNotContains(response, "Der Vermietungsabschluss steht noch aus.")
+        self.assertIn("no-store", response.headers.get("Cache-Control", ""))
+
+    def test_profile_uses_current_unit_status_instead_of_assuming_taken(self):
+        self.complete_as_employee()
+        for status, label in (
+            (WohnungStatus.TAKEN, "Vermietet"),
+            (WohnungStatus.FREE, "Verfügbar"),
+            (WohnungStatus.BLOCKED, "Gesperrt"),
+        ):
+            with self.subTest(status=status):
+                Wohnung.objects.filter(pk=self.unit.pk).update(status=status)
+                response = self.client.get(self.profile_url)
+                self.assertContains(response, label)
+                if status != WohnungStatus.TAKEN:
+                    self.assertNotContains(response, "Vermietet")
+
+    def test_other_account_cannot_see_acceptance_unit_or_contract(self):
+        for completed in (False, True):
+            with self.subTest(completed=completed):
+                if completed:
+                    self.complete_as_employee()
+                self.client.force_login(self.other)
+                response = self.client.get(self.profile_url)
+                self.assertNotContains(response, "Als Mieter angenommen")
+                self.assertNotContains(response, str(self.unit))
+                self.assertNotContains(response, "Vermietet")
+                self.assertNotContains(response, self.contract_url)
+
+    def test_missing_acceptance_or_ended_application_has_no_profile_confirmation(self):
+        cases = (
+            {"accepted_at": None},
+            {"status": BewerbungStatus.DECLINED},
+            {"status": BewerbungStatus.BLOCKED},
+            {"interest_withdrawn_at": timezone.now()},
+            {"submitted_at": None},
+        )
+        for changes in cases:
+            with self.subTest(changes=changes), transaction.atomic():
+                Bewerbung.objects.filter(pk=self.application.pk).update(**changes)
+                response = self.client.get(self.profile_url)
+                self.assertNotContains(response, "Als Mieter angenommen")
+                self.assertNotContains(response, str(self.unit))
+                self.assertNotContains(response, "Vermietet")
+                transaction.set_rollback(True)
+
+    def test_manual_person_assignment_and_tenant_role_do_not_imply_completed_rental(self):
+        Bewerbung.objects.filter(pk=self.application.pk).update(accepted_at=None)
+        self.applicant.groups.add(Group.objects.get(name=ROLE_TENANT))
+        Person.objects.filter(pk=self.person.pk).update(wohnung=self.unit)
+        response = self.client.get(self.profile_url)
+        self.assertNotContains(response, "Als Mieter angenommen")
+        self.assertNotContains(response, "Wohnungsstatus:")
+        self.assertNotContains(response, "Vermietet")
+
+    def test_relinked_account_does_not_inherit_completed_rental_status(self):
+        self.complete_as_employee()
+        Person.objects.filter(pk=self.person.pk).update(user=self.other)
+        for account in (self.applicant, self.other):
+            with self.subTest(account=account.pk):
+                self.client.force_login(account)
+                response = self.client.get(self.profile_url)
+                self.assertNotContains(response, "Vermietet")
+                self.assertNotContains(response, str(self.unit))
+                self.assertNotContains(response, self.contract_url)
+
+    def test_removed_tenant_access_hides_rental_status_and_contract(self):
+        self.complete_as_employee()
+        self.applicant.groups.remove(Group.objects.get(name=ROLE_TENANT))
+        response = self.client.get(self.profile_url)
+        self.assertNotContains(response, "Wohnungsstatus:")
+        self.assertNotContains(response, "Vermietet")
+        self.assertNotContains(response, self.contract_url)
+
+    def test_person_relinked_during_profile_loading_does_not_expose_pending_acceptance(self):
+        original_has_perm = type(self.applicant).has_perm
+
+        def relink_before_query(account, permission, obj=None):
+            if account.pk == self.applicant.pk and permission == APPLICANT_ACCESS_PERMISSION:
+                Person.objects.filter(pk=self.person.pk).update(user=self.other)
+            return original_has_perm(account, permission, obj)
+
+        with patch.object(type(self.applicant), "has_perm", relink_before_query):
+            response = self.client.get(self.profile_url)
+        self.assertNotContains(response, "Als Mieter angenommen")
+        self.assertNotContains(response, str(self.unit))

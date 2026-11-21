@@ -42,6 +42,8 @@ from wohnungsverwaltung.forms import (
 )
 from wohnungsverwaltung.models import (
     AccountLoginThrottle,
+    Bewerbung,
+    BewerbungStatus,
     EmployeeLoginVerification,
     LoginIpThrottle,
     PendingEmailChange,
@@ -89,6 +91,21 @@ def personal_profile(request):
     with transaction.atomic():
         account = _locked_profile_account(request)
         person = Person.objects.select_for_update().filter(user=account).first()
+    accepted_applications = ()
+    if person is not None and account.has_perm(APPLICANT_ACCESS_PERMISSION):
+        accepted_applications = (
+            Bewerbung.objects.filter(
+                person=person,
+                person__user=account,
+                status=BewerbungStatus.OPEN,
+                interest_withdrawn_at__isnull=True,
+                submitted_at__isnull=False,
+                accepted_at__isnull=False,
+                rental__isnull=True,
+            )
+            .select_related("wohnung")
+            .order_by("-accepted_at", "-created_at")
+        )
     rentals = ()
     if account.has_perm(TENANT_ACCESS_PERMISSION):
         rentals = (
@@ -102,6 +119,7 @@ def personal_profile(request):
         "core/personal_profile.html",
         {
             "person": person,
+            "accepted_applications": accepted_applications,
             "rentals": rentals,
             "pending_email_change": PendingEmailChange.objects.filter(user=request.user).exists(),
         },
