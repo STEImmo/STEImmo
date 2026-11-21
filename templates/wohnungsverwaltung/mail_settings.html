@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Mail · Einstellungen · Verwaltung{% endblock %}
+
+{% block content %}
+<section class="uk-section">
+    <div class="uk-container uk-container-small">
+        {% include "wohnungsverwaltung/_workspace_navigation.html" %}
+        <p><a href="{% url 'verwaltung:global_settings' %}">Zurück zu den Einstellungen</a></p>
+        <h1>Mail</h1>
+        <dl class="uk-description-list">
+            <dt>Standardabsender</dt>
+            <dd>
+                {{ default_sender }}
+                <div class="uk-text-meta">Diese Adresse steht im Absenderfeld ausgehender Mails. Der Betrieb legt sie über die Mailkonfiguration fest.</div>
+            </dd>
+        </dl>
+        {% if needs_recipients %}
+            <p class="uk-alert-warning" uk-alert>Hinterlegen Sie mindestens eine Adresse für Rückrufwünsche.</p>
+        {% endif %}
+        <form method="post" class="uk-form-stacked">
+            {% csrf_token %}
+            {{ form.version }}
+            {{ form.version.errors }}
+            {{ form.non_field_errors }}
+            {% include "wohnungsverwaltung/_form_field.html" with field=form.callback_recipients only %}
+            {% include "wohnungsverwaltung/_form_field.html" with field=form.reply_to only %}
+            {% if conflict %}
+                <a class="uk-button uk-button-default" href="{% url 'verwaltung:mail_settings' %}">Aktuellen Stand laden</a>
+            {% else %}
+                <button class="uk-button uk-button-primary" type="submit">Mailadressen speichern</button>
+            {% endif %}
+        </form>
+    </div>
+</section>
+{% endblock %}

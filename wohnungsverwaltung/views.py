@@ -14,7 +14,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.contrib.sessions.models import Session
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.mail import EmailMessage, send_mail
+from django.core.mail import EmailMessage
 from django.core.paginator import Paginator
 from django.core.validators import validate_email
 from django.db import DatabaseError, IntegrityError, transaction
@@ -47,6 +47,8 @@ from django.utils import timezone
 from django.utils.crypto import salted_hmac
 from django.views.decorators.cache import never_cache
 from PIL import Image
+
+from core.mail_settings import send_repliable_mail
 
 from .access import (
     APPLICANT_ACCESS_PERMISSION,
@@ -1954,7 +1956,7 @@ def _send_application_invitation(application: Bewerbung, actor, base_url: str) -
         f"Zur Hauptbewerbung: {base_url}{detail_url}\n"
     )
     try:
-        sent = send_mail(subject, body, None, [recipient], fail_silently=False)
+        sent = send_repliable_mail(subject, body, [recipient])
     except Exception:
         sent = 0
     kind = (
@@ -2245,6 +2247,8 @@ def application_withdraw(request: HttpRequest, application_id: UUID) -> HttpResp
             eligible_applications.select_related("wohnung"),
             pk=application_id,
         )
+        if Rental.objects.filter(application=application).exists():
+            raise Http404("Eine abgeschlossene Vermietung kann nicht zurückgezogen werden.")
         return render(
             request,
             "wohnungsverwaltung/application_withdraw_confirm.html",
@@ -2256,6 +2260,10 @@ def application_withdraw(request: HttpRequest, application_id: UUID) -> HttpResp
             eligible_applications.select_for_update(),
             pk=application_id,
         )
+        # Completion takes the same application lock. Query the rental afterwards
+        # so a completion committed while this request waited is also visible.
+        if Rental.objects.filter(application=application).exists():
+            raise Http404("Eine abgeschlossene Vermietung kann nicht zurückgezogen werden.")
         application.interest_withdrawn_at = timezone.now()
         application.save(update_fields=["interest_withdrawn_at", "updated_at"])
         cancel_open_viewings(

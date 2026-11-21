@@ -1250,6 +1250,8 @@ class ProtokollSchluessel(models.Model):
 class GlobalSettings(models.Model):
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
     optional_user_emails_enabled = models.BooleanField(default=True)
+    callback_recipients = models.JSONField(null=True)
+    reply_to = models.EmailField(blank=True, default="")
     version = models.PositiveBigIntegerField(default=0)
 
     class Meta:
@@ -1262,3 +1264,10 @@ class GlobalSettingsChange(models.Model):
     actor_account_id = models.PositiveBigIntegerField()
     changed_at = models.DateTimeField(auto_now_add=True)
     changed_fields = models.JSONField()
+
+
+class MailTestAttempt(models.Model):
+    account = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True
+    )
+    next_allowed_at = models.DateTimeField()

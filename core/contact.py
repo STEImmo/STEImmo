@@ -6,7 +6,6 @@ from smtplib import SMTPException
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
 from django.core.validators import validate_email
 from django.db import transaction
 from django.shortcuts import redirect, render
@@ -16,6 +15,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from .forms import CallbackForm
+from .mail_settings import callback_recipients, get_mail_settings, send_repliable_mail
 from .models import CallbackThrottle
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,8 @@ def _reserve_attempt(request):
 
 
 def _send_callback(form):
-    recipients = settings.CALLBACK_RECIPIENTS
+    mail_settings = get_mail_settings()
+    recipients = callback_recipients(mail_settings)
     if settings.EMAIL_BACKEND == "django.core.mail.backends.console.EmailBackend":
         logger.warning("Rückrufversand benötigt ein Mail-Backend ohne Konsolenausgabe.")
         return False
@@ -62,7 +63,7 @@ def _send_callback(form):
         for recipient in recipients:
             validate_email(recipient)
         return (
-            send_mail(
+            send_repliable_mail(
                 subject="STE Immobilien eGbR: Neuer Rückrufwunsch",
                 message=(
                     "Über das Kontaktformular wurde ein Rückruf gewünscht.\n\n"
@@ -70,9 +71,8 @@ def _send_callback(form):
                     f"Erreichbarkeit: {form.cleaned_data['availability']}\n\n"
                     "Bitte rufen Sie zu den angegebenen Zeiten zurück."
                 ),
-                from_email=None,
                 recipient_list=recipients,
-                fail_silently=False,
+                mail_settings=mail_settings,
             )
             == 1
         )
