@@ -9,7 +9,7 @@
 {% endblock %}
 {% block application_content %}
 {% for application in applications %}
-<article class="uk-card uk-card-default uk-card-body application-summary application-card uk-margin-bottom" data-state="{% if application.status != 'open' or application.interest_withdrawn_at %}beendet{% elif not application.main_application_unlocked %}warten{% endif %}">
+<article id="bewerbung-{{ application.pk }}" class="uk-card uk-card-default uk-card-body application-summary application-card uk-margin-bottom" data-state="{% if application.status != 'open' or application.interest_withdrawn_at %}beendet{% elif not application.main_application_unlocked %}warten{% endif %}">
     <div class="application-summary-top"><div><p class="application-eyebrow">Ihre Wunschwohnung</p><h2>{{ application.wohnung }}</h2></div><span class="uk-label{% if application.status == 'declined' or application.status == 'blocked' %} uk-label-danger{% endif %}">{{ application.get_applicant_status_display }}</span></div>
     <p class="uk-text-meta">{{ application.personenanzahl }} Person{{ application.personenanzahl|pluralize:"en" }} im Haushalt</p>
     {% for event in application.occupancy_decline_events %}

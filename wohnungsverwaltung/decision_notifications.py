@@ -24,6 +24,7 @@ from .models import (
     Rental,
 )
 from .notification_preferences import mail_allowed
+from .open_step_reminders import REMINDER_TYPES, reminder_message
 
 logger = logging.getLogger(__name__)
 MAX_ATTEMPTS = 3
@@ -121,6 +122,10 @@ def _message(notice, recipient):
 
 
 def _eligible_message(notice, recipient):
+    if notice.kind in REMINDER_TYPES:
+        if settings.DEMO_MODE or settings.EMAIL_BACKEND in INACTIVE_BACKENDS:
+            return None
+        return reminder_message(notice, recipient)
     if settings.EMAIL_BACKEND in INACTIVE_BACKENDS or not mail_allowed(recipient, notice.kind):
         return None
     return _message(notice, recipient)
@@ -174,6 +179,13 @@ def deliver_decision_notification(notice_id):
         notice.status = states.SENDING
         notice.attempts += 1
         notice.save(update_fields=["status", "attempts"])
+
+    if notice.kind in REMINDER_TYPES:
+        recipient = get_user_model().objects.filter(pk=notice.recipient_id).first()
+        message = _eligible_message(notice, recipient) if recipient else None
+        if message is None:
+            DecisionNotification.objects.filter(pk=notice.pk).update(status=states.SUPPRESSED)
+            return
 
     subject, body, link_label, path = message
     link_url = f"{origin}{path}"

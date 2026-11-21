@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
@@ -35,9 +36,11 @@ def notifications(request):
                         else:
                             choices[key] = value
                     if choices != current.choices:
+                        if choices.get("user_reminders") != current.choices.get("user_reminders"):
+                            current.reminders_changed_at = timezone.now()
                         current.choices = choices
                         current.version += 1
-                        current.save(update_fields=["choices", "version"])
+                        current.save(update_fields=["choices", "version", "reminders_changed_at"])
             if status != 409:
                 messages.success(request, "Einstellungen gespeichert.")
                 return redirect("profile:notifications")
