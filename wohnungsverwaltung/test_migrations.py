@@ -69,7 +69,7 @@ class RaumstammMigrationTests(TransactionTestCase):
 
 
 class RentalAndGlobalSettingsMigrationTests(TransactionTestCase):
-    merge_target = ("immobilien", "0038_merge_mail_settings_and_rental_completion")
+    merge_target = ("immobilien", "0040_merge_notification_preferences_and_status_branch")
 
     def setUp(self):
         super().setUp()
@@ -99,8 +99,9 @@ class RentalAndGlobalSettingsMigrationTests(TransactionTestCase):
         apps = self.migrate_to(self.merge_target)
 
         settings = apps.get_model("immobilien", "GlobalSettings").objects.get(pk=1)
-        self.assertFalse(settings.optional_user_emails_enabled)
-        self.assertEqual(settings.version, 3)
+        self.assertTrue(settings.user_mail_types)
+        self.assertFalse(any(settings.user_mail_types.values()))
+        self.assertEqual(settings.version, 4)
         saved_change = apps.get_model("immobilien", "GlobalSettingsChange").objects.get(
             pk=change.pk
         )
@@ -174,8 +175,32 @@ class RentalAndGlobalSettingsMigrationTests(TransactionTestCase):
         settings = apps.get_model("immobilien", "GlobalSettings").objects.get(pk=1)
         self.assertEqual(settings.callback_recipients, recipients)
         self.assertEqual(settings.reply_to, "reply@example.test")
-        self.assertFalse(settings.optional_user_emails_enabled)
-        self.assertEqual(settings.version, 5)
+        self.assertTrue(settings.user_mail_types)
+        self.assertFalse(any(settings.user_mail_types.values()))
+        self.assertEqual(settings.version, 6)
         attempt = apps.get_model("immobilien", "MailTestAttempt").objects.get(pk=account.pk)
         self.assertEqual(attempt.next_allowed_at, next_allowed)
         self.assertFalse(apps.get_model("immobilien", "Rental").objects.exists())
+
+    def test_upgrade_from_notification_branch_preserves_global_and_personal_choices(self):
+        apps = self.migrate_to(("immobilien", "0039_notification_preferences"))
+        policy = {"rental_completed": False, "main_application_invited": True}
+        choices = {"documents": False, "application_decisions": True}
+        apps.get_model("immobilien", "GlobalSettings").objects.create(
+            user_mail_types=policy, version=7
+        )
+        account = apps.get_model("auth", "User").objects.create(username="migration-preferences")
+        apps.get_model("immobilien", "NotificationPreference").objects.create(
+            account_id=account.pk, choices=choices, version=3
+        )
+
+        apps = self.migrate_to(self.merge_target)
+
+        settings = apps.get_model("immobilien", "GlobalSettings").objects.get(pk=1)
+        preference = apps.get_model("immobilien", "NotificationPreference").objects.get(
+            account_id=account.pk
+        )
+        self.assertEqual(settings.user_mail_types, policy)
+        self.assertEqual(settings.version, 7)
+        self.assertEqual(preference.choices, choices)
+        self.assertEqual(preference.version, 3)

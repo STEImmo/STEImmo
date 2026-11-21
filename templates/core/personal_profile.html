@@ -57,6 +57,7 @@
                 <dl class="profile-data profile-login-data"><div><dt>E-Mail-Adresse für die Anmeldung</dt><dd>{{ user.email|default:"Nicht angegeben" }}</dd></div></dl>
                 <p class="profile-card-footnote"><span uk-icon="icon: info; ratio: .8" aria-hidden="true"></span> Mit dieser E-Mail-Adresse melden Sie sich bei uns an.</p>
                 {% if person %}<div class="profile-form-actions"><a class="uk-button uk-button-default" href="{% url 'profile:email' %}">E-Mail-Adresse ändern</a><a class="uk-button uk-button-default" href="{% url 'profile:password' %}">Passwort ändern</a></div>{% endif %}
+                <a class="uk-button uk-button-default uk-margin-small-top" href="{% url 'profile:notifications' %}">Benachrichtigungen</a>
                 {% if pending_email_change %}<div class="uk-alert-primary uk-margin-top" role="status"><p>Eine E-Mail-Änderung wartet auf Bestätigung.</p><a href="{% url 'profile:email_confirm' %}">Bestätigungscode eingeben</a></div>{% endif %}
             </section>
             <div class="profile-information"><span uk-icon="icon: info; ratio: 1.1" aria-hidden="true"></span><div><h2>Was passiert mit Ihren Änderungen?</h2><p>Ihre Änderungen aktualisieren die Angaben in Ihrem Profil. Bereits eingereichte Bewerbungsunterlagen und abgeschlossene Übergabeprotokolle bleiben erhalten.</p><a href="{% url 'privacy' %}">Mehr zum Umgang mit Ihren Daten <span uk-icon="icon: arrow-right; ratio: .8" aria-hidden="true"></span></a></div></div>

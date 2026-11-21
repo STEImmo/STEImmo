@@ -198,6 +198,24 @@ class TenantProfileStatusTests(TestCase):
         self.assertNotContains(response, "Vermietet")
         self.assertNotContains(response, self.contract_url)
 
+    def test_completed_profile_keeps_access_to_personal_notification_preferences(self):
+        self.complete_as_employee()
+        response = self.client.get(self.profile_url)
+        self.assertContains(response, "Vermietet")
+        self.assertContains(response, reverse("profile:notifications"))
+
+    def test_completed_application_keeps_its_acceptance_in_both_applicant_views(self):
+        self.complete_as_employee()
+        urls = (
+            reverse("wohnungsverwaltung:pre_application_list"),
+            reverse("wohnungsverwaltung:main_application_status", args=[self.application.pk]),
+        )
+        for url in urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertContains(response, "Als Mieter angenommen")
+                self.assertNotContains(response, "Bitte warten Sie auf die Rückmeldung")
+
     def test_person_relinked_during_profile_loading_does_not_expose_pending_acceptance(self):
         original_has_perm = type(self.applicant).has_perm
 

@@ -68,3 +68,11 @@ Während der Umsetzung wurde #188 in main aufgenommen. Die leere Migration
 mit dem geprüften Vermietungszweig, ohne bereits geteilte Migrationen zu verändern.
 Upgrade-Tests prüfen den Erhalt der Vertrags- und Kontozuordnungen sowie der
 globalen Einstellungen, Mailadressen und Sperrzeit eines Testmailversuchs.
+
+Vor dem PR wurde auch der inzwischen um #182 und #205 ergänzte main integriert.
+Die zusätzliche leere Migration `0040_merge_notification_preferences_and_status_branch`
+verbindet die bereits veröffentlichten Zweige, ohne sie nachträglich umzuschreiben.
+Die Upgrade-Prüfung umfasst die Übernahme der alten globalen Abwahl sowie den
+unveränderten Erhalt globaler Mailarten und persönlicher Benachrichtigungswahl.
+Zusage, Wohnungskarte und Zugang zu den Benachrichtigungseinstellungen bleiben
+gemeinsam im persönlichen Bereich verfügbar.

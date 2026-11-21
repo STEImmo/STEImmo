@@ -442,7 +442,10 @@ zurückgezogene oder nicht angenommene Bewerbungen erhalten keine Zusageanzeige.
 Ein vor dem Abschluss geöffnetes Stammdatenformular wird beim Speichern mit
 einem Hinweis abgewiesen, damit es den Vermietet-Status nicht unbemerkt zurücksetzt.
 Der abgeschlossene Vorgang bleibt in der Bewerbungsübersicht
-abrufbar. Das Einblenden anderer Kalender, Kalenderabonnements und Synchronisation bleiben
+abrufbar. Nach dem Abschluss ist ein Rückzug der Bewerbung nicht mehr möglich.
+Eine manuelle Person-Wohnungszuordnung darf der gespeicherten Vermietung nicht
+widersprechen; ein Wohnungswechsel benötigt einen eigenen Vermietungsablauf.
+Das Einblenden anderer Kalender, Kalenderabonnements und Synchronisation bleiben
 einem separaten Folgeissue nach Fertigstellung des Dashboards vorbehalten.
 
 ## Bewerbungen im Betreiberbereich

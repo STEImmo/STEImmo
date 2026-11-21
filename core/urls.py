@@ -2,7 +2,7 @@ from django.contrib.auth.views import LogoutView
 from django.urls import include, path
 from django.views.generic import TemplateView
 
-from . import account_views, contact, views
+from . import account_views, contact, notification_views, views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -21,6 +21,11 @@ urlpatterns = [
             (
                 [
                     path("", views.personal_profile, name="detail"),
+                    path(
+                        "benachrichtigungen/",
+                        notification_views.notifications,
+                        name="notifications",
+                    ),
                     path("bearbeiten/", views.personal_profile_edit, name="edit"),
                     path("passwort/", account_views.password_change, name="password"),
                     path("email/", account_views.email_change, name="email"),

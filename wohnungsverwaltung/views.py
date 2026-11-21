@@ -148,6 +148,7 @@ from .models import (
     WohnungStatus,
     calculate_photo_checksum,
 )
+from .notification_preferences import mail_allowed
 from .upload_limits import upload_too_large_response
 from .viewings import (
     BERLIN,
@@ -1007,6 +1008,7 @@ def employee_application_list(request: HttpRequest) -> HttpResponse:
                 kind__in=(
                     ApplicationReviewEvent.Kind.INVITATION_SENT,
                     ApplicationReviewEvent.Kind.INVITATION_FAILED,
+                    ApplicationReviewEvent.Kind.INVITATION_SUPPRESSED,
                 ),
             )
             .order_by("-created_at", "-review_event_id")
@@ -1270,6 +1272,13 @@ def _employee_application_detail_response(
                     "Bitte prüfen Sie den aktuellen Termin- und Bewerbungsstand.",
                 )
         viewing_form = ViewingAppointmentForm(auto_id="id_viewing_create_%s", initial=initial)
+    invitation_event = application.review_events.filter(
+        kind__in=(
+            ApplicationReviewEvent.Kind.INVITATION_SENT,
+            ApplicationReviewEvent.Kind.INVITATION_FAILED,
+            ApplicationReviewEvent.Kind.INVITATION_SUPPRESSED,
+        )
+    ).first()
     return render(
         request,
         "wohnungsverwaltung/employee_application_detail.html",
@@ -1305,6 +1314,7 @@ def _employee_application_detail_response(
                 else RentalContractForm(application=application)
             ),
             "contract_notice": contract_notice,
+            "invitation_event": invitation_event,
             "rental_form": (
                 rental_form
                 if rental_form is not None
@@ -1845,7 +1855,11 @@ def employee_viewing_resend(request, application_id, appointment_id):
         messages.error(request, "Bitte wählen Sie die aktuelle Benachrichtigung.")
     else:
         event = get_object_or_404(ViewingAppointmentEvent, pk=event_id, appointment=appointment)
-        if event.notification_status in ("none", "obsolete") or not notification_is_current(
+        if event.notification_status == "suppressed":
+            messages.info(request, "Die Terminbenachrichtigung wurde unterdrückt.")
+        elif event.notification_status == "sent":
+            messages.info(request, "Die Terminbenachrichtigung ist bereits versendet.")
+        elif event.notification_status not in ("pending", "failed") or not notification_is_current(
             event, appointment
         ):
             messages.error(
@@ -1855,6 +1869,12 @@ def employee_viewing_resend(request, application_id, appointment_id):
         elif send_viewing_notification(event.pk, actor=request.user):
             messages.success(request, "Die Terminbenachrichtigung wurde versendet.")
         else:
+            event.refresh_from_db()
+            if event.notification_status == "suppressed":
+                messages.info(request, "Die Terminbenachrichtigung wurde unterdrückt.")
+                return redirect(
+                    "wohnungsverwaltung:employee_application_detail", application_id=application_id
+                )
             messages.error(
                 request,
                 "Die Terminbenachrichtigung konnte nicht versendet werden. "
@@ -1946,8 +1966,32 @@ def employee_application_suitability_approve(
     return redirect("wohnungsverwaltung:employee_application_detail", application_id=application_id)
 
 
-def _send_application_invitation(application: Bewerbung, actor, base_url: str) -> bool:
-    recipient = application.person.email
+@transaction.atomic
+def _send_application_invitation(application: Bewerbung, actor, base_url: str) -> str:
+    # Related rows read by a join can predate the end of a lock wait.
+    application = Bewerbung.objects.select_for_update().get(pk=application.pk)
+    if (
+        not application.main_application_unlocked
+        or application.submitted_at is not None
+        or application.status != BewerbungStatus.OPEN
+        or application.interest_withdrawn_at is not None
+    ):
+        return "obsolete"
+    kinds = ApplicationReviewEvent.Kind
+    if application.review_events.filter(kind=kinds.INVITATION_SENT).exists():
+        return "sent"
+    if application.review_events.filter(kind=kinds.INVITATION_SUPPRESSED).exists():
+        return "suppressed"
+    account = application.person.user
+    if not mail_allowed(account, "main_application_invited"):
+        ApplicationReviewEvent.objects.create(
+            application=application,
+            actor=actor,
+            kind=kinds.INVITATION_SUPPRESSED,
+            to_value="suppressed",
+        )
+        return "suppressed"
+    recipient = account.email
     detail_url = reverse("wohnungsverwaltung:main_application_status", args=[application.pk])
     subject = "Ihre Hauptbewerbung bei STE Immobilien eGbR"
     body = (
@@ -1971,7 +2015,7 @@ def _send_application_invitation(application: Bewerbung, actor, base_url: str) -
         kind=kind,
         to_value="sent" if sent else "failed",
     )
-    return bool(sent)
+    return "sent" if sent else "failed"
 
 
 @employee_required
@@ -2039,7 +2083,13 @@ def employee_application_invite(request: HttpRequest, application_id: UUID) -> H
         sent = _send_application_invitation(
             application, request.user, request.build_absolute_uri("/").rstrip("/")
         )
-        if sent:
+        if sent == "suppressed":
+            messages.info(
+                request, "Die Hauptbewerbung wurde freigeschaltet. Die Einladung wurde unterdrückt."
+            )
+        elif sent == "obsolete":
+            messages.info(request, "Die Freischaltung ist nicht mehr aktuell.")
+        elif sent == "sent":
             messages.success(
                 request, "Die Hauptbewerbung wurde freigeschaltet und die Einladung versendet."
             )
@@ -2072,10 +2122,15 @@ def employee_application_invitation_resend(
         return redirect(
             "wohnungsverwaltung:employee_application_detail", application_id=application_id
         )
-    if _send_application_invitation(
+    status = _send_application_invitation(
         application, request.user, request.build_absolute_uri("/").rstrip("/")
-    ):
-        messages.success(request, "Die Einladung wurde erneut versendet.")
+    )
+    if status == "sent":
+        messages.success(request, "Die Einladung ist als versendet vermerkt.")
+    elif status == "suppressed":
+        messages.info(request, "Der Einladungsversand wurde unterdrückt.")
+    elif status == "obsolete":
+        messages.info(request, "Die Einladung ist überholt.")
     else:
         messages.error(
             request, "Die E-Mail konnte nicht versendet werden. Bitte versuchen Sie es erneut."
@@ -2248,6 +2303,8 @@ def application_withdraw(request: HttpRequest, application_id: UUID) -> HttpResp
             eligible_applications.select_related("wohnung"),
             pk=application_id,
         )
+        if Rental.objects.filter(application=application).exists():
+            raise Http404("Eine abgeschlossene Vermietung kann nicht zurückgezogen werden.")
         return render(
             request,
             "wohnungsverwaltung/application_withdraw_confirm.html",
@@ -2259,6 +2316,10 @@ def application_withdraw(request: HttpRequest, application_id: UUID) -> HttpResp
             eligible_applications.select_for_update(),
             pk=application_id,
         )
+        # Completion takes the same application lock. Query the rental afterwards
+        # so a completion committed while this request waited is also visible.
+        if Rental.objects.filter(application=application).exists():
+            raise Http404("Eine abgeschlossene Vermietung kann nicht zurückgezogen werden.")
         application.interest_withdrawn_at = timezone.now()
         application.save(update_fields=["interest_withdrawn_at", "updated_at"])
         cancel_open_viewings(

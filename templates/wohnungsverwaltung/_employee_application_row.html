@@ -34,6 +34,7 @@
         <span class="application-cell-label uk-text-meta">Hauptbewerbungsstatus</span>
         {% if application.submitted_at %}Eingereicht
         {% elif application.main_application_unlocked and application.latest_invitation_status == "invitation_failed" %}Einladung fehlgeschlagen
+        {% elif application.main_application_unlocked and application.latest_invitation_status == "invitation_suppressed" %}Einladung unterdrückt
         {% elif application.main_application_unlocked and application.latest_invitation_status == "invitation_sent" %}Einladung versendet
         {% elif application.main_application_unlocked %}Freigeschaltet
         {% else %}Noch nicht freigeschaltet{% endif %}
