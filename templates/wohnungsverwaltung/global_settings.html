@@ -7,6 +7,7 @@
     <div class="uk-container uk-container-small">
         {% include "wohnungsverwaltung/_workspace_navigation.html" %}
         <h1>Einstellungen</h1>
+        <p><a href="{% url 'verwaltung:mail_settings' %}">Mailadressen</a></p>
         <form method="post" class="uk-form-stacked">
             {% csrf_token %}
             {{ form.version }}

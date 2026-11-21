@@ -62,6 +62,9 @@ Abschluss, widersprüchliche manuelle Zuordnungen und parallele Abschluss- und
 Die leere Merge-Migration `0037_merge_rental_completion_and_global_settings`
 führt den Vermietungszweig mit den inzwischen auf `main` integrierten globalen
 Einstellungen zusammen; vorhandene Migrationen bleiben unverändert.
+Die zusätzliche leere Merge-Migration `0038_merge_rental_completion_and_mail_settings`
+verbindet diesen Stand mit den inzwischen auf `main` integrierten Mailadressen
+aus #188. Sie verändert keine gespeicherten Vermietungen oder Einstellungen.
 
 Am 20.11.2026 bestanden alle 1.013 Django-Tests auf PostgreSQL sowie
 System-, Migrations- und Ruff-Prüfungen. Der interne Browser-Smoke-Test mit
