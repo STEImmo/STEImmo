@@ -433,6 +433,12 @@ als **Vermietet** gespeichert und nicht mehr als öffentlich verfügbar angebote
 Eine Bewerbungsannahme oder ein Vertragsversand allein ändert den Wohnungsstatus
 nicht. Bei einem fehlgeschlagenen Abschluss bleiben Status und Zuordnung unverändert;
 ein wiederholter Abschluss überschreibt keinen später geänderten Wohnungsstatus.
+Eine Zusage wird unter **Meine Bewerbungen**, in der Hauptbewerbungsansicht und
+im eigenen Profil als **Als Mieter angenommen** angezeigt. Vor dem Abschluss
+weist das Profil auf den noch offenen Vermietungsabschluss hin. Nach dem Abschluss
+sieht das berechtigte Mieterkonto die eigene Wohnung mit dem gespeicherten
+Wohnungsstatus und dem geschützten Link zum Mietvertrag. Abgelehnte, gesperrte,
+zurückgezogene oder nicht angenommene Bewerbungen erhalten keine Zusageanzeige.
 Ein vor dem Abschluss geöffnetes Stammdatenformular wird beim Speichern mit
 einem Hinweis abgewiesen, damit es den Vermietet-Status nicht unbemerkt zurücksetzt.
 Der abgeschlossene Vorgang bleibt in der Bewerbungsübersicht
