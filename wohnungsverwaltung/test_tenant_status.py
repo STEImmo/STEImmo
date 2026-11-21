@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import Group
 from django.db import transaction
+from django.db.models import QuerySet
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -209,3 +210,22 @@ class TenantProfileStatusTests(TestCase):
             response = self.client.get(self.profile_url)
         self.assertNotContains(response, "Als Mieter angenommen")
         self.assertNotContains(response, str(self.unit))
+
+    def test_completion_during_rendering_does_not_show_pending_and_completed_together(self):
+        self.applicant.groups.add(Group.objects.get(name=ROLE_TENANT))
+        original_fetch = QuerySet._fetch_all
+        completed = False
+
+        def complete_after_pending_selection(queryset):
+            nonlocal completed
+            original_fetch(queryset)
+            if queryset.model is Bewerbung and not completed:
+                completed = True
+                self.complete_as_employee()
+
+        with patch.object(QuerySet, "_fetch_all", complete_after_pending_selection):
+            response = self.client.get(self.profile_url)
+        self.assertTrue(completed)
+        self.assertContains(response, "Der Vermietungsabschluss steht noch aus.")
+        self.assertNotContains(response, "Wohnungsstatus:")
+        self.assertNotContains(response, "Vermietung abgeschlossen.")

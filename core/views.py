@@ -108,7 +108,8 @@ def personal_profile(request):
         )
     rentals = ()
     if account.has_perm(TENANT_ACCESS_PERMISSION):
-        rentals = (
+        # Read completions before pending notices can be evaluated by the template.
+        rentals = list(
             Rental.objects.for_tenant(account)
             .select_related("wohnung")
             .defer("contract_pdf")
