@@ -425,10 +425,21 @@ Kennzahl für heute und die nächsten sieben Tage nicht.
 Die Parameter `woche` und `datum` erwarten `YYYY-MM-DD`; andere Formate fallen auf
 die aktuelle Woche beziehungsweise die Standardterminliste zurück.
 
-Eingereichte Hauptbewerbungen bleiben bis zu ihrem fachlichen Abschluss als
-Mitarbeiteraufgabe sichtbar. Die Erfassung einer finalen Zu- oder Absage ist noch
-nicht Bestandteil der Anwendung und bleibt eine gesonderte Folgeaufgabe. Ebenso
-bleiben das Einblenden anderer Kalender, Kalenderabonnements und Synchronisation
+Eingereichte Hauptbewerbungen bleiben bis zum Vermietungsabschluss als
+Mitarbeiteraufgabe sichtbar. Mitarbeitende können die angenommene Bewerbung mit
+einem aktiven Mieterkonto verknüpfen und den endgültigen Mietvertrag für dieses
+Konto freigeben. Mit diesem Abschluss wird die Wohnung in derselben Transaktion
+als **Vermietet** gespeichert und nicht mehr als öffentlich verfügbar angeboten.
+Eine Bewerbungsannahme oder ein Vertragsversand allein ändert den Wohnungsstatus
+nicht. Bei einem fehlgeschlagenen Abschluss bleiben Status und Zuordnung unverändert;
+ein wiederholter Abschluss überschreibt keinen später geänderten Wohnungsstatus.
+Ein vor dem Abschluss geöffnetes Stammdatenformular wird beim Speichern mit
+einem Hinweis abgewiesen, damit es den Vermietet-Status nicht unbemerkt zurücksetzt.
+Der abgeschlossene Vorgang bleibt in der Bewerbungsübersicht
+abrufbar. Nach dem Abschluss ist ein Rückzug der Bewerbung nicht mehr möglich.
+Eine manuelle Person-Wohnungszuordnung darf der gespeicherten Vermietung nicht
+widersprechen; ein Wohnungswechsel benötigt einen eigenen Vermietungsablauf.
+Das Einblenden anderer Kalender, Kalenderabonnements und Synchronisation bleiben
 einem separaten Folgeissue nach Fertigstellung des Dashboards vorbehalten.
 
 ## Bewerbungen im Betreiberbereich

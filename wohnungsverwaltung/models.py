@@ -641,6 +641,23 @@ class Bewerbung(models.Model):
         return "Warten Sie auf die nächste Rückmeldung zu Ihrer Bewerbung."
 
 
+class RentalQuerySet(models.QuerySet):
+    def for_tenant(self, account):
+        return self.filter(tenant=account, application__person__user=account)
+
+
+class Rental(models.Model):
+    application = models.OneToOneField(Bewerbung, on_delete=models.PROTECT, related_name="rental")
+    wohnung = models.OneToOneField(Wohnung, on_delete=models.PROTECT, related_name="rental")
+    tenant = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="rentals"
+    )
+    completed_at = models.DateTimeField(auto_now_add=True)
+    contract_pdf = models.BinaryField()
+
+    objects = RentalQuerySet.as_manager()
+
+
 class ApplicationReviewEvent(models.Model):
     class Kind(models.TextChoices):
         PRIORITY_CHANGED = "priority_changed", "Priorität geändert"

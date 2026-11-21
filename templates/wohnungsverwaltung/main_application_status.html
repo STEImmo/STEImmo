@@ -187,6 +187,8 @@
                 </div>
                 <script src="{% static 'js/main_application_uploads.js' %}?v=8"></script>
             {% endif %}
-<div class="application-withdraw"><a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:application_withdraw' application.pk %}">Interesse zurückziehen</a></div>
+            {% if not application.rental %}
+                <div class="application-withdraw"><a class="uk-button uk-button-text" href="{% url 'wohnungsverwaltung:application_withdraw' application.pk %}">Interesse zurückziehen</a></div>
+            {% endif %}
         </article>
 {% endblock %}

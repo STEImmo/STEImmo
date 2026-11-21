@@ -1,9 +1,11 @@
-"""Early request and streaming file limits for proof and apartment photo uploads."""
+"""Early request and streaming file limits for uploads."""
 
 from django.conf import settings
 from django.core.files.uploadhandler import FileUploadHandler, StopUpload
 from django.http import HttpRequest, HttpResponse
 from django.template.loader import render_to_string
+
+RENTAL_CONTRACT_MAX_SIZE = 5 * 1024 * 1024
 
 
 def _is_main_application_submission(request: HttpRequest) -> bool:
@@ -93,6 +95,18 @@ class MainApplicationUploadLimitMiddleware:
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         path_parts = request.path_info.strip("/").split("/")
+        if (
+            request.method == "POST"
+            and len(path_parts) == 5
+            and path_parts[:3] == ["uebergaben", "bewerbungen", "mitarbeiter"]
+            and path_parts[4] == "vermietung-abschliessen"
+        ):
+            try:
+                content_length = int(request.META.get("CONTENT_LENGTH") or 0)
+            except (TypeError, ValueError):
+                content_length = 0
+            if content_length > RENTAL_CONTRACT_MAX_SIZE + 64 * 1024:
+                return upload_too_large_response("Der Mietvertrag darf höchstens 5 MiB groß sein.")
         if (
             request.method == "POST"
             and len(path_parts) == 4

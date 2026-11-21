@@ -89,9 +89,9 @@ class NotificationPreferenceTests(TestCase):
 class NotificationPolicyMigrationTests(TransactionTestCase):
     def test_existing_switch_populates_every_mail_type(self):
         # Keep the live test schema at the latest migration for teardown.
-        before = ("immobilien", "0037_mail_settings")
-        after = ("immobilien", "0038_notification_preferences")
-        migration = import_module("wohnungsverwaltung.migrations.0038_notification_preferences")
+        before = ("immobilien", "0038_merge_rental_completion_and_mail_settings")
+        after = ("immobilien", "0039_notification_preferences")
+        migration = import_module("wohnungsverwaltung.migrations.0039_notification_preferences")
         self.assertEqual(set(migration.MAIL_TYPES), set(USER_MAIL_TYPES))
         try:
             for enabled in (True, False):
