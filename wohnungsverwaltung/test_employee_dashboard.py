@@ -25,6 +25,7 @@ from .models import (
     Bewerbung,
     BewerbungStatus,
     BewerbungStellplatz,
+    GlobalSettings,
     Person,
     Stellplatz,
     StellplatzTyp,
@@ -920,6 +921,7 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.assertNotContains(response, "Hoch")
 
     def test_invitation_unlocks_only_selected_application_and_sends_email(self):
+        GlobalSettings.objects.create(reply_to="reply@example.test")
         self.record_completed_viewing(self.match)
         person = self.match.person
         person.user = self.applicant_user
@@ -937,6 +939,8 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.occupancy_exception.refresh_from_db()
         self.assertTrue(self.match.main_application_unlocked)
         self.assertFalse(self.occupancy_exception.main_application_unlocked)
+        self.assertEqual(mail.outbox[0].to, [person.email])
+        self.assertEqual(mail.outbox[0].reply_to, ["reply@example.test"])
         self.assertEqual(len(mail.outbox), 1)
         self.assertTrue(
             ApplicationReviewEvent.objects.filter(
@@ -958,7 +962,9 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.match.person.user = self.applicant_user
         self.match.person.save(update_fields=["user"])
         invite_url = reverse("wohnungsverwaltung:employee_application_invite", args=[self.match.pk])
-        with patch("wohnungsverwaltung.views.send_mail", side_effect=OSError("smtp down")):
+        with patch(
+            "wohnungsverwaltung.views.send_repliable_mail", side_effect=OSError("smtp down")
+        ):
             self.client.post(
                 invite_url,
                 {
@@ -982,7 +988,9 @@ class EmployeeApplicationSelectionTests(TestCase):
         resend_url = reverse(
             "wohnungsverwaltung:employee_application_invitation_resend", args=[self.match.pk]
         )
-        with patch("wohnungsverwaltung.views.send_mail", return_value=1) as send_mail_mock:
+        with patch(
+            "wohnungsverwaltung.views.send_repliable_mail", return_value=1
+        ) as send_mail_mock:
             response = self.client.post(resend_url)
         self.assertEqual(response.status_code, 302)
         send_mail_mock.assert_called_once()

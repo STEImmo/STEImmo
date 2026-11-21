@@ -43,8 +43,9 @@ Vermietungsabschluss wird nicht pauschal Vermietet abgeleitet. Vertragsbytes wer
 weiterhin erst beim geschützten Download geladen.
 
 Die Anzeige ändert keine fachlichen Status, erzeugt keine Vertragsunterzeichnung
-und sendet keine zusätzlichen Nachrichten. Es gibt keine neue Tabelle, Migration,
-JavaScript-Abhängigkeit oder zusätzliche UI-Komponentenbibliothek.
+und sendet keine zusätzlichen Nachrichten. Für die Anzeigen entstehen keine
+neuen Tabellen oder fachlichen Schemaänderungen, JavaScript-Abhängigkeiten
+oder zusätzliche UI-Komponentenbibliotheken.
 
 ## Prüfung
 
@@ -59,3 +60,11 @@ Die mit synthetischen Daten gerenderten HTML-Antworten wurden zusätzlich im
 Browser bei 390 und 1280 Pixeln geprüft: Zusage im Profil, abgeschlossene
 Vermietung, Bewerbungsübersicht, Hauptbewerbung und Profil ohne Zusage.
 Die neuen Anzeigen bleiben lesbar und verursachen keinen horizontalen Überlauf.
+
+## Integration mit main
+
+Während der Umsetzung wurde #188 in main aufgenommen. Die leere Migration
+`0038_merge_mail_settings_and_rental_completion` verbindet dessen Mail-Einstellungen
+mit dem geprüften Vermietungszweig, ohne bereits geteilte Migrationen zu verändern.
+Upgrade-Tests prüfen den Erhalt der Vertrags- und Kontozuordnungen sowie der
+globalen Einstellungen, Mailadressen und Sperrzeit eines Testmailversuchs.

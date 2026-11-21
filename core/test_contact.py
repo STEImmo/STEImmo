@@ -19,6 +19,8 @@ from django.test import (
 from django.urls import reverse
 from django.utils import timezone
 
+from wohnungsverwaltung.models import GlobalSettings
+
 from .forms import CallbackForm
 
 
@@ -173,12 +175,21 @@ class ContactTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         message = mail.outbox[0]
         self.assertEqual(message.to, ["verwaltung@example.test"])
+        self.assertEqual(message.reply_to, [])
         self.assertIn(self.data["phone"], message.body)
         self.assertIn(self.data["availability"], message.body)
         self.assertNotIn(self.data["phone"], message.subject)
         self.assertContains(self.client.get(self.url), "Ihr Rückrufwunsch wurde versendet.")
         self.client.get(self.url)
         self.assertEqual(len(mail.outbox), 1)
+
+    def test_saved_recipients_and_reply_to_are_used_for_callback(self):
+        GlobalSettings.objects.create(
+            callback_recipients=["saved@example.test"], reply_to="reply@example.test"
+        )
+        self.client.post(self.url, self.data)
+        self.assertEqual(mail.outbox[0].to, ["saved@example.test"])
+        self.assertEqual(mail.outbox[0].reply_to, ["reply@example.test"])
 
     def test_required_fields_and_invalid_phone_do_not_send_mail(self):
         for data, field in (
@@ -205,7 +216,9 @@ class ContactTests(TestCase):
         self.assertTrue(response.context["form"].errors)
 
     def test_smtp_failure_preserves_input_and_allows_retry(self):
-        with patch("core.contact.send_mail", side_effect=SMTPException("private details")):
+        with patch(
+            "core.contact.send_repliable_mail", side_effect=SMTPException("private details")
+        ):
             with self.assertLogs("core.contact", level="WARNING") as logs:
                 response = self.client.post(self.url, self.data)
         self.assertContains(response, "Bitte versuchen Sie es erneut.", status_code=503)
@@ -215,7 +228,7 @@ class ContactTests(TestCase):
         self.assertRedirects(self.client.post(self.url, self.data), self.url)
 
     def test_zero_delivery_count_is_not_reported_as_success(self):
-        with patch("core.contact.send_mail", return_value=0):
+        with patch("core.contact.send_repliable_mail", return_value=0):
             response = self.client.post(self.url, self.data)
         self.assertContains(response, "Bitte versuchen Sie es erneut.", status_code=503)
         self.assertNotContains(response, "Ihr Rückrufwunsch wurde versendet.", status_code=503)
@@ -228,7 +241,7 @@ class ContactTests(TestCase):
 
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend")
     def test_console_backend_cannot_write_private_callback_details_to_logs(self):
-        with patch("core.contact.send_mail") as send:
+        with patch("core.contact.send_repliable_mail") as send:
             response = self.client.post(self.url, self.data)
         send.assert_not_called()
         self.assertEqual(response.status_code, 503)
@@ -262,7 +275,7 @@ class ContactTests(TestCase):
 
     @override_settings(DEMO_MODE=True)
     def test_demo_simulates_request_without_sending_real_mail(self):
-        with patch("core.contact.send_mail") as send:
+        with patch("core.contact.send_repliable_mail") as send:
             response = self.client.post(self.url, self.data, follow=True)
         send.assert_not_called()
         self.assertContains(response, "Demo: Ihr Rückrufwunsch wurde nur simuliert.")

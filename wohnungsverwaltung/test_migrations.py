@@ -69,7 +69,7 @@ class RaumstammMigrationTests(TransactionTestCase):
 
 
 class RentalAndGlobalSettingsMigrationTests(TransactionTestCase):
-    merge_target = ("immobilien", "0037_merge_rental_completion_and_global_settings")
+    merge_target = ("immobilien", "0038_merge_mail_settings_and_rental_completion")
 
     def setUp(self):
         super().setUp()
@@ -153,3 +153,29 @@ class RentalAndGlobalSettingsMigrationTests(TransactionTestCase):
         saved_application = apps.get_model("immobilien", "Bewerbung").objects.get(pk=application.pk)
         self.assertEqual(saved_application.accepted_at, application.accepted_at)
         self.assertFalse(apps.get_model("immobilien", "GlobalSettings").objects.exists())
+
+    def test_upgrade_from_mail_branch_preserves_addresses_and_test_cooldown(self):
+        apps = self.migrate_to(("immobilien", "0037_mail_settings"))
+        recipients = ["first@example.test", "second@example.test"]
+        apps.get_model("immobilien", "GlobalSettings").objects.create(
+            optional_user_emails_enabled=False,
+            callback_recipients=recipients,
+            reply_to="reply@example.test",
+            version=5,
+        )
+        account = apps.get_model("auth", "User").objects.create(username="migration-mail-admin")
+        next_allowed = timezone.now()
+        apps.get_model("immobilien", "MailTestAttempt").objects.create(
+            account_id=account.pk, next_allowed_at=next_allowed
+        )
+
+        apps = self.migrate_to(self.merge_target)
+
+        settings = apps.get_model("immobilien", "GlobalSettings").objects.get(pk=1)
+        self.assertEqual(settings.callback_recipients, recipients)
+        self.assertEqual(settings.reply_to, "reply@example.test")
+        self.assertFalse(settings.optional_user_emails_enabled)
+        self.assertEqual(settings.version, 5)
+        attempt = apps.get_model("immobilien", "MailTestAttempt").objects.get(pk=account.pk)
+        self.assertEqual(attempt.next_allowed_at, next_allowed)
+        self.assertFalse(apps.get_model("immobilien", "Rental").objects.exists())
