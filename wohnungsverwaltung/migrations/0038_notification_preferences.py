@@ -42,7 +42,7 @@ def restore_switch(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("immobilien", "0036_merge_application_acceptance_and_global_settings"),
+        ("immobilien", "0037_mail_settings"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

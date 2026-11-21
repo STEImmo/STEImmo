@@ -88,6 +88,7 @@ class ViewingTests(TestCase):
         )
 
     def test_schedule_assigns_only_selected_application_and_sends_after_commit(self):
+        GlobalSettings.objects.create(reply_to="reply@example.test")
         with self.captureOnCommitCallbacks(execute=False) as callbacks:
             response = self.client.post(self.create_url, self.payload())
         self.assertEqual(response.status_code, 302)
@@ -101,6 +102,8 @@ class ViewingTests(TestCase):
         for callback in callbacks:
             callback()
         self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.application.person.email])
+        self.assertEqual(mail.outbox[0].reply_to, ["reply@example.test"])
         self.assertIn(reverse("wohnungsverwaltung:pre_application_list"), mail.outbox[0].body)
         self.assertNotIn("Interne Terminnotiz", mail.outbox[0].body)
         event = appointment.events.get(kind="created")
@@ -425,7 +428,9 @@ class ViewingTests(TestCase):
         self.assertNotIn("Grundriss", mail.outbox[-1].body)
 
     def test_mail_failure_keeps_appointment_and_retry_only_sends_current_notice(self):
-        with patch("wohnungsverwaltung.viewings.send_mail", side_effect=OSError("smtp down")):
+        with patch(
+            "wohnungsverwaltung.viewings.send_repliable_mail", side_effect=OSError("smtp down")
+        ):
             appointment = self.schedule()
         notice = appointment.events.get(kind="created")
         self.assertEqual(notice.notification_status, "failed")
@@ -1003,7 +1008,7 @@ class ViewingProposalTests(TestCase):
             self.client.post(self.create_url, self.payload())
         event = self.application.viewings.get().events.get(notification_status="pending")
         policy = GlobalSettings.objects.create(user_mail_types={"viewing_invited": False})
-        with patch("wohnungsverwaltung.viewings.send_mail") as send:
+        with patch("wohnungsverwaltung.viewings.send_repliable_mail") as send:
             for callback in callbacks:
                 callback()
             event.refresh_from_db()

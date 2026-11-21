@@ -11,7 +11,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.mail import EmailMessage, send_mail
+from django.core.mail import EmailMessage
 from django.core.paginator import Paginator
 from django.core.validators import validate_email
 from django.db import DatabaseError, IntegrityError, transaction
@@ -44,6 +44,8 @@ from django.utils import timezone
 from django.utils.crypto import salted_hmac
 from django.views.decorators.cache import never_cache
 from PIL import Image
+
+from core.mail_settings import send_repliable_mail
 
 from .access import (
     APPLICANT_ACCESS_PERMISSION,
@@ -1809,11 +1811,8 @@ def employee_application_suitability_approve(
 
 @transaction.atomic
 def _send_application_invitation(application: Bewerbung, actor, base_url: str) -> str:
-    application = (
-        Bewerbung.objects.select_for_update(of=("self",))
-        .select_related("person__user", "wohnung")
-        .get(pk=application.pk)
-    )
+    # Related rows read by a join can predate the end of a lock wait.
+    application = Bewerbung.objects.select_for_update().get(pk=application.pk)
     if (
         not application.main_application_unlocked
         or application.submitted_at is not None
@@ -1845,7 +1844,7 @@ def _send_application_invitation(application: Bewerbung, actor, base_url: str) -
         f"Zur Hauptbewerbung: {base_url}{detail_url}\n"
     )
     try:
-        sent = send_mail(subject, body, None, [recipient], fail_silently=False)
+        sent = send_repliable_mail(subject, body, [recipient])
     except Exception:
         sent = 0
     kind = (

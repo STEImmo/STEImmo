@@ -7,6 +7,7 @@
     <div class="uk-container uk-container-small">
         {% include "wohnungsverwaltung/_workspace_navigation.html" %}
         <h1>Nutzer-Benachrichtigungen</h1>
+        <p><a href="{% url 'verwaltung:mail_settings' %}">Mailadressen</a></p>
         <p>Freigaben für einzelne E-Mail-Arten an Bewerber und Mieter. Eine ausgeschaltete Mailart bleibt auch bei persönlicher Auswahl „An“ gesperrt.</p>
         {% include "partials/_notification_form.html" %}
     </div>

@@ -8,6 +8,8 @@ from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 
+from core.mail_settings import send_repliable_mail
+
 from .access import EMPLOYEE_ACCESS_PERMISSION
 from .models import (
     ApplicationReviewEvent,
@@ -162,7 +164,10 @@ def send_viewing_notification(event_id, actor=None):
                 results[key] = "suppressed"
                 continue
             try:
-                sent = send_mail(subject, body, None, [recipient.email], fail_silently=False)
+                if mail_type in ("viewing_cancelled", "viewing_proposal_changed"):
+                    sent = send_mail(subject, body, None, [recipient.email])
+                else:
+                    sent = send_repliable_mail(subject, body, [recipient.email])
             except Exception:
                 logger.warning("Terminbenachrichtigung konnte nicht versendet werden.")
                 sent = False

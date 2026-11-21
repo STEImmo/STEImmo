@@ -1,7 +1,10 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from html.parser import HTMLParser
 from io import BytesIO
+from queue import Queue
 from tempfile import TemporaryDirectory
+from time import monotonic, sleep
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
@@ -10,8 +13,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import connection
-from django.test import Client, TestCase
+from django.db import connection, connections, transaction
+from django.test import Client, TestCase, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -25,6 +28,7 @@ from .models import (
     Bewerbung,
     BewerbungStatus,
     BewerbungStellplatz,
+    GlobalSettings,
     Person,
     Stellplatz,
     StellplatzTyp,
@@ -922,6 +926,7 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.assertNotContains(response, "Hoch")
 
     def test_invitation_unlocks_only_selected_application_and_sends_email(self):
+        GlobalSettings.objects.create(reply_to="reply@example.test")
         self.record_completed_viewing(self.match)
         person = self.match.person
         person.user = self.applicant_user
@@ -939,6 +944,8 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.occupancy_exception.refresh_from_db()
         self.assertTrue(self.match.main_application_unlocked)
         self.assertFalse(self.occupancy_exception.main_application_unlocked)
+        self.assertEqual(mail.outbox[0].to, [self.applicant_user.email])
+        self.assertEqual(mail.outbox[0].reply_to, ["reply@example.test"])
         self.assertEqual(len(mail.outbox), 1)
         self.assertTrue(
             ApplicationReviewEvent.objects.filter(
@@ -960,7 +967,9 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.match.person.user = self.applicant_user
         self.match.person.save(update_fields=["user"])
         invite_url = reverse("wohnungsverwaltung:employee_application_invite", args=[self.match.pk])
-        with patch("wohnungsverwaltung.views.send_mail", side_effect=OSError("smtp down")):
+        with patch(
+            "wohnungsverwaltung.views.send_repliable_mail", side_effect=OSError("smtp down")
+        ):
             self.client.post(
                 invite_url,
                 {
@@ -984,7 +993,9 @@ class EmployeeApplicationSelectionTests(TestCase):
         resend_url = reverse(
             "wohnungsverwaltung:employee_application_invitation_resend", args=[self.match.pk]
         )
-        with patch("wohnungsverwaltung.views.send_mail", return_value=1) as send_mail_mock:
+        with patch(
+            "wohnungsverwaltung.views.send_repliable_mail", return_value=1
+        ) as send_mail_mock:
             response = self.client.post(resend_url)
         self.assertEqual(response.status_code, 302)
         send_mail_mock.assert_called_once()
@@ -1017,7 +1028,7 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.assertTrue(self.match.review_events.filter(kind="invitation_suppressed").exists())
         policy.user_mail_types = {}
         policy.save()
-        with patch("wohnungsverwaltung.views.send_mail") as send:
+        with patch("wohnungsverwaltung.views.send_repliable_mail") as send:
             self.client.post(
                 reverse(
                     "wohnungsverwaltung:employee_application_invitation_resend",
@@ -1041,3 +1052,55 @@ class EmployeeApplicationSelectionTests(TestCase):
         self.match.refresh_from_db()
         self.assertEqual(self.match.review_priority, Bewerbung.Priority.UNRATED)
         self.assertFalse(ApplicationReviewEvent.objects.filter(application=self.match).exists())
+
+
+class ConcurrentInvitationTests(TransactionTestCase):
+    def test_waiting_invitation_checks_account_after_application_lock(self):
+        from .views import _send_application_invitation
+
+        account = get_user_model().objects.create_user(
+            username="waiting-invitation", email="recipient@example.test"
+        )
+        account.groups.add(Group.objects.get(name=ROLE_APPLICANT))
+        unit = Wohnung.objects.create(gebaeudenummer="1", wohnungsnummer="waiting-invitation")
+        application = EmployeeDashboardTests.create_application(unit)
+        application.person.user = account
+        application.person.save(update_fields=["user"])
+        application.main_application_unlocked = True
+        application.save(update_fields=["main_application_unlocked"])
+        worker_pid = Queue()
+
+        def send_invitation():
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT pg_backend_pid()")
+                    worker_pid.put(cursor.fetchone()[0])
+                return _send_application_invitation(application, None, "https://example.test")
+            finally:
+                connections.close_all()
+
+        with (
+            patch("wohnungsverwaltung.views.send_repliable_mail") as send,
+            ThreadPoolExecutor(max_workers=1) as executor,
+        ):
+            with transaction.atomic():
+                Bewerbung.objects.select_for_update().get(pk=application.pk)
+                future = executor.submit(send_invitation)
+                pid = worker_pid.get(timeout=5)
+                deadline = monotonic() + 5
+                with connection.cursor() as cursor:
+                    while True:
+                        cursor.execute("SELECT pg_backend_pid() = ANY(pg_blocking_pids(%s))", [pid])
+                        if cursor.fetchone()[0]:
+                            break
+                        if monotonic() >= deadline:
+                            self.fail("Der Versand wartet nicht auf die Bewerbungssperre.")
+                        sleep(0.01)
+                account.is_active = False
+                account.save(update_fields=["is_active"])
+            self.assertEqual(future.result(timeout=5), "suppressed")
+        send.assert_not_called()
+        self.assertEqual(
+            list(application.review_events.values_list("kind", flat=True)),
+            [ApplicationReviewEvent.Kind.INVITATION_SUPPRESSED],
+        )

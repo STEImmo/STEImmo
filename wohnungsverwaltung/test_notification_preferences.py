@@ -89,9 +89,9 @@ class NotificationPreferenceTests(TestCase):
 class NotificationPolicyMigrationTests(TransactionTestCase):
     def test_existing_switch_populates_every_mail_type(self):
         # Keep the live test schema at the latest migration for teardown.
-        before = ("immobilien", "0036_merge_application_acceptance_and_global_settings")
-        after = ("immobilien", "0037_notification_preferences")
-        migration = import_module("wohnungsverwaltung.migrations.0037_notification_preferences")
+        before = ("immobilien", "0037_mail_settings")
+        after = ("immobilien", "0038_notification_preferences")
+        migration = import_module("wohnungsverwaltung.migrations.0038_notification_preferences")
         self.assertEqual(set(migration.MAIL_TYPES), set(USER_MAIL_TYPES))
         try:
             for enabled in (True, False):
@@ -101,9 +101,14 @@ class NotificationPolicyMigrationTests(TransactionTestCase):
                     "immobilien", "GlobalSettings"
                 )
                 settings_model.objects.update_or_create(
-                    pk=1, defaults={"optional_user_emails_enabled": enabled}
+                    pk=1,
+                    defaults={
+                        "optional_user_emails_enabled": enabled,
+                        "reply_to": "reply@example.test",
+                    },
                 )
                 MigrationExecutor(connection).migrate([after])
+                self.assertEqual(GlobalSettings.objects.get().reply_to, "reply@example.test")
                 self.assertEqual(
                     GlobalSettings.objects.get().user_mail_types,
                     dict.fromkeys(USER_MAIL_TYPES, enabled),
