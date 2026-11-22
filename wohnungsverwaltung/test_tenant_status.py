@@ -249,6 +249,32 @@ class TenantProfileStatusTests(TestCase):
         self.assertContains(response, "Vermietung abgeschlossen.")
         self.assertContains(response, self.contract_url)
 
+    def test_first_completion_after_applicant_permission_check_shows_completed_rental(self):
+        self.assertFalse(self.applicant.groups.filter(name=ROLE_TENANT).exists())
+        original_has_perm = type(self.applicant).has_perm
+        completed = False
+
+        def complete_after_permission_check(account, permission, obj=None):
+            nonlocal completed
+            allowed = original_has_perm(account, permission, obj)
+            if (
+                account.pk == self.applicant.pk
+                and permission == APPLICANT_ACCESS_PERMISSION
+                and not completed
+            ):
+                completed = True
+                self.complete_as_employee()
+            return allowed
+
+        with patch.object(type(self.applicant), "has_perm", complete_after_permission_check):
+            response = self.client.get(self.profile_url)
+
+        self.assertTrue(completed)
+        self.assertContains(response, str(self.unit))
+        self.assertContains(response, "Wohnungsstatus:")
+        self.assertContains(response, self.contract_url)
+        self.assertNotContains(response, "Der Vermietungsabschluss steht noch aus.")
+
     def test_completion_between_profile_queries_keeps_acceptance_or_rental_visible(self):
         self.applicant.groups.add(Group.objects.get(name=ROLE_TENANT))
         original_fetch = QuerySet._fetch_all

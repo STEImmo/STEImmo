@@ -108,6 +108,8 @@ def personal_profile(request):
             .order_by("-accepted_at", "-created_at")
         )
     rentals = ()
+    # Completion can grant tenant access after the applicant check cached permissions.
+    account = get_user_model().objects.get(pk=account.pk)
     if account.has_perm(TENANT_ACCESS_PERMISSION):
         rentals = list(
             Rental.objects.for_tenant(account)

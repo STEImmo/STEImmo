@@ -39,6 +39,11 @@ So bleibt bei einem Abschluss zwischen den Abfragen mindestens eine der beiden
 Anzeigen erhalten, ohne gleichzeitig eine offene und eine abgeschlossene
 Vermietung für dieselbe Bewerbung auszugeben.
 
+Vor der Mieterberechtigungsprüfung wird das Konto erneut geladen. So wird auch
+eine beim ersten Abschluss zwischen Bewerberprüfung und Zusageabfrage neu
+vergebene Mieterrolle berücksichtigt, ohne den vorherigen Berechtigungscache
+weiterzuverwenden. Ein Regressionstest startet dafür mit einem reinen Bewerberkonto.
+
 Der Wohnungsstatus wird aus dem bestehenden Wohnungsdatensatz gelesen. Spätere
 Änderungen zu Verfügbar oder Gesperrt werden ebenfalls angezeigt; aus einem alten
 Vermietungsabschluss wird nicht pauschal Vermietet abgeleitet. Vertragsbytes werden
