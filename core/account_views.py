@@ -154,7 +154,9 @@ def email_change(request):
                 )
     # Deliver after releasing the account/person row locks.
     if code is not None:
-        if views._deliver_verification_code(send_email_code, pending.new_email, code):
+        if views._deliver_verification_code(
+            send_email_code, pending.new_email, code, purpose="email_change"
+        ):
             messages.success(
                 request, "Wir haben einen Bestätigungscode an Ihre neue E-Mail-Adresse gesendet."
             )

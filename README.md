@@ -297,6 +297,16 @@ absichtlich öffentlichen Beispielzugangsdaten sind ausschließlich für die lok
 
 Für den Produktivbetrieb wird der SMTP-Backend über Umgebungsvariablen konfiguriert: `DJANGO_EMAIL_BACKEND`, `DJANGO_DEFAULT_FROM_EMAIL`, `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT`, `DJANGO_EMAIL_HOST_USER`, `DJANGO_EMAIL_HOST_PASSWORD`, `DJANGO_EMAIL_USE_TLS` und `DJANGO_EMAIL_TIMEOUT`. Der SMTP-Timeout beträgt standardmäßig zehn Sekunden und kann über `DJANGO_EMAIL_TIMEOUT` in Sekunden angepasst werden. Zugangsdaten gehören ausschließlich in die nicht versionierte Serverkonfiguration.
 
+Bei einem Mailfehler bleibt ein neu registriertes Konto unbestätigt. Die Bestätigungsseite
+erklärt den fehlgeschlagenen Versand; nach einer Minute kann ein neuer Code angefordert
+werden. Die erneute Anforderung zeigt unabhängig von Kontostand und Versandresultat
+denselben neutralen Hinweis statt einer Versandbestätigung. Ein neuer Code ersetzt den
+vorherigen. Scheitert der Mitarbeiter-Einmalcode, bleibt die Anmeldung unvollständig und
+kann mit dem Passwort erneut begonnen werden; MFA wird dabei nicht umgangen.
+Bereinigte Warnungen im Log unterscheiden Registrierung, erneute Codeanforderung und
+Mitarbeiteranmeldung. Diagnose und betriebliche Abhilfe beschreibt
+[ADR-0026](docs/decisions/0026-e-mail-benachrichtigungen.md#sicherheitscodes-bei-mailstörungen-issue-189).
+
 ## Kontakt und Rückrufwünsche
 
 Unter [Kontakt](http://localhost:8000/kontakt/) können Besucher ohne Konto ihre
