@@ -5,12 +5,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core import mail
 from django.db import transaction
-from django.template.loader import render_to_string
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .access import ROLE_APPLICANT, ROLE_EMPLOYEE, ROLE_TENANT
+from .access import ROLE_APPLICANT, ROLE_EMPLOYEE, ROLE_GLOBAL_SETTINGS, ROLE_TENANT
 from .decision_notifications import deliver_decision_notification, queue_decision_notification
 from .models import (
     AbnahmeStatus,
@@ -18,6 +17,7 @@ from .models import (
     Bewerbung,
     BewerbungStatus,
     DecisionNotification,
+    GlobalSettings,
     NotificationPreference,
     Person,
     Protokoll,
@@ -26,7 +26,7 @@ from .models import (
     UebergabeStatus,
     Wohnung,
 )
-from .notification_preferences import USER_GROUPS
+from .notification_preferences import STAFF_GROUPS, USER_GROUPS, USER_MAIL_TYPES
 
 
 @override_settings(
@@ -86,44 +86,6 @@ class DecisionNotificationTests(TestCase):
         self.assertEqual(notice.status, DecisionNotification.Status.SUPPRESSED)
         self.assertEqual(mail.outbox, [])
 
-    def test_personal_disable_then_enable_retires_retry(self):
-        self.accept()
-        notice = DecisionNotification.objects.get()
-        error = SMTPRecipientsRefused({self.applicant.email: (450, b"temporary")})
-        with patch("wohnungsverwaltung.decision_notifications.send_mail", side_effect=error):
-            deliver_decision_notification(notice.pk)
-        notice.refresh_from_db()
-        self.assertEqual((notice.status, notice.attempts), ("retry", 1))
-        self.client.force_login(self.applicant)
-        url = reverse("profile:notifications")
-        choices = dict.fromkeys(USER_GROUPS, "default")
-        for version, choice in enumerate(("off", "on")):
-            choices["application_decisions"] = choice
-            self.assertEqual(
-                self.client.post(url, {"version": version, **choices}).status_code, 302
-            )
-        deliver_decision_notification(notice.pk)
-        notice.refresh_from_db()
-        self.assertEqual((notice.status, notice.attempts), ("suppressed", 1))
-        self.assertEqual(mail.outbox, [])
-
-    def test_owner_change_during_render_prevents_disclosure(self):
-        self.accept()
-        notice = DecisionNotification.objects.get()
-
-        def render_after_reassignment(*args, **kwargs):
-            Person.objects.filter(pk=self.person.pk).update(user=self.other)
-            return render_to_string(*args, **kwargs)
-
-        with patch(
-            "wohnungsverwaltung.decision_notifications.render_to_string",
-            side_effect=render_after_reassignment,
-        ):
-            deliver_decision_notification(notice.pk)
-        notice.refresh_from_db()
-        self.assertEqual(notice.status, "suppressed")
-        self.assertEqual(mail.outbox, [])
-
     def test_withdrawal_sends_once_to_authorized_staff(self):
         self.client.force_login(self.applicant)
         url = reverse("wohnungsverwaltung:application_withdraw", args=[self.application.pk])
@@ -180,8 +142,8 @@ class DecisionNotificationTests(TestCase):
         self.application.refresh_from_db()
         self.assertIsNotNone(self.application.accepted_at)
 
-        choice = NotificationPreference.objects.create(
-            account=self.applicant, choices={"application_decisions": "off"}
+        choice, _ = NotificationPreference.objects.update_or_create(
+            account=self.applicant, defaults={"choices": {"application_decisions": "off"}}
         )
         deliver_decision_notification(notice.pk)
         choice.delete()
@@ -190,6 +152,88 @@ class DecisionNotificationTests(TestCase):
         self.assertEqual(notice.status, DecisionNotification.Status.SUPPRESSED)
         self.assertEqual(notice.attempts, 1)
         self.assertEqual(mail.outbox, [])
+
+    def test_switching_personal_category_off_and_on_suppresses_retry(self):
+        self.accept()
+        notice = DecisionNotification.objects.get()
+        states = DecisionNotification.Status
+        with patch(
+            "wohnungsverwaltung.decision_notifications.send_mail",
+            side_effect=SMTPDataError(451, b"temporary"),
+        ):
+            deliver_decision_notification(notice.pk)
+        notice.refresh_from_db()
+        self.assertEqual(notice.status, states.RETRY)
+
+        self.client.force_login(self.applicant)
+        url = reverse("profile:notifications")
+        choices = dict.fromkeys(USER_GROUPS, "default")
+        for version, choice in enumerate(("off", "on")):
+            self.assertRedirects(
+                self.client.post(
+                    url, {**choices, "version": version, "application_decisions": choice}
+                ),
+                url,
+            )
+        deliver_decision_notification(notice.pk)
+        notice.refresh_from_db()
+        self.assertEqual(notice.status, states.SUPPRESSED)
+        self.assertEqual(notice.attempts, 1)
+        self.assertEqual(mail.outbox, [])
+
+    def test_switching_staff_category_off_and_on_suppresses_pending_withdrawal(self):
+        self.client.force_login(self.applicant)
+        withdraw_url = reverse(
+            "wohnungsverwaltung:application_withdraw", args=[self.application.pk]
+        )
+        self.assertEqual(self.client.post(withdraw_url).status_code, 302)
+        notice = DecisionNotification.objects.get()
+
+        self.client.force_login(self.employee)
+        url = reverse("profile:notifications")
+        choices = {key: "on" for key in STAFF_GROUPS if key != "application_changes"}
+        self.assertRedirects(self.client.post(url, {**choices, "version": 0}), url)
+        self.assertRedirects(
+            self.client.post(url, {**choices, "version": 1, "application_changes": "on"}), url
+        )
+        deliver_decision_notification(notice.pk)
+        notice.refresh_from_db()
+        self.assertEqual(notice.status, DecisionNotification.Status.SUPPRESSED)
+        self.assertEqual(mail.outbox, [])
+
+    def test_switching_global_mail_type_off_and_on_suppresses_pending_decision(self):
+        self.accept()
+        notice = DecisionNotification.objects.get()
+        self.employee.groups.add(Group.objects.get(name=ROLE_GLOBAL_SETTINGS))
+        self.client.force_login(self.employee)
+        url = reverse("verwaltung:global_settings")
+        version = GlobalSettings.objects.get(pk=1).version
+        choices = {key: "on" for key in USER_MAIL_TYPES if key != "application_accepted"}
+        self.assertRedirects(self.client.post(url, {**choices, "version": version}), url)
+        self.assertRedirects(
+            self.client.post(
+                url, {**choices, "version": version + 1, "application_accepted": "on"}
+            ),
+            url,
+        )
+        deliver_decision_notification(notice.pk)
+        notice.refresh_from_db()
+        self.assertEqual(notice.status, DecisionNotification.Status.SUPPRESSED)
+        self.assertEqual(mail.outbox, [])
+
+    def test_temporary_recipient_rejection_retries_up_to_limit(self):
+        self.accept()
+        notice = DecisionNotification.objects.get()
+        error = SMTPRecipientsRefused({self.applicant.email: (450, b"temporary")})
+        states = DecisionNotification.Status
+        with patch(
+            "wohnungsverwaltung.decision_notifications.send_mail", side_effect=error
+        ) as send:
+            for expected in (states.RETRY, states.RETRY, states.FAILED, states.FAILED):
+                deliver_decision_notification(notice.pk)
+                notice.refresh_from_db()
+                self.assertEqual(notice.status, expected)
+        self.assertEqual(send.call_count, 3)
 
     def test_initial_opt_out_prevents_queueing_for_delivery(self):
         preference = NotificationPreference.objects.create(
@@ -222,6 +266,38 @@ class DecisionNotificationTests(TestCase):
         Person.objects.filter(pk=self.person.pk).update(user=self.other)
         deliver_decision_notification(DecisionNotification.objects.get().pk)
         self.assertEqual(mail.outbox, [])
+
+    def test_owner_change_during_render_prevents_delivery(self):
+        self.accept()
+        notice = DecisionNotification.objects.get()
+
+        def reassign(*args, **kwargs):
+            Person.objects.filter(pk=self.person.pk).update(user=self.other)
+            return "<p>Gerenderte Nachricht</p>"
+
+        with patch(
+            "wohnungsverwaltung.decision_notifications.render_to_string", side_effect=reassign
+        ):
+            deliver_decision_notification(notice.pk)
+        notice.refresh_from_db()
+        self.assertEqual(notice.status, DecisionNotification.Status.SUPPRESSED)
+        self.assertEqual(mail.outbox, [])
+
+    def test_address_change_during_render_uses_current_account_address(self):
+        self.accept()
+        notice = DecisionNotification.objects.get()
+        address = "updated@example.test"
+
+        def change_address(*args, **kwargs):
+            get_user_model().objects.filter(pk=self.applicant.pk).update(email=address)
+            return "<p>Gerenderte Nachricht</p>"
+
+        with patch(
+            "wohnungsverwaltung.decision_notifications.render_to_string", side_effect=change_address
+        ):
+            deliver_decision_notification(notice.pk)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [address])
 
     def test_handover_requires_an_own_verified_pdf(self):
         self.applicant.groups.add(Group.objects.get(name=ROLE_TENANT))

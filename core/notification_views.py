@@ -12,7 +12,7 @@ from wohnungsverwaltung.notification_forms import PersonalNotificationForm
 from wohnungsverwaltung.notification_preferences import (
     STAFF_GROUPS,
     USER_GROUPS,
-    suppress_disabled_personal_notifications,
+    suppress_personal_decision_notifications,
 )
 
 
@@ -40,12 +40,18 @@ def notifications(request):
                         else:
                             choices[key] = value
                     if choices != current.choices:
-                        suppress_disabled_personal_notifications(account, current.choices, choices)
+                        disabled_groups = {
+                            key
+                            for key, value in choices.items()
+                            if value == "off" and current.choices.get(key) != "off"
+                        }
                         if choices.get("user_reminders") != current.choices.get("user_reminders"):
                             current.reminders_changed_at = timezone.now()
                         current.choices = choices
                         current.version += 1
                         current.save(update_fields=["choices", "version", "reminders_changed_at"])
+                        if disabled_groups:
+                            suppress_personal_decision_notifications(account, disabled_groups)
             if status != 409:
                 messages.success(request, "Einstellungen gespeichert.")
                 return redirect("profile:notifications")
