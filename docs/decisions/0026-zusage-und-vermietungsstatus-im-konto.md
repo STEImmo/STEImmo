@@ -95,3 +95,12 @@ Datenerhalt bis zu diesem gemeinsamen Stand.
 Nach Integration der Entscheidungsbenachrichtigungen aus #212 verbindet die leere
 Migration `0042_merge_decision_notifications_and_tenant_status` deren Stand mit
 dem Zusagezweig. Die Upgrade-Tests laufen bis zu diesem gemeinsamen Stand.
+
+Nach den Merges von #203/#204 und #183 verbindet die leere Migration
+`0044_merge_staff_digest_and_tenant_status` die Endpunkte
+`0042_merge_decision_notifications_and_tenant_status` und `0043_staff_digest`.
+Bereits veröffentlichte Migrationen bleiben unverändert. Die Upgrade-Tests
+laufen bis zu diesem gemeinsamen Stand und prüfen aus beiden Zweigen den Erhalt
+vorhandener Benachrichtigungen, persönlicher Einstellungen, des Zeitpunkts der
+Erinnerungsauswahl und vorgemerkter Aufgaben der Tageszusammenfassung. Die
+bestehenden Prüfungen für Verträge und Kontozuordnungen bleiben erhalten.
