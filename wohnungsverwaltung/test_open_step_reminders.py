@@ -120,6 +120,31 @@ class OpenStepReminderTests(TestCase):
         self.assertEqual((notice.status, notice.attempts), ("suppressed", 0))
         self.assertEqual(mail.outbox, [])
 
+    def test_global_reenable_only_allows_future_due_tasks(self):
+        manager = get_user_model().objects.create_user("settings-manager")
+        manager.groups.add(Group.objects.get(name=ROLE_GLOBAL_SETTINGS))
+        self.client.force_login(manager)
+        url = reverse("verwaltung:global_settings")
+        choices = dict.fromkeys(USER_MAIL_TYPES, "on")
+        choices.pop(MAIN_REMINDER)
+        with patch("django.utils.timezone.now", return_value=self.now - timedelta(hours=1)):
+            self.assertEqual(self.client.post(url, {"version": 0, **choices}).status_code, 302)
+        choices[MAIN_REMINDER] = "on"
+        with patch("django.utils.timezone.now", return_value=self.now + timedelta(hours=1)):
+            self.assertEqual(self.client.post(url, {"version": 1, **choices}).status_code, 302)
+
+        run_at = self.now + timedelta(hours=2)
+        self.assertFalse(DecisionNotification.objects.exists())
+        self.assertIn("0 neue", self.run_command(send=False, now=run_at))
+        self.run_command(now=run_at)
+        self.assertEqual(DecisionNotification.objects.get().status, "suppressed")
+        self.assertEqual(mail.outbox, [])
+
+        with patch("django.utils.timezone.now", return_value=run_at):
+            self.application.review_events.create(kind=ApplicationReviewEvent.Kind.MAIN_UNLOCKED)
+        self.run_command(now=run_at + timedelta(hours=48))
+        self.assertEqual(len(mail.outbox), 1)
+
     def test_enabling_after_due_does_not_backfill_and_role_is_required(self):
         NotificationPreference.objects.create(
             account=self.account, reminders_changed_at=self.now + timedelta(seconds=1)

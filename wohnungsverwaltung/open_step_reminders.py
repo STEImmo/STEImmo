@@ -9,6 +9,7 @@ from .models import (
     ApplicationReviewEvent,
     Bewerbung,
     BewerbungStatus,
+    GlobalSettingsChange,
     NotificationPreference,
     ViewingAppointment,
     ViewingAppointmentEvent,
@@ -60,6 +61,11 @@ def current_task(application, now):
 
 def reminder_allowed(account, kind, due_at):
     if not mail_allowed(account, kind):
+        return False
+    # A currently enabled type changed after maturity only if it was re-enabled.
+    if GlobalSettingsChange.objects.filter(
+        changed_at__gt=due_at, changed_fields__contains=[kind]
+    ).exists():
         return False
     return not NotificationPreference.objects.filter(
         account=account, reminders_changed_at__gt=due_at

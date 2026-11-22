@@ -14,7 +14,10 @@ Versand und Wiederholung verwenden den bestehenden Benachrichtigungsverlauf.
 Die Ereignis-ID begrenzt die Erinnerung je Aufgabe auf eine Empfängerzuordnung.
 Die aktuell zugeordnete Person benötigt Bewerberzugriff und die Mailart muss
 gemäß #205 aktiv sein. Eine Änderung der persönlichen Auswahl nach Fälligkeit
-holt eine bereits fällige Erinnerung nicht nach. Ohne historisches
+holt eine bereits fällige Erinnerung nicht nach. Bei globaler Wiederfreigabe
+gilt dasselbe für die betroffene Mailart, auch ohne vorherigen Erinnerungslauf.
+Der vorhandene Einstellungsverlauf liefert den Zeitpunkt der Wiederfreigabe.
+Ohne historisches
 Freischalt- oder Terminereignis fehlt ein belastbarer Beginn der Wartephase.
 
 `python manage.py remind_open_steps` zeigt eine Vorschau ohne Änderungen.
