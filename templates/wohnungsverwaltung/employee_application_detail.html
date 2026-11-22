@@ -20,6 +20,7 @@
         <article class="management-panel uk-card uk-card-default uk-card-body uk-text-break">
             <span class="uk-label{% if not application.interest_withdrawn_at %}{% if application.status == 'declined' or application.status == 'blocked' %} uk-label-danger{% endif %}{% endif %}">{{ application.get_applicant_status_display }}</span>
             <h1 class="uk-card-title">{{ application.person }} – {{ application.wohnung }}</h1>
+            <p><strong>Nächster Akteur:</strong> {{ application.get_next_actor_display }}<br><strong>Nächster Schritt:</strong> {{ application.get_employee_next_step }}</p>
             <h2 class="uk-h3">Besichtigungsanfrage</h2>
             <p>Eingang der Besichtigungsanfrage: {{ application.created_at|date:"d.m.Y, H:i" }} Uhr</p>
             <dl class="management-facts uk-description-list">
@@ -50,6 +51,15 @@
             </dl>
         </article>
 
+        {% if application.notifications.all %}
+        <article class="uk-card uk-card-default uk-card-body uk-margin-top">
+            <h2 class="uk-h3">Prozessbenachrichtigungen</h2>
+            <p>Der Versandstatus ändert keine Aufgabe. Unklare oder noch reservierte Versandergebnisse vor einer weiteren Kontaktaufnahme prüfen.</p>
+            <ul class="uk-list uk-list-divider">{% for notice in application.notifications.all %}
+                <li>{{ notice.created_at|date:"d.m.Y, H:i" }} · {{ notice.get_kind_display }} · Konto {{ notice.recipient_id }} · {{ notice.get_status_display }} (Versuche: {{ notice.attempts }})</li>
+            {% endfor %}</ul>
+        </article>
+        {% endif %}
         {% include "wohnungsverwaltung/_employee_application_acceptance.html" %}
         {% include "wohnungsverwaltung/_employee_rental_completion.html" %}
         {% include "wohnungsverwaltung/_employee_viewings.html" %}

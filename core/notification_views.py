@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.shortcuts import redirect, render
@@ -9,6 +10,7 @@ from django.views.decorators.http import require_http_methods
 from wohnungsverwaltung.models import NotificationPreference
 from wohnungsverwaltung.notification_forms import PersonalNotificationForm
 from wohnungsverwaltung.notification_preferences import STAFF_GROUPS, USER_GROUPS
+from wohnungsverwaltung.notifications import suppress_process_notifications
 
 
 @never_cache
@@ -22,6 +24,7 @@ def notifications(request):
         form = PersonalNotificationForm(request.POST, account=account)
         if form.is_valid():
             with transaction.atomic():
+                get_user_model().objects.select_for_update().get(pk=account.pk)
                 current, _ = NotificationPreference.objects.select_for_update().get_or_create(
                     account=account
                 )
@@ -30,6 +33,8 @@ def notifications(request):
                 else:
                     choices = current.choices.copy()
                     for key, value in form.preferences().items():
+                        if value == "off":
+                            suppress_process_notifications(recipient=account, groups=(key,))
                         if value == ("on" if key in STAFF_GROUPS else "default"):
                             choices.pop(key, None)
                         else:

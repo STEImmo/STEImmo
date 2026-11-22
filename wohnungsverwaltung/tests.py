@@ -3764,7 +3764,11 @@ class MainApplicationMutationLockTests(TransactionTestCase):
         client.force_login(self.applicant_user)
 
         def observe_lock(execute, sql, params, many, context):
-            if "FOR UPDATE" in sql.upper() and lock_requested is not None:
+            # Mutations now acquire the shared mail-handoff advisory lock before
+            # the application row lock. Observe the first blocking boundary.
+            if lock_requested is not None and (
+                "FOR UPDATE" in sql.upper() or "pg_advisory_xact_lock" in sql
+            ):
                 lock_requested.set()
             return execute(sql, params, many, context)
 
