@@ -17,6 +17,7 @@ from wohnungsverwaltung.open_step_reminders import (
     open_applications,
     reminder_allowed,
 )
+from wohnungsverwaltung.staff_digest import DIGEST_KIND, digest_candidates, queue_digest
 
 
 class Command(BaseCommand):
@@ -63,7 +64,20 @@ class Command(BaseCommand):
             elif allowed and not notices.filter(**key).exists():
                 due_count += 1
 
-        pending = notices.filter(status__in=(states.PENDING, states.RETRY)).order_by("pk")
+        for recipient, day, entries in digest_candidates(timezone.now()):
+            if send:
+                due_count += int(queue_digest(recipient, day, entries))
+            else:
+                due_count += 1
+                self.stdout.write(f"Verwaltungskonto {recipient.pk}, {day}")
+                for task in entries:
+                    self.stdout.write(
+                        f"  {task.reason} seit {timezone.localtime(task.since):%d.%m.%Y %H:%M}"
+                    )
+
+        pending = DecisionNotification.objects.filter(
+            kind__in=(*REMINDER_TYPES, DIGEST_KIND), status__in=(states.PENDING, states.RETRY)
+        ).order_by("pk")
         if send:
             for notice_id in pending.values_list("pk", flat=True).iterator():
                 transaction.on_commit(
