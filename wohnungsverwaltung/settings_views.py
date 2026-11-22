@@ -20,6 +20,7 @@ from .access import employee_required, global_settings_required
 from .models import GlobalSettings, GlobalSettingsChange, MailTestAttempt
 from .notification_forms import GlobalNotificationForm
 from .notification_preferences import USER_MAIL_TYPES, suppress_decision_notifications
+from .notifications import suppress_process_notifications
 
 
 @employee_required
@@ -43,12 +44,12 @@ def global_settings(request):
                         if current.user_mail_types.get(key, True) != value
                     ]
                     if changed:
+                        disabled_types = [key for key, enabled in choices.items() if not enabled]
+                        suppress_process_notifications(mail_types=disabled_types)
+                        suppress_decision_notifications(mail_types=disabled_types)
                         current.user_mail_types = choices
                         current.version += 1
                         current.save(update_fields=["user_mail_types", "version"])
-                        suppress_decision_notifications(
-                            mail_types=[key for key in changed if not choices[key]]
-                        )
                         GlobalSettingsChange.objects.create(
                             actor_account_id=request.user.pk, changed_fields=changed
                         )

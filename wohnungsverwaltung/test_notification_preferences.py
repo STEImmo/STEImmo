@@ -91,6 +91,7 @@ class NotificationPolicyMigrationTests(TransactionTestCase):
         # Keep the live test schema at the latest migration for teardown.
         before = ("immobilien", "0038_merge_rental_completion_and_mail_settings")
         after = ("immobilien", "0039_notification_preferences")
+        latest = MigrationExecutor(connection).loader.graph.leaf_nodes("immobilien")
         migration = import_module("wohnungsverwaltung.migrations.0039_notification_preferences")
         self.assertEqual(set(migration.MAIL_TYPES), set(USER_MAIL_TYPES))
         try:
@@ -114,5 +115,4 @@ class NotificationPolicyMigrationTests(TransactionTestCase):
                     dict.fromkeys(USER_MAIL_TYPES, enabled),
                 )
         finally:
-            executor = MigrationExecutor(connection)
-            executor.migrate(executor.loader.graph.leaf_nodes())
+            MigrationExecutor(connection).migrate(latest)

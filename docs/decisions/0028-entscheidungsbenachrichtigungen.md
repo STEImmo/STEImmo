@@ -1,4 +1,4 @@
-# 0027 Entscheidungs- und Abschlussbenachrichtigungen
+# 0028 Entscheidungs- und Abschlussbenachrichtigungen
 
 Optionale Hinweise für #202 greifen bestehende fachliche Übergänge und die
 Versandentscheidung aus #205 auf. Die Annahme und der ausdrückliche Vertragsversand
@@ -15,7 +15,9 @@ und Konto eindeutig gespeichert. Nach dem Commit sowie bei
 Empfängerberechtigung, Dokumentverfügbarkeit und aktueller Präferenzen geprüft.
 Eine Abwahl unterdrückt bereits vorgemerkte Meldungen zusammen mit dem Speichern
 der Einstellungen dauerhaft. Nach der HTML-Erstellung wird der Anlass mit dem
-aktuellen Konto erneut unmittelbar vor der SMTP-Übergabe geprüft.
+aktuellen Konto erneut unmittelbar vor der SMTP-Übergabe geprüft. Für
+Bewerbungsmails koordinieren #201 und #202 die Übergabe mit derselben
+Bewerbungssperre, auch beim ausdrücklichen Vertragsversand.
 Der Befehl kann durch den betrieblichen Zeitgeber aus #194 aufgerufen werden.
 HTTP-Auslöser verwenden den geprüften Request-Host. Für modellseitige Auslöser ohne
 HTTP-Request muss `DJANGO_DECISION_NOTIFICATION_ORIGIN` die öffentliche HTTPS-Adresse

@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.shortcuts import redirect, render
@@ -13,6 +14,7 @@ from wohnungsverwaltung.notification_preferences import (
     USER_GROUPS,
     suppress_personal_decision_notifications,
 )
+from wohnungsverwaltung.notifications import suppress_process_notifications
 
 
 @never_cache
@@ -26,6 +28,7 @@ def notifications(request):
         form = PersonalNotificationForm(request.POST, account=account)
         if form.is_valid():
             with transaction.atomic():
+                get_user_model().objects.select_for_update().get(pk=account.pk)
                 current, _ = NotificationPreference.objects.select_for_update().get_or_create(
                     account=account
                 )
@@ -33,22 +36,20 @@ def notifications(request):
                     status = 409
                 else:
                     choices = current.choices.copy()
-                    for key, value in form.preferences().items():
+                    submitted = form.preferences()
+                    disabled_groups = {key for key, value in submitted.items() if value == "off"}
+                    if disabled_groups:
+                        suppress_process_notifications(recipient=account, groups=disabled_groups)
+                        suppress_personal_decision_notifications(account, disabled_groups)
+                    for key, value in submitted.items():
                         if value == ("on" if key in STAFF_GROUPS else "default"):
                             choices.pop(key, None)
                         else:
                             choices[key] = value
                     if choices != current.choices:
-                        disabled_groups = {
-                            key
-                            for key, value in choices.items()
-                            if value == "off" and current.choices.get(key) != "off"
-                        }
                         current.choices = choices
                         current.version += 1
                         current.save(update_fields=["choices", "version"])
-                        if disabled_groups:
-                            suppress_personal_decision_notifications(account, disabled_groups)
             if status != 409:
                 messages.success(request, "Einstellungen gespeichert.")
                 return redirect("profile:notifications")

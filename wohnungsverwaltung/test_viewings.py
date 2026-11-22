@@ -420,18 +420,21 @@ class ViewingTests(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             self.unit.max_occupants = 1
             self.unit.occupancy_requirement_reason = "Grundriss"
-            self.unit.save()
+            self.unit.save(notification_origin="http://testserver/")
         appointment.refresh_from_db()
         self.application.refresh_from_db()
         self.assertEqual(self.application.status, BewerbungStatus.DECLINED)
         self.assertEqual(appointment.status, "cancelled")
-        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(len(mail.outbox), 3)
+        self.assertEqual(mail.outbox[-2].subject, "Entscheidung zu Ihrer Bewerbung")
         self.assertIn("Abgesagt", mail.outbox[-1].body)
-        self.assertNotIn("Grundriss", mail.outbox[-1].body)
+        for message in mail.outbox:
+            self.assertNotIn("Grundriss", message.body)
 
     def test_mail_failure_keeps_appointment_and_retry_only_sends_current_notice(self):
         with patch(
-            "wohnungsverwaltung.viewings.send_repliable_mail", side_effect=OSError("smtp down")
+            "wohnungsverwaltung.notifications.send_repliable_mail",
+            side_effect=ConnectionRefusedError("smtp down"),
         ):
             appointment = self.schedule()
         notice = appointment.events.get(kind="created")
@@ -947,7 +950,10 @@ class ViewingProposalTests(TestCase):
         self.employee.email = "employee@example.test"
         self.employee.save(update_fields=["email"])
         appointment = self.decline()
-        with patch("wohnungsverwaltung.viewings.send_mail", side_effect=TimeoutError):
+        with patch(
+            "wohnungsverwaltung.notifications.send_repliable_mail",
+            side_effect=ConnectionRefusedError,
+        ):
             self.post(self.proposal_url(appointment), self.proposal_data(appointment))
         appointment.refresh_from_db()
         self.assertIsNotNone(appointment.proposed_start)
@@ -1001,7 +1007,7 @@ class ViewingProposalTests(TestCase):
         connect.assert_not_called()
         self.assertEqual(mail.outbox, [])
         self.assertTrue(
-            self.application.viewings.get().events.filter(notification_status="sent").exists()
+            self.application.viewings.get().events.filter(notification_status="suppressed").exists()
         )
 
     def test_pending_viewing_mail_is_suppressed_and_not_replayed(self):
@@ -1010,7 +1016,7 @@ class ViewingProposalTests(TestCase):
             self.client.post(self.create_url, self.payload())
         event = self.application.viewings.get().events.get(notification_status="pending")
         policy = GlobalSettings.objects.create(user_mail_types={"viewing_invited": False})
-        with patch("wohnungsverwaltung.viewings.send_repliable_mail") as send:
+        with patch("wohnungsverwaltung.notifications.send_repliable_mail") as send:
             for callback in callbacks:
                 callback()
             event.refresh_from_db()
@@ -1038,24 +1044,26 @@ class ViewingProposalTests(TestCase):
             account=opted_out, choices={"viewing_responses": "off"}
         )
 
-        def partial_delivery(subject, body, sender, recipients, **kwargs):
+        def partial_delivery(subject, body, recipients, **kwargs):
             return int(recipients == [self.employee.email])
 
         appointment = self.decline()
-        with patch("wohnungsverwaltung.viewings.send_mail", side_effect=partial_delivery) as send:
+        with patch(
+            "wohnungsverwaltung.notifications.send_repliable_mail", side_effect=partial_delivery
+        ) as send:
             self.post(self.proposal_url(appointment), self.proposal_data(appointment))
         self.assertEqual(send.call_count, 3)
         event = appointment.events.get(kind="proposal_changed")
         self.assertEqual(event.notification_status, "failed")
         revokes.groups.clear()
         preference.delete()
-        with patch("wohnungsverwaltung.viewings.send_mail", return_value=1) as send:
+        with patch("wohnungsverwaltung.notifications.send_repliable_mail", return_value=1) as send:
             self.assertTrue(send_viewing_notification(event.pk))
-        self.assertEqual(send.call_args.args[3], [retry.email])
+        self.assertEqual(send.call_args.args[2], [retry.email])
         event.refresh_from_db()
         self.assertEqual(event.recipient_results[str(revokes.pk)], "suppressed")
         self.assertEqual(event.recipient_results[str(opted_out.pk)], "suppressed")
-        with patch("wohnungsverwaltung.viewings.send_mail") as send:
+        with patch("wohnungsverwaltung.notifications.send_repliable_mail") as send:
             send_viewing_notification(event.pk)
         send.assert_not_called()
 
@@ -1253,7 +1261,7 @@ class ConcurrentViewingTests(TransactionTestCase):
 
                 with (
                     patch(
-                        "wohnungsverwaltung.viewings.send_repliable_mail", return_value=1
+                        "wohnungsverwaltung.notifications.send_repliable_mail", return_value=1
                     ) as send,
                     ThreadPoolExecutor(max_workers=1) as executor,
                 ):
