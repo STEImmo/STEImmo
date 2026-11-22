@@ -151,7 +151,9 @@ from .models import (
     WohnungStatus,
     calculate_photo_checksum,
 )
+from .notification_locks import application_notification_handoff, lock_application_notifications
 from .notification_preferences import USER_MAIL_TYPES, mail_allowed
+from .notifications import queue_submission_notifications, queue_viewing_notifications
 from .open_step_reminders import REMINDER_TYPES
 from .upload_limits import upload_too_large_response
 from .viewings import (
@@ -506,6 +508,10 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
                             applicant.user_id,
                             origin=request.build_absolute_uri("/"),
                         )
+                    else:
+                        queue_submission_notifications(
+                            application, "pre", request.build_absolute_uri("/")
+                        )
                     application_created = True
         except IntegrityError:
             form.add_error(
@@ -547,7 +553,7 @@ def pre_application_list(request: HttpRequest) -> HttpResponse:
     applicant = _applicant_for_user(request)
     applications = (
         Bewerbung.objects.filter(person=applicant)
-        .select_related("wohnung")
+        .select_related("wohnung", "rental")
         .prefetch_related(
             "viewings",
             Prefetch(
@@ -796,6 +802,7 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
 
         try:
             with transaction.atomic():
+                lock_application_notifications(application_id)
                 # All mutations of this application serialize on the same row. Recheck
                 # access and submission state only after acquiring the lock.
                 application = get_object_or_404(
@@ -825,6 +832,9 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
                         if action == "submit":
                             application.submitted_at = timezone.now()
                             application.save(update_fields=("submitted_at", "updated_at"))
+                            queue_submission_notifications(
+                                application, "main", request.build_absolute_uri("/")
+                            )
                         else:
                             application.save(update_fields=("updated_at",))
             if "remove_proof" in post_data:
@@ -1365,6 +1375,7 @@ def employee_application_accept(request, application_id):
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     with transaction.atomic():
+        lock_application_notifications(application_id)
         application = get_object_or_404(Bewerbung.objects.select_for_update(), pk=application_id)
         if not application.acceptance_eligible:
             messages.error(request, "Diese Bewerbung kann nicht angenommen werden.")
@@ -1429,83 +1440,85 @@ def employee_application_send_contract(request, application_id):
             request, application_id, status=400, contract_form=form
         )
 
-    actor = _current_employee_for_contract_action(request)
+    with application_notification_handoff(application_id):
+        actor = _current_employee_for_contract_action(request)
 
-    application.refresh_from_db()
-    if not application.acceptance_eligible or application.accepted_at is None:
-        messages.error(request, "Der Versand ist nur für eine angenommene Bewerbung möglich.")
-        return detail
+        application.refresh_from_db()
+        if not application.acceptance_eligible or application.accepted_at is None:
+            messages.error(request, "Der Versand ist nur für eine angenommene Bewerbung möglich.")
+            return detail
 
-    # Capture once after PDF validation. Comparison and send must use this same value.
-    recipient = application.person.email
-    if form.cleaned_data["recipient_confirmation"] != form.recipient_payload(
-        application, recipient
-    ):
-        return _employee_application_detail_response(
-            request,
-            application_id,
-            status=409,
-            contract_notice=(
-                "Die Empfängeradresse hat sich geändert oder die Empfängerbestätigung gehört "
-                "nicht mehr zu dieser Bewerbung. Es wurde keine E-Mail versendet. "
-                "Bitte prüfen Sie den angezeigten Empfänger erneut und wählen Sie "
-                "den Mietvertrag nochmals aus."
-            ),
-        )
-
-    status_url = request.build_absolute_uri(reverse("wohnungsverwaltung:pre_application_list"))
-    sent = 0
-    failure_message = (
-        "Der Mietvertrag konnte nicht versendet werden. Prüfen Sie die Empfängeradresse "
-        "oder versuchen Sie es erneut."
-    )
-    if settings.EMAIL_BACKEND in {
-        "django.core.mail.backends.console.EmailBackend",
-        "django.core.mail.backends.filebased.EmailBackend",
-        "django.core.mail.backends.dummy.EmailBackend",
-    }:
-        failure_message = "Der E-Mail-Versand für Mietverträge ist nicht aktiv."
-    else:
-        try:
-            validate_email(recipient)
-            body = (
-                "Guten Tag,\n\n"
-                f"die Verwaltung hat Ihre Bewerbung für {application.wohnung} angenommen. "
-                "Bitte prüfen Sie den Mietvertrag im Anhang."
-            )
-            link_label = "Bewerbungsstatus öffnen"
-            message = EmailMultiAlternatives(
-                subject="Ihr Mietvertrag bei STE Immobilien eGbR",
-                body=f"{body}\n\n{link_label}: {status_url}",
-                to=[recipient],
-            )
-            message.attach_alternative(
-                render_to_string(
-                    "wohnungsverwaltung/email/notification_link.html",
-                    {"body": body, "link_label": link_label, "link_url": status_url},
+        # Capture once after PDF validation. Comparison and send must use this same value.
+        recipient = application.person.email
+        if form.cleaned_data["recipient_confirmation"] != form.recipient_payload(
+            application, recipient
+        ):
+            return _employee_application_detail_response(
+                request,
+                application_id,
+                status=409,
+                contract_notice=(
+                    "Die Empfängeradresse hat sich geändert oder die Empfängerbestätigung gehört "
+                    "nicht mehr zu dieser Bewerbung. Es wurde keine E-Mail versendet. "
+                    "Bitte prüfen Sie den angezeigten Empfänger erneut und wählen Sie "
+                    "den Mietvertrag nochmals aus."
                 ),
-                "text/html",
             )
-            message.attach(
-                "Mietvertrag.pdf", form.cleaned_data["contract"].read(), "application/pdf"
-            )
-            sent = message.send()
-        except (OSError, ValidationError, ValueError):
-            pass
 
-    if sent:
-        kind = ApplicationReviewEvent.Kind.CONTRACT_SENT
-        messages.success(request, "Der Mietvertrag wurde zum Versand übergeben.")
-    else:
-        kind = ApplicationReviewEvent.Kind.CONTRACT_FAILED
-        messages.error(request, failure_message)
-    ApplicationReviewEvent.objects.create(application=application, actor=actor, kind=kind)
-    return detail
+        status_url = request.build_absolute_uri(reverse("wohnungsverwaltung:pre_application_list"))
+        sent = 0
+        failure_message = (
+            "Der Mietvertrag konnte nicht versendet werden. Prüfen Sie die Empfängeradresse "
+            "oder versuchen Sie es erneut."
+        )
+        if settings.EMAIL_BACKEND in {
+            "django.core.mail.backends.console.EmailBackend",
+            "django.core.mail.backends.filebased.EmailBackend",
+            "django.core.mail.backends.dummy.EmailBackend",
+        }:
+            failure_message = "Der E-Mail-Versand für Mietverträge ist nicht aktiv."
+        else:
+            try:
+                validate_email(recipient)
+                body = (
+                    "Guten Tag,\n\n"
+                    f"die Verwaltung hat Ihre Bewerbung für {application.wohnung} angenommen. "
+                    "Bitte prüfen Sie den Mietvertrag im Anhang."
+                )
+                link_label = "Bewerbungsstatus öffnen"
+                message = EmailMultiAlternatives(
+                    subject="Ihr Mietvertrag bei STE Immobilien eGbR",
+                    body=f"{body}\n\n{link_label}: {status_url}",
+                    to=[recipient],
+                )
+                message.attach_alternative(
+                    render_to_string(
+                        "wohnungsverwaltung/email/notification_link.html",
+                        {"body": body, "link_label": link_label, "link_url": status_url},
+                    ),
+                    "text/html",
+                )
+                message.attach(
+                    "Mietvertrag.pdf", form.cleaned_data["contract"].read(), "application/pdf"
+                )
+                sent = message.send()
+            except (OSError, ValidationError, ValueError):
+                pass
+
+        if sent:
+            kind = ApplicationReviewEvent.Kind.CONTRACT_SENT
+            messages.success(request, "Der Mietvertrag wurde zum Versand übergeben.")
+        else:
+            kind = ApplicationReviewEvent.Kind.CONTRACT_FAILED
+            messages.error(request, failure_message)
+        ApplicationReviewEvent.objects.create(application=application, actor=actor, kind=kind)
+        return detail
 
 
 def _lock_viewing_application(application_id):
     initial = get_object_or_404(Bewerbung, pk=application_id)
     unit = Wohnung.objects.select_for_update().get(pk=initial.wohnung_id)
+    lock_application_notifications(application_id)
     application = (
         Bewerbung.objects.select_for_update(of=("self",))
         .select_related("person", "wohnung")
@@ -1758,6 +1771,7 @@ def applicant_viewing_response(request, application_id, appointment_id):
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     with transaction.atomic():
+        lock_application_notifications(application_id)
         application = get_object_or_404(
             Bewerbung.objects.select_for_update(),
             pk=application_id,
@@ -1791,9 +1805,16 @@ def applicant_viewing_response(request, application_id, appointment_id):
             )
             appointment.version += 1
             appointment.save(update_fields=("status", "version", "updated_at"))
-            record_viewing_event(
-                appointment, actor=request.user, kind="status_changed", before=before
+            event = record_viewing_event(
+                appointment,
+                actor=request.user,
+                kind="status_changed",
+                before=before,
+                notification_url=request.build_absolute_uri(
+                    reverse("wohnungsverwaltung:employee_application_detail", args=[application.pk])
+                ),
             )
+            queue_viewing_notifications(event, response=True)
             if form.cleaned_data["action"] == "decline":
                 message = (
                     "Ihre Terminzusage wurde zurückgezogen. Ihre Bewerbung bleibt aktiv."
@@ -1812,6 +1833,7 @@ def applicant_viewing_proposal(request, application_id, appointment_id):
     if request.method not in ("GET", "POST"):
         return HttpResponseNotAllowed(["GET", "POST"])
     with transaction.atomic():
+        lock_application_notifications(application_id)
         application = get_object_or_404(
             Bewerbung.objects.select_for_update(),
             pk=application_id,
@@ -1929,6 +1951,7 @@ def employee_application_priority_update(
     if form.is_valid():
         new_priority = int(form.cleaned_data["priority"])
         with transaction.atomic():
+            lock_application_notifications(application_id)
             application = Bewerbung.objects.select_for_update().get(pk=application.pk)
             old_priority = application.review_priority
             if new_priority != old_priority or form.cleaned_data["reason"]:
@@ -2069,6 +2092,7 @@ def employee_application_invite(request: HttpRequest, application_id: UUID) -> H
     invite = False
     with transaction.atomic():
         unit = Wohnung.objects.select_for_update().get(pk=application.wohnung_id)
+        lock_application_notifications(application_id)
         application = (
             Bewerbung.objects.select_for_update()
             .select_related("person", "wohnung")
@@ -2346,6 +2370,7 @@ def application_withdraw(request: HttpRequest, application_id: UUID) -> HttpResp
         )
 
     with transaction.atomic():
+        lock_application_notifications(application_id)
         application = get_object_or_404(
             eligible_applications.select_for_update(),
             pk=application_id,

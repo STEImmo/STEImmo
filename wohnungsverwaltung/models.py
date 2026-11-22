@@ -468,6 +468,22 @@ class Wohnung(models.Model):
             saved = super().save(*args, **kwargs)
             if occupancy_limit_changed and self.max_occupants is not None:
                 now = timezone.now()
+                application_ids = (
+                    Bewerbung.objects.filter(
+                        wohnung_id=self.pk,
+                        status=BewerbungStatus.OPEN,
+                        interest_withdrawn_at__isnull=True,
+                        main_application_unlocked=False,
+                        submitted_at__isnull=True,
+                        personenanzahl__gt=self.max_occupants,
+                    )
+                    .order_by("pk")
+                    .values_list("pk", flat=True)
+                )
+                from .notification_locks import lock_application_notifications
+
+                for application_id in application_ids:
+                    lock_application_notifications(application_id)
                 applications = list(
                     Bewerbung.objects.select_for_update()
                     .filter(
@@ -625,8 +641,8 @@ class Bewerbung(models.Model):
             return "Abgelehnt"
         if self.status == BewerbungStatus.BLOCKED:
             return "Gesperrt"
-        if self.accepted_at is not None:
-            return "Angenommen"
+        if self.accepted_at:
+            return "Bewerbung angenommen"
         if self.submitted_at is not None:
             return "Hauptbewerbung eingereicht"
         if self.main_application_unlocked:
@@ -645,13 +661,68 @@ class Bewerbung(models.Model):
             return "Die Bewerbung wurde beendet."
         if self.status == BewerbungStatus.BLOCKED:
             return "Die Bewerbung ist derzeit gesperrt."
-        if self.accepted_at is not None:
-            return "Bitte prüfen Sie den Mietvertrag, sobald er Ihnen vorliegt."
+        if hasattr(self, "rental"):
+            return "Die Vermietung ist abgeschlossen. Ihre Vertragsunterlagen finden Sie im Konto."
+        if self.accepted_at:
+            return (
+                "Die Verwaltung bearbeitet den Vertragsablauf "
+                "und informiert Sie über nächste Schritte."
+            )
         if self.submitted_at is not None:
-            return "Bitte warten Sie auf die Rückmeldung des Mitarbeiters."
+            return (
+                "Bitte warten Sie auf die Rückmeldung des Mitarbeiters. "
+                "Die Verwaltung prüft die Hauptbewerbung; "
+                "aktuell ist keine weitere Aktion erforderlich."
+            )
         if self.main_application_unlocked:
             return "Bitte reichen Sie die Hauptbewerbung mit allen drei Nachweisen ein."
-        return "Warten Sie auf die nächste Rückmeldung zu Ihrer Bewerbung."
+        appointment = self.viewings.first()
+        if appointment:
+            if appointment.status == "planned" and appointment.can_respond:
+                return "Sie sind am Zug: Bitte sagen Sie den Besichtigungstermin zu oder ab."
+            if appointment.status == "confirmed" and appointment.starts_at > timezone.now():
+                return "Der Termin ist bestätigt. Die Verwaltung berücksichtigt Ihre Zusage."
+            if appointment.status in ("applicant_declined", "cancelled"):
+                return (
+                    "Ihre Bewerbung bleibt aktiv. Die Verwaltung prüft die weitere Terminplanung."
+                )
+            return (
+                "Die Verwaltung prüft das Besichtigungsergebnis "
+                "und die Freischaltung der Hauptbewerbung."
+            )
+        return (
+            "Warten Sie auf die nächste Rückmeldung zu Ihrer Bewerbung. "
+            "Die Verwaltung prüft; aktuell ist keine weitere Aktion erforderlich."
+        )
+
+    def get_next_actor_display(self):
+        if (
+            self.interest_withdrawn_at
+            or self.status != BewerbungStatus.OPEN
+            or hasattr(self, "rental")
+        ):
+            return "Abgeschlossen / keine offene Aktion"
+        if self.submitted_at is not None or self.accepted_at is not None:
+            return "Verwaltung"
+        if self.submitted_at is None and self.main_application_unlocked:
+            return "Bewerber"
+        appointment = self.viewings.first()
+        if appointment and appointment.status == "planned" and appointment.can_respond:
+            return "Bewerber"
+        return "Verwaltung"
+
+    def get_employee_next_step(self):
+        if self.accepted_at or self.interest_withdrawn_at or self.status != BewerbungStatus.OPEN:
+            return self.get_applicant_next_step()
+        from .dashboard import STEP_LABELS, application_rows
+
+        step = (
+            application_rows(timezone.now())
+            .filter(pk=self.pk)
+            .values_list("dashboard_step", flat=True)
+            .first()
+        )
+        return STEP_LABELS[step] if step else self.get_applicant_next_step()
 
 
 class RentalQuerySet(models.QuerySet):
@@ -816,6 +887,8 @@ class ViewingAppointmentEvent(models.Model):
         PENDING = "pending", "Versand ausstehend"
         SENT = "sent", "Versendet"
         FAILED = "failed", "Versand fehlgeschlagen"
+        SENDING = "sending", "Versand reserviert"
+        UNCERTAIN = "uncertain", "Versandergebnis unklar"
         OBSOLETE = "obsolete", "Überholt"
 
     event_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -1294,6 +1367,56 @@ class MailTestAttempt(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True
     )
     next_allowed_at = models.DateTimeField()
+
+
+class ProcessNotification(models.Model):
+    class Kind(models.TextChoices):
+        PRE_RECEIPT = "pre_receipt", "Eingang der Besichtigungsanfrage"
+        PRE_TASK = "pre_task", "Neue Bewerbung prüfen"
+        MAIN_RECEIPT = "main_receipt", "Eingang der Hauptbewerbung"
+        MAIN_TASK = "main_task", "Hauptbewerbung prüfen"
+        VIEWING_CREATED = "viewing_created", "Besichtigungseinladung"
+        VIEWING_RESCHEDULED = "viewing_rescheduled", "Terminverschiebung"
+        VIEWING_CANCELLED = "viewing_cancelled", "Terminabsage"
+        VIEWING_RESPONSE = "viewing_response", "Terminrückmeldung"
+        VIEWING_PROPOSAL = "viewing_proposal", "Alternativvorschlag"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Versand ausstehend"
+        SENDING = "sending", "Versand reserviert; Ergebnis noch offen"
+        SENT = "sent", "Zum Versand übergeben"
+        FAILED = "failed", "Nicht übergeben; Wiederholung möglich"
+        UNCERTAIN = "uncertain", "Versandergebnis unklar; keine automatische Wiederholung"
+        SUPPRESSED = "suppressed", "Durch Einstellung oder Berechtigung unterdrückt"
+        OBSOLETE = "obsolete", "Überholt"
+
+    application = models.ForeignKey(
+        Bewerbung, on_delete=models.CASCADE, related_name="notifications"
+    )
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    viewing_event = models.ForeignKey(
+        ViewingAppointmentEvent,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="deliveries",
+    )
+    kind = models.CharField(max_length=32, choices=Kind.choices)
+    source = models.CharField(max_length=64)
+    url = models.URLField(max_length=2048)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("application", "recipient", "kind", "source"),
+                name="process_notice_unique_recipient",
+            )
+        ]
+        indexes = [models.Index(fields=("status", "created_at"), name="process_notice_pending_idx")]
 
 
 class DecisionNotification(models.Model):

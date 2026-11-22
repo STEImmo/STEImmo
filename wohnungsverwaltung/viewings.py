@@ -1,16 +1,10 @@
 """Shared appointment history and notifications for staff and applicant actions."""
 
-import logging
 from zoneinfo import ZoneInfo
 
-from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 
-from core.mail_settings import send_repliable_mail
-
-from .access import EMPLOYEE_ACCESS_PERMISSION
 from .models import (
     ApplicationReviewEvent,
     Bewerbung,
@@ -18,9 +12,7 @@ from .models import (
     ViewingAppointment,
     ViewingAppointmentEvent,
 )
-from .notification_preferences import mail_allowed
 
-logger = logging.getLogger(__name__)
 BERLIN = ZoneInfo("Europe/Berlin")
 
 
@@ -58,7 +50,10 @@ def record_viewing_event(
         notification_url=notification_url,
     )
     if notify:
-        transaction.on_commit(lambda: send_viewing_notification(event.pk))
+        from .notifications import queue_viewing_notifications
+
+        queue_viewing_notifications(event)
+        transaction.on_commit(lambda: send_viewing_notification(event.pk), robust=True)
     return event
 
 
@@ -87,106 +82,46 @@ def notification_is_current(event, appointment, *, latest_appointment_id=None):
 
 
 def send_viewing_notification(event_id, actor=None):
-    # Lock the application first, like all applicant mutations. Holding these
-    # locks during the bounded SMTP call prevents sending a superseded notice.
-    initial = (
-        ViewingAppointmentEvent.objects.filter(pk=event_id)
-        .values("appointment__application_id", "appointment_id")
+    from .notifications import (
+        _sync_viewing_status,
+        queue_viewing_notifications,
+        send_process_notification,
+    )
+
+    event = (
+        ViewingAppointmentEvent.objects.select_related("appointment__application__person")
+        .filter(pk=event_id)
         .first()
     )
-    if initial is None:
+    if event is None:
         return False
-    with transaction.atomic():
-        # Load the person only after the application lock is acquired.
-        application = Bewerbung.objects.select_for_update().get(
-            pk=initial["appointment__application_id"]
-        )
-        appointment = ViewingAppointment.objects.select_for_update().get(
-            pk=initial["appointment_id"]
-        )
-        appointment.application = application
-        event = ViewingAppointmentEvent.objects.select_for_update().get(pk=event_id)
-        if event.notification_status not in ("pending", "failed"):
-            return False
-        if not notification_is_current(event, appointment):
-            if event.notification_status != "none":
-                event.notification_status = "obsolete"
-                event.save(update_fields=("notification_status",))
-            return False
-        start = timezone.localtime(appointment.starts_at, BERLIN)
-        end = timezone.localtime(appointment.ends_at, BERLIN)
-        body = (
-            f"Guten Tag {application.person.vorname} {application.person.nachname},\n\n"
-            f"Besichtigung für {application.wohnung}\n"
-            f"Datum: {start:%d.%m.%Y}\nBeginn: {start:%H:%M} Uhr\nEnde: {end:%H:%M} Uhr\n"
-            f"Status: {appointment.get_status_display()}\n\n"
-            f"Ihre Termine und Rückmeldung: {event.notification_url}\n"
-        )
-        account_id = application.person.user_id
-        recipient_ids = [str(account_id)] if account_id else []
-        if appointment.status == ViewingAppointment.Status.CANCELLED:
-            mail_type = "viewing_cancelled"
-        elif event.kind == "rescheduled":
-            mail_type = "viewing_rescheduled"
-        else:
-            mail_type = "viewing_invited"
-        subject = "Ihr Besichtigungstermin bei STEImmo"
-        if event.kind == "proposal_changed":
-            proposed = timezone.localtime(appointment.proposed_start, BERLIN)
-            subject = "Neuer Alternativtermin für eine Besichtigung"
-            body = (
-                f"Für die Besichtigung zu {application.wohnung} "
-                "wurde ein Alternativtermin vorgeschlagen.\n"
-                f"Wunschdatum: {proposed:%d.%m.%Y}\n"
-                f"Beginn: {proposed:%H:%M} Uhr (Europe/Berlin)\n\n"
-                f"Bewerbung prüfen und verbindlichen Termin planen: {event.notification_url}\n"
-                "Der Vorschlag ist keine verbindliche Buchung.\n"
-            )
-            mail_type = "viewing_proposal_changed"
-            recipient_ids = [
-                str(account_id)
-                for account_id in get_user_model()
-                .objects.with_perm(EMPLOYEE_ACCESS_PERMISSION)
-                .values_list("pk", flat=True)
-            ]
-        results = event.recipient_results
-        pending = (
-            [key for key, outcome in results.items() if outcome == "failed"]
-            if results
-            else recipient_ids
-        )
-        for key in pending:
-            recipient = (
-                get_user_model().objects.filter(pk=key).first() if key in recipient_ids else None
-            )
-            if not mail_allowed(recipient, mail_type):
-                results[key] = "suppressed"
-                continue
-            try:
-                if mail_type in ("viewing_cancelled", "viewing_proposal_changed"):
-                    sent = send_mail(subject, body, None, [recipient.email])
-                else:
-                    sent = send_repliable_mail(subject, body, [recipient.email])
-            except Exception:
-                logger.warning("Terminbenachrichtigung konnte nicht versendet werden.")
-                sent = False
-            results[key] = "sent" if sent else "failed"
+    if not notification_is_current(event, event.appointment):
+        if event.notification_status != "none":
+            event.notification_status = "obsolete"
+            event.save(update_fields=("notification_status",))
+        event.deliveries.filter(status__in=("pending", "failed")).update(status="obsolete")
+        return False
+    # Migrate a still-pending legacy event only when explicitly processed. Sent,
+    # suppressed and uncertain messages must never produce new recipient intents.
+    if not event.deliveries.exists() and event.notification_status in ("pending", "failed"):
+        from .notification_locks import application_notification_handoff
 
-        if "failed" in results.values():
-            status = "failed"
-        elif "sent" in results.values():
-            status = "sent"
-        else:
-            status = "suppressed"
-        event.notification_status = status
-        event.save(update_fields=("notification_status", "recipient_results"))
-        if status != "suppressed":
-            record_viewing_event(
-                appointment,
-                kind="mail_sent" if status == "sent" else "mail_failed",
-                actor=actor or event.actor,
-            )
-        return status == "sent"
+        with application_notification_handoff(event.appointment.application_id):
+            with transaction.atomic():
+                application = Bewerbung.objects.select_for_update().get(
+                    pk=event.appointment.application_id
+                )
+                event.appointment.application = application
+                queue_viewing_notifications(event)
+    sent = False
+    for notice_id in event.deliveries.values_list("pk", flat=True):
+        sent = send_process_notification(notice_id) or sent
+    _sync_viewing_status(event.pk)
+    event.refresh_from_db()
+    if not event.deliveries.exists():
+        event.notification_status = "suppressed"
+        event.save(update_fields=("notification_status",))
+    return sent
 
 
 def cancel_open_viewings(application_id, *, reason, actor=None, notify=False):
@@ -195,7 +130,13 @@ def cancel_open_viewings(application_id, *, reason, actor=None, notify=False):
         application_id=application_id, status__in=("planned", "confirmed")
     ):
         before = appointment.snapshot()
-        previous_notice = appointment.events.exclude(notification_url="").first()
+        # Responses and proposals point to the staff area. A cancellation sent to
+        # the applicant must retain the applicant link from the invitation.
+        previous_notice = (
+            appointment.events.filter(kind__in=("created", "rescheduled"))
+            .exclude(notification_url="")
+            .first()
+        )
         appointment.status = "cancelled"
         appointment.version += 1
         appointment.save(update_fields=("status", "version", "updated_at"))

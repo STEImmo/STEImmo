@@ -152,7 +152,7 @@ class OpenStepReminderTests(TestCase):
         self.assertIn("0 neue", self.run_command(send=False, now=self.now + timedelta(minutes=31)))
         self.run_command()
         self.assertEqual(DecisionNotification.objects.get().kind, VIEWING_REMINDER)
-        self.assertIn(f"#bewerbung-{self.application.pk}", mail.outbox[0].body)
+        self.assertIn(f"#application-{self.application.pk}", mail.outbox[0].body)
 
     def test_viewing_rescheduled_after_queue_is_suppressed(self):
         appointment = self.create_viewing()

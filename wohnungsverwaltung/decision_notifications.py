@@ -20,11 +20,11 @@ from .models import (
     BewerbungStatus,
     DecisionNotification,
     GlobalSettings,
-    NotificationPreference,
     Protokoll,
     ProtokollStatus,
     Rental,
 )
+from .notification_locks import application_notification_handoff
 from .notification_preferences import USER_MAIL_TYPES, mail_allowed
 from .open_step_reminders import REMINDER_TYPES, reminder_message
 
@@ -124,11 +124,11 @@ def _message(notice, recipient):
 
 
 def _eligible_message(notice, recipient):
+    if settings.DEMO_MODE or settings.EMAIL_BACKEND in INACTIVE_BACKENDS:
+        return None
     if notice.kind in REMINDER_TYPES:
-        if settings.DEMO_MODE or settings.EMAIL_BACKEND in INACTIVE_BACKENDS:
-            return None
         return reminder_message(notice, recipient)
-    if settings.EMAIL_BACKEND in INACTIVE_BACKENDS or not mail_allowed(recipient, notice.kind):
+    if not mail_allowed(recipient, notice.kind):
         return None
     return _message(notice, recipient)
 
@@ -143,9 +143,12 @@ def queue_decision_notification(kind, object_id, version, recipient_id=None, *, 
     )
     if kind in USER_MAIL_TYPES:
         GlobalSettings.objects.select_for_update().get_or_create(pk=1)
-    for recipient in recipients.order_by("pk"):
-        # Serialize the initial preference check and insertion with explicit opt-outs.
-        NotificationPreference.objects.select_for_update().get_or_create(account=recipient)
+    recipient_ids = list(recipients.order_by("pk").values_list("pk", flat=True))
+    for account_id in recipient_ids:
+        # The personal settings view locks the same account before writing an opt-out.
+        recipient = accounts.select_for_update().filter(pk=account_id).first()
+        if recipient is None:
+            continue
         notice = DecisionNotification(
             kind=kind,
             object_id=object_id,
@@ -167,6 +170,17 @@ def queue_decision_notification(kind, object_id, version, recipient_id=None, *, 
 
 
 def deliver_decision_notification(notice_id):
+    initial = DecisionNotification.objects.filter(pk=notice_id).values("kind", "object_id").first()
+    if initial is None:
+        return
+    if initial["kind"] == "handover_finalized":
+        _deliver_decision_notification(notice_id)
+    else:
+        with application_notification_handoff(initial["object_id"]):
+            _deliver_decision_notification(notice_id)
+
+
+def _deliver_decision_notification(notice_id):
     states = DecisionNotification.Status
     with transaction.atomic():
         notice = DecisionNotification.objects.select_for_update().filter(pk=notice_id).first()

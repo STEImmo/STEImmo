@@ -93,5 +93,5 @@ def reminder_message(notice, recipient):
     else:
         body = "Bitte antworten Sie auf Ihre Einladung zur Besichtigung."
         label = "Besichtigung in meinen Bewerbungen öffnen"
-        path = f"{reverse('wohnungsverwaltung:pre_application_list')}#bewerbung-{application.pk}"
+        path = f"{reverse('wohnungsverwaltung:pre_application_list')}#application-{application.pk}"
     return subject, f"{body} Diese Erinnerung setzt keine neue Frist.", label, path
