@@ -2,7 +2,7 @@
 
 import logging
 from functools import partial
-from smtplib import SMTPResponseException
+from smtplib import SMTPRecipientsRefused, SMTPResponseException
 from urllib.parse import urlsplit
 
 from django.conf import settings
@@ -19,11 +19,13 @@ from .models import (
     Bewerbung,
     BewerbungStatus,
     DecisionNotification,
+    GlobalSettings,
+    NotificationPreference,
     Protokoll,
     ProtokollStatus,
     Rental,
 )
-from .notification_preferences import mail_allowed
+from .notification_preferences import USER_MAIL_TYPES, mail_allowed
 
 logger = logging.getLogger(__name__)
 MAX_ATTEMPTS = 3
@@ -134,7 +136,11 @@ def queue_decision_notification(kind, object_id, version, recipient_id=None, *, 
         if kind == "application_withdrawn"
         else accounts.filter(pk=recipient_id)
     )
-    for recipient in recipients:
+    if kind in USER_MAIL_TYPES:
+        GlobalSettings.objects.select_for_update().get_or_create(pk=1)
+    for recipient in recipients.order_by("pk"):
+        # Serialize the initial preference check and insertion with explicit opt-outs.
+        NotificationPreference.objects.select_for_update().get_or_create(account=recipient)
         notice = DecisionNotification(
             kind=kind,
             object_id=object_id,
@@ -181,24 +187,52 @@ def deliver_decision_notification(notice_id):
         "wohnungsverwaltung/email/notification_link.html",
         {"body": body, "link_label": link_label, "link_url": link_url},
     )
+    # HTML rendering can outlast a reassignment, address change or opt-out.
+    # Read current access and settings outside the reservation transaction.
+    current = (
+        DecisionNotification.objects.filter(pk=notice.pk, status=states.SENDING)
+        .select_related("recipient")
+        .first()
+    )
+    if current is None:
+        return
+    if _eligible_message(current, current.recipient) != message:
+        DecisionNotification.objects.filter(pk=notice.pk, status=states.SENDING).update(
+            status=states.SUPPRESSED
+        )
+        return
+    if not DecisionNotification.objects.filter(pk=notice.pk, status=states.SENDING).exists():
+        return
+
     outcome = states.FAILED
     try:
         if send_mail(
             subject,
             f"{body}\n\n{link_label}: {link_url}",
             None,
-            [recipient.email],
+            [current.recipient.email],
             html_message=html,
         ):
             outcome = states.SENT
-    except (SMTPResponseException, ConnectionRefusedError) as error:
-        # A negative response or refused connection confirms the message was not accepted.
-        temporary = not isinstance(error, SMTPResponseException) or 400 <= error.smtp_code < 500
-        if temporary and notice.attempts < MAX_ATTEMPTS:
+    except (SMTPRecipientsRefused, SMTPResponseException, ConnectionRefusedError) as error:
+        if _temporary_rejection(error) and notice.attempts < MAX_ATTEMPTS:
             outcome = states.RETRY
     except (OSError, ValueError):
         # A disconnect can occur after acceptance. Leave ambiguous outcomes for manual review.
         pass
     if outcome != states.SENT:
         logger.warning("Entscheidungsbenachrichtigung %s: %s", notice.pk, outcome)
-    DecisionNotification.objects.filter(pk=notice.pk).update(status=outcome)
+    # Keep an opt-out terminal on failure. Record successful handoffs even if the
+    # settings changed after SMTP had already started.
+    statuses = (states.SENDING, states.SUPPRESSED) if outcome == states.SENT else (states.SENDING,)
+    DecisionNotification.objects.filter(pk=notice.pk, status__in=statuses).update(status=outcome)
+
+
+def _temporary_rejection(error):
+    if isinstance(error, SMTPRecipientsRefused):
+        return bool(error.recipients) and all(
+            400 <= code < 500 for code, _ in error.recipients.values()
+        )
+    if isinstance(error, SMTPResponseException):
+        return 400 <= error.smtp_code < 500
+    return isinstance(error, ConnectionRefusedError)

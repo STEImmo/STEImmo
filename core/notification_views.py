@@ -8,7 +8,11 @@ from django.views.decorators.http import require_http_methods
 
 from wohnungsverwaltung.models import NotificationPreference
 from wohnungsverwaltung.notification_forms import PersonalNotificationForm
-from wohnungsverwaltung.notification_preferences import STAFF_GROUPS, USER_GROUPS
+from wohnungsverwaltung.notification_preferences import (
+    STAFF_GROUPS,
+    USER_GROUPS,
+    suppress_personal_decision_notifications,
+)
 
 
 @never_cache
@@ -35,9 +39,16 @@ def notifications(request):
                         else:
                             choices[key] = value
                     if choices != current.choices:
+                        disabled_groups = {
+                            key
+                            for key, value in choices.items()
+                            if value == "off" and current.choices.get(key) != "off"
+                        }
                         current.choices = choices
                         current.version += 1
                         current.save(update_fields=["choices", "version"])
+                        if disabled_groups:
+                            suppress_personal_decision_notifications(account, disabled_groups)
             if status != 409:
                 messages.success(request, "Einstellungen gespeichert.")
                 return redirect("profile:notifications")

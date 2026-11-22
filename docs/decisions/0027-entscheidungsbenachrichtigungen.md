@@ -13,6 +13,9 @@ Die Versandabsicht wird innerhalb der fachlichen Transaktion pro Ereignisversion
 und Konto eindeutig gespeichert. Nach dem Commit sowie bei
 `python manage.py send_decision_notifications` wird der Anlass einschließlich
 Empfängerberechtigung, Dokumentverfügbarkeit und aktueller Präferenzen geprüft.
+Eine Abwahl unterdrückt bereits vorgemerkte Meldungen zusammen mit dem Speichern
+der Einstellungen dauerhaft. Nach der HTML-Erstellung wird der Anlass mit dem
+aktuellen Konto erneut unmittelbar vor der SMTP-Übergabe geprüft.
 Der Befehl kann durch den betrieblichen Zeitgeber aus #194 aufgerufen werden.
 HTTP-Auslöser verwenden den geprüften Request-Host. Für modellseitige Auslöser ohne
 HTTP-Request muss `DJANGO_DECISION_NOTIFICATION_ORIGIN` die öffentliche HTTPS-Adresse
