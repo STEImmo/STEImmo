@@ -19,7 +19,7 @@ from core.mail_settings import callback_recipients, get_mail_settings, send_repl
 from .access import employee_required, global_settings_required
 from .models import GlobalSettings, GlobalSettingsChange, MailTestAttempt
 from .notification_forms import GlobalNotificationForm
-from .notification_preferences import USER_MAIL_TYPES
+from .notification_preferences import USER_MAIL_TYPES, suppress_pending_notifications
 
 
 @employee_required
@@ -46,6 +46,9 @@ def global_settings(request):
                         current.user_mail_types = choices
                         current.version += 1
                         current.save(update_fields=["user_mail_types", "version"])
+                        disabled = [key for key in changed if not choices[key]]
+                        if disabled:
+                            suppress_pending_notifications(disabled)
                         GlobalSettingsChange.objects.create(
                             actor_account_id=request.user.pk, changed_fields=changed
                         )

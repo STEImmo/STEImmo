@@ -9,7 +9,11 @@ from django.views.decorators.http import require_http_methods
 
 from wohnungsverwaltung.models import NotificationPreference
 from wohnungsverwaltung.notification_forms import PersonalNotificationForm
-from wohnungsverwaltung.notification_preferences import STAFF_GROUPS, USER_GROUPS
+from wohnungsverwaltung.notification_preferences import (
+    STAFF_GROUPS,
+    USER_GROUPS,
+    suppress_disabled_personal_notifications,
+)
 
 
 @never_cache
@@ -36,6 +40,7 @@ def notifications(request):
                         else:
                             choices[key] = value
                     if choices != current.choices:
+                        suppress_disabled_personal_notifications(account, current.choices, choices)
                         if choices.get("user_reminders") != current.choices.get("user_reminders"):
                             current.reminders_changed_at = timezone.now()
                         current.choices = choices

@@ -5,7 +5,7 @@ from .access import (
     EMPLOYEE_ACCESS_PERMISSION,
     TENANT_ACCESS_PERMISSION,
 )
-from .models import GlobalSettings, NotificationPreference
+from .models import DecisionNotification, GlobalSettings, NotificationPreference
 
 USER_GROUPS = {
     "application_receipts": (
@@ -74,6 +74,30 @@ STAFF_MAIL_TYPES = {
     "contract_return_recorded": "application_changes",
     "staff_daily_digest": "staff_digest",
 }
+
+
+def suppress_pending_notifications(mail_types, *, account=None):
+    """Retire queued notices in the transaction that disables their mail types."""
+    states = DecisionNotification.Status
+    notices = DecisionNotification.objects.filter(
+        kind__in=mail_types, status__in=(states.PENDING, states.RETRY)
+    )
+    if account is not None:
+        notices = notices.filter(recipient=account)
+    notices.update(status=states.SUPPRESSED)
+
+
+def suppress_disabled_personal_notifications(account, previous, current):
+    disabled_groups = {
+        group for group, value in current.items() if value == "off" and previous.get(group) != "off"
+    }
+    if disabled_groups:
+        mail_types = {kind: details[0] for kind, details in USER_MAIL_TYPES.items()}
+        mail_types.update(STAFF_MAIL_TYPES)
+        suppress_pending_notifications(
+            [kind for kind, group in mail_types.items() if group in disabled_groups],
+            account=account,
+        )
 
 
 def mail_allowed(account, mail_type):

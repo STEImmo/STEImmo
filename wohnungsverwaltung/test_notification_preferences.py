@@ -114,4 +114,5 @@ class NotificationPolicyMigrationTests(TransactionTestCase):
                     dict.fromkeys(USER_MAIL_TYPES, enabled),
                 )
         finally:
-            MigrationExecutor(connection).migrate([after])
+            executor = MigrationExecutor(connection)
+            executor.migrate(executor.loader.graph.leaf_nodes())

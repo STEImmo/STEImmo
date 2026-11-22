@@ -2,7 +2,7 @@
 
 import logging
 from functools import partial
-from smtplib import SMTPResponseException
+from smtplib import SMTPRecipientsRefused, SMTPResponseException
 from urllib.parse import urlsplit
 
 from django.conf import settings
@@ -180,19 +180,16 @@ def deliver_decision_notification(notice_id):
         notice.attempts += 1
         notice.save(update_fields=["status", "attempts"])
 
-    if notice.kind in REMINDER_TYPES:
-        recipient = get_user_model().objects.filter(pk=notice.recipient_id).first()
-        message = _eligible_message(notice, recipient) if recipient else None
-        if message is None:
-            DecisionNotification.objects.filter(pk=notice.pk).update(status=states.SUPPRESSED)
-            return
-
     subject, body, link_label, path = message
     link_url = f"{origin}{path}"
     html = render_to_string(
         "wohnungsverwaltung/email/notification_link.html",
         {"body": body, "link_label": link_label, "link_url": link_url},
     )
+    recipient = get_user_model().objects.filter(pk=notice.recipient_id).first()
+    if recipient is None or _eligible_message(notice, recipient) != message:
+        DecisionNotification.objects.filter(pk=notice.pk).update(status=states.SUPPRESSED)
+        return
     outcome = states.FAILED
     try:
         if send_mail(
@@ -203,6 +200,13 @@ def deliver_decision_notification(notice_id):
             html_message=html,
         ):
             outcome = states.SENT
+    except SMTPRecipientsRefused as error:
+        if (
+            error.recipients
+            and all(400 <= code < 500 for code, _ in error.recipients.values())
+            and notice.attempts < MAX_ATTEMPTS
+        ):
+            outcome = states.RETRY
     except (SMTPResponseException, ConnectionRefusedError) as error:
         # A negative response or refused connection confirms the message was not accepted.
         temporary = not isinstance(error, SMTPResponseException) or 400 <= error.smtp_code < 500

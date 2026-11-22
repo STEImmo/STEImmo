@@ -13,7 +13,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .access import ROLE_APPLICANT
+from .access import ROLE_APPLICANT, ROLE_GLOBAL_SETTINGS
 from .models import (
     ApplicationReviewEvent,
     Bewerbung,
@@ -24,6 +24,7 @@ from .models import (
     ViewingAppointmentEvent,
     Wohnung,
 )
+from .notification_preferences import USER_MAIL_TYPES
 from .open_step_reminders import MAIN_REMINDER, VIEWING_REMINDER
 
 
@@ -100,6 +101,23 @@ class OpenStepReminderTests(TestCase):
         self.run_command()
         notice = DecisionNotification.objects.get()
         self.assertEqual((notice.status, notice.attempts), ("suppressed", 1))
+        self.assertEqual(mail.outbox, [])
+
+    def test_global_disable_then_enable_retires_pending_reminder(self):
+        call_command("remind_open_steps", send=True, stdout=StringIO())
+        self.assertEqual(DecisionNotification.objects.get().status, "pending")
+        manager = get_user_model().objects.create_user("settings-manager")
+        manager.groups.add(Group.objects.get(name=ROLE_GLOBAL_SETTINGS))
+        self.client.force_login(manager)
+        url = reverse("verwaltung:global_settings")
+        choices = dict.fromkeys(USER_MAIL_TYPES, "on")
+        choices.pop(MAIN_REMINDER)
+        self.assertEqual(self.client.post(url, {"version": 0, **choices}).status_code, 302)
+        choices[MAIN_REMINDER] = "on"
+        self.assertEqual(self.client.post(url, {"version": 1, **choices}).status_code, 302)
+        self.run_command()
+        notice = DecisionNotification.objects.get()
+        self.assertEqual((notice.status, notice.attempts), ("suppressed", 0))
         self.assertEqual(mail.outbox, [])
 
     def test_enabling_after_due_does_not_backfill_and_role_is_required(self):
