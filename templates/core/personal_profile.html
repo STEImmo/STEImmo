@@ -15,14 +15,22 @@
             </nav>
         </aside>
         <div class="profile-main">
+            {% if accepted_applications %}
+                <section class="uk-card uk-card-default profile-panel" aria-labelledby="profile-acceptance-title">
+                    <h2 id="profile-acceptance-title">Ihre Zusage</h2>
+                    {% for application in accepted_applications %}
+                        {% include "wohnungsverwaltung/_application_acceptance_notice.html" with application=application only %}
+                        <p>Der Vermietungsabschluss steht noch aus.</p>
+                    {% endfor %}
+                </section>
+            {% endif %}
             {% if rentals %}
                 <section class="uk-card uk-card-default profile-panel" aria-labelledby="profile-rentals-title">
                     <h2 id="profile-rentals-title">Meine Wohnung</h2>
                     <ul class="uk-list uk-list-divider">
                         {% for rental in rentals %}
                             <li>
-                                <p>{{ rental.wohnung }}</p>
-                                <a href="{% url 'wohnungsverwaltung:tenant_rental_contract' rental.application_id %}">Mietvertrag herunterladen</a>
+                                {% include "wohnungsverwaltung/_tenant_rental_summary.html" with rental=rental only %}
                             </li>
                         {% endfor %}
                     </ul>

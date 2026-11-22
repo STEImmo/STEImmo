@@ -8,6 +8,7 @@
 {% block application_content %}<article class="uk-card uk-card-default uk-card-body application-summary">
             <span class="uk-label{% if not application.interest_withdrawn_at %}{% if application.status == 'declined' or application.status == 'blocked' %} uk-label-danger{% endif %}{% endif %}">{{ application.get_applicant_status_display }}</span>
             <h2 class="uk-card-title">Hauptbewerbung für {{ application.wohnung }}</h2>
+            {% include "wohnungsverwaltung/_application_acceptance_notice.html" with application=application only %}
             {% if not application.submitted_at %}<p>Die Hauptbewerbung ist freigeschaltet.</p>{% endif %}
             <div class="application-next-step"><span uk-icon="arrow-right" aria-hidden="true"></span><div><strong>Ihr nächster Schritt</strong><p>Nächster Akteur: {{ application.get_next_actor_display }}</p><p>{{ application.get_applicant_next_step }}</p></div></div>
             {% if application.submitted_at %}

@@ -1,0 +1,6 @@
+{% if application.accepted_at and application.acceptance_eligible %}
+    <div class="uk-alert-success uk-margin-top" role="status">
+        <p class="uk-margin-small-bottom"><strong>Als Mieter angenommen</strong></p>
+        <p class="uk-margin-remove">Ihre Bewerbung für {{ application.wohnung }} wurde angenommen.</p>
+    </div>
+{% endif %}

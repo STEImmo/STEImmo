@@ -1,0 +1,6 @@
+<p class="uk-margin-small-bottom">{{ rental.wohnung }}</p>
+<p>Wohnungsstatus:
+    <span class="uk-label{% if rental.wohnung.status == 'taken' %} uk-label-success{% endif %}">{% if rental.wohnung.status == 'taken' %}Vermietet{% elif rental.wohnung.status == 'free' %}Verfügbar{% else %}Gesperrt{% endif %}</span>
+</p>
+<p class="uk-text-meta">Vermietung abgeschlossen.</p>
+<a href="{% url 'wohnungsverwaltung:tenant_rental_contract' rental.application_id %}">Mietvertrag herunterladen</a>

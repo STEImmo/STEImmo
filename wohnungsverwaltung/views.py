@@ -772,6 +772,7 @@ def _queue_application_proof_deletion(storage, stored_name: str) -> None:
     transaction.on_commit(delete_after_commit)
 
 
+@never_cache
 @applicant_required
 def main_application_status(request: HttpRequest, application_id: UUID) -> HttpResponse:
     if request.method not in {"GET", "POST"}:
