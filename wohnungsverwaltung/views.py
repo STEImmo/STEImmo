@@ -130,6 +130,7 @@ from .models import (
     ApplicationReviewEvent,
     Bewerbung,
     BewerbungStatus,
+    DecisionNotification,
     Merkmal,
     Person,
     Protokoll,
@@ -151,8 +152,9 @@ from .models import (
     calculate_photo_checksum,
 )
 from .notification_locks import application_notification_handoff, lock_application_notifications
-from .notification_preferences import mail_allowed
+from .notification_preferences import USER_MAIL_TYPES, mail_allowed
 from .notifications import queue_submission_notifications, queue_viewing_notifications
+from .open_step_reminders import REMINDER_TYPES
 from .upload_limits import upload_too_large_response
 from .viewings import (
     BERLIN,
@@ -1321,6 +1323,12 @@ def _employee_application_detail_response(
                 requirements_version=application.wohnung.requirements_version,
             ).exists(),
             "review_events": list(application.review_events.select_related("actor")),
+            "reminders": [
+                (USER_MAIL_TYPES[notice.kind][1], notice)
+                for notice in DecisionNotification.objects.filter(
+                    object_id=application.pk, kind__in=REMINDER_TYPES
+                ).order_by("-created_at", "-pk")
+            ],
             "priority_form": ApplicationPriorityForm(
                 initial={"priority": application.review_priority}, auto_id="id_priority_%s"
             ),

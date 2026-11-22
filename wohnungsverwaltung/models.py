@@ -1353,6 +1353,7 @@ class NotificationPreference(models.Model):
     account = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     choices = models.JSONField(default=dict, blank=True)
     version = models.PositiveBigIntegerField(default=0)
+    reminders_changed_at = models.DateTimeField(null=True, blank=True, editable=False)
 
 
 class GlobalSettingsChange(models.Model):
@@ -1441,6 +1442,11 @@ class DecisionNotification(models.Model):
             models.UniqueConstraint(
                 fields=("kind", "object_id", "version", "recipient"),
                 name="decision_notification_event_recipient",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=("kind", "object_id", "version"),
+                condition=models.Q(kind__in=("main_application_due", "viewing_response_due")),
+                name="open_step_reminder_task_version",
+            ),
         ]
         indexes = [models.Index(fields=("status", "created_at"), name="decision_notice_status_idx")]

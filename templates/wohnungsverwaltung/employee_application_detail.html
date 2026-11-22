@@ -134,6 +134,14 @@
                     {% endfor %}
                 </ul>
             {% else %}<p>Noch keine internen Änderungen dokumentiert.</p>{% endif %}
+            {% if reminders %}
+                <h3 class="uk-h4">Erinnerungen an offene Schritte</h3>
+                <ul class="uk-list uk-list-divider">
+                    {% for label, notice in reminders %}
+                        <li><strong>{{ label }}</strong> · {{ notice.get_status_display }} · {{ notice.created_at|date:"d.m.Y, H:i" }} Uhr</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
         </article>
 
         <article class="management-panel uk-card uk-card-default uk-card-body uk-margin-top uk-text-break">

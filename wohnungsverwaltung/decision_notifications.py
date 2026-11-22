@@ -26,6 +26,7 @@ from .models import (
 )
 from .notification_locks import application_notification_handoff
 from .notification_preferences import USER_MAIL_TYPES, mail_allowed
+from .open_step_reminders import REMINDER_TYPES, reminder_message
 
 logger = logging.getLogger(__name__)
 MAX_ATTEMPTS = 3
@@ -123,11 +124,11 @@ def _message(notice, recipient):
 
 
 def _eligible_message(notice, recipient):
-    if (
-        settings.DEMO_MODE
-        or settings.EMAIL_BACKEND in INACTIVE_BACKENDS
-        or not mail_allowed(recipient, notice.kind)
-    ):
+    if settings.DEMO_MODE or settings.EMAIL_BACKEND in INACTIVE_BACKENDS:
+        return None
+    if notice.kind in REMINDER_TYPES:
+        return reminder_message(notice, recipient)
+    if not mail_allowed(recipient, notice.kind):
         return None
     return _message(notice, recipient)
 
