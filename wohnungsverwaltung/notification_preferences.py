@@ -5,7 +5,7 @@ from .access import (
     EMPLOYEE_ACCESS_PERMISSION,
     TENANT_ACCESS_PERMISSION,
 )
-from .models import GlobalSettings, NotificationPreference
+from .models import DecisionNotification, GlobalSettings, NotificationPreference
 
 USER_GROUPS = {
     "application_receipts": (
@@ -74,6 +74,23 @@ STAFF_MAIL_TYPES = {
     "contract_return_recorded": "application_changes",
     "staff_daily_digest": "staff_digest",
 }
+
+
+def suppress_decision_notifications(*, mail_types, account=None):
+    """Record delivery opt-outs in the same transaction as the settings change."""
+    states = DecisionNotification.Status
+    notices = DecisionNotification.objects.filter(
+        kind__in=mail_types, status__in=(states.PENDING, states.RETRY, states.SENDING)
+    )
+    if account is not None:
+        notices = notices.filter(recipient=account)
+    notices.update(status=states.SUPPRESSED)
+
+
+def suppress_personal_decision_notifications(account, disabled_groups):
+    mail_types = {kind for kind, (group, _) in USER_MAIL_TYPES.items() if group in disabled_groups}
+    mail_types.update(kind for kind, group in STAFF_MAIL_TYPES.items() if group in disabled_groups)
+    suppress_decision_notifications(mail_types=mail_types, account=account)
 
 
 def mail_allowed(account, mail_type):

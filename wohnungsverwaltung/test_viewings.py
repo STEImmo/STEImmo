@@ -420,14 +420,16 @@ class ViewingTests(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             self.unit.max_occupants = 1
             self.unit.occupancy_requirement_reason = "Grundriss"
-            self.unit.save()
+            self.unit.save(notification_origin="http://testserver/")
         appointment.refresh_from_db()
         self.application.refresh_from_db()
         self.assertEqual(self.application.status, BewerbungStatus.DECLINED)
         self.assertEqual(appointment.status, "cancelled")
-        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(len(mail.outbox), 3)
+        self.assertEqual(mail.outbox[-2].subject, "Entscheidung zu Ihrer Bewerbung")
         self.assertIn("Abgesagt", mail.outbox[-1].body)
-        self.assertNotIn("Grundriss", mail.outbox[-1].body)
+        for message in mail.outbox:
+            self.assertNotIn("Grundriss", message.body)
 
     def test_mail_failure_keeps_appointment_and_retry_only_sends_current_notice(self):
         with patch(

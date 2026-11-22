@@ -91,3 +91,7 @@ konkreter nächster Akteure integriert. Die leere Migration
 `0041_merge_process_notifications_and_tenant_status` verbindet die beiden
 veröffentlichten Migrationszweige. Die bestehenden Upgrade-Tests prüfen den
 Datenerhalt bis zu diesem gemeinsamen Stand.
+
+Nach Integration der Entscheidungsbenachrichtigungen aus #212 verbindet die leere
+Migration `0042_merge_decision_notifications_and_tenant_status` deren Stand mit
+dem Zusagezweig. Die Upgrade-Tests laufen bis zu diesem gemeinsamen Stand.

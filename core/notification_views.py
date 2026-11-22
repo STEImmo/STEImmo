@@ -9,7 +9,11 @@ from django.views.decorators.http import require_http_methods
 
 from wohnungsverwaltung.models import NotificationPreference
 from wohnungsverwaltung.notification_forms import PersonalNotificationForm
-from wohnungsverwaltung.notification_preferences import STAFF_GROUPS, USER_GROUPS
+from wohnungsverwaltung.notification_preferences import (
+    STAFF_GROUPS,
+    USER_GROUPS,
+    suppress_personal_decision_notifications,
+)
 from wohnungsverwaltung.notifications import suppress_process_notifications
 
 
@@ -32,9 +36,12 @@ def notifications(request):
                     status = 409
                 else:
                     choices = current.choices.copy()
-                    for key, value in form.preferences().items():
-                        if value == "off":
-                            suppress_process_notifications(recipient=account, groups=(key,))
+                    submitted = form.preferences()
+                    disabled_groups = {key for key, value in submitted.items() if value == "off"}
+                    if disabled_groups:
+                        suppress_process_notifications(recipient=account, groups=disabled_groups)
+                        suppress_personal_decision_notifications(account, disabled_groups)
+                    for key, value in submitted.items():
                         if value == ("on" if key in STAFF_GROUPS else "default"):
                             choices.pop(key, None)
                         else:

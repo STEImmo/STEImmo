@@ -19,7 +19,7 @@ from core.mail_settings import callback_recipients, get_mail_settings, send_repl
 from .access import employee_required, global_settings_required
 from .models import GlobalSettings, GlobalSettingsChange, MailTestAttempt
 from .notification_forms import GlobalNotificationForm
-from .notification_preferences import USER_MAIL_TYPES
+from .notification_preferences import USER_MAIL_TYPES, suppress_decision_notifications
 from .notifications import suppress_process_notifications
 
 
@@ -44,9 +44,9 @@ def global_settings(request):
                         if current.user_mail_types.get(key, True) != value
                     ]
                     if changed:
-                        suppress_process_notifications(
-                            mail_types=[key for key, enabled in choices.items() if not enabled]
-                        )
+                        disabled_types = [key for key, enabled in choices.items() if not enabled]
+                        suppress_process_notifications(mail_types=disabled_types)
+                        suppress_decision_notifications(mail_types=disabled_types)
                         current.user_mail_types = choices
                         current.version += 1
                         current.save(update_fields=["user_mail_types", "version"])

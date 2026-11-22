@@ -281,16 +281,23 @@ class SubmissionNotificationTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(ProcessNotification.objects.count(), 1)
 
-    def test_invalid_input_and_automatic_occupancy_rejection_do_not_send_waiting_confirmation(self):
+    def test_invalid_input_sends_nothing_and_occupancy_rejection_only_sends_decision(self):
         self.client.force_login(self.user)
         with self.captureOnCommitCallbacks(execute=True):
             self.client.post(reverse("wohnungsverwaltung:pre_application_create"), {})
+            self.assertFalse(Bewerbung.objects.exists())
             self.free_unit.max_occupants = 1
             self.free_unit.save()
             self.client.post(
                 reverse("wohnungsverwaltung:pre_application_create"), self.valid_form_data()
             )
-        self.assertEqual(mail.outbox, [])
+        self.assertEqual(
+            [message.subject for message in mail.outbox],
+            [
+                "Entscheidung zu Ihrer Bewerbung",
+            ],
+        )
+        self.assertEqual(mail.outbox[0].to, [self.user.email])
         self.assertFalse(ProcessNotification.objects.exists())
 
     def test_pre_submission_rollback_also_discards_intent(self):
@@ -443,11 +450,14 @@ class ViewingResponseNotificationTests(TestCase):
         mail.outbox.clear()
         with self.captureOnCommitCallbacks(execute=True):
             self.unit.max_occupants = 1
-            self.unit.save()
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(mail.outbox[0].to, [self.person.email])
-        self.assertIn(applicant_url, mail.outbox[0].body)
-        self.assertNotIn(self.detail_url, mail.outbox[0].body)
+            self.unit.save(notification_origin="http://testserver/")
+        self.assertEqual(len(mail.outbox), 2)
+        cancellation = mail.outbox[-1]
+        self.assertEqual(cancellation.to, [self.person.email])
+        self.assertIn("Abgesagt", cancellation.body)
+        self.assertIn(applicant_url, cancellation.body)
+        self.assertNotIn(self.detail_url, cancellation.body)
+        self.assertEqual(mail.outbox[0].subject, "Entscheidung zu Ihrer Bewerbung")
 
     def test_failure_keeps_binding_response_and_retry_sends_only_to_current_staff(self):
         with patch(
