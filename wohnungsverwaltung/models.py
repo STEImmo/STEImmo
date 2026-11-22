@@ -427,7 +427,7 @@ class Wohnung(models.Model):
             f"{self.occupancy_requirement_reason}"
         ).strip()
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, notification_origin="", **kwargs):
         requirement_fields = (
             "max_occupants",
             "occupancy_requirement_reason",
@@ -501,14 +501,23 @@ class Wohnung(models.Model):
                         status=BewerbungStatus.DECLINED,
                         updated_at=now,
                     )
-                    ApplicationReviewEvent.objects.create(
+                    rejection = ApplicationReviewEvent.objects.create(
                         application_id=application_id,
                         kind=ApplicationReviewEvent.Kind.OCCUPANCY_DECLINED,
                         to_value=BewerbungStatus.DECLINED,
                         reason=self.occupancy_decline_reason(people_count),
                         requirements_version=self.requirements_version,
                     )
+                    from .decision_notifications import queue_decision_notification
                     from .viewings import cancel_open_viewings
+
+                    queue_decision_notification(
+                        "application_rejected",
+                        application_id,
+                        rejection.pk,
+                        rejection.application.person.user_id,
+                        origin=notification_origin,
+                    )
 
                     cancel_open_viewings(
                         application_id,
@@ -1407,3 +1416,31 @@ class ProcessNotification(models.Model):
             )
         ]
         indexes = [models.Index(fields=("status", "created_at"), name="process_notice_pending_idx")]
+
+
+class DecisionNotification(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Vorgemerkt"
+        SENDING = "sending", "Versand begonnen"
+        SENT = "sent", "Versendet"
+        RETRY = "retry", "Wiederholung vorgemerkt"
+        SUPPRESSED = "suppressed", "Unterdrückt"
+        FAILED = "failed", "Versand fehlgeschlagen"
+
+    kind = models.CharField(max_length=32)
+    object_id = models.UUIDField()
+    version = models.CharField(max_length=64)
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    origin = models.URLField(max_length=255, blank=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("kind", "object_id", "version", "recipient"),
+                name="decision_notification_event_recipient",
+            )
+        ]
+        indexes = [models.Index(fields=("status", "created_at"), name="decision_notice_status_idx")]

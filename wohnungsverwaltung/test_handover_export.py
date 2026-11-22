@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core import mail
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -126,6 +127,20 @@ class HandoverExportTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = b"".join(response.streaming_content)
         return data, PdfReader(BytesIO(data))
+
+    def test_finalization_notifies_tenant_once_with_the_protected_pdf_link(self):
+        self.tenant.email = "mia@example.test"
+        self.tenant.save(update_fields=["email"])
+        with self.captureOnCommitCallbacks(execute=True):
+            self.finalize()
+            self.assertEqual(self.client.post(self.url("confirm")).status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.tenant.email])
+        self.assertIn(self.url("pdf"), mail.outbox[0].body)
+
+        self.client.force_login(self.tenant)
+        self.pdf()
+        self.assertEqual(len(mail.outbox), 1)
 
     def test_large_signature_is_stopped_before_validation_and_temp_files_are_cleaned(self):
         data = self.signing_data()

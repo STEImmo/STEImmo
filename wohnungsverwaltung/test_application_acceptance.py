@@ -82,6 +82,12 @@ class ApplicationAcceptanceTests(TestCase):
             self.url("detail"),
         )
         self.assertEqual(mail.outbox[0].to, ["new-recipient@example.test"])
+        status_url = "http://testserver" + reverse("wohnungsverwaltung:pre_application_list")
+        self.assertIn(f"Bewerbungsstatus öffnen: {status_url}", mail.outbox[0].body)
+        html, mimetype = mail.outbox[0].alternatives[0]
+        self.assertEqual(mimetype, "text/html")
+        self.assertIn(f'<a href="{status_url}">Bewerbungsstatus öffnen</a>', html)
+        self.assertEqual(mail.outbox[0].attachments[0].filename, "Mietvertrag.pdf")
 
     def test_missing_tampered_or_other_application_confirmation_cannot_send(self):
         self.client.force_login(self.employee)

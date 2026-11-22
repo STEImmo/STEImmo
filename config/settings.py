@@ -175,5 +175,6 @@ EMAIL_PORT = int(os.environ.get("DJANGO_EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.environ.get("DJANGO_EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("DJANGO_EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("DJANGO_EMAIL_USE_TLS", default=True)
+DECISION_NOTIFICATION_ORIGIN = os.environ.get("DJANGO_DECISION_NOTIFICATION_ORIGIN", "")
 EMAIL_TIMEOUT = int(os.environ.get("DJANGO_EMAIL_TIMEOUT", "10"))
 CSRF_FAILURE_VIEW = "core.views.csrf_failure"
