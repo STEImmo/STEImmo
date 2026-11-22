@@ -628,7 +628,7 @@ def resend_registration_code(request: HttpRequest) -> HttpResponse:
             if code is not None:
                 _deliver_verification_code(send_registration_code, user.email, code)
         request.session["registration_verification_email"] = form.cleaned_data["email"]
-    messages.success(
+    messages.info(
         request,
         "Falls eine offene Registrierung vorliegt und der Versand möglich ist, "
         "erhalten Sie einen neuen Bestätigungscode. "
