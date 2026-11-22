@@ -1,6 +1,7 @@
 """Delivery of committed decision and completion notifications."""
 
 import logging
+from contextlib import ExitStack
 from functools import partial
 from smtplib import SMTPRecipientsRefused, SMTPResponseException
 from urllib.parse import urlsplit
@@ -27,6 +28,7 @@ from .models import (
 from .notification_locks import application_notification_handoff
 from .notification_preferences import USER_MAIL_TYPES, mail_allowed
 from .open_step_reminders import REMINDER_TYPES, reminder_message
+from .staff_digest import DIGEST_KIND, digest_message
 
 logger = logging.getLogger(__name__)
 MAX_ATTEMPTS = 3
@@ -126,6 +128,8 @@ def _message(notice, recipient):
 def _eligible_message(notice, recipient):
     if settings.DEMO_MODE or settings.EMAIL_BACKEND in INACTIVE_BACKENDS:
         return None
+    if notice.kind == DIGEST_KIND:
+        return digest_message(notice, recipient)
     if notice.kind in REMINDER_TYPES:
         return reminder_message(notice, recipient)
     if not mail_allowed(recipient, notice.kind):
@@ -170,13 +174,24 @@ def queue_decision_notification(kind, object_id, version, recipient_id=None, *, 
 
 
 def deliver_decision_notification(notice_id):
-    initial = DecisionNotification.objects.filter(pk=notice_id).values("kind", "object_id").first()
+    initial = (
+        DecisionNotification.objects.filter(pk=notice_id)
+        .values("kind", "object_id", "task_versions")
+        .first()
+    )
     if initial is None:
         return
     if initial["kind"] == "handover_finalized":
         _deliver_decision_notification(notice_id)
     else:
-        with application_notification_handoff(initial["object_id"]):
+        application_ids = (
+            sorted(initial["task_versions"])
+            if initial["kind"] == DIGEST_KIND
+            else [initial["object_id"]]
+        )
+        with ExitStack() as locks:
+            for application_id in application_ids:
+                locks.enter_context(application_notification_handoff(application_id))
             _deliver_decision_notification(notice_id)
 
 
@@ -202,10 +217,13 @@ def _deliver_decision_notification(notice_id):
 
     subject, body, link_label, path = message
     link_url = f"{origin}{path}"
-    html = render_to_string(
-        "wohnungsverwaltung/email/notification_link.html",
-        {"body": body, "link_label": link_label, "link_url": link_url},
-    )
+    html = None
+    if path:
+        html = render_to_string(
+            "wohnungsverwaltung/email/notification_link.html",
+            {"body": body, "link_label": link_label, "link_url": link_url},
+        )
+        body = f"{body}\n\n{link_label}: {link_url}"
     # HTML rendering can outlast a reassignment, address change or opt-out.
     # Read current access and settings outside the reservation transaction.
     current = (
@@ -215,7 +233,8 @@ def _deliver_decision_notification(notice_id):
     )
     if current is None:
         return
-    if _eligible_message(current, current.recipient) != message:
+    current_message = _eligible_message(current, current.recipient)
+    if current_message is None or (path and current_message != message):
         DecisionNotification.objects.filter(pk=notice.pk, status=states.SENDING).update(
             status=states.SUPPRESSED
         )
@@ -223,11 +242,13 @@ def _deliver_decision_notification(notice_id):
     if not DecisionNotification.objects.filter(pk=notice.pk, status=states.SENDING).exists():
         return
 
+    if current.kind == DIGEST_KIND:
+        subject, body, _, _ = current_message
     outcome = states.FAILED
     try:
         if send_mail(
             subject,
-            f"{body}\n\n{link_label}: {link_url}",
+            body,
             None,
             [current.recipient.email],
             html_message=html,

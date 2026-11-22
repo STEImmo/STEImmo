@@ -1431,6 +1431,7 @@ class DecisionNotification(models.Model):
     kind = models.CharField(max_length=32)
     object_id = models.UUIDField()
     version = models.CharField(max_length=64)
+    task_versions = models.JSONField(blank=True, default=dict)
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     origin = models.URLField(max_length=255, blank=True)
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
