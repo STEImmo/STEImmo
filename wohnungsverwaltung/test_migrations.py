@@ -69,7 +69,7 @@ class RaumstammMigrationTests(TransactionTestCase):
 
 
 class RentalAndGlobalSettingsMigrationTests(TransactionTestCase):
-    merge_target = ("immobilien", "0040_merge_notification_preferences_and_status_branch")
+    merge_target = ("immobilien", "0041_merge_process_notifications_and_tenant_status")
 
     def setUp(self):
         super().setUp()

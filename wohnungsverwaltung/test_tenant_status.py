@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from . import test_rental_completion as fixtures
 from .access import APPLICANT_ACCESS_PERMISSION, ROLE_APPLICANT, ROLE_TENANT
-from .models import Bewerbung, BewerbungStatus, Person, Wohnung, WohnungStatus
+from .models import Bewerbung, BewerbungStatus, Person, Rental, Wohnung, WohnungStatus
 
 
 class ApplicantAcceptanceStatusTests(TestCase):
@@ -229,7 +229,7 @@ class TenantProfileStatusTests(TestCase):
         self.assertNotContains(response, "Als Mieter angenommen")
         self.assertNotContains(response, str(self.unit))
 
-    def test_completion_during_rendering_does_not_show_pending_and_completed_together(self):
+    def test_completion_after_pending_selection_shows_only_completed_rental(self):
         self.applicant.groups.add(Group.objects.get(name=ROLE_TENANT))
         original_fetch = QuerySet._fetch_all
         completed = False
@@ -244,6 +244,30 @@ class TenantProfileStatusTests(TestCase):
         with patch.object(QuerySet, "_fetch_all", complete_after_pending_selection):
             response = self.client.get(self.profile_url)
         self.assertTrue(completed)
-        self.assertContains(response, "Der Vermietungsabschluss steht noch aus.")
-        self.assertNotContains(response, "Wohnungsstatus:")
-        self.assertNotContains(response, "Vermietung abgeschlossen.")
+        self.assertNotContains(response, "Der Vermietungsabschluss steht noch aus.")
+        self.assertContains(response, "Wohnungsstatus:")
+        self.assertContains(response, "Vermietung abgeschlossen.")
+        self.assertContains(response, self.contract_url)
+
+    def test_completion_between_profile_queries_keeps_acceptance_or_rental_visible(self):
+        self.applicant.groups.add(Group.objects.get(name=ROLE_TENANT))
+        original_fetch = QuerySet._fetch_all
+        completed = False
+
+        def complete_after_rental_selection(queryset):
+            nonlocal completed
+            original_fetch(queryset)
+            if queryset.model is Rental and not completed:
+                completed = True
+                self.complete_as_employee()
+
+        with patch.object(QuerySet, "_fetch_all", complete_after_rental_selection):
+            response = self.client.get(self.profile_url)
+
+        self.assertTrue(completed)
+        self.assertTrue(Rental.objects.filter(application=self.application).exists())
+        self.assertContains(response, str(self.unit))
+        pending = "Der Vermietungsabschluss steht noch aus." in response.text
+        rented = "Wohnungsstatus:" in response.text
+        self.assertTrue(pending or rented)
+        self.assertFalse(pending and rented)

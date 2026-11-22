@@ -148,7 +148,9 @@ from .models import (
     WohnungStatus,
     calculate_photo_checksum,
 )
+from .notification_locks import lock_application_notifications
 from .notification_preferences import mail_allowed
+from .notifications import queue_submission_notifications, queue_viewing_notifications
 from .upload_limits import upload_too_large_response
 from .viewings import (
     BERLIN,
@@ -495,6 +497,10 @@ def pre_application_create(request: HttpRequest, unit_id: UUID | None = None) ->
                             ),
                             requirements_version=selected_unit.requirements_version,
                         )
+                    if not exceeds_occupancy_limit:
+                        queue_submission_notifications(
+                            application, "pre", request.build_absolute_uri("/")
+                        )
                     application_created = True
         except IntegrityError:
             form.add_error(
@@ -536,7 +542,7 @@ def pre_application_list(request: HttpRequest) -> HttpResponse:
     applicant = _applicant_for_user(request)
     applications = (
         Bewerbung.objects.filter(person=applicant)
-        .select_related("wohnung")
+        .select_related("wohnung", "rental")
         .prefetch_related(
             "viewings",
             Prefetch(
@@ -786,6 +792,7 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
 
         try:
             with transaction.atomic():
+                lock_application_notifications(application_id)
                 # All mutations of this application serialize on the same row. Recheck
                 # access and submission state only after acquiring the lock.
                 application = get_object_or_404(
@@ -815,6 +822,9 @@ def main_application_status(request: HttpRequest, application_id: UUID) -> HttpR
                         if action == "submit":
                             application.submitted_at = timezone.now()
                             application.save(update_fields=("submitted_at", "updated_at"))
+                            queue_submission_notifications(
+                                application, "main", request.build_absolute_uri("/")
+                            )
                         else:
                             application.save(update_fields=("updated_at",))
             if "remove_proof" in post_data:
@@ -1349,6 +1359,7 @@ def employee_application_accept(request, application_id):
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     with transaction.atomic():
+        lock_application_notifications(application_id)
         application = get_object_or_404(Bewerbung.objects.select_for_update(), pk=application_id)
         if not application.acceptance_eligible:
             messages.error(request, "Diese Bewerbung kann nicht angenommen werden.")
@@ -1472,6 +1483,7 @@ def employee_application_send_contract(request, application_id):
 def _lock_viewing_application(application_id):
     initial = get_object_or_404(Bewerbung, pk=application_id)
     unit = Wohnung.objects.select_for_update().get(pk=initial.wohnung_id)
+    lock_application_notifications(application_id)
     application = (
         Bewerbung.objects.select_for_update(of=("self",))
         .select_related("person", "wohnung")
@@ -1724,6 +1736,7 @@ def applicant_viewing_response(request, application_id, appointment_id):
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     with transaction.atomic():
+        lock_application_notifications(application_id)
         application = get_object_or_404(
             Bewerbung.objects.select_for_update(),
             pk=application_id,
@@ -1757,9 +1770,16 @@ def applicant_viewing_response(request, application_id, appointment_id):
             )
             appointment.version += 1
             appointment.save(update_fields=("status", "version", "updated_at"))
-            record_viewing_event(
-                appointment, actor=request.user, kind="status_changed", before=before
+            event = record_viewing_event(
+                appointment,
+                actor=request.user,
+                kind="status_changed",
+                before=before,
+                notification_url=request.build_absolute_uri(
+                    reverse("wohnungsverwaltung:employee_application_detail", args=[application.pk])
+                ),
             )
+            queue_viewing_notifications(event, response=True)
             if form.cleaned_data["action"] == "decline":
                 message = (
                     "Ihre Terminzusage wurde zurückgezogen. Ihre Bewerbung bleibt aktiv."
@@ -1778,6 +1798,7 @@ def applicant_viewing_proposal(request, application_id, appointment_id):
     if request.method not in ("GET", "POST"):
         return HttpResponseNotAllowed(["GET", "POST"])
     with transaction.atomic():
+        lock_application_notifications(application_id)
         application = get_object_or_404(
             Bewerbung.objects.select_for_update(),
             pk=application_id,
@@ -1895,6 +1916,7 @@ def employee_application_priority_update(
     if form.is_valid():
         new_priority = int(form.cleaned_data["priority"])
         with transaction.atomic():
+            lock_application_notifications(application_id)
             application = Bewerbung.objects.select_for_update().get(pk=application.pk)
             old_priority = application.review_priority
             if new_priority != old_priority or form.cleaned_data["reason"]:
@@ -2035,6 +2057,7 @@ def employee_application_invite(request: HttpRequest, application_id: UUID) -> H
     invite = False
     with transaction.atomic():
         unit = Wohnung.objects.select_for_update().get(pk=application.wohnung_id)
+        lock_application_notifications(application_id)
         application = (
             Bewerbung.objects.select_for_update()
             .select_related("person", "wohnung")
@@ -2312,6 +2335,7 @@ def application_withdraw(request: HttpRequest, application_id: UUID) -> HttpResp
         )
 
     with transaction.atomic():
+        lock_application_notifications(application_id)
         application = get_object_or_404(
             eligible_applications.select_for_update(),
             pk=application_id,

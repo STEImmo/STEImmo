@@ -93,7 +93,8 @@ def personal_profile(request):
         person = Person.objects.select_for_update().filter(user=account).first()
     accepted_applications = ()
     if person is not None and account.has_perm(APPLICANT_ACCESS_PERMISSION):
-        accepted_applications = (
+        # Capture pending acceptances before a completion can remove them.
+        accepted_applications = list(
             Bewerbung.objects.filter(
                 person=person,
                 person__user=account,
@@ -108,13 +109,19 @@ def personal_profile(request):
         )
     rentals = ()
     if account.has_perm(TENANT_ACCESS_PERMISSION):
-        # Read completions before pending notices can be evaluated by the template.
         rentals = list(
             Rental.objects.for_tenant(account)
             .select_related("wohnung")
             .defer("contract_pdf")
             .order_by("-completed_at")
         )
+    # Prefer the completed rental if it appeared after the acceptance query.
+    completed_application_ids = {rental.application_id for rental in rentals}
+    accepted_applications = [
+        application
+        for application in accepted_applications
+        if application.pk not in completed_application_ids
+    ]
     return render(
         request,
         "core/personal_profile.html",
@@ -208,15 +215,17 @@ def csrf_failure(request, reason=""):
     )
 
 
-def _deliver_verification_code(sender, email: str, code: str) -> bool:
+def _deliver_verification_code(sender, email: str, code: str, *, purpose: str) -> bool:
     try:
         delivered = sender(email, code)
     except (SMTPException, OSError) as error:
         # Do not log recipient addresses, codes or server error details.
-        logger.warning("Verification email delivery failed (%s).", type(error).__name__)
+        logger.warning(
+            "Verification email delivery failed (%s: %s).", purpose, type(error).__name__
+        )
         return False
     if not delivered:
-        logger.warning("Verification email delivery failed (no delivery).")
+        logger.warning("Verification email delivery failed (%s: no delivery).", purpose)
     return bool(delivered)
 
 
@@ -475,7 +484,9 @@ class RoleAwareLoginView(LoginView):
                 return response
         # SMTP must not hold a database lock. A concurrent account change can
         # invalidate the issued code even if delivery has not completed yet.
-        if not _deliver_verification_code(send_employee_mfa_code, user.email, code):
+        if not _deliver_verification_code(
+            send_employee_mfa_code, user.email, code, purpose="employee_mfa"
+        ):
             _discard_employee_code_after_delivery_failure(user.pk, verification.code_hash)
             _clear_pending_employee_login(self.request)
             form.add_error(
@@ -525,7 +536,9 @@ def register(request: HttpRequest) -> HttpResponse:
         else:
             request.session["registration_verification_email"] = user.email
             request.session["registration_redirect_url"] = next_url
-            if _deliver_verification_code(send_registration_code, user.email, code):
+            if _deliver_verification_code(
+                send_registration_code, user.email, code, purpose="registration"
+            ):
                 messages.success(request, "Wir haben Ihnen einen Bestätigungscode gesendet.")
             else:
                 messages.error(
@@ -645,9 +658,11 @@ def resend_registration_code(request: HttpRequest) -> HttpResponse:
             code = None
         else:
             if code is not None:
-                _deliver_verification_code(send_registration_code, user.email, code)
+                _deliver_verification_code(
+                    send_registration_code, user.email, code, purpose="registration_resend"
+                )
         request.session["registration_verification_email"] = form.cleaned_data["email"]
-    messages.success(
+    messages.info(
         request,
         "Falls eine offene Registrierung vorliegt und der Versand möglich ist, "
         "erhalten Sie einen neuen Bestätigungscode. "
