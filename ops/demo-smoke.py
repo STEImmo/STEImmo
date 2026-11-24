@@ -11,11 +11,11 @@ base = sys.argv[1].rstrip("/")
 context = ssl.create_default_context(cadata=sys.stdin.read() or None)
 
 
-def browser():
+def browser(cookies):
     return urllib.request.build_opener(
         urllib.request.ProxyHandler({}),
         urllib.request.HTTPSHandler(context=context),
-        urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
+        urllib.request.HTTPCookieProcessor(cookies),
     )
 
 
@@ -35,11 +35,16 @@ def submit(opener, path, data):
         return urllib.parse.urlparse(response.url).path
 
 
-applicant = browser()
+applicant_cookies = http.cookiejar.CookieJar()
+applicant = browser(applicant_cookies)
 assert submit(applicant, "/accounts/login/", {"username": "user", "password": "user"}) == (
     "/uebergaben/bewerbung/meine/"
 )
-manager = browser()
+for name in ("sessionid", "csrftoken"):
+    matching = [cookie for cookie in applicant_cookies if cookie.name == name]
+    assert matching and all(cookie.secure for cookie in matching), f"{name} fehlt oder ist unsicher"
+
+manager = browser(http.cookiejar.CookieJar())
 assert (
     submit(manager, "/accounts/login/", {"username": "verwaltung", "password": "verwaltung"})
     == "/accounts/mitarbeiter-mfa/"

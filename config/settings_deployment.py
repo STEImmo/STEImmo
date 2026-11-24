@@ -60,5 +60,7 @@ if SECURE_HSTS_SECONDS < 0:
     raise ImproperlyConfigured("DJANGO_SECURE_HSTS_SECONDS darf nicht negativ sein.")
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
-# ADR-0018: opt in to HSTS after the first successful public HTTPS check.
-SILENCED_SYSTEM_CHECKS = ["security.W004"] if SECURE_HSTS_SECONDS == 0 else []
+# ADR-0018: opt in after HTTPS verification and scope HSTS to the deployed host.
+SILENCED_SYSTEM_CHECKS = (
+    ["security.W004"] if SECURE_HSTS_SECONDS == 0 else ["security.W005", "security.W021"]
+)
