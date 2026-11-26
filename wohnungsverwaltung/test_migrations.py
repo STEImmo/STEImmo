@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.loader import MigrationLoader
@@ -69,7 +71,7 @@ class RaumstammMigrationTests(TransactionTestCase):
 
 
 class RentalAndGlobalSettingsMigrationTests(TransactionTestCase):
-    merge_target = ("immobilien", "0042_merge_decision_notifications_and_tenant_status")
+    merge_target = ("immobilien", "0044_merge_staff_digest_and_tenant_status")
 
     def setUp(self):
         super().setUp()
@@ -204,3 +206,69 @@ class RentalAndGlobalSettingsMigrationTests(TransactionTestCase):
         self.assertEqual(settings.version, 7)
         self.assertEqual(preference.choices, choices)
         self.assertEqual(preference.version, 3)
+
+    def test_upgrade_from_staff_digest_preserves_reminder_preferences_and_queued_digest(self):
+        apps = self.migrate_to(("immobilien", "0043_staff_digest"))
+        account = apps.get_model("auth", "User").objects.create(username="migration-digest")
+        changed_at = timezone.now()
+        choices = {"user_reminders": "off", "staff_digest": "on"}
+        apps.get_model("immobilien", "NotificationPreference").objects.create(
+            account_id=account.pk, choices=choices, version=4, reminders_changed_at=changed_at
+        )
+        task_versions = {str(uuid4()): "synthetic-task-version"}
+        notice = apps.get_model("immobilien", "DecisionNotification").objects.create(
+            kind="staff_daily_digest",
+            object_id=uuid4(),
+            version="2026-11-23",
+            recipient_id=account.pk,
+            task_versions=task_versions,
+            status="retry",
+            attempts=1,
+        )
+
+        apps = self.migrate_to(self.merge_target)
+
+        preference = apps.get_model("immobilien", "NotificationPreference").objects.get(
+            account_id=account.pk
+        )
+        self.assertEqual(preference.choices, choices)
+        self.assertEqual(preference.version, 4)
+        self.assertEqual(preference.reminders_changed_at, changed_at)
+        saved_notice = apps.get_model("immobilien", "DecisionNotification").objects.get(
+            pk=notice.pk
+        )
+        self.assertEqual(saved_notice.recipient_id, account.pk)
+        self.assertEqual(saved_notice.task_versions, task_versions)
+        self.assertEqual((saved_notice.status, saved_notice.attempts), ("retry", 1))
+
+    def test_upgrade_from_tenant_status_preserves_existing_notice_and_adds_reminder_defaults(self):
+        apps = self.migrate_to(
+            ("immobilien", "0042_merge_decision_notifications_and_tenant_status")
+        )
+        account = apps.get_model("auth", "User").objects.create(username="migration-status")
+        apps.get_model("immobilien", "NotificationPreference").objects.create(
+            account_id=account.pk, choices={"documents": "off"}, version=2
+        )
+        notice = apps.get_model("immobilien", "DecisionNotification").objects.create(
+            kind="application_accepted",
+            object_id=uuid4(),
+            version="accepted",
+            recipient_id=account.pk,
+            status="sent",
+            attempts=1,
+        )
+
+        apps = self.migrate_to(self.merge_target)
+
+        preference = apps.get_model("immobilien", "NotificationPreference").objects.get(
+            account_id=account.pk
+        )
+        self.assertEqual(preference.choices, {"documents": "off"})
+        self.assertEqual(preference.version, 2)
+        self.assertIsNone(preference.reminders_changed_at)
+        saved_notice = apps.get_model("immobilien", "DecisionNotification").objects.get(
+            pk=notice.pk
+        )
+        self.assertEqual(saved_notice.recipient_id, account.pk)
+        self.assertEqual(saved_notice.task_versions, {})
+        self.assertEqual((saved_notice.status, saved_notice.attempts), ("sent", 1))
