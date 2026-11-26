@@ -54,6 +54,7 @@ cat > "$STEIMMO_ENV_FILE" <<'ENV'
 DJANGO_SECRET_KEY=ci-only-example-with-more-than-fifty-characters-never-use-in-production
 DJANGO_ALLOWED_HOSTS=steimmo.example.test,localhost
 DJANGO_CSRF_TRUSTED_ORIGINS=https://steimmo.example.test,https://localhost
+DJANGO_SECURE_HSTS_SECONDS=3600
 DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS=127.0.0.1
 DJANGO_EMAIL_HOST=smtp.example.test
 DJANGO_DEFAULT_FROM_EMAIL=noreply@example.test
@@ -63,7 +64,9 @@ POSTGRES_PASSWORD=ci-only-example-database-password
 ENV
 chmod 600 "$STEIMMO_ENV_FILE"
 if [[ $mode == demo ]]; then
-    sed -i 's/^DJANGO_EMAIL_HOST=.*/DJANGO_EMAIL_HOST=CHANGE_ME/; s/^DJANGO_DEFAULT_FROM_EMAIL=.*/DJANGO_DEFAULT_FROM_EMAIL=CHANGE_ME/' "$STEIMMO_ENV_FILE"
+    sed 's/^DJANGO_EMAIL_HOST=.*/DJANGO_EMAIL_HOST=CHANGE_ME/; s/^DJANGO_DEFAULT_FROM_EMAIL=.*/DJANGO_DEFAULT_FROM_EMAIL=CHANGE_ME/' \
+        "$STEIMMO_ENV_FILE" > "$directory/demo.env"
+    cat "$directory/demo.env" > "$STEIMMO_ENV_FILE"
 fi
 docker volume create "$POSTGRES_VOLUME_NAME" > /dev/null
 docker volume create "$MEDIA_VOLUME_NAME" > /dev/null
@@ -73,7 +76,9 @@ docker network create "$proxy_network" > /dev/null
 # Use the actual site snippet, with an isolated local TLS authority for the smoke test.
 sed -e 's/steimmo-projekt-page.justus.software/localhost/' \
     -e "s/172.17.0.1:8010/$proxy_host:8010/" \
-    -e '/^localhost {/a\    tls internal' "$repository/ops/caddy-steimmo.caddy" > "$directory/Caddyfile"
+    -e '/^localhost {/a\
+    tls internal
+' "$repository/ops/caddy-steimmo.caddy" > "$directory/Caddyfile"
 caddy=$(docker create --network "$proxy_network" \
     --volume "$public_volume:/srv/steimmo/public:ro" caddy:2.10.2)
 caddy_file="$directory/Caddyfile"
@@ -81,7 +86,9 @@ if command -v cygpath > /dev/null; then caddy_file=$(cygpath -m "$caddy_file"); 
 docker cp "$caddy_file" "$caddy:/etc/caddy/Caddyfile"
 docker start "$caddy" > /dev/null
 proxy_source=$(bash "$repository/ops/proxy-source.sh" "$caddy" "$STEIMMO_BIND_IP" "$image" "$proxy_host")
-sed -i "s/^DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS=.*/DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS=$proxy_source/" "$STEIMMO_ENV_FILE"
+sed "s/^DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS=.*/DJANGO_LOGIN_THROTTLE_TRUSTED_PROXY_IPS=$proxy_source/" \
+    "$STEIMMO_ENV_FILE" > "$directory/proxy.env"
+cat "$directory/proxy.env" > "$STEIMMO_ENV_FILE"
 docker run --rm --user 0:0 --entrypoint sh --volume "$public_volume:/out" "$image" \
     -ec 'mkdir -p /out/releases/one; chown 10001:10001 /out/releases/one; ln -s releases/one /out/current'
 compose config --quiet
@@ -161,10 +168,25 @@ https_check() {
         --entrypoint python "$image" -c '
 import json, ssl, sys, urllib.error, urllib.request
 context = ssl.create_default_context(cadata=sys.stdin.read())
-opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=context))
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args):
+        return None
+
+opener = urllib.request.build_opener(
+    urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=context), NoRedirect()
+)
+try:
+    opener.open("http://localhost/health/", timeout=10)
+    raise AssertionError("Caddy did not redirect HTTP to HTTPS")
+except urllib.error.HTTPError as error:
+    assert error.code == 308
+    assert error.headers["Location"] == "https://localhost/health/"
+
 def get(path):
     with opener.open("https://localhost" + path, timeout=10) as response:
         assert response.status == 200
+        if path == "/health/":
+            assert response.headers.get_all("Strict-Transport-Security") == ["max-age=3600"]
         return response.read()
 assert json.loads(get("/health/")) == {"service": "steimmo", "status": "ok"}
 assert get("/")

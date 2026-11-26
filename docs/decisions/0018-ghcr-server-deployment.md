@@ -655,3 +655,22 @@ verlässliches Wiederherstellungsverfahren.
 
 Dieses ADR ist die zentrale Deployment-Dokumentation. Die README enthält
 einen kurzen Verweis; ein paralleles Deployment-Konzept wird nicht geführt.
+
+### HTTPS-Abnahme (#134)
+
+Caddy übernimmt die öffentliche HTTP-Weiterleitung und übermittelt Django das
+ursprüngliche Schema. Django erzwingt HTTPS zusätzlich für Anwendungsanfragen,
+setzt `Secure` auf Session- und CSRF-Cookies und liefert bei aktivierter
+Laufzeit HSTS aus. Der Standard bleibt `0`, bis öffentliches HTTPS abgenommen
+und HSTS betrieblich freigegeben ist. CI prüft sowohl den Standard im
+Deploymentcheck als auch eine positive HSTS-Laufzeit im isolierten Caddy-Smoke.
+Der Demo-Smoke prüft die vom Browser-Client empfangenen Cookie-Attribute.
+HSTS gilt bei Aktivierung nur für den bereitgestellten Host. Subdomains und
+Browser-Preload sind nicht Teil dieser Bereitstellung. Deshalb sind die
+Django-Hinweise W005 und W021 bei aktiver HSTS-Laufzeit gezielt ausgenommen.
+
+Für die Zielabnahme die öffentliche HTTP-Weiterleitung und gültiges HTTPS
+prüfen. In der aktiven Konfiguration zusätzlich Caddys Upstream, die
+Portbindung und Erreichbarkeit aus dem vorgesehenen Netz sowie die konkreten
+Werte von `ALLOWED_HOSTS` und `CSRF_TRUSTED_ORIGINS` mit der Zieladresse
+abgleichen. Nur Prüfergebnisse dokumentieren, keine Zugangsdaten.
